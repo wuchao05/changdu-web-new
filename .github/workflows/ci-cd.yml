@@ -193,6 +193,41 @@ jobs:
               echo "⚠️ 未找到共享 .env，将继续使用包内 .env 或服务器环境变量"
             fi
 
+            resolve_app_port() {
+              if [ -n "$PORT" ]; then
+                echo "$PORT"
+                return
+              fi
+
+              if [ -f ".env" ]; then
+                env_port=$(awk -F= '/^PORT=/{print $2; exit}' .env | tr -d '\r"' | xargs)
+                if [ -n "$env_port" ]; then
+                  echo "$env_port"
+                  return
+                fi
+              fi
+
+              echo "3000"
+            }
+
+            wait_for_healthcheck() {
+              healthcheck_url="$1"
+              max_attempts="${2:-12}"
+              sleep_seconds="${3:-5}"
+
+              for attempt in $(seq 1 "$max_attempts"); do
+                if curl -fsS --connect-timeout 3 --max-time 5 "$healthcheck_url" > /dev/null 2>&1; then
+                  echo "✅ 健康检查通过（第 ${attempt}/${max_attempts} 次）"
+                  return 0
+                fi
+
+                echo "⏳ 健康检查未通过（第 ${attempt}/${max_attempts} 次），等待 ${sleep_seconds}s 后重试..."
+                sleep "$sleep_seconds"
+              done
+
+              return 1
+            }
+
             echo "📦 安装生产依赖..."
             pnpm install --prod --frozen-lockfile --ignore-scripts
 
@@ -224,23 +259,26 @@ jobs:
             echo "🔗 更新软链接..."
             ln -sfn "$RELEASE_DIR" "$CURRENT_LINK"
 
+            APP_PORT=$(resolve_app_port)
+            HEALTHCHECK_URL="http://127.0.0.1:${APP_PORT}/health"
+
             echo "▶️ 启动新服务..."
+            echo "   健康检查地址: $HEALTHCHECK_URL"
             pm2 start "$PM2_CONFIG_FILE"
             pm2 save
 
             echo "🏥 健康检查..."
-            sleep 5
-            if curl -f http://localhost:3000/health > /dev/null 2>&1; then
-              echo "✅ 健康检查通过"
+            if wait_for_healthcheck "$HEALTHCHECK_URL"; then
+              echo "✅ 服务已就绪"
             else
               echo "❌ 健康检查失败，尝试重启..."
-              pm2 restart "$APP_NAME"
-              sleep 5
-              if curl -f http://localhost:3000/health > /dev/null 2>&1; then
+              pm2 restart "$APP_NAME" --update-env
+              if wait_for_healthcheck "$HEALTHCHECK_URL"; then
                 echo "✅ 重启后通过"
               else
                 echo "❌ 重启后仍失败，请检查日志"
-                pm2 logs "$APP_NAME" --lines 20
+                pm2 status "$APP_NAME" || true
+                pm2 logs "$APP_NAME" --lines 20 --nostream || true
                 exit 1
               fi
             fi

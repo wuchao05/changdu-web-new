@@ -85,8 +85,8 @@ const submitting = ref(false)
 const errorMessage = ref('')
 
 const form = reactive({
-  account: 'admin',
-  password: 'qwer1234',
+  account: '',
+  password: '',
 })
 
 const rules = {

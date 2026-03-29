@@ -18,6 +18,42 @@ DATA_DIR="/data/changdu-web"
 STUDIO_DATA_DIR="$DATA_DIR/studio"
 PM2_CONFIG_FILE="$DATA_DIR/ecosystem.config.js"
 
+resolve_app_port() {
+    if [ -n "$PORT" ]; then
+        echo "$PORT"
+        return
+    fi
+
+    if [ -f ".env" ]; then
+        local env_port
+        env_port=$(awk -F= '/^PORT=/{print $2; exit}' .env | tr -d '\r"' | xargs)
+        if [ -n "$env_port" ]; then
+            echo "$env_port"
+            return
+        fi
+    fi
+
+    echo "3000"
+}
+
+wait_for_healthcheck() {
+    local healthcheck_url="$1"
+    local max_attempts="${2:-12}"
+    local sleep_seconds="${3:-5}"
+
+    for attempt in $(seq 1 "$max_attempts"); do
+        if curl -fsS --connect-timeout 3 --max-time 5 "$healthcheck_url" > /dev/null 2>&1; then
+            echo "✅ 健康检查通过（第 ${attempt}/${max_attempts} 次）"
+            return 0
+        fi
+
+        echo "⏳ 健康检查未通过（第 ${attempt}/${max_attempts} 次），等待 ${sleep_seconds}s 后重试..."
+        sleep "$sleep_seconds"
+    done
+
+    return 1
+}
+
 # 检查是否为本地部署
 if [ "$1" = "local" ]; then
     echo "🚀 开始本地部署长读工作台..."
@@ -161,9 +197,13 @@ EOF
     ln -sfn "$RELEASE_DIR" "$CURRENT_LINK"
 
     # 9. 使用外部 PM2 配置启动新服务
+    APP_PORT=$(resolve_app_port)
+    HEALTHCHECK_URL="http://127.0.0.1:${APP_PORT}/health"
+
     echo "▶️ 启动新服务（使用外部配置）..."
     echo "   配置文件: $PM2_CONFIG_FILE"
     echo "   Studio 数据目录: $STUDIO_DATA_DIR"
+    echo "   健康检查地址: $HEALTHCHECK_URL"
     pm2 start "$PM2_CONFIG_FILE"
 
     # 10. 保存PM2配置
@@ -171,19 +211,17 @@ EOF
 
     # 11. 健康检查
     echo "🏥 健康检查..."
-    sleep 5
-
-    if curl -f http://localhost:3000/health > /dev/null 2>&1; then
-        echo "✅ 健康检查通过！"
+    if wait_for_healthcheck "$HEALTHCHECK_URL"; then
+        echo "✅ 服务已就绪"
     else
         echo "❌ 健康检查失败，尝试重启服务..."
-        pm2 restart "$APP_NAME"
-        sleep 5
-        if curl -f http://localhost:3000/health > /dev/null 2>&1; then
+        pm2 restart "$APP_NAME" --update-env
+        if wait_for_healthcheck "$HEALTHCHECK_URL"; then
             echo "✅ 重启后健康检查通过！"
         else
             echo "❌ 服务启动失败，请检查日志："
-            pm2 logs "$APP_NAME" --lines 20
+            pm2 status "$APP_NAME" || true
+            pm2 logs "$APP_NAME" --lines 20 --nostream || true
             exit 1
         fi
     fi
