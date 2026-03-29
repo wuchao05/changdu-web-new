@@ -564,6 +564,7 @@ async function getFirstAvailableAccount(channelId) {
  */
 async function createDramaStatusRecord(channelId, params) {
   const { dramaName, publishTime, account, status, douyinMaterial, rating } = params
+  const profile = getSchedulerProfile(channelId)
   const accessToken = await getFeishuAccessToken()
 
   // 计算日期时间戳（与前端逻辑一致）
