@@ -1013,7 +1013,6 @@ function sortDramasByPriority(dramas, downloadList, newDramaSet) {
  */
 async function processDrama(channelId, drama, downloadList, newDramaSet, options = {}) {
   await ensureSchedulerRuntime(channelId)
-  const profile = getSchedulerProfile(channelId)
   const dramaName = drama.series_name
   const manualRedFlag = options.manualRedFlag === true
 
