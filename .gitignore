@@ -1,0 +1,41 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+.DS_Store
+dist
+dist-ssr
+coverage
+*.local
+.env.development
+server/data/reverse-bogus/
+
+/cypress/videos/
+/cypress/screenshots/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+*.tsbuildinfo
+
+# 达人配置文件（包含业务数据，不纳入版本控制）
+server/data/daren-config.json
+
+# 认证配置文件（包含敏感信息，不纳入版本控制）
+server/data/auth.json
+
+# PM2 配置文件（包含环境特定配置）
+ecosystem.config.js

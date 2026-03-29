@@ -1,0 +1,577 @@
+import fs from 'fs/promises'
+import path from 'path'
+import crypto from 'crypto'
+import { fileURLToPath } from 'url'
+import { DEFAULT_BUILD_CONFIG, normalizeBuildConfig } from '../config/buildConfig.js'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+const PREFERRED_STUDIO_DATA_DIR = process.env.STUDIO_DATA_DIR || '/data/changdu-web-studio'
+const FALLBACK_STUDIO_DATA_DIR = path.join(__dirname, '../data/studio')
+
+let resolvedStudioDataDir = ''
+
+export function getStudioDataDir() {
+  return resolvedStudioDataDir || PREFERRED_STUDIO_DATA_DIR
+}
+
+export function getUserinfoDir() {
+  return path.join(getStudioDataDir(), 'userinfo')
+}
+
+export function getChannelsFilePath() {
+  return path.join(getStudioDataDir(), 'channles.json')
+}
+
+export const STUDIO_DATA_DIR = getStudioDataDir
+export const USERINFO_DIR = getUserinfoDir
+export const CHANNELS_FILE_PATH = getChannelsFilePath
+
+const DEFAULT_ADMIN_USER_ID = 'admin'
+
+function nowIso() {
+  return new Date().toISOString()
+}
+
+function defaultMaterialPreview() {
+  return {
+    enabled: false,
+    intervalMinutes: 20,
+    buildTimeWindowStart: 90,
+    buildTimeWindowEnd: 20,
+  }
+}
+
+function defaultFeishuConfig() {
+  return {
+    dramaListTableId: '',
+    dramaStatusTableId: '',
+    accountTableId: '',
+  }
+}
+
+function defaultOrderUserStats() {
+  return {
+    enabled: false,
+    sortMode: 'manual',
+    usernames: [],
+  }
+}
+
+function defaultUserChannelConfig() {
+  return {
+    feishu: defaultFeishuConfig(),
+    materialPreview: defaultMaterialPreview(),
+    permissions: {
+      syncAccount: false,
+      desktopMenus: {
+        download: false,
+        materialClip: false,
+        upload: false,
+        juliangUpload: false,
+        uploadBuild: false,
+        juliangBuild: false,
+      },
+    },
+    orderUserStats: defaultOrderUserStats(),
+    douyinMaterialMatches: [],
+  }
+}
+
+function defaultChannelConfig() {
+  return {
+    id: crypto.randomUUID(),
+    name: '',
+    juliang: {
+      cookie: '',
+      buildConfig: normalizeBuildConfig(DEFAULT_BUILD_CONFIG),
+    },
+    changdu: {
+      secretKey: '',
+      cookie: '',
+      distributorId: '',
+      adUserId: '',
+      rootAdUserId: '',
+      appId: '',
+    },
+    adx: {
+      cookie: '',
+    },
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  }
+}
+
+function defaultAdminUser() {
+  return {
+    id: DEFAULT_ADMIN_USER_ID,
+    nickname: '管理员',
+    account: 'admin',
+    password: 'qwer1234',
+    authToken: '',
+    userType: 'admin',
+    channelIds: [],
+    defaultChannelId: '',
+    channelConfigs: {},
+    feishu: defaultFeishuConfig(),
+    materialPreview: defaultMaterialPreview(),
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  }
+}
+
+export function normalizeDouyinMaterialMatch(match = {}) {
+  return {
+    id: String(match.id || crypto.randomUUID()),
+    douyinAccount: String(match.douyinAccount || '').trim(),
+    douyinAccountId: String(match.douyinAccountId || '').trim(),
+    materialRange: String(match.materialRange || '').trim(),
+    createdAt: match.createdAt || nowIso(),
+    updatedAt: match.updatedAt || nowIso(),
+  }
+}
+
+function normalizeDouyinMaterialMatches(matches = []) {
+  if (!Array.isArray(matches)) {
+    return []
+  }
+
+  return matches
+    .map(normalizeDouyinMaterialMatch)
+    .filter(match => match.douyinAccount || match.douyinAccountId || match.materialRange)
+}
+
+function normalizeOrderUserStats(config = {}) {
+  const usernames = Array.isArray(config?.usernames)
+    ? config.usernames
+        .map(item => String(item || '').trim())
+        .filter(Boolean)
+        .filter((item, index, list) => list.indexOf(item) === index)
+    : []
+
+  return {
+    enabled: Boolean(config?.enabled),
+    sortMode: config?.sortMode === 'amount_desc' ? 'amount_desc' : 'manual',
+    usernames,
+  }
+}
+
+function normalizeFeishuConfig(feishu = {}) {
+  return {
+    dramaListTableId: String(feishu?.dramaListTableId || '').trim(),
+    dramaStatusTableId: String(feishu?.dramaStatusTableId || '').trim(),
+    accountTableId: String(feishu?.accountTableId || '').trim(),
+  }
+}
+
+function normalizeUserChannelConfig(config = {}) {
+  return {
+    feishu: normalizeFeishuConfig(config.feishu || config),
+    materialPreview: {
+      ...defaultMaterialPreview(),
+      ...(config.materialPreview || {}),
+      enabled: Boolean(config.materialPreview?.enabled),
+    },
+    permissions: {
+      syncAccount: Boolean(config.permissions?.syncAccount),
+      desktopMenus: {
+        download: Boolean(config.permissions?.desktopMenus?.download),
+        materialClip: Boolean(config.permissions?.desktopMenus?.materialClip),
+        upload: Boolean(config.permissions?.desktopMenus?.upload),
+        juliangUpload: Boolean(config.permissions?.desktopMenus?.juliangUpload),
+        uploadBuild: Boolean(config.permissions?.desktopMenus?.uploadBuild),
+        juliangBuild: Boolean(config.permissions?.desktopMenus?.juliangBuild),
+      },
+    },
+    orderUserStats: {
+      ...defaultOrderUserStats(),
+      ...normalizeOrderUserStats(config.orderUserStats),
+    },
+    douyinMaterialMatches: normalizeDouyinMaterialMatches(config.douyinMaterialMatches),
+  }
+}
+
+function hasFeishuConfig(feishu = {}) {
+  return Boolean(feishu.dramaListTableId || feishu.dramaStatusTableId || feishu.accountTableId)
+}
+
+function normalizeUserChannelConfigs(user = {}, channelIds = [], defaultChannelId = '') {
+  const rawChannelConfigs =
+    user.channelConfigs && typeof user.channelConfigs === 'object' ? user.channelConfigs : {}
+  const normalizedConfigs = {}
+
+  channelIds.forEach(channelId => {
+    normalizedConfigs[channelId] = normalizeUserChannelConfig(rawChannelConfigs[channelId] || {})
+  })
+
+  const legacyFeishuConfig = normalizeFeishuConfig(user.feishu || {})
+  const legacyMaterialPreview = {
+    ...defaultMaterialPreview(),
+    ...(user.materialPreview || {}),
+    enabled: Boolean(user.materialPreview?.enabled),
+  }
+  const legacyDouyinMaterialMatches = normalizeDouyinMaterialMatches(user.douyinMaterialMatches)
+  const legacyChannelId = defaultChannelId || channelIds[0] || ''
+  if (legacyChannelId && hasFeishuConfig(legacyFeishuConfig)) {
+    normalizedConfigs[legacyChannelId] = {
+      ...defaultUserChannelConfig(),
+      ...(normalizedConfigs[legacyChannelId] || {}),
+      feishu:
+        normalizedConfigs[legacyChannelId] &&
+        hasFeishuConfig(normalizedConfigs[legacyChannelId].feishu)
+          ? normalizedConfigs[legacyChannelId].feishu
+          : legacyFeishuConfig,
+    }
+  }
+
+  if (
+    legacyChannelId &&
+    user.materialPreview &&
+    !rawChannelConfigs[legacyChannelId]?.materialPreview
+  ) {
+    normalizedConfigs[legacyChannelId] = {
+      ...defaultUserChannelConfig(),
+      ...(normalizedConfigs[legacyChannelId] || {}),
+      materialPreview: {
+        ...defaultMaterialPreview(),
+        ...(normalizedConfigs[legacyChannelId]?.materialPreview || {}),
+        ...legacyMaterialPreview,
+      },
+    }
+  }
+
+  if (
+    legacyChannelId &&
+    legacyDouyinMaterialMatches.length > 0 &&
+    (!normalizedConfigs[legacyChannelId] ||
+      !Array.isArray(normalizedConfigs[legacyChannelId].douyinMaterialMatches) ||
+      normalizedConfigs[legacyChannelId].douyinMaterialMatches.length === 0)
+  ) {
+    normalizedConfigs[legacyChannelId] = {
+      ...defaultUserChannelConfig(),
+      ...(normalizedConfigs[legacyChannelId] || {}),
+      douyinMaterialMatches: legacyDouyinMaterialMatches,
+    }
+  }
+
+  return normalizedConfigs
+}
+
+export function getUserChannelConfig(user = {}, channelId = '') {
+  const normalizedChannelId = String(channelId || '').trim()
+  const rawChannelIds = Array.isArray(user.channelIds)
+    ? user.channelIds
+    : user.channelId
+      ? [user.channelId]
+      : []
+  const channelIds = rawChannelIds.map(item => String(item || '').trim()).filter(Boolean)
+  const defaultChannelId = String(user.defaultChannelId || user.channelId || '').trim()
+  const normalizedConfigs = normalizeUserChannelConfigs(user, channelIds, defaultChannelId)
+  const targetChannelId = normalizedChannelId || defaultChannelId || channelIds[0] || ''
+
+  if (targetChannelId && normalizedConfigs[targetChannelId]) {
+    return normalizedConfigs[targetChannelId]
+  }
+
+  return defaultUserChannelConfig()
+}
+
+export function ensureUserChannelConfig(user = {}, channelId = '') {
+  const normalizedChannelId = String(channelId || '').trim()
+  if (!normalizedChannelId) {
+    return defaultUserChannelConfig()
+  }
+
+  if (!user.channelConfigs || typeof user.channelConfigs !== 'object') {
+    user.channelConfigs = {}
+  }
+
+  user.channelConfigs[normalizedChannelId] = normalizeUserChannelConfig(
+    user.channelConfigs[normalizedChannelId] || {}
+  )
+
+  return user.channelConfigs[normalizedChannelId]
+}
+
+function getDefaultRuntimeFeishu(user = {}, defaultChannelId = '') {
+  return getUserChannelConfig(user, defaultChannelId).feishu
+}
+
+function getDefaultRuntimeMaterialPreview(user = {}, defaultChannelId = '') {
+  return getUserChannelConfig(user, defaultChannelId).materialPreview
+}
+
+export function buildRuntimeUser(user = {}, channelId = '') {
+  const normalizedUser = normalizeUser(user)
+  const channelConfig = getUserChannelConfig(normalizedUser, channelId)
+  const normalizedPermissions = {
+    ...channelConfig.permissions,
+    desktopMenus:
+      normalizedUser.userType === 'admin'
+        ? {
+            download: true,
+            materialClip: true,
+            upload: true,
+            juliangUpload: true,
+            uploadBuild: true,
+            juliangBuild: true,
+          }
+        : channelConfig.permissions.desktopMenus,
+  }
+
+  return {
+    ...normalizedUser,
+    feishu: channelConfig.feishu,
+    materialPreview: channelConfig.materialPreview,
+    permissions: normalizedPermissions,
+    orderUserStats: channelConfig.orderUserStats,
+    douyinMaterialMatches: channelConfig.douyinMaterialMatches,
+  }
+}
+
+export function normalizeUser(user = {}) {
+  const base = defaultAdminUser()
+  const rawChannelIds = Array.isArray(user.channelIds)
+    ? user.channelIds
+    : user.channelId
+      ? [user.channelId]
+      : []
+  const channelIds = rawChannelIds.map(item => String(item || '').trim()).filter(Boolean)
+  const defaultChannelId = String(user.defaultChannelId || user.channelId || '').trim()
+  const resolvedDefaultChannelId = channelIds.includes(defaultChannelId)
+    ? defaultChannelId
+    : channelIds[0] || ''
+  const channelConfigs = normalizeUserChannelConfigs(user, channelIds, resolvedDefaultChannelId)
+  const defaultRuntimeFeishu = getDefaultRuntimeFeishu(
+    { ...user, channelIds, defaultChannelId: resolvedDefaultChannelId, channelConfigs },
+    resolvedDefaultChannelId
+  )
+  const defaultRuntimeMaterialPreview = getDefaultRuntimeMaterialPreview(
+    { ...user, channelIds, defaultChannelId: resolvedDefaultChannelId, channelConfigs },
+    resolvedDefaultChannelId
+  )
+
+  return {
+    id: String(user.id || crypto.randomUUID()),
+    nickname: String(user.nickname || '').trim(),
+    account: String(user.account || '').trim(),
+    password: String(user.password || '').trim(),
+    authToken: String(user.authToken || '').trim(),
+    userType: user.userType === 'admin' ? 'admin' : 'normal',
+    channelIds,
+    defaultChannelId: resolvedDefaultChannelId,
+    channelConfigs,
+    feishu: defaultRuntimeFeishu,
+    materialPreview: defaultRuntimeMaterialPreview,
+    createdAt: user.createdAt || base.createdAt,
+    updatedAt: user.updatedAt || nowIso(),
+  }
+}
+
+export function normalizeChannel(channel = {}) {
+  const base = defaultChannelConfig()
+  const rawJuliang = channel.juliang || {}
+  const normalizedBuildConfig = normalizeBuildConfig(
+    rawJuliang.buildConfig || base.juliang.buildConfig
+  )
+  const secretKey = String(
+    channel.changdu?.secretKey || normalizedBuildConfig.secretKey || base.changdu.secretKey
+  ).trim()
+
+  return {
+    id: String(channel.id || base.id),
+    name: String(channel.name || '').trim(),
+    juliang: {
+      cookie: String(rawJuliang.cookie || '').trim(),
+      buildConfig: {
+        ...normalizedBuildConfig,
+        secretKey,
+      },
+    },
+    changdu: {
+      secretKey,
+      cookie: String(channel.changdu?.cookie || '').trim(),
+      distributorId: String(channel.changdu?.distributorId || '').trim(),
+      adUserId: String(channel.changdu?.adUserId || '').trim(),
+      rootAdUserId: String(channel.changdu?.rootAdUserId || '').trim(),
+      appId: String(channel.changdu?.appId || '').trim(),
+    },
+    adx: {
+      cookie: String(channel.adx?.cookie || '').trim(),
+    },
+    createdAt: channel.createdAt || base.createdAt,
+    updatedAt: channel.updatedAt || nowIso(),
+  }
+}
+
+async function ensureDir(dirPath) {
+  await fs.mkdir(dirPath, { recursive: true })
+}
+
+export async function ensureStudioData() {
+  if (!resolvedStudioDataDir) {
+    try {
+      await ensureDir(PREFERRED_STUDIO_DATA_DIR)
+      resolvedStudioDataDir = PREFERRED_STUDIO_DATA_DIR
+    } catch (error) {
+      console.warn(
+        `[StudioData] 无法写入 ${PREFERRED_STUDIO_DATA_DIR}，已降级到 ${FALLBACK_STUDIO_DATA_DIR}:`,
+        error.message
+      )
+      await ensureDir(FALLBACK_STUDIO_DATA_DIR)
+      resolvedStudioDataDir = FALLBACK_STUDIO_DATA_DIR
+    }
+  }
+
+  await ensureDir(getStudioDataDir())
+  await ensureDir(getUserinfoDir())
+
+  try {
+    await fs.access(getChannelsFilePath())
+  } catch {
+    await fs.writeFile(
+      getChannelsFilePath(),
+      JSON.stringify({ channels: [], updatedAt: nowIso() }, null, 2),
+      'utf-8'
+    )
+  }
+
+  const adminFile = path.join(getUserinfoDir(), `${DEFAULT_ADMIN_USER_ID}.json`)
+  try {
+    await fs.access(adminFile)
+  } catch {
+    await fs.writeFile(adminFile, JSON.stringify(defaultAdminUser(), null, 2), 'utf-8')
+  }
+}
+
+export async function readChannels() {
+  await ensureStudioData()
+  const raw = await fs.readFile(getChannelsFilePath(), 'utf-8')
+  const parsed = JSON.parse(raw)
+  const channels = Array.isArray(parsed.channels) ? parsed.channels.map(normalizeChannel) : []
+  return { channels, updatedAt: parsed.updatedAt || nowIso() }
+}
+
+export async function writeChannels(channels) {
+  await ensureStudioData()
+  const normalizedChannels = channels.map(normalizeChannel)
+  const payload = {
+    channels: normalizedChannels,
+    updatedAt: nowIso(),
+  }
+  await fs.writeFile(getChannelsFilePath(), JSON.stringify(payload, null, 2), 'utf-8')
+  return payload
+}
+
+export async function listUsers() {
+  await ensureStudioData()
+  const files = await fs.readdir(getUserinfoDir())
+  const users = []
+
+  for (const fileName of files) {
+    if (!fileName.endsWith('.json')) continue
+    const filePath = path.join(getUserinfoDir(), fileName)
+    const raw = await fs.readFile(filePath, 'utf-8')
+    users.push(normalizeUser(JSON.parse(raw)))
+  }
+
+  return users.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+}
+
+export async function readUser(userId) {
+  await ensureStudioData()
+  const filePath = path.join(getUserinfoDir(), `${userId}.json`)
+  const raw = await fs.readFile(filePath, 'utf-8')
+  return normalizeUser(JSON.parse(raw))
+}
+
+export async function writeUser(user) {
+  await ensureStudioData()
+  const normalizedUser = normalizeUser(user)
+  const filePath = path.join(getUserinfoDir(), `${normalizedUser.id}.json`)
+  await fs.writeFile(filePath, JSON.stringify(normalizedUser, null, 2), 'utf-8')
+  return normalizedUser
+}
+
+export async function deleteUser(userId) {
+  const filePath = path.join(getUserinfoDir(), `${userId}.json`)
+  await fs.unlink(filePath)
+}
+
+export function sanitizeUser(user) {
+  const rest = { ...user }
+  delete rest.password
+  delete rest.authToken
+  return rest
+}
+
+export async function findUserByAccount(account) {
+  const users = await listUsers()
+  return users.find(user => user.account === account) || null
+}
+
+export async function findUserByToken(token) {
+  if (!token) return null
+  const users = await listUsers()
+  return users.find(user => user.authToken === token) || null
+}
+
+export async function resolveUserChannel(user) {
+  if (!user?.defaultChannelId) {
+    return null
+  }
+
+  const { channels } = await readChannels()
+  return channels.find(channel => channel.id === user.defaultChannelId) || null
+}
+
+export async function findUsersByChannelId(channelId) {
+  if (!channelId) return []
+  const users = await listUsers()
+  return users.filter(user =>
+    Array.isArray(user.channelIds)
+      ? user.channelIds.includes(channelId)
+      : user.channelId === channelId
+  )
+}
+
+export async function resolveRuntimeContext(sessionUser, requestedChannelId = '') {
+  const { channels } = await readChannels()
+
+  if (!sessionUser) {
+    return {
+      channel: null,
+      runtimeUser: null,
+    }
+  }
+
+  const accessibleChannelIds = Array.isArray(sessionUser.channelIds)
+    ? sessionUser.channelIds
+    : sessionUser.channelId
+      ? [sessionUser.channelId]
+      : []
+  const availableChannels =
+    sessionUser.userType === 'admin'
+      ? channels
+      : channels.filter(item => accessibleChannelIds.includes(item.id))
+  const channel =
+    availableChannels.find(item => item.id === requestedChannelId) ||
+    availableChannels.find(item => item.id === sessionUser.defaultChannelId) ||
+    availableChannels[0] ||
+    null
+
+  if (!channel) {
+    return {
+      channel: null,
+      runtimeUser: buildRuntimeUser(sessionUser),
+      availableChannels: [],
+    }
+  }
+
+  return {
+    channel,
+    runtimeUser: buildRuntimeUser(sessionUser, channel.id),
+    availableChannels,
+  }
+}

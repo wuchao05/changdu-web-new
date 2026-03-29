@@ -1,0 +1,6 @@
+<svg width="96" height="128" viewBox="0 0 96 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="96" height="128" fill="#F3F4F6"/>
+<path d="M32 48C40.8366 48 48 40.8366 48 32C48 23.1634 40.8366 16 32 16C23.1634 16 16 23.1634 16 32C16 40.8366 23.1634 48 32 48Z" fill="#9B9DA1"/>
+<path d="M16 80L40 56C41.1046 54.8954 42.8954 54.8954 44 56L64 76L70 68C71.1046 66.8954 72.8954 66.8954 74 68L80 76V80H16Z" fill="#9B9DA1"/>
+<text x="48" y="104" font-family="Arial, sans-serif" font-size="12" fill="#6B7280" text-anchor="middle">暂无封面</text>
+</svg>

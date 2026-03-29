@@ -1,0 +1,45 @@
+@import '../assets/base.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 全局样式重置 */
+body {
+  @apply font-sans antialiased;
+  margin: 0;
+  padding: 0;
+  /* 只在需要时显示滚动条 */
+  overflow-x: auto;
+  overflow-y: auto;
+}
+
+#app {
+  min-height: 100vh;
+  font-weight: normal;
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* 响应式字体大小 */
+@media (max-width: 640px) {
+  html {
+    font-size: 14px;
+  }
+}

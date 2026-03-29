@@ -1,0 +1,295 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: '部署环境'
+        required: false
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+jobs:
+  ci:
+    name: Continuous Integration
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [20, 22]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --registry=https://registry.npmjs.org/
+
+      - name: Lint code
+        run: pnpm run lint
+
+      - name: Type check
+        run: pnpm run type-check
+
+      - name: Build project
+        run: pnpm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-files-${{ matrix.node-version }}
+          path: dist/
+          retention-days: 7
+
+  deploy-aliyun:
+    name: Deploy to Aliyun
+    needs: ci
+    runs-on: ubuntu-latest
+    if: |
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    environment: ${{ github.event.inputs.environment || 'production' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --registry=https://registry.npmjs.org/
+
+      - name: Build project
+        run: pnpm run build
+
+      - name: Create deployment package
+        run: |
+          tar -czf changdu-web-${GITHUB_SHA}.tar.gz \
+            dist/ \
+            server/ \
+            server.js \
+            package.json \
+            pnpm-lock.yaml \
+            .env \
+            deploy.sh
+
+      - name: Upload deployment package
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-package-aliyun
+          path: changdu-web-*.tar.gz
+          retention-days: 1
+
+      - name: Download deployment package
+        uses: actions/download-artifact@v4
+        with:
+          name: deployment-package-aliyun
+          path: ./deployment-package
+
+      - name: Upload package to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.ALIYUN_HOST }}
+          username: ${{ secrets.ALIYUN_USERNAME }}
+          key: ${{ secrets.ALIYUN_SSH_KEY }}
+          port: ${{ secrets.ALIYUN_PORT || 22 }}
+          source: './deployment-package/*'
+          target: '/tmp/'
+          strip_components: 1
+
+      - name: Deploy to Aliyun Server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.ALIYUN_HOST }}
+          username: ${{ secrets.ALIYUN_USERNAME }}
+          key: ${{ secrets.ALIYUN_SSH_KEY }}
+          port: ${{ secrets.ALIYUN_PORT || 22 }}
+          script: |
+            set -e
+
+            APP_NAME="changdu-web"
+            APP_DIR="/home/web/changdu-web"
+            RELEASES_DIR="$APP_DIR/releases"
+            SHARED_DIR="$APP_DIR/shared"
+            CURRENT_LINK="$APP_DIR/current"
+            TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+            RELEASE_DIR="$RELEASES_DIR/$TIMESTAMP"
+            PACKAGE_NAME="changdu-web-${{ github.sha }}.tar.gz"
+            DATA_DIR="/data/changdu-web"
+            PM2_CONFIG_FILE="$DATA_DIR/ecosystem.config.js"
+            STUDIO_DATA_DIR="$DATA_DIR/studio"
+
+            echo "🚀 开始部署到 Aliyun..."
+            echo "📦 部署包: $PACKAGE_NAME"
+
+            mkdir -p "$RELEASES_DIR" "$SHARED_DIR" "$RELEASE_DIR"
+            cd "$RELEASE_DIR"
+
+            echo "📥 解压部署包..."
+            if [ -f "/tmp/$PACKAGE_NAME" ]; then
+              tar -xzf "/tmp/$PACKAGE_NAME" -C .
+              echo "✅ 解压成功"
+            else
+              echo "❌ 部署包不存在: /tmp/$PACKAGE_NAME"
+              exit 1
+            fi
+
+            echo "📋 复制共享配置文件..."
+            if [ -f "$SHARED_DIR/.env" ]; then
+              cp "$SHARED_DIR/.env" .
+              echo "✅ 使用共享环境配置"
+            else
+              echo "⚠️ 未找到共享 .env，将继续使用包内 .env 或服务器环境变量"
+            fi
+
+            echo "📦 安装生产依赖..."
+            pnpm install --prod --frozen-lockfile --ignore-scripts
+
+            echo "📋 初始化数据目录..."
+            mkdir -p "$DATA_DIR" "$STUDIO_DATA_DIR"
+
+            echo "🆕 创建 PM2 配置文件..."
+            node -e "
+            const fs = require('fs');
+            const config = {
+              apps: [{
+                name: 'changdu-web',
+                cwd: '/home/web/changdu-web/current',
+                script: 'server.js',
+                env: {
+                  NODE_ENV: 'production',
+                  STUDIO_DATA_DIR: '/data/changdu-web/studio',
+                  CHANGDU_REVERSE_DIR: '/data/changdu-web/reverse-bogus'
+                }
+              }]
+            };
+            fs.writeFileSync('$PM2_CONFIG_FILE', 'module.exports = ' + JSON.stringify(config, null, 2));
+            "
+            echo "✅ 已创建 $PM2_CONFIG_FILE"
+
+            echo "⏹️ 停止旧服务..."
+            pm2 delete "$APP_NAME" 2>/dev/null || true
+
+            echo "🔗 更新软链接..."
+            ln -sfn "$RELEASE_DIR" "$CURRENT_LINK"
+
+            echo "▶️ 启动新服务..."
+            pm2 start "$PM2_CONFIG_FILE"
+            pm2 save
+
+            echo "🏥 健康检查..."
+            sleep 5
+            if curl -f http://localhost:3000/health > /dev/null 2>&1; then
+              echo "✅ 健康检查通过"
+            else
+              echo "❌ 健康检查失败，尝试重启..."
+              pm2 restart "$APP_NAME"
+              sleep 5
+              if curl -f http://localhost:3000/health > /dev/null 2>&1; then
+                echo "✅ 重启后通过"
+              else
+                echo "❌ 重启后仍失败，请检查日志"
+                pm2 logs "$APP_NAME" --lines 20
+                exit 1
+              fi
+            fi
+
+            echo "🔄 重载 Nginx 配置..."
+            sudo systemctl reload nginx 2>/dev/null || echo "⚠️ Nginx 未运行或无权限重载"
+
+            echo "🧹 清理旧版本..."
+            cd "$RELEASES_DIR"
+            ls -t | tail -n +6 | xargs -r rm -rf
+
+            echo "🗑️ 清理临时文件..."
+            rm -f "/tmp/$PACKAGE_NAME"
+
+            echo "🎉 Aliyun 部署完成！版本: $TIMESTAMP"
+            echo "Git SHA: ${{ github.sha }}"
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "✅ Aliyun 部署成功！"
+            echo "🌐 http://${{ secrets.ALIYUN_HOST }}"
+          else
+            echo "❌ Aliyun 部署失败，请查看日志"
+          fi
+
+  notify:
+    name: Notify Status
+    needs: [ci, deploy-aliyun]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Notify CI/CD Status
+        run: |
+          echo "📊 CI/CD 流水线状态报告："
+          echo "CI 状态: ${{ needs.ci.result }}"
+          echo "Aliyun 部署状态: ${{ needs.deploy-aliyun.result }}"
+
+          if [ "${{ needs.ci.result }}" = "success" ]; then
+            echo "✅ CI 检查通过"
+          else
+            echo "❌ CI 检查失败"
+          fi
+
+          if [ "${{ needs.deploy-aliyun.result }}" = "success" ]; then
+            echo "✅ Aliyun 部署成功"
+          elif [ "${{ needs.deploy-aliyun.result }}" = "skipped" ]; then
+            echo "⏭️ Aliyun 部署跳过"
+          else
+            echo "❌ Aliyun 部署失败"
+          fi

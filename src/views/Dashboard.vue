@@ -1,0 +1,1464 @@
+<template>
+  <UnauthorizedGuide v-if="!isValidUser" />
+
+  <div v-else class="min-h-full bg-gradient-to-br from-slate-50 to-blue-50">
+    <header
+      class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200/60 shadow-sm"
+    >
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between h-16 relative">
+          <div class="flex items-center space-x-4 min-w-0 flex-1">
+            <div
+              class="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl"
+            >
+              <Icon icon="mdi:chart-line" class="w-6 h-6 text-white" />
+            </div>
+            <div class="min-w-0" v-if="!isMobile">
+              <div class="flex items-center gap-2">
+                <h1
+                  class="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent"
+                >
+                  {{ dynamicTitle }}
+                </h1>
+                <button
+                  v-for="label in userLabels"
+                  :key="label"
+                  type="button"
+                  class="user-label-badge"
+                  :class="{ 'user-label-badge--clickable': isAdmin && label === '管理员' }"
+                  @click="handleUserLabelClick(label)"
+                >
+                  {{ label }}
+                </button>
+              </div>
+              <p class="text-xs text-gray-500 hidden sm:block">{{ dashboardSubtitle }}</p>
+            </div>
+
+            <div v-if="hasChannelTabs" class="hidden md:flex items-center min-w-0 flex-1">
+              <div class="channel-tabs-shell compact">
+                <button
+                  v-for="channel in channelTabs"
+                  :key="channel.id"
+                  type="button"
+                  class="channel-tab-button"
+                  :class="{ active: activeChannelTabId === channel.id }"
+                  @click="handleChannelChange(channel.id)"
+                >
+                  <span class="channel-tab-dot"></span>
+                  <span class="channel-tab-label">{{ channel.name }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-center" :class="isMobile ? 'space-x-2' : 'space-x-3'">
+            <n-tooltip :disabled="!autoBuildDisabledReason" placement="bottom" trigger="hover">
+              <template #trigger>
+                <span class="inline-flex">
+                  <n-button
+                    type="warning"
+                    :size="isMobile ? 'small' : 'medium'"
+                    :disabled="Boolean(autoBuildDisabledReason)"
+                    @click="handleAutoBuildClick"
+                    class="auto-build-button"
+                  >
+                    <template #icon>
+                      <Icon icon="mdi:hammer-wrench" :class="isMobile ? 'w-3 h-3' : 'w-4 h-4'" />
+                    </template>
+                    <span class="max-sm:hidden">提交搭建</span>
+                  </n-button>
+                </span>
+              </template>
+              {{ autoBuildDisabledReason }}
+            </n-tooltip>
+
+            <n-button
+              v-if="canAccessSyncAccount"
+              type="info"
+              :size="isMobile ? 'small' : 'medium'"
+              :disabled="!hasAccountTableId"
+              @click="showSyncAccountModal = true"
+              class="sync-account-button"
+            >
+              <template #icon>
+                <Icon icon="mdi:account-sync-outline" :class="isMobile ? 'w-3 h-3' : 'w-4 h-4'" />
+              </template>
+              <span class="max-sm:hidden">同步账户</span>
+            </n-button>
+
+            <n-button
+              text
+              :disabled="!hasActiveChannel"
+              @click="router.push('/clip')"
+              class="!text-gray-600 hover:!text-purple-600 transition-colors"
+            >
+              <template #icon>
+                <Icon icon="mdi:fire" :class="isMobile ? 'w-4 h-4' : 'w-5 h-5'" />
+              </template>
+              <span class="ml-1 max-sm:hidden">爆剧爆剪</span>
+            </n-button>
+
+            <n-button
+              text
+              @click="router.push('/settings')"
+              class="!text-gray-600 hover:!text-gray-900 transition-colors"
+            >
+              <template #icon>
+                <Icon icon="mdi:cog" :class="isMobile ? 'w-4 h-4' : 'w-5 h-5'" />
+              </template>
+              <span class="ml-1 max-sm:hidden">设置</span>
+            </n-button>
+          </div>
+        </div>
+      </div>
+
+      <div
+        v-if="hasChannelTabs"
+        class="border-t border-gray-100/80 bg-white/70 backdrop-blur-md md:hidden"
+      >
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <div class="channel-tabs-shell">
+            <button
+              v-for="channel in channelTabs"
+              :key="channel.id"
+              type="button"
+              class="channel-tab-button"
+              :class="{ active: activeChannelTabId === channel.id }"
+              @click="handleChannelChange(channel.id)"
+            >
+              <span class="channel-tab-dot"></span>
+              <span class="channel-tab-label">{{ channel.name }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
+      <div v-if="!hasActiveChannel" class="space-y-6">
+        <div
+          class="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center shadow-sm"
+        >
+          <div
+            class="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-500"
+          >
+            <Icon icon="mdi:shape-plus-outline" class="h-8 w-8" />
+          </div>
+          <h2 class="mt-5 text-2xl font-bold text-slate-900">
+            {{ isAdmin ? '还没有可用渠道' : '当前还没有分配可用渠道' }}
+          </h2>
+          <p class="mx-auto mt-3 max-w-2xl text-sm leading-7 text-slate-500">
+            {{
+              isAdmin
+                ? '请先进入管理员后台创建渠道，并为渠道绑定用户配置。创建完成后，再返回首页查看该渠道下的数据、爆剧爆剪和搭建能力。'
+                : '请联系管理员先为你创建并分配渠道。渠道配置完成后，首页数据和业务操作才会开放。'
+            }}
+          </p>
+          <div class="mt-6 flex justify-center gap-3">
+            <n-button v-if="isAdmin" type="primary" @click="router.push('/admin')">
+              前往管理员后台
+            </n-button>
+            <n-button tertiary @click="router.push('/settings')">查看个人设置</n-button>
+          </div>
+        </div>
+      </div>
+
+      <div v-else class="space-y-6">
+        <n-card :bordered="false" class="shadow-sm">
+          <template #header>
+            <div class="flex items-center justify-between gap-4 flex-wrap">
+              <div class="flex items-center gap-3">
+                <Icon icon="mdi:chart-box-outline" class="w-5 h-5 text-blue-600" />
+                <div>
+                  <h3 class="text-lg font-semibold text-slate-900">数据概览</h3>
+                  <div class="mt-1 flex items-center gap-2 flex-wrap">
+                    <p class="text-sm text-slate-500">实时数据，一目了然</p>
+                    <div class="refresh-status-pill" :class="{ active: autoRefreshEnabled }">
+                      <span class="refresh-status-dot"></span>
+                      <span>{{ autoRefreshLabel }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="flex items-center gap-3">
+                <div v-if="overviewUpdatedAt" class="text-right">
+                  <p class="text-xs text-slate-400">更新时间</p>
+                  <p class="text-sm font-medium text-slate-600">{{ overviewUpdatedAt }}</p>
+                </div>
+                <button
+                  type="button"
+                  class="refresh-icon-button"
+                  :disabled="overviewLoading"
+                  @click="autoRefresh.manualRefresh()"
+                  title="手动刷新"
+                >
+                  <Icon
+                    icon="mdi:refresh"
+                    class="h-5 w-5 text-emerald-600 transition-transform duration-300"
+                    :class="{ 'animate-spin': overviewLoading }"
+                  />
+                </button>
+              </div>
+            </div>
+          </template>
+          <n-alert v-if="overviewError" type="error" :show-icon="true" class="mb-4">
+            {{ overviewError }}
+          </n-alert>
+          <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div v-for="card in overviewCards" :key="card.label" class="overview-card group">
+              <div class="overview-card-inner" :class="card.cardClass">
+                <div class="flex items-center justify-between gap-4">
+                  <div class="min-w-0">
+                    <div class="flex items-center space-x-2 mb-2">
+                      <div class="w-3 h-3 rounded-full animate-pulse" :class="card.dotClass"></div>
+                      <p class="text-sm font-medium" :class="card.labelClass">{{ card.label }}</p>
+                    </div>
+                    <p class="text-2xl lg:text-3xl font-bold" :class="card.labelClass">
+                      <n-spin v-if="overviewLoading" size="small" />
+                      <span v-else>{{ card.value }}</span>
+                    </p>
+                    <div class="mt-2 flex items-center gap-2 text-xs">
+                      <p :class="card.metaClass">{{ card.meta }}</p>
+                      <div
+                        v-if="card.diffValue !== null && card.diffValue !== 0"
+                        class="flex items-center gap-1"
+                        :class="card.diffValue > 0 ? 'text-red-500' : 'text-green-500'"
+                      >
+                        <Icon
+                          :icon="card.diffValue > 0 ? 'mdi:trending-up' : 'mdi:trending-down'"
+                          class="h-3 w-3"
+                        />
+                        <span>
+                          {{
+                            card.label === '今日新用户'
+                              ? formatSignedPlainNumber(card.diffValue)
+                              : formatDiffCurrency(card.diffValue)
+                          }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="overview-card-icon" :class="card.iconClass">
+                    <Icon :icon="card.icon" class="h-5 w-5 text-white" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </n-card>
+
+        <div class="space-y-6">
+          <n-card :bordered="false" class="shadow-sm">
+            <template #header>
+              <div class="flex flex-wrap items-start justify-between gap-4">
+                <div class="flex items-center gap-3">
+                  <Icon icon="mdi:receipt-text-outline" class="w-5 h-5 text-amber-600" />
+                  <div>
+                    <h3 class="text-lg font-semibold text-slate-900">订单统计</h3>
+                    <p class="text-sm text-slate-500">查看当前渠道的订单明细和支付情况</p>
+                  </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <DateRangePicker
+                    v-model="orderDateRange"
+                    select-class-name="w-40"
+                    @update:model-value="handleOrderDateChange"
+                  />
+                  <n-select
+                    v-model:value="payStatus"
+                    class="w-28"
+                    :options="payStatusOptions"
+                    @update:value="handlePayStatusChange"
+                  />
+                  <n-button type="primary" ghost :loading="ordersLoading" @click="fetchOrdersData">
+                    查询
+                  </n-button>
+                </div>
+              </div>
+            </template>
+            <n-alert v-if="ordersError" type="error" :show-icon="true" class="mb-4">
+              {{ ordersError }}
+            </n-alert>
+            <n-alert
+              v-if="ordersData?.order_fetch_limit_hit"
+              type="warning"
+              :show-icon="true"
+              class="mb-4"
+            >
+              常读平台限制，最多只能拉到最近 1w 条订单数据，当前统计结果可能不准确
+            </n-alert>
+            <div v-if="orderUserCardItems.length > 0" class="mb-4">
+              <div class="order-user-tabs">
+                <button
+                  v-for="tab in orderUserCardItems"
+                  :key="tab.key"
+                  type="button"
+                  class="order-user-tab"
+                  :class="{
+                    active: !ordersLoading && activePromotionUserName === tab.key,
+                    'order-user-tab--loading': ordersLoading,
+                  }"
+                  :disabled="ordersLoading"
+                  @click="handlePromotionUserTabChange(tab.key)"
+                >
+                  <div class="order-user-tab__head">
+                    <span
+                      class="order-user-tab__label"
+                      :class="{ 'order-user-tab__skeleton order-user-tab__skeleton--label': ordersLoading }"
+                    >
+                      {{ ordersLoading ? '' : tab.label }}
+                    </span>
+                    <span
+                      class="order-user-tab__count"
+                      :class="{ 'order-user-tab__skeleton order-user-tab__skeleton--count': ordersLoading }"
+                    >
+                      {{ ordersLoading ? '' : `${tab.total} 单` }}
+                    </span>
+                  </div>
+                  <p
+                    class="order-user-tab__amount"
+                    :class="{ 'order-user-tab__skeleton order-user-tab__skeleton--amount': ordersLoading }"
+                  >
+                    {{ ordersLoading ? '' : formatCurrency(tab.totalAmount) }}
+                  </p>
+                  <p
+                    class="order-user-tab__meta"
+                    :class="{ 'order-user-tab__skeleton order-user-tab__skeleton--meta': ordersLoading }"
+                  >
+                    {{ ordersLoading ? '' : tab.meta }}
+                  </p>
+                </button>
+              </div>
+            </div>
+            <n-data-table
+              :columns="orderColumns"
+              :data="orderRows"
+              :loading="ordersLoading"
+              :bordered="false"
+              :single-line="false"
+              striped
+              size="small"
+              :pagination="ordersPagination"
+              :scroll-x="1100"
+            />
+          </n-card>
+
+          <n-card :bordered="false" class="shadow-sm">
+            <template #header>
+              <div class="flex flex-wrap items-start justify-between gap-4">
+                <div class="flex items-center gap-3">
+                  <Icon icon="mdi:table-eye" class="w-5 h-5 text-violet-600" />
+                  <div>
+                    <h3 class="text-lg font-semibold text-slate-900">数据报表</h3>
+                    <p class="text-sm text-slate-500">查看当前渠道的充值日报</p>
+                  </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <DateRangePicker
+                    v-model="reportDateRange"
+                    select-class-name="w-40"
+                    @update:model-value="handleReportDateChange"
+                  />
+                  <n-button type="primary" ghost :loading="reportLoading" @click="fetchReportData">
+                    查询
+                  </n-button>
+                </div>
+              </div>
+            </template>
+            <n-alert v-if="reportError" type="error" :show-icon="true" class="mb-4">
+              {{ reportError }}
+            </n-alert>
+            <n-data-table
+              :columns="reportColumns"
+              :data="reportRows"
+              :loading="reportLoading"
+              :bordered="false"
+              :single-line="false"
+              striped
+              size="small"
+              :pagination="reportPagination"
+              :scroll-x="1100"
+            />
+          </n-card>
+        </div>
+      </div>
+    </main>
+
+    <BuildWorkflowSchedulerModal
+      :show="showAutoBuildModal"
+      @update:show="showAutoBuildModal = $event"
+    />
+    <SyncAccountModal v-model:visible="showSyncAccountModal" />
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, h, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { Icon } from '@iconify/vue'
+import { useMessage, NAlert, NButton, NCard, NDataTable, NSelect, NSpin, NTooltip } from 'naive-ui'
+import type { DataTableColumns } from 'naive-ui'
+import BuildWorkflowSchedulerModal from '@/components/BuildWorkflowSchedulerModal.vue'
+import SyncAccountModal from '@/components/SyncAccountModal.vue'
+import DateRangePicker from '@/components/DateRangePicker.vue'
+import UnauthorizedGuide from '@/views/UnauthorizedGuide.vue'
+import { useApiConfigStore } from '@/stores/apiConfig'
+import { useDouyinMaterialStore } from '@/stores/douyinMaterial'
+import { useUserAuth } from '@/composables/useUserAuth'
+import { useDynamicTitle } from '@/composables/useDynamicTitle'
+import { useSessionStore } from '@/stores/session'
+import { useSettingsStore } from '@/stores/settings'
+import { useAutoRefresh } from '@/composables/useAutoRefresh'
+import { getDataOverviewV1, getMonthlyRechargeAnalyze, getOrders, getReport } from '@/api'
+import type {
+  ReportData,
+  ReportRow,
+  OrderItem,
+  OrderData,
+  PromotionUserSummary,
+  OrderParams,
+  ReportParams,
+  DataOverviewV1Response,
+} from '@/api/types'
+
+defineOptions({
+  name: 'StudioDashboardPage',
+})
+
+const router = useRouter()
+const message = useMessage()
+const apiConfigStore = useApiConfigStore()
+const douyinMaterialStore = useDouyinMaterialStore()
+const sessionStore = useSessionStore()
+const settingsStore = useSettingsStore()
+const { isAdmin, isValidUser, userLabels } = useUserAuth()
+const { dynamicTitle } = useDynamicTitle()
+
+const showAutoBuildModal = ref(false)
+const showSyncAccountModal = ref(false)
+const isMobile = ref(false)
+const overviewLoading = ref(false)
+const overviewError = ref('')
+const reportLoading = ref(false)
+const reportError = ref('')
+const ordersLoading = ref(false)
+const ordersError = ref('')
+const overviewToday = ref<DataOverviewV1Response['data'] | null>(null)
+const overviewAll = ref<DataOverviewV1Response['data'] | null>(null)
+const overviewUpdatedAt = ref('')
+const reportData = ref<ReportData | null>(null)
+const ordersData = ref<OrderData | null>(null)
+const monthRechargeAmount = ref(0)
+const reportCurrentPage = ref(1)
+const ordersCurrentPage = ref(1)
+const payStatus = ref(-1)
+const activePromotionUserName = ref('')
+
+type DateRangeValue = [string, string] | null
+const reportDateRange = ref<DateRangeValue>(null)
+const orderDateRange = ref<DateRangeValue>(null)
+
+const hasMaterialRules = computed(() => douyinMaterialStore.matches.length > 0)
+const autoBuildDisabledReason = computed(() => {
+  if (!hasActiveChannel.value) {
+    return '请先配置可用渠道'
+  }
+
+  if (!hasMaterialRules.value) {
+    return '请先为当前渠道配置抖音号匹配素材'
+  }
+
+  return ''
+})
+const canAccessSyncAccount = computed(
+  () =>
+    hasActiveChannel.value && Boolean(sessionStore.currentRuntimeUser?.permissions?.syncAccount)
+)
+const hasAccountTableId = computed(() => Boolean(apiConfigStore.config.accountTableId))
+const dashboardSubtitle = computed(() => '数据驱动，精准运营')
+const hasActiveChannel = computed(() =>
+  isAdmin.value ? Boolean(sessionStore.activeChannelId) : Boolean(sessionStore.currentChannel?.id)
+)
+const channelTabs = computed(() => {
+  if (sessionStore.availableChannels.length > 0) {
+    return sessionStore.availableChannels
+  }
+  return sessionStore.currentChannel ? [sessionStore.currentChannel] : []
+})
+const hasChannelTabs = computed(() => channelTabs.value.length > 0)
+const activeChannelTabId = computed(
+  () => sessionStore.activeChannelId || sessionStore.currentChannel?.id || ''
+)
+const autoRefreshEnabled = computed(() => settingsStore.settings.autoRefresh)
+const autoRefreshIntervalSeconds = computed(() => settingsStore.settings.refreshInterval)
+const autoRefreshLabel = computed(() =>
+  autoRefreshEnabled.value
+    ? `自动刷新已开启，每 ${autoRefreshIntervalSeconds.value} 秒更新一次`
+    : '自动刷新未开启，可在设置中心开启'
+)
+const configuredOrderUsernames = computed(() => {
+  const usernames = sessionStore.currentRuntimeUser?.orderUserStats?.usernames
+  return Array.isArray(usernames) ? usernames.filter(Boolean) : []
+})
+const orderUserSortMode = computed(() =>
+  sessionStore.currentRuntimeUser?.orderUserStats?.sortMode === 'amount_desc'
+    ? 'amount_desc'
+    : 'manual'
+)
+
+const reportRows = computed<ReportRow[]>(() => {
+  if (!reportData.value) return []
+  const candidates = [
+    reportData.value.data,
+    (reportData.value as ReportData & { daily_data?: ReportRow[] }).daily_data,
+    reportData.value.report_data,
+    reportData.value.rows,
+  ]
+  return candidates.find(item => Array.isArray(item)) || []
+})
+
+const orderSummaryUsernames = computed(() =>
+  Array.isArray(ordersData.value?.promotion_user_summaries)
+    ? (ordersData.value?.promotion_user_summaries || []).map(item => item.username)
+    : []
+)
+
+const allOrderRows = computed<OrderItem[]>(() => ordersData.value?.data || [])
+
+const orderRows = computed<OrderItem[]>(() => {
+  if (!activePromotionUserName.value) {
+    return allOrderRows.value
+  }
+
+  return allOrderRows.value.filter(
+    order =>
+      matchOrderPromotionUser(order.promotion_name, orderSummaryUsernames.value) ===
+      activePromotionUserName.value
+  )
+})
+
+const orderUserTabs = computed(() => {
+  const summaries = Array.isArray(ordersData.value?.promotion_user_summaries)
+    ? ordersData.value?.promotion_user_summaries || []
+    : []
+
+  if (summaries.length === 0) {
+    return []
+  }
+
+  const sortedSummaries = [...summaries]
+  if (orderUserSortMode.value === 'amount_desc') {
+    sortedSummaries.sort((left, right) => {
+      const amountDiff = Number(right.total_amount || 0) - Number(left.total_amount || 0)
+      if (amountDiff !== 0) {
+        return amountDiff
+      }
+      return Number(right.paid_order_count || 0) - Number(left.paid_order_count || 0)
+    })
+  }
+
+  return [
+    {
+      key: '',
+      label: '全部',
+      total:
+        typeof ordersData.value?.all_total === 'number'
+          ? ordersData.value.all_total
+          : summaries.reduce((sum, item) => sum + Number(item.total || 0), 0),
+      totalAmount:
+        typeof ordersData.value?.all_total_amount === 'number'
+          ? ordersData.value.all_total_amount
+          : calculateOrderRechargeAmount(ordersData.value?.data || []),
+      meta: '当前时间段全部订单汇总',
+    },
+    ...sortedSummaries.map((summary: PromotionUserSummary) => ({
+      key: summary.username,
+      label: summary.username,
+      total: Number(summary.total || 0),
+      totalAmount: Number(summary.total_amount || 0),
+      meta: `支付成功 ${formatNumberValue(summary.paid_order_count || 0)} 单`,
+    })),
+  ]
+})
+
+const orderUserCardItems = computed(() => {
+  if (orderUserTabs.value.length > 0) {
+    return orderUserTabs.value
+  }
+
+  if (!ordersLoading.value || configuredOrderUsernames.value.length === 0) {
+    return []
+  }
+
+  return [
+    {
+      key: '__loading_all__',
+      label: '全部',
+      total: 0,
+      totalAmount: 0,
+      meta: '当前时间段全部订单汇总',
+    },
+    ...configuredOrderUsernames.value.map(username => ({
+      key: `__loading_${username}`,
+      label: username,
+      total: 0,
+      totalAmount: 0,
+      meta: '加载中',
+    })),
+  ]
+})
+
+const payStatusOptions = [
+  { label: '全部支付', value: -1 },
+  { label: '支付成功', value: 0 },
+  { label: '未支付', value: 1 },
+]
+
+const reportPagination = reactive({
+  page: 1,
+  pageSize: 8,
+  showSizePicker: false,
+  onChange: (page: number) => {
+    reportCurrentPage.value = page
+  },
+})
+
+const ordersPagination = reactive({
+  page: 1,
+  pageSize: 10,
+  showSizePicker: false,
+  onChange: (page: number) => {
+    ordersCurrentPage.value = page
+  },
+})
+
+const overviewCards = computed(() => [
+  {
+    label: '今日充值',
+    value: formatOverviewAmount(overviewToday.value?.income_amount || 0),
+    meta: '实时更新',
+    diffValue: overviewToday.value?.income_amount_diff || 0,
+    icon: 'mdi:cash-fast',
+    dotClass: 'bg-emerald-500',
+    cardClass: 'bg-gradient-to-br from-emerald-50 to-green-100 border-emerald-200',
+    iconClass: 'bg-emerald-500',
+    labelClass: 'text-emerald-700',
+    metaClass: 'text-emerald-500',
+  },
+  {
+    label: '今日新用户',
+    value: formatPlainNumber(overviewToday.value?.user_num || 0),
+    meta: '实时更新',
+    diffValue: overviewToday.value?.user_num_diff || 0,
+    icon: 'mdi:account-plus-outline',
+    dotClass: 'bg-orange-500',
+    cardClass: 'bg-gradient-to-br from-orange-50 to-amber-100 border-orange-200',
+    iconClass: 'bg-orange-500',
+    labelClass: 'text-orange-700',
+    metaClass: 'text-orange-500',
+  },
+  {
+    label: '本月充值',
+    value: formatOverviewAmount(monthRechargeAmount.value),
+    meta: '当月累计充值金额',
+    diffValue: null,
+    icon: 'mdi:calendar-month-outline',
+    dotClass: 'bg-blue-500',
+    cardClass: 'bg-gradient-to-br from-blue-50 to-indigo-100 border-blue-200',
+    iconClass: 'bg-blue-500',
+    labelClass: 'text-blue-700',
+    metaClass: 'text-blue-500',
+  },
+  {
+    label: '累计充值',
+    value: formatOverviewAmount(overviewAll.value?.income_amount || 0),
+    meta: '历史累计充值金额',
+    diffValue: null,
+    icon: 'mdi:rocket-launch-outline',
+    dotClass: 'bg-purple-500',
+    cardClass: 'bg-gradient-to-br from-purple-50 to-violet-100 border-purple-200',
+    iconClass: 'bg-purple-500',
+    labelClass: 'text-purple-700',
+    metaClass: 'text-purple-500',
+  },
+])
+
+const reportColumns: DataTableColumns<ReportRow> = [
+  {
+    title: '日期',
+    key: 'date',
+    width: 110,
+    render: row => formatReportDate(row.date),
+  },
+  {
+    title: '全用户充值金额',
+    key: 'total_amount',
+    width: 140,
+    render: row =>
+      h('span', { class: 'font-semibold text-blue-600' }, formatCurrency(row.total_amount)),
+  },
+  {
+    title: '全用户充值人数',
+    key: 'paid_user',
+    width: 120,
+    render: row => formatNumberValue(row.paid_user),
+  },
+  {
+    title: '全用户充值订单',
+    key: 'paid_order',
+    width: 130,
+    render: row => formatNumberValue(row.paid_order),
+  },
+  {
+    title: '全用户完成率',
+    key: 'paid_order_rate',
+    width: 120,
+    render: row => formatReportPercent(row.paid_order_rate),
+  },
+  {
+    title: '新用户数',
+    key: 'new_user_cnt',
+    width: 100,
+    render: row => formatNumberValue(row.new_user_cnt),
+  },
+  {
+    title: '新用户充值金额',
+    key: 'new_user_amount',
+    width: 150,
+    render: row =>
+      h('span', { class: 'font-semibold text-emerald-600' }, formatCurrency(row.new_user_amount)),
+  },
+  {
+    title: '新用户充值率',
+    key: 'paid_new_user_rate',
+    width: 120,
+    render: row => formatReportPercent(row.paid_new_user_rate),
+  },
+]
+
+const orderColumns: DataTableColumns<OrderItem> = [
+  {
+    title: '订单创建时间',
+    key: 'order_create_time',
+    width: 170,
+  },
+  {
+    title: '订单支付时间',
+    key: 'order_paid_time',
+    width: 170,
+    render: row => row.order_paid_time || '-',
+  },
+  {
+    title: '推广链来源',
+    key: 'promotion_name',
+    minWidth: 320,
+    ellipsis: { tooltip: true },
+  },
+  {
+    title: '支付金额',
+    key: 'pay_amount',
+    width: 110,
+    render: row =>
+      h('span', { class: 'font-semibold text-slate-900' }, formatCurrency(row.pay_amount || 0)),
+  },
+  {
+    title: '支付状态',
+    key: 'pay_status',
+    width: 100,
+    render: row =>
+      h(
+        'span',
+        {
+          class:
+            row.pay_status === 0
+              ? 'inline-flex rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700'
+              : 'inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600',
+        },
+        row.pay_status === 0 ? '支付成功' : '未支付'
+      ),
+  },
+  {
+    title: '用户 ID',
+    key: 'device_id',
+    width: 96,
+    render: row => String(row.device_id || '').slice(0, 4) || '-',
+  },
+]
+
+function checkMobile() {
+  isMobile.value = window.innerWidth < 768
+}
+
+function getDefaultDateRange(): DateRangeValue {
+  const preset = settingsStore.settings.defaultDateRange
+  const now = new Date()
+  const end = formatDate(now)
+  const startDate = new Date(now)
+
+  switch (preset) {
+    case 'today':
+      return [end, end]
+    case '3days':
+      startDate.setDate(startDate.getDate() - 2)
+      return [formatDate(startDate), end]
+    case '7days':
+      startDate.setDate(startDate.getDate() - 6)
+      return [formatDate(startDate), end]
+    case '30days':
+      startDate.setDate(startDate.getDate() - 29)
+      return [formatDate(startDate), end]
+    case 'all':
+      return ['2025-09-01', end]
+    default:
+      return [end, end]
+  }
+}
+
+function formatDate(date: Date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-')
+}
+
+function toCompactDate(date: string) {
+  return date.replace(/-/g, '')
+}
+
+function dateStringToTimestamp(date: string, endOfDay = false) {
+  return Math.floor(new Date(`${date} ${endOfDay ? '23:59:59' : '00:00:00'}`).getTime() / 1000)
+}
+
+function formatCurrency(amountInCent: number) {
+  return `¥${(amountInCent / 100).toFixed(1)}`
+}
+
+function formatOverviewAmount(amountInCent: number) {
+  return (amountInCent / 100).toFixed(1)
+}
+
+function formatDiffCurrency(amountInCent: number) {
+  const prefix = amountInCent > 0 ? '+' : ''
+  return `${prefix}${formatCurrency(amountInCent)}`
+}
+
+function formatNumberValue(value: number) {
+  return Number(value || 0).toLocaleString()
+}
+
+function formatPlainNumber(value: number) {
+  return String(Number(value || 0))
+}
+
+function formatSignedPlainNumber(value: number) {
+  return `${value > 0 ? '+' : ''}${formatPlainNumber(value)}`
+}
+
+function formatReportPercent(value: number) {
+  return `${(Number(value || 0) / 100).toFixed(2)}%`
+}
+
+function calculateOrderRechargeAmount(orders: OrderItem[]) {
+  return orders.reduce((sum, order) => {
+    if (order.pay_status === 0 && order.pay_amount) {
+      return sum + order.pay_amount
+    }
+    return sum
+  }, 0)
+}
+
+function matchOrderPromotionUser(promotionName: string, usernames: string[]) {
+  const normalizedPromotionName = String(promotionName || '').trim()
+  if (!normalizedPromotionName || !Array.isArray(usernames) || usernames.length === 0) {
+    return ''
+  }
+
+  const matchedUsernames = usernames.filter(username => normalizedPromotionName.includes(username))
+  if (matchedUsernames.length === 0) {
+    return ''
+  }
+
+  return [...matchedUsernames].sort((left, right) => right.length - left.length)[0]
+}
+
+function getCurrentMonthDateRange() {
+  const now = new Date()
+  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
+  return {
+    begin: formatDate(firstDay),
+    end: formatDate(now),
+  }
+}
+
+function formatReportDate(value: string | number) {
+  if (typeof value === 'number') {
+    const timestamp = value > 1e11 ? value : value * 1000
+    const date = new Date(timestamp)
+    if (Number.isNaN(date.getTime())) return String(value)
+    return formatDate(date)
+  }
+
+  const normalizedValue = String(value || '').trim()
+  if (/^\d{8}$/.test(normalizedValue)) {
+    return `${normalizedValue.slice(0, 4)}-${normalizedValue.slice(4, 6)}-${normalizedValue.slice(6, 8)}`
+  }
+
+  if (/^\d{10,13}$/.test(normalizedValue)) {
+    const numericValue = Number(normalizedValue)
+    const timestamp = normalizedValue.length === 13 ? numericValue : numericValue * 1000
+    const date = new Date(timestamp)
+    if (Number.isNaN(date.getTime())) return normalizedValue
+    return formatDate(date)
+  }
+
+  return normalizedValue
+}
+
+async function triggerDashboardRefresh() {
+  if (!hasActiveChannel.value) return
+  await loadDashboardData()
+}
+
+const autoRefresh = useAutoRefresh(() => {
+  triggerDashboardRefresh().catch(error => {
+    console.error('自动刷新首页数据失败:', error)
+  })
+})
+
+async function fetchOverviewData() {
+  if (!hasActiveChannel.value) return
+
+  overviewLoading.value = true
+  overviewError.value = ''
+  try {
+    const { begin, end } = getCurrentMonthDateRange()
+    const [todayRes, allRes, monthlyRes] = await Promise.all([
+      getDataOverviewV1({ is_today: true, app_type: 7 }),
+      getDataOverviewV1({ is_today: false, app_type: 7 }),
+      getMonthlyRechargeAnalyze({
+        begin,
+        end,
+        analyze_type: 1,
+        app_type: 7,
+      }),
+    ])
+    overviewToday.value = todayRes.data
+    overviewAll.value = allRes.data
+    monthRechargeAmount.value = monthlyRes?.total || 0
+    overviewUpdatedAt.value = new Date().toLocaleString('zh-CN')
+  } catch (error) {
+    console.error('获取数据概览失败:', error)
+    overviewError.value = error instanceof Error ? error.message : '获取数据概览失败'
+  } finally {
+    overviewLoading.value = false
+  }
+}
+
+async function fetchReportData() {
+  if (!hasActiveChannel.value || !reportDateRange.value) return
+
+  reportLoading.value = true
+  reportError.value = ''
+  try {
+    const [begin, end] = reportDateRange.value
+    const params: ReportParams = {
+      begin: toCompactDate(begin),
+      end: toCompactDate(end),
+      page_index: 0,
+      page_size: 10,
+    }
+    reportData.value = await getReport(params)
+    reportCurrentPage.value = 1
+    reportPagination.page = 1
+  } catch (error) {
+    console.error('获取数据报表失败:', error)
+    reportError.value = error instanceof Error ? error.message : '获取数据报表失败'
+  } finally {
+    reportLoading.value = false
+  }
+}
+
+async function fetchOrdersData() {
+  if (!hasActiveChannel.value || !orderDateRange.value) return
+
+  ordersLoading.value = true
+  ordersError.value = ''
+  try {
+    const [begin, end] = orderDateRange.value
+    const previousActivePromotionUserName = activePromotionUserName.value
+    const params: OrderParams = {
+      begin_time: dateStringToTimestamp(begin, false),
+      end_time: dateStringToTimestamp(end, true),
+      page_index: 0,
+      page_size: 100,
+      ...(payStatus.value >= 0 ? { pay_status: payStatus.value } : {}),
+    }
+    const response = await getOrders(params)
+    ordersData.value = response
+    const nextSummaryUsernames = Array.isArray(response.promotion_user_summaries)
+      ? response.promotion_user_summaries.map(item => item.username)
+      : []
+    activePromotionUserName.value = nextSummaryUsernames.includes(previousActivePromotionUserName)
+      ? previousActivePromotionUserName
+      : ''
+    ordersCurrentPage.value = 1
+    ordersPagination.page = 1
+  } catch (error) {
+    console.error('获取订单统计失败:', error)
+    ordersError.value = error instanceof Error ? error.message : '获取订单统计失败'
+  } finally {
+    ordersLoading.value = false
+  }
+}
+
+async function loadDashboardData() {
+  if (!hasActiveChannel.value) return
+  await Promise.all([fetchOverviewData(), fetchReportData(), fetchOrdersData()])
+}
+
+function handleAutoBuildClick() {
+  if (!hasActiveChannel.value) {
+    message.warning('请先配置可用渠道')
+    return
+  }
+
+  if (!hasMaterialRules.value) {
+    message.warning('请先在管理员后台为当前渠道绑定用户并配置抖音号匹配素材')
+    return
+  }
+
+  showAutoBuildModal.value = true
+}
+
+function handleUserLabelClick(label: string) {
+  if (isAdmin.value && label === '管理员') {
+    void router.push('/admin')
+  }
+}
+
+async function handleChannelChange(value: string) {
+  if (!value || value === sessionStore.selectedChannelId) {
+    return
+  }
+
+  sessionStore.updateSelectedChannel(value)
+  await apiConfigStore.loadFromStorage()
+  await refreshDashboardContext()
+  await douyinMaterialStore.loadFromServer(true)
+  await loadDashboardData()
+}
+
+async function refreshDashboardContext() {
+  await sessionStore.loadSession()
+  await apiConfigStore.loadFromStorage()
+}
+
+function handleReportDateChange() {
+  reportCurrentPage.value = 1
+  reportPagination.page = 1
+  fetchReportData()
+}
+
+function handleOrderDateChange() {
+  ordersCurrentPage.value = 1
+  ordersPagination.page = 1
+  fetchOrdersData()
+}
+
+function handlePayStatusChange() {
+  ordersCurrentPage.value = 1
+  ordersPagination.page = 1
+  fetchOrdersData()
+}
+
+function handlePromotionUserTabChange(username: string) {
+  if (activePromotionUserName.value === username) {
+    return
+  }
+
+  activePromotionUserName.value = username
+  ordersCurrentPage.value = 1
+  ordersPagination.page = 1
+}
+
+onMounted(async () => {
+  checkMobile()
+  window.addEventListener('resize', checkMobile)
+  reportDateRange.value = getDefaultDateRange()
+  orderDateRange.value = getDefaultDateRange()
+  await refreshDashboardContext()
+  if (hasActiveChannel.value) {
+    douyinMaterialStore.loadFromServer(true).catch(error => {
+      console.error('加载抖音号匹配素材失败:', error)
+    })
+    await loadDashboardData()
+    autoRefresh.startAutoRefresh()
+  }
+})
+
+watch(
+  hasActiveChannel,
+  active => {
+    if (active) {
+      douyinMaterialStore.loadFromServer(true).catch(error => {
+        console.error('加载抖音号匹配素材失败:', error)
+      })
+      loadDashboardData().catch(error => {
+        console.error('加载首页数据失败:', error)
+      })
+      autoRefresh.startAutoRefresh()
+    } else {
+      autoRefresh.stopAutoRefresh()
+    }
+  },
+  { immediate: false }
+)
+
+watch(reportCurrentPage, page => {
+  reportPagination.page = page
+})
+
+watch(ordersCurrentPage, page => {
+  ordersPagination.page = page
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', checkMobile)
+  autoRefresh.stopAutoRefresh()
+})
+</script>
+
+<style scoped>
+.channel-tabs-shell {
+  display: inline-flex;
+  max-width: 100%;
+  gap: 0.5rem;
+  padding: 0.35rem;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, rgba(241, 245, 249, 0.9), rgba(226, 232, 240, 0.95));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 12px 32px -20px rgba(15, 23, 42, 0.35);
+  overflow-x: auto;
+}
+
+.channel-tabs-shell.compact {
+  gap: 0.35rem;
+  padding: 0.25rem;
+  margin-left: 0.75rem;
+  background: linear-gradient(135deg, rgba(248, 250, 252, 0.96), rgba(241, 245, 249, 0.98));
+}
+
+.channel-tab-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: fit-content;
+  padding: 0.7rem 1rem;
+  border-radius: 0.85rem;
+  color: rgb(71 85 105);
+  font-size: 0.95rem;
+  font-weight: 600;
+  transition: all 0.25s ease;
+}
+
+.channel-tab-button:hover {
+  color: rgb(15 23 42);
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.channel-tab-button.active {
+  color: white;
+  background: linear-gradient(135deg, rgb(59 130 246), rgb(37 99 235));
+  box-shadow:
+    0 10px 28px -18px rgba(37, 99, 235, 0.9),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.channel-tabs-shell.compact .channel-tab-button {
+  padding: 0.55rem 0.9rem;
+}
+
+.channel-tab-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 9999px;
+  background: currentColor;
+  opacity: 0.35;
+}
+
+.channel-tab-button.active .channel-tab-dot {
+  opacity: 0.95;
+}
+
+.overview-card {
+  cursor: pointer;
+  transition: transform 0.3s ease;
+}
+
+.overview-card:hover {
+  transform: scale(1.02);
+}
+
+.overview-card-inner {
+  border-width: 1px;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  box-shadow: 0 8px 24px -18px rgba(15, 23, 42, 0.28);
+  backdrop-filter: blur(8px);
+  transition: all 0.3s ease;
+}
+
+.overview-card:hover .overview-card-inner {
+  box-shadow: 0 18px 38px -24px rgba(15, 23, 42, 0.35);
+}
+
+.overview-card-icon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 12px 28px -18px rgba(15, 23, 42, 0.35);
+  transition: transform 0.3s ease;
+}
+
+.overview-card:hover .overview-card-icon {
+  transform: scale(1.08);
+}
+
+.user-label-badge {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #fff;
+  background: linear-gradient(to right, rgb(59 130 246), rgb(147 51 234));
+  border-radius: 9999px;
+  border: none;
+  line-height: 1;
+}
+
+.user-label-badge--clickable {
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.user-label-badge--clickable:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px -16px rgba(37, 99, 235, 0.8);
+}
+
+.refresh-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border-radius: 9999px;
+  padding: 0.22rem 0.7rem;
+  background: rgba(226, 232, 240, 0.7);
+  color: rgb(100 116 139);
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.refresh-status-pill.active {
+  background: rgba(220, 252, 231, 0.8);
+  color: rgb(22 101 52);
+}
+
+.refresh-status-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: currentColor;
+  opacity: 0.45;
+}
+
+.refresh-status-pill.active .refresh-status-dot {
+  opacity: 1;
+  animation: refresh-breath 1.6s ease-in-out infinite;
+}
+
+.refresh-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 9999px;
+  background: rgba(236, 253, 245, 0.95);
+  box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.12);
+  transition: all 0.2s ease;
+}
+
+.refresh-icon-button:hover {
+  background: rgba(220, 252, 231, 1);
+  transform: scale(1.04);
+}
+
+.refresh-icon-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.order-user-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.order-user-tab {
+  min-width: 180px;
+  flex: 1 1 180px;
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(251, 191, 36, 0.22);
+  border-radius: 1rem;
+  background:
+    radial-gradient(circle at top right, rgba(253, 224, 71, 0.28), transparent 46%),
+    linear-gradient(135deg, rgba(255, 251, 235, 0.96), rgba(255, 247, 237, 0.98));
+  box-shadow: 0 14px 34px -24px rgba(194, 65, 12, 0.35);
+  text-align: left;
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    border-color 0.22s ease;
+}
+
+.order-user-tab:hover {
+  transform: translateY(-2px);
+  border-color: rgba(249, 115, 22, 0.28);
+  box-shadow: 0 18px 36px -24px rgba(194, 65, 12, 0.42);
+}
+
+.order-user-tab.active {
+  border-color: rgba(14, 116, 144, 0.28);
+  background:
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.24), transparent 42%),
+    linear-gradient(135deg, rgba(14, 165, 233, 0.98), rgba(3, 105, 161, 0.95));
+  box-shadow: 0 24px 48px -30px rgba(3, 105, 161, 0.68);
+}
+
+.order-user-tab--loading {
+  cursor: progress;
+}
+
+.order-user-tab--loading:hover {
+  transform: none;
+}
+
+.order-user-tab__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.order-user-tab__label {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: rgb(154 52 18);
+}
+
+.order-user-tab__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: rgb(194 65 12);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.order-user-tab__amount {
+  margin-top: 0.6rem;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: rgb(15 23 42);
+}
+
+.order-user-tab__meta {
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+  color: rgb(148 63 18);
+}
+
+.order-user-tab.active .order-user-tab__label,
+.order-user-tab.active .order-user-tab__amount,
+.order-user-tab.active .order-user-tab__meta {
+  color: white;
+}
+
+.order-user-tab.active .order-user-tab__count {
+  background: rgba(255, 255, 255, 0.18);
+  color: white;
+}
+
+.order-user-tab__skeleton {
+  position: relative;
+  color: transparent !important;
+  overflow: hidden;
+}
+
+.order-user-tab__skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    rgba(226, 232, 240, 0.55) 0%,
+    rgba(255, 255, 255, 0.9) 48%,
+    rgba(226, 232, 240, 0.55) 100%
+  );
+  background-size: 220% 100%;
+  animation: order-tab-skeleton 1.45s ease-in-out infinite;
+}
+
+.order-user-tab__skeleton--label {
+  width: 3.8rem;
+  min-height: 1.1rem;
+  border-radius: 0.5rem;
+}
+
+.order-user-tab__skeleton--count {
+  width: 3.4rem;
+  min-height: 1.35rem;
+  border-radius: 9999px;
+}
+
+.order-user-tab__skeleton--amount {
+  width: 5.2rem;
+  min-height: 1.5rem;
+  border-radius: 0.65rem;
+}
+
+.order-user-tab__skeleton--meta {
+  width: 7.2rem;
+  min-height: 1rem;
+  border-radius: 0.5rem;
+}
+
+@keyframes refresh-breath {
+  0%,
+  100% {
+    transform: scale(0.85);
+    opacity: 0.45;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+}
+
+@keyframes order-tab-skeleton {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: -100% 50%;
+  }
+}
+</style>

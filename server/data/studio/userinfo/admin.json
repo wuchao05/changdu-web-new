@@ -1,0 +1,87 @@
+{
+  "id": "admin",
+  "nickname": "管理员",
+  "account": "admin",
+  "password": "qwer1234",
+  "authToken": "cfe1a6760c578521262b2145f1d80a07b145f3d4cbe8c53c",
+  "userType": "admin",
+  "channelIds": [
+    "5f0d85e6-26a0-4fe2-a0c5-30c78a8770df",
+    "00514b91-884d-40f8-9e67-6a593a9df74f"
+  ],
+  "defaultChannelId": "5f0d85e6-26a0-4fe2-a0c5-30c78a8770df",
+  "channelConfigs": {
+    "5f0d85e6-26a0-4fe2-a0c5-30c78a8770df": {
+      "feishu": {
+        "dramaListTableId": "tblvuZhBd4drW26n",
+        "dramaStatusTableId": "tblDOyi2Lzs80sv0",
+        "accountTableId": "tblrlxmzydVtPcbW"
+      },
+      "materialPreview": {
+        "enabled": true,
+        "intervalMinutes": 20,
+        "buildTimeWindowStart": 90,
+        "buildTimeWindowEnd": 20
+      },
+      "permissions": {
+        "syncAccount": true
+      },
+      "orderUserStats": {
+        "enabled": true,
+        "sortMode": "amount_desc",
+        "usernames": [
+          "小何",
+          "小红",
+          "虎哥",
+          "岁月",
+          "昱飞"
+        ]
+      },
+      "douyinMaterialMatches": [
+        {
+          "id": "ce8cd4a5-c909-467c-8b95-88dc6c96f0f8",
+          "douyinAccount": "小红看剧",
+          "douyinAccountId": "25655660267",
+          "materialRange": "01-04",
+          "createdAt": "2026-03-27T23:20:14.942Z",
+          "updatedAt": "2026-03-27T23:20:14.942Z"
+        }
+      ]
+    },
+    "00514b91-884d-40f8-9e67-6a593a9df74f": {
+      "feishu": {
+        "dramaListTableId": "",
+        "dramaStatusTableId": "",
+        "accountTableId": ""
+      },
+      "materialPreview": {
+        "enabled": false,
+        "intervalMinutes": 20,
+        "buildTimeWindowStart": 90,
+        "buildTimeWindowEnd": 20
+      },
+      "permissions": {
+        "syncAccount": false
+      },
+      "orderUserStats": {
+        "enabled": false,
+        "sortMode": "manual",
+        "usernames": []
+      },
+      "douyinMaterialMatches": []
+    }
+  },
+  "feishu": {
+    "dramaListTableId": "tblvuZhBd4drW26n",
+    "dramaStatusTableId": "tblDOyi2Lzs80sv0",
+    "accountTableId": "tblrlxmzydVtPcbW"
+  },
+  "materialPreview": {
+    "enabled": true,
+    "intervalMinutes": 20,
+    "buildTimeWindowStart": 90,
+    "buildTimeWindowEnd": 20
+  },
+  "createdAt": "2026-03-26T13:32:12.621Z",
+  "updatedAt": "2026-03-29T09:29:36.169Z"
+}

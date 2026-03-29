@@ -1,0 +1,31 @@
+{
+  "admin__5f0d85e6-26a0-4fe2-a0c5-30c78a8770df": {
+    "instanceKey": "admin__5f0d85e6-26a0-4fe2-a0c5-30c78a8770df",
+    "userId": "admin",
+    "runtimeUserName": "管理员",
+    "channelId": "5f0d85e6-26a0-4fe2-a0c5-30c78a8770df",
+    "channelName": "每日",
+    "enabled": false,
+    "running": false,
+    "intervalMinutes": 20,
+    "buildTimeWindowStart": 90,
+    "buildTimeWindowEnd": 20,
+    "nextRunTime": null,
+    "lastRunTime": "2026-03-28T16:25:01.190Z",
+    "lastStatus": "success",
+    "lastError": "",
+    "lastResolvedConfig": {
+      "tableId": "tblDOyi2Lzs80sv0",
+      "awemeWhiteList": [
+        "小红看剧"
+      ]
+    },
+    "stats": {
+      "totalProcessed": 20,
+      "totalPreviewed": 16,
+      "totalDeleted": 1,
+      "successCount": 6,
+      "failCount": 0
+    }
+  }
+}

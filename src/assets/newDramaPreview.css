@@ -1,0 +1,1369 @@
+/* 主容器 */
+.new-drama-preview {
+  @apply bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-8;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* 置顶筛选区域样式 */
+.filter-section {
+  @apply w-full;
+  /* 固定高度，防止内容变化导致高度跳动 */
+  min-height: 50px;
+  height: 50px;
+}
+
+/* 紧凑的筛选布局 */
+.compact-filter-row {
+  @apply flex items-center gap-4;
+}
+
+/* Tab 切换器样式 */
+/* 一级 Tab 样式 - 卡片式设计，更突出 */
+.tab-switcher {
+  @apply flex items-center space-x-2 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-1 shadow-inner;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  /* 移动端优化：防止横向滚动 */
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+/* 隐藏滚动条 */
+.tab-switcher::-webkit-scrollbar {
+  display: none;
+}
+
+.tab-switch-btn {
+  @apply flex items-center space-x-2 px-4 py-2.5 text-sm font-semibold rounded-lg transition-all duration-300;
+  @apply text-gray-700 hover:text-gray-900 hover:bg-white/80;
+  @apply min-w-0 flex-shrink-0;
+  @apply border border-transparent hover:border-gray-200/50;
+  @apply shadow-sm hover:shadow-md;
+  /* 固定高度，防止徽章影响布局 */
+  height: 40px;
+  min-height: 40px;
+  position: relative;
+  overflow: hidden;
+  /* 移动端优化：确保按钮不会超出容器 */
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.tab-switch-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, transparent 0%, rgba(255, 255, 255, 0.1) 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.tab-switch-btn:hover::before {
+  opacity: 1;
+}
+
+.tab-switch-btn.active {
+  @apply bg-white text-blue-600 shadow-lg border border-blue-200/60;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  transform: translateY(-1px);
+}
+
+.tab-switch-btn.active::before {
+  opacity: 1;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(59, 130, 246, 0.1) 100%);
+}
+
+/* 紧凑的日期标签 */
+.date-tabs-compact {
+  @apply flex items-center space-x-1 bg-gray-50 rounded-lg p-0.5;
+}
+
+.date-tab-compact {
+  @apply flex items-center space-x-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md transition-all duration-200;
+  @apply text-gray-600 hover:text-gray-900 hover:bg-white;
+  @apply min-w-0 flex-shrink-0;
+  @apply border border-transparent hover:border-gray-200;
+  /* 固定高度，防止徽章影响布局 */
+  height: 32px;
+  min-height: 32px;
+}
+
+.date-tab-compact.active {
+  @apply bg-white text-blue-600 shadow-sm border border-blue-200;
+}
+
+.tab-icon-compact {
+  @apply w-4 h-4 flex-shrink-0;
+  transition: all 0.3s ease;
+}
+
+.tab-switch-btn:hover .tab-icon-compact {
+  transform: scale(1.1);
+}
+
+.tab-switch-btn.active .tab-icon-compact {
+  transform: scale(1.05);
+}
+
+.tab-text-compact {
+  @apply whitespace-nowrap text-sm font-semibold;
+  transition: all 0.3s ease;
+}
+
+.tab-count-compact {
+  @apply bg-blue-100 text-blue-600 px-1 py-0.5 rounded-full text-xs font-medium;
+  @apply min-w-[16px] text-center;
+  /* 确保徽章不影响按钮高度 */
+}
+
+/* 二级 Tab 吸顶区域 */
+.secondary-tab-sticky {
+  /* 固定整个吸顶区域高度，防止滚动时高度变化 */
+  /* height: 64px;
+  min-height: 64px;
+  max-height: 64px; */
+}
+
+/* 二级 Tab 容器 */
+.secondary-tab-container {
+  @apply w-full;
+  /* 固定容器高度，防止滚动时高度变化 */
+  /* height: 48px;
+  min-height: 48px;
+  max-height: 48px; */
+}
+
+/* 二级 Tab 切换器样式 */
+/* 二级 Tab 样式 - 轻量标签式设计 */
+.secondary-tab-switcher {
+  @apply flex items-center space-x-1 bg-white/60 backdrop-blur-sm rounded-lg p-1 border border-gray-200/40;
+  /* 固定切换器高度 */
+  height: 36px;
+  min-height: 36px;
+  max-height: 36px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.secondary-tab-btn {
+  @apply flex items-center space-x-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md transition-all duration-300;
+  @apply text-gray-500 hover:text-gray-700 hover:bg-gray-50/80;
+  @apply min-w-0 flex-shrink-0;
+  @apply border border-transparent hover:border-gray-200/60;
+  /* 固定按钮高度，确保一致性 */
+  height: 28px;
+  min-height: 28px;
+  max-height: 28px;
+  /* 确保内容垂直居中 */
+  display: flex;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.secondary-tab-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, transparent 0%, rgba(255, 255, 255, 0.3) 100%);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.secondary-tab-btn:hover::before {
+  opacity: 1;
+}
+
+.secondary-tab-btn.active {
+  @apply bg-blue-50/80 text-blue-600 shadow-sm border border-blue-200/60;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(59, 130, 246, 0.12) 100%);
+  transform: translateY(-0.5px);
+}
+
+.secondary-tab-btn.active::before {
+  opacity: 1;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.15) 100%);
+}
+
+.secondary-tab-icon {
+  @apply w-3.5 h-3.5 flex-shrink-0;
+  transition: all 0.25s ease;
+}
+
+.secondary-tab-btn:hover .secondary-tab-icon {
+  transform: scale(1.1);
+}
+
+.secondary-tab-btn.active .secondary-tab-icon {
+  transform: scale(1.05);
+}
+
+.secondary-tab-text {
+  @apply whitespace-nowrap text-xs font-medium;
+  transition: all 0.25s ease;
+}
+
+.secondary-tab-count {
+  @apply inline-flex items-center justify-center min-w-[16px] h-4 px-1.5 text-xs font-semibold rounded-full;
+  @apply bg-gray-200/80 text-gray-600;
+  transition: all 0.25s ease;
+}
+
+.secondary-tab-btn.active .secondary-tab-count {
+  @apply bg-blue-200/80 text-blue-700;
+  transform: scale(1.05);
+}
+
+/* 紧凑的搜索和查询区域 */
+.search-query-compact {
+  @apply flex items-center gap-2 flex-shrink-0 ml-auto;
+  /* 固定高度，与日期按钮保持一致 */
+  height: 32px;
+}
+
+.search-input-native {
+  @apply w-48;
+}
+
+/* 搜索输入框圆角样式 */
+.search-input-native :deep(.n-input) {
+  @apply rounded-lg;
+}
+
+/* 现代精致的刷新按钮 */
+.refresh-btn-modern {
+  @apply flex items-center justify-center relative overflow-hidden;
+  @apply bg-white border border-gray-200 text-gray-600;
+  @apply hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700;
+  @apply active:bg-gray-100 active:scale-95;
+  @apply disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:border-gray-200;
+  @apply transition-all duration-200 ease-out;
+  @apply shadow-sm hover:shadow-md;
+  @apply rounded-lg;
+
+  /* 与搜索输入框高度保持一致 */
+  width: 36px;
+  height: 28px;
+
+  /* 微妙的渐变效果 */
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.view-all-btn-modern {
+  @apply flex items-center justify-center relative overflow-hidden;
+  @apply bg-white border border-gray-200 text-gray-600;
+  @apply hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700;
+  @apply active:bg-gray-100 active:scale-95;
+  @apply disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:border-gray-200;
+  @apply transition-all duration-200 ease-out;
+  @apply shadow-sm hover:shadow-md;
+  @apply rounded-lg;
+  @apply text-xs font-semibold whitespace-nowrap;
+  height: 28px;
+  padding: 0 10px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.view-all-btn-modern:hover {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-color: #cbd5e1;
+}
+
+.view-all-btn-modern:active {
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  transform: scale(0.95);
+}
+
+/* 查看增剧按钮激活状态 */
+.view-all-btn-modern.active-compare {
+  @apply bg-red-500 border-red-500 text-white;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.view-all-btn-modern.active-compare:hover {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
+}
+
+.refresh-btn-modern:hover {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-color: #cbd5e1;
+}
+
+.refresh-btn-modern:active {
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  transform: scale(0.95);
+}
+
+.refresh-icon-modern {
+  @apply w-4 h-4 transition-transform duration-200;
+}
+
+/* 待下载按钮样式 */
+.pending-download-btn {
+  @apply flex items-center justify-center relative overflow-hidden;
+  @apply bg-white border border-gray-200 text-gray-600;
+  @apply hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700;
+  @apply active:bg-gray-100 active:scale-95;
+  @apply disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:border-gray-200;
+  @apply transition-all duration-200 ease-out;
+  @apply shadow-sm hover:shadow-md;
+  @apply rounded-lg;
+
+  /* 与搜索输入框高度保持一致 */
+  width: 36px;
+  height: 28px;
+
+  /* 微妙的渐变效果 */
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.pending-download-btn:hover {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-color: #cbd5e1;
+}
+
+.pending-download-btn:active {
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  transform: scale(0.95);
+}
+
+.pending-download-btn.active {
+  @apply bg-blue-500 border-blue-500 text-white;
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.pending-download-btn.active:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+}
+
+.pending-download-icon {
+  @apply w-4 h-4 transition-transform duration-200;
+}
+
+/* 待下载进度提示样式 */
+.pending-download-progress {
+  @apply mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg;
+}
+
+.progress-content {
+  @apply flex items-center gap-3 w-full;
+}
+
+.progress-icon {
+  @apply w-5 h-5 text-blue-600;
+}
+
+.progress-text {
+  @apply text-blue-700 font-medium;
+}
+
+.auto-download-bar {
+  @apply mb-4 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3;
+  @apply bg-gradient-to-r from-indigo-50 to-blue-50 border border-blue-200 rounded-xl;
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.08);
+}
+
+.auto-download-info {
+  @apply flex items-center gap-3;
+}
+
+.auto-download-icon {
+  @apply w-6 h-6 text-blue-600;
+}
+
+.auto-download-title {
+  @apply text-sm font-semibold text-slate-900;
+}
+
+.auto-download-desc {
+  @apply text-xs text-slate-600;
+}
+
+.auto-download-actions {
+  @apply flex items-center gap-3 flex-wrap;
+}
+
+.auto-download-button {
+  @apply px-4 py-2 rounded-lg text-sm font-medium text-white;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  box-shadow: 0 8px 20px rgba(16, 185, 129, 0.25);
+  transition: all 0.2s ease;
+}
+
+.auto-download-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(16, 185, 129, 0.3);
+}
+
+.auto-download-button.stop {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  box-shadow: 0 8px 20px rgba(217, 119, 6, 0.2);
+}
+
+.auto-download-button:disabled {
+  @apply opacity-70 cursor-not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.auto-download-hint {
+  @apply text-xs text-slate-500;
+}
+
+.auto-download-message {
+  @apply text-xs text-slate-700;
+}
+
+/* 未找到剧集样式 */
+.not-found-dramas {
+  @apply mb-4 p-4 bg-orange-50 border border-orange-200 rounded-lg;
+}
+
+.not-found-header {
+  @apply flex items-center gap-2 mb-3;
+}
+
+.not-found-icon {
+  @apply w-5 h-5 text-orange-600;
+}
+
+.not-found-title {
+  @apply text-orange-700 font-medium;
+}
+
+.not-found-list {
+  @apply text-orange-600 text-sm leading-relaxed;
+}
+
+.not-found-item {
+  @apply inline;
+}
+
+/* 加载状态的旋转动画优化 */
+.refresh-icon-modern.animate-spin {
+  animation: spin-smooth 1s linear infinite;
+}
+
+@keyframes spin-smooth {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 分页器样式 */
+.pagination-container {
+  @apply mt-8 space-y-4;
+}
+
+.pagination {
+  @apply flex items-center justify-center space-x-2;
+}
+
+.pagination-btn {
+  @apply flex items-center space-x-1 px-3 py-2 text-sm font-medium;
+  @apply bg-white border border-gray-300 rounded-lg;
+  @apply hover:bg-gray-50 hover:border-gray-400 transition-all duration-200;
+  @apply disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white;
+}
+
+.pagination-pages {
+  @apply flex items-center space-x-1;
+}
+
+.page-btn {
+  @apply w-8 h-8 text-sm font-medium rounded-lg;
+  @apply bg-white border border-gray-300 text-gray-700;
+  @apply hover:bg-gray-50 hover:border-gray-400 transition-all duration-200;
+}
+
+.page-btn.active {
+  @apply bg-blue-500 text-white border-blue-500;
+}
+
+.btn-icon {
+  @apply w-4 h-4;
+}
+
+.pagination-info {
+  @apply flex items-center justify-center space-x-4 text-sm text-gray-600;
+}
+
+.page-info {
+  @apply font-medium;
+}
+
+.total-info {
+  @apply text-gray-500;
+}
+
+/* 日期选择器 */
+.date-selector-section {
+  @apply mb-8;
+}
+
+.date-selector-container {
+  @apply bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden;
+  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 50%, #f1f5f9 100%);
+}
+
+.date-selector-row {
+  @apply flex items-center justify-between p-4 border-b border-gray-200;
+  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+}
+
+.top-actions {
+  @apply flex items-center space-x-3;
+}
+
+.refresh-button {
+  @apply flex items-center space-x-3 relative overflow-hidden rounded-xl font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 disabled:cursor-not-allowed;
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  padding: 12px 20px;
+  color: white;
+  min-height: 48px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.refresh-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2563eb 0%, #1e40af 50%, #1e3a8a 100%);
+  box-shadow: 0 10px 25px rgba(59, 130, 246, 0.4);
+}
+
+.refresh-button:active:not(:disabled) {
+  transform: translateY(-0.5px);
+  box-shadow: 0 5px 15px rgba(59, 130, 246, 0.3);
+}
+
+.refresh-button:disabled {
+  @apply bg-gray-400;
+  transform: none;
+  box-shadow: none;
+}
+
+.refresh-icon {
+  @apply w-5 h-5;
+}
+
+.refresh-text {
+  @apply text-sm font-semibold;
+}
+
+.date-tabs-container {
+  @apply flex-1;
+}
+
+.tabs-wrapper {
+  @apply flex space-x-2;
+}
+
+.date-tab {
+  @apply relative px-6 py-4 rounded-xl text-sm font-medium transition-all duration-300 flex items-center space-x-3 bg-white border border-gray-200 hover:border-blue-300 hover:shadow-md;
+  min-width: 120px;
+}
+
+.date-tab.active {
+  @apply bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg transform -translate-y-0.5 border-blue-500;
+}
+
+.date-tab:not(.active) {
+  @apply text-gray-600 hover:text-gray-900 hover:bg-gray-50;
+}
+
+.tab-content {
+  @apply flex items-center justify-between w-full;
+}
+
+.tab-main {
+  @apply flex items-center space-x-2;
+}
+
+.tab-icon {
+  @apply w-4 h-4;
+}
+
+.tab-text {
+  @apply font-medium;
+}
+
+.tab-badge {
+  @apply ml-2 px-2 py-1 bg-blue-100 text-blue-600 rounded-full text-xs font-bold;
+}
+
+.date-tab.active .tab-badge {
+  @apply bg-white bg-opacity-20 text-white;
+}
+
+.tab-indicator {
+  @apply absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-400 to-blue-600 rounded-b-xl opacity-0 transition-opacity duration-300;
+}
+
+.date-tab.active .tab-indicator {
+  @apply opacity-100;
+}
+
+.date-label {
+  @apply font-medium;
+}
+
+.date-count {
+  @apply px-2 py-1 bg-white bg-opacity-20 text-white rounded-full text-xs font-bold;
+}
+
+/* 骨架屏加载状态 */
+.drama-list-skeleton {
+  @apply p-6;
+}
+
+.skeleton-header {
+  @apply mb-8 text-center;
+}
+
+.skeleton-title {
+  @apply h-8 bg-gray-300 rounded-lg mx-auto mb-3;
+  width: 300px;
+  background: linear-gradient(90deg, #e0e0e0 25%, #d0d0d0 50%, #e0e0e0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+}
+
+.skeleton-subtitle {
+  @apply h-4 bg-gray-300 rounded mx-auto;
+  width: 200px;
+  background: linear-gradient(90deg, #e0e0e0 25%, #d0d0d0 50%, #e0e0e0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+  animation-delay: 0.2s;
+}
+
+.skeleton-drama-list {
+  @apply space-y-4 mb-8;
+}
+
+.skeleton-drama-card {
+  @apply bg-white rounded-xl shadow-lg p-4 border border-gray-100 flex gap-4;
+  animation: skeleton-card-fade-in 0.6s ease-out;
+}
+
+.skeleton-drama-card:nth-child(1) {
+  animation-delay: 0.1s;
+}
+.skeleton-drama-card:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.skeleton-drama-card:nth-child(3) {
+  animation-delay: 0.3s;
+}
+.skeleton-drama-card:nth-child(4) {
+  animation-delay: 0.4s;
+}
+.skeleton-drama-card:nth-child(5) {
+  animation-delay: 0.5s;
+}
+.skeleton-drama-card:nth-child(6) {
+  animation-delay: 0.6s;
+}
+.skeleton-drama-card:nth-child(7) {
+  animation-delay: 0.7s;
+}
+.skeleton-drama-card:nth-child(8) {
+  animation-delay: 0.8s;
+}
+.skeleton-drama-card:nth-child(9) {
+  animation-delay: 0.9s;
+}
+.skeleton-drama-card:nth-child(10) {
+  animation-delay: 1s;
+}
+.skeleton-drama-card:nth-child(11) {
+  animation-delay: 1.1s;
+}
+.skeleton-drama-card:nth-child(12) {
+  animation-delay: 1.2s;
+}
+
+.skeleton-poster {
+  @apply w-32 h-24 bg-gray-300 rounded-lg flex-shrink-0;
+  background: linear-gradient(90deg, #e0e0e0 25%, #d0d0d0 50%, #e0e0e0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+}
+
+/* 中间信息区域骨架 */
+.skeleton-drama-info {
+  @apply flex-1;
+}
+
+.skeleton-drama-main {
+  @apply h-full;
+}
+
+.skeleton-drama-details {
+  @apply space-y-3;
+}
+
+/* 分类标签骨架 */
+.skeleton-category-tags {
+  @apply flex flex-wrap gap-2 mb-3;
+}
+
+.skeleton-tag {
+  @apply h-6 bg-gray-300 rounded-full;
+  background: linear-gradient(90deg, #e0e0e0 25%, #d0d0d0 50%, #e0e0e0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+}
+
+.skeleton-tag:nth-child(1) {
+  width: 60px;
+  animation-delay: 0.3s;
+}
+.skeleton-tag:nth-child(2) {
+  width: 50px;
+  animation-delay: 0.4s;
+}
+.skeleton-tag:nth-child(3) {
+  width: 70px;
+  animation-delay: 0.5s;
+}
+.skeleton-tag:nth-child(4) {
+  width: 45px;
+  animation-delay: 0.6s;
+}
+
+/* 剧集信息骨架 */
+.skeleton-episode-info {
+  @apply mb-2;
+}
+
+.skeleton-episode-item {
+  @apply h-4 w-16 bg-gray-300 rounded;
+  background: linear-gradient(90deg, #e0e0e0 25%, #d0d0d0 50%, #e0e0e0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+  animation-delay: 0.7s;
+}
+
+/* 首发时间骨架 */
+.skeleton-publish-time {
+  @apply mb-2;
+}
+
+.skeleton-time-text {
+  @apply h-4 w-32 bg-gray-300 rounded;
+  background: linear-gradient(90deg, #e0e0e0 25%, #d0d0d0 50%, #e0e0e0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+  animation-delay: 0.8s;
+}
+
+/* 右侧操作区域骨架 */
+.skeleton-drama-actions {
+  @apply flex flex-col items-end space-y-3 w-32 flex-shrink-0;
+}
+
+.skeleton-status-label {
+  @apply h-6 w-16 bg-gray-300 rounded;
+  background: linear-gradient(90deg, #e0e0e0 25%, #d0d0d0 50%, #e0e0e0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+  animation-delay: 0.9s;
+}
+
+.skeleton-drama-id {
+  @apply h-4 w-24 bg-gray-300 rounded;
+  background: linear-gradient(90deg, #e0e0e0 25%, #d0d0d0 50%, #e0e0e0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+  animation-delay: 1s;
+}
+
+.skeleton-action-button {
+  @apply h-10 w-20 bg-gray-300 rounded;
+  background: linear-gradient(90deg, #e0e0e0 25%, #d0d0d0 50%, #e0e0e0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+  animation-delay: 1.1s;
+}
+
+.skeleton-loading-indicator {
+  @apply flex items-center justify-center space-x-3 py-8;
+}
+
+.skeleton-spinner {
+  @apply animate-spin rounded-full h-6 w-6 border-2 border-gray-300 border-t-blue-500;
+}
+
+.skeleton-loading-text {
+  @apply text-gray-500 text-sm font-medium;
+}
+
+/* 错误状态 */
+.error-section {
+  @apply text-center py-16;
+}
+
+.error-icon {
+  @apply w-16 h-16 text-red-500 mx-auto mb-6;
+}
+
+.error-message {
+  @apply text-red-600 mb-6 text-lg;
+}
+
+.retry-button {
+  @apply flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl hover:from-red-600 hover:to-red-700 transition-all duration-300 font-medium shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 mx-auto;
+}
+
+/* 短剧列表 */
+.drama-list {
+  @apply space-y-6;
+}
+
+.drama-card {
+  @apply bg-white rounded-xl border border-gray-200 p-5 hover:shadow-xl transition-all duration-300 hover:border-blue-300 hover:-translate-y-0.5;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  box-shadow:
+    0 2px 4px -1px rgba(0, 0, 0, 0.1),
+    0 1px 2px -1px rgba(0, 0, 0, 0.06);
+}
+
+.drama-content {
+  @apply flex space-x-4;
+}
+
+/* 封面图片 */
+.drama-poster {
+  @apply flex-shrink-0;
+}
+
+.poster-container {
+  @apply relative cursor-pointer;
+}
+
+.poster-image {
+  @apply w-24 h-32 object-cover rounded-xl shadow-lg;
+  transition: transform 0.3s ease;
+}
+
+.poster-container:hover .poster-image {
+  @apply transform scale-105;
+}
+
+/* 短剧信息 */
+.drama-info {
+  @apply flex-1 min-w-0;
+}
+
+.drama-main {
+  @apply flex items-start justify-between;
+}
+
+.drama-details {
+  @apply flex-1;
+}
+
+.drama-title-section {
+  @apply mb-3;
+}
+
+.drama-title-row {
+  @apply flex items-center gap-3;
+}
+
+.drama-title {
+  @apply text-lg font-bold text-gray-900 line-clamp-2 cursor-pointer hover:text-blue-600 transition-colors duration-300;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.abstract-button {
+  @apply flex items-center space-x-1 px-2 py-1 bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 text-xs rounded-md border border-blue-200 font-medium hover:from-blue-100 hover:to-indigo-100 hover:border-blue-300 hover:shadow-md transform hover:-translate-y-0.5 transition-all duration-200 flex-shrink-0;
+}
+
+.abstract-button:hover {
+  @apply shadow-lg;
+}
+
+.abstract-icon {
+  @apply w-3 h-3;
+}
+
+/* 分类标签 */
+.category-tags {
+  @apply flex flex-wrap gap-1.5 mb-3;
+}
+
+.category-tag {
+  @apply px-2.5 py-1 bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 text-xs rounded-full border border-blue-200 font-medium;
+  background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%);
+  transition: all 0.3s ease;
+}
+
+.category-tag:hover {
+  @apply transform scale-105 shadow-md;
+}
+
+/* 剧集信息 */
+.episode-info {
+  @apply mb-3;
+}
+
+.episode-item {
+  @apply flex items-center space-x-2;
+}
+
+.episode-icon {
+  @apply w-3.5 h-3.5 text-gray-500;
+}
+
+.episode-text {
+  @apply text-xs text-gray-600 font-medium;
+}
+
+/* 发布时间 */
+.publish-time {
+  @apply flex items-center text-xs;
+}
+
+.time-icon {
+  @apply w-3.5 h-3.5 mr-1.5 text-green-500;
+}
+
+.time-label {
+  @apply text-gray-600;
+}
+
+.time-value {
+  @apply font-semibold text-green-600 ml-1;
+}
+
+/* 状态和操作区域 */
+.drama-actions {
+  @apply flex flex-col items-end space-y-3;
+}
+
+.status-labels {
+  @apply flex flex-col items-end space-y-2;
+}
+
+.status-label {
+  @apply flex items-center px-3 py-1.5 text-xs rounded-full font-semibold border shadow-sm;
+  transition: all 0.3s ease;
+}
+
+.status-approved {
+  @apply bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 border-green-200;
+  background: linear-gradient(135deg, #dcfce7 0%, #d1fae5 100%);
+}
+
+.status-submitting {
+  @apply bg-gradient-to-r from-orange-50 to-amber-50 text-orange-700 border-orange-200;
+  background: linear-gradient(135deg, #fed7aa 0%, #fde68a 100%);
+}
+
+.status-label-wrapper {
+  @apply flex items-center;
+}
+
+.status-icon {
+  @apply w-3 h-3 mr-1.5;
+}
+
+.drama-id {
+  @apply text-xs text-gray-500 font-mono bg-gray-100 px-2.5 py-1 rounded-md;
+}
+
+/* 操作按钮 */
+.action-buttons {
+  @apply flex flex-col items-end space-y-2;
+}
+
+.action-button {
+  @apply flex items-center space-x-2 px-4 py-2 text-xs rounded-lg transition-all duration-300 font-semibold shadow-md hover:shadow-lg transform hover:-translate-y-0.5;
+}
+
+.action-button-download {
+  @apply bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700;
+}
+
+.action-button-downloaded {
+  @apply bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border border-green-300 cursor-not-allowed;
+  background: linear-gradient(135deg, #dcfce7 0%, #d1fae5 100%);
+}
+
+.action-button-submit {
+  @apply bg-gradient-to-r from-purple-500 to-purple-600 text-white hover:from-purple-600 hover:to-purple-700;
+}
+
+.action-button-submitted {
+  @apply bg-gradient-to-r from-orange-100 to-amber-100 text-orange-700 border border-orange-300 cursor-not-allowed;
+  background: linear-gradient(135deg, #fed7aa 0%, #fde68a 100%);
+}
+
+.action-button-pending {
+  @apply bg-gradient-to-r from-gray-100 to-slate-100 text-gray-600 border border-gray-300 cursor-not-allowed;
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+}
+
+.action-button-sync {
+  @apply bg-gradient-to-r from-indigo-500 to-indigo-600 text-white hover:from-indigo-600 hover:to-indigo-700;
+}
+
+.button-icon {
+  @apply w-3.5 h-3.5;
+}
+
+/* 空状态 */
+.empty-state {
+  @apply text-center py-20;
+}
+
+.empty-icon {
+  @apply w-20 h-20 text-gray-300 mx-auto mb-6;
+}
+
+.empty-title {
+  @apply text-2xl font-semibold text-gray-900 mb-4;
+}
+
+.empty-description {
+  @apply text-gray-600 text-lg;
+}
+
+/* Toast 提示 */
+.toast {
+  @apply fixed top-6 right-6 z-50 flex items-center space-x-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-4 rounded-2xl shadow-2xl;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.toast-icon {
+  @apply w-6 h-6;
+}
+
+.toast-message {
+  @apply font-semibold text-lg;
+}
+
+/* 下载状态样式 */
+.status-compressing {
+  @apply bg-gradient-to-r from-yellow-50 to-amber-50 text-yellow-800 border-yellow-200;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+}
+
+.status-completed {
+  @apply bg-gradient-to-r from-green-50 to-emerald-50 text-green-800 border-green-200;
+  background: linear-gradient(135deg, #dcfce7 0%, #d1fae5 100%);
+}
+
+.status-failed {
+  @apply bg-gradient-to-r from-red-50 to-rose-50 text-red-800 border-red-200;
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+}
+
+.status-encrypting {
+  @apply bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-800 border-blue-200;
+  background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  /* Tab 切换器移动端优化 */
+  .tab-switcher {
+    @apply space-x-1;
+    padding: 0.25rem;
+    /* 确保在移动端不会导致横向滚动 */
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .tab-switch-btn {
+    @apply px-3 py-2 text-xs;
+    /* 移动端更紧凑的按钮 */
+    height: 36px;
+    min-height: 36px;
+    /* 确保按钮内容不会溢出 */
+    min-width: auto;
+    flex-shrink: 1;
+  }
+
+  .tab-text-compact {
+    @apply text-xs;
+    /* 移动端文字更小，防止溢出 */
+  }
+
+  .compact-filter-row {
+    @apply flex-col gap-2;
+    /* 移动端垂直布局 */
+  }
+
+  .drama-content {
+    @apply flex-col space-x-0 space-y-4;
+  }
+
+  .drama-poster {
+    @apply self-center;
+  }
+
+  .drama-actions {
+    @apply items-center;
+  }
+
+  .header-content {
+    @apply flex-col space-y-6 items-start;
+  }
+
+  .title-section {
+    @apply flex-col space-y-4 items-start;
+  }
+
+  .header-actions {
+    @apply w-full justify-between;
+  }
+
+  .update-info {
+    @apply p-3;
+  }
+
+  .main-title {
+    @apply text-3xl;
+  }
+}
+
+/* 动画效果 */
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* 悬停效果增强 */
+.drama-card:hover {
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+.category-tag:hover {
+  background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+  @apply text-white;
+}
+
+/* 渐变文字效果 */
+.gradient-text {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* 简介弹窗样式 */
+.abstract-modal-overlay {
+  @apply fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4;
+}
+
+.abstract-modal {
+  @apply bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col;
+}
+
+.abstract-modal-header {
+  @apply flex items-center justify-between p-6 border-b border-gray-200;
+}
+
+.abstract-modal-title {
+  @apply text-xl font-bold text-gray-900 truncate flex-1 mr-4;
+}
+
+.abstract-modal-close {
+  @apply p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors duration-200 flex-shrink-0;
+}
+
+.close-icon {
+  @apply w-5 h-5;
+}
+
+.abstract-modal-content {
+  @apply p-6 flex-1 overflow-y-auto;
+}
+
+.abstract-loading {
+  @apply flex items-center justify-center space-x-3 py-8;
+}
+
+.abstract-spinner {
+  @apply w-6 h-6 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin;
+}
+
+.abstract-error {
+  @apply flex items-center justify-center space-x-3 py-8 text-red-600;
+}
+
+.error-icon {
+  @apply w-6 h-6;
+}
+
+.abstract-text {
+  @apply text-gray-700 leading-relaxed whitespace-pre-wrap;
+  line-height: 1.8;
+}
+
+.abstract-empty {
+  @apply flex items-center justify-center space-x-3 py-8 text-gray-500;
+}
+
+.abstract-empty .empty-icon {
+  @apply w-6 h-6;
+}
+
+/* 图片弹窗样式 */
+.image-modal-overlay {
+  @apply fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4;
+}
+
+.image-modal {
+  @apply bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col;
+}
+
+.image-modal-header {
+  @apply flex items-center justify-between p-6 border-b border-gray-200;
+}
+
+.image-modal-title {
+  @apply text-xl font-bold text-gray-900 truncate flex-1 mr-4;
+}
+
+.image-modal-close {
+  @apply p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors duration-200 flex-shrink-0;
+}
+
+.image-modal-content {
+  @apply p-6 flex-1 overflow-y-auto flex items-center justify-center;
+}
+
+.image-container {
+  @apply w-full flex items-center justify-center;
+  min-height: 400px; /* 固定最小高度，避免布局跳动 */
+  height: 70vh; /* 固定高度为视窗高度的70% */
+}
+
+/* 骨架屏样式 */
+.image-skeleton {
+  @apply w-full h-full flex flex-col items-center justify-center;
+}
+
+.skeleton-image-large {
+  @apply bg-gray-300 rounded-lg shadow-lg;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  background: linear-gradient(90deg, #e0e0e0 25%, #d0d0d0 50%, #e0e0e0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+  object-fit: contain;
+}
+
+.skeleton-loading-text {
+  @apply mt-4 text-sm text-gray-500 font-medium;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes skeleton-card-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.image-error {
+  @apply flex items-center justify-center space-x-3 text-red-600;
+  height: 100%; /* 占满容器高度 */
+}
+
+.image-display {
+  @apply w-full h-full flex items-center justify-center;
+}
+
+.image-large {
+  @apply max-w-full max-h-full object-contain rounded-lg shadow-lg;
+  height: 100%; /* 占满容器高度 */
+}
+
+.image-fade-in {
+  animation: imageFadeIn 0.5s ease-out;
+}
+
+@keyframes imageFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.image-empty {
+  @apply flex items-center justify-center space-x-3 text-gray-500;
+  height: 100%; /* 占满容器高度 */
+}
+
+.image-empty .empty-icon {
+  @apply w-6 h-6;
+}
+
+/* 模态框动画样式 */
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+
+.modal-enter-active .bg-white,
+.modal-leave-active .bg-white {
+  transition: transform 0.3s ease;
+}
+
+.modal-enter-from .bg-white,
+.modal-leave-to .bg-white {
+  transform: scale(0.9);
+}

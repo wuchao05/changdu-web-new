@@ -1,0 +1,183 @@
+{
+  "instanceKey": "admin__5f0d85e6-26a0-4fe2-a0c5-30c78a8770df",
+  "userId": "admin",
+  "runtimeUserName": "管理员",
+  "enabled": true,
+  "intervalMinutes": 20,
+  "tableId": null,
+  "channelId": "5f0d85e6-26a0-4fe2-a0c5-30c78a8770df",
+  "channelName": "每日",
+  "channelRuntime": {
+    "channelId": "5f0d85e6-26a0-4fe2-a0c5-30c78a8770df",
+    "channelName": "每日",
+    "buildConfig": {
+      "secretKey": "H53iZltmBXDndYt5ONW2h6tgCUxbG7kX",
+      "source": "合肥山宥麦网络",
+      "productId": "1764165838361148283",
+      "productPlatformId": "1969743078737707",
+      "landingUrl": "https://www.chengzijianzhan.com/tetris/page/7552876685726089254/",
+      "microAppName": "每日剧场",
+      "microAppId": "tt9c36ea8b0305b6c401",
+      "ccId": "1849832732821859",
+      "rechargeTemplateId": "1126190",
+      "adCallbackConfigId": "1845407746151576"
+    },
+    "juliang": {
+      "cookie": "__security_mc_61_s_sdk_crypt_sdk=03c7afd5-437d-ad4f; bd_ticket_guard_client_data=eyJiZC10aWNrZXQtZ3VhcmQtdmVyc2lvbiI6MiwiYmQtdGlja2V0LWd1YXJkLWl0ZXJhdGlvbi12ZXJzaW9uIjoxLCJiZC10aWNrZXQtZ3VhcmQtcmVlLXB1YmxpYy1rZXkiOiJCSlNWTzVzckRxc3JXMm5EWHZNK1g4NFp1VllQTXo3Kzdac3dSVERpWDhXU05lMDJzckwrMkpmS3U4TVVFSVhDL0dSV1B2Q3pBOHJUQklqM1VCMUx5Tms9IiwiYmQtdGlja2V0LWd1YXJkLXdlYi12ZXJzaW9uIjoyfQ%3D%3D; bd_ticket_guard_client_web_domain=2; passport_csrf_token=837da2edb5a9d247f7015a7c72ac11e5; passport_csrf_token_default=837da2edb5a9d247f7015a7c72ac11e5; ttwid=1%7CJ3VyHiQq3gPkViAy8w1L-7OaF2Faq8DCEvDtMsTFbA0%7C1772946679%7Ca70f78ce5e72ac7150039744995ffc7871172a424a9b2e60f8b42419581a4096; d_ticket=64a2be836b7db1d034d159bd10f7b3b2021d9; passport_auth_status=ea92dc842edce205490c011c9e90544a%2C; passport_auth_status_ss=ea92dc842edce205490c011c9e90544a%2C; passport_mfa_token=CjH0oNl4A4V6yg3%2B83wlzChR5Be1zlOWdZzXChDA2U%2BR3aS5awfbtG5BVy%2BVw4uKVEe5GkoKPAAAAAAAAAAAAABQKCGDU6aoye%2FGE9%2F3V9YAaJknpkhCoSkOXuNKYv3A1Iwa6fOkPvMgOChFp9a72DsXGBD6wosOGPax0WwgAiIBAxip4hs%3D; n_mh=Is1iB8GYEmIolPCbsKTNDXu5N6moq6Yvf_T7fcRre8M; sso_uid_tt=89a6be0a805ac194c19abad908692e20; sso_uid_tt_ss=89a6be0a805ac194c19abad908692e20; toutiao_sso_user=e557297d84f6779c32918a5958f3d9d3; toutiao_sso_user_ss=e557297d84f6779c32918a5958f3d9d3; sid_ucp_sso_v1=1.0.0-KGZmYWU4ZDMwY2MzMzNlNGFmOGY1OGVhODAzOTk5MDMzNDM0ZDIxZDYKIgj8p8Cul8ylAhDXirTNBhjizTQgDDDMu92wBjgBQOsHSAYaAmxmIiBlNTU3Mjk3ZDg0ZjY3NzljMzI5MThhNTk1OGYzZDlkMw; ssid_ucp_sso_v1=1.0.0-KGZmYWU4ZDMwY2MzMzNlNGFmOGY1OGVhODAzOTk5MDMzNDM0ZDIxZDYKIgj8p8Cul8ylAhDXirTNBhjizTQgDDDMu92wBjgBQOsHSAYaAmxmIiBlNTU3Mjk3ZDg0ZjY3NzljMzI5MThhNTk1OGYzZDlkMw; __security_mc_61_s_sdk_sign_data_key_sso=25f87ec3-44e5-940a; __security_mc_61_s_sdk_cert_key=55c746aa-4125-8ef3; odin_tt=4934370e92705e4ba5d6878c86f272a63aa95bb18ea4aa77c75a21059d0f8c5a9822fd113118c3bf297ef5cf0b25affedddf7266f21de707124151948b3363f3; sid_guard=2c3c68fd66adc69a21e067b1172f9685%7C1772946775%7C5184002%7CThu%2C+07-May-2026+05%3A12%3A57+GMT; uid_tt=3fbd765885d35fc4d4d165e0e1e41f96; uid_tt_ss=3fbd765885d35fc4d4d165e0e1e41f96; uid_tt_ss=3fbd765885d35fc4d4d165e0e1e41f96; is_hit_partitioned_cookie_canary_ss=true; is_hit_partitioned_cookie_canary_ss=true; sid_tt=2c3c68fd66adc69a21e067b1172f9685; sessionid=2c3c68fd66adc69a21e067b1172f9685; sessionid_ss=2c3c68fd66adc69a21e067b1172f9685; sessionid_ss=2c3c68fd66adc69a21e067b1172f9685; session_tlb_tag=sttt%7C5%7CLDxo_Watxpoh4GexFy-Whf________-0L3GKrQ2oF07-XWT5TW5W0f61m3qJbS_GEgGZoROjbhA%3D; session_tlb_tag=sttt%7C5%7CLDxo_Watxpoh4GexFy-Whf________-0L3GKrQ2oF07-XWT5TW5W0f61m3qJbS_GEgGZoROjbhA%3D; is_staff_user=false; sid_ucp_v1=1.0.0-KGFkYjdkZjY0OGNmMzUwMTNkNjE1ZWVhZjdjYjUyYjI0YjRkZDIxOTAKHAj8p8Cul8ylAhDXirTNBhjizTQgDDgBQOsHSAQaAmxmIiAyYzNjNjhmZDY2YWRjNjlhMjFlMDY3YjExNzJmOTY4NQ; sid_ucp_v1=1.0.0-KGFkYjdkZjY0OGNmMzUwMTNkNjE1ZWVhZjdjYjUyYjI0YjRkZDIxOTAKHAj8p8Cul8ylAhDXirTNBhjizTQgDDgBQOsHSAQaAmxmIiAyYzNjNjhmZDY2YWRjNjlhMjFlMDY3YjExNzJmOTY4NQ; is_hit_partitioned_cookie_canary=true; is_hit_partitioned_cookie_canary=true; ssid_ucp_v1=1.0.0-KGFkYjdkZjY0OGNmMzUwMTNkNjE1ZWVhZjdjYjUyYjI0YjRkZDIxOTAKHAj8p8Cul8ylAhDXirTNBhjizTQgDDgBQOsHSAQaAmxmIiAyYzNjNjhmZDY2YWRjNjlhMjFlMDY3YjExNzJmOTY4NQ; ssid_ucp_v1=1.0.0-KGFkYjdkZjY0OGNmMzUwMTNkNjE1ZWVhZjdjYjUyYjI0YjRkZDIxOTAKHAj8p8Cul8ylAhDXirTNBhjizTQgDDgBQOsHSAQaAmxmIiAyYzNjNjhmZDY2YWRjNjlhMjFlMDY3YjExNzJmOTY4NQ; _tea_utm_cache_367610=undefined; ttcid=94da2822741a4fd594cd9f6817f3836338; csrftoken=sWFf73LxNDQRgQw7gNNZqkDd; is_force_toggle_superior_1857697019870537=1; is_force_toggle_superior_1857697019342922=1; is_force_toggle_superior_1857697018636442=1; is_force_toggle_superior_1857697020436490=1; is_force_toggle_superior_1857697024289803=1; is_force_toggle_superior_1857697021401098=1; is_force_toggle_superior_1857697022342219=1; is_force_toggle_superior_1857697050022339=1; is_force_toggle_superior_1857697049312535=1; is_force_toggle_superior_1857697048616131=1; is_force_toggle_superior_1857697047956552=1; is_force_toggle_superior_1857697045881864=1; is_force_toggle_superior_1857697045169155=1; is_force_toggle_superior_1857697042719882=1; is_force_toggle_superior_1857697042215178=1; is_force_toggle_superior_1857697014237195=1; is_force_toggle_superior_1857697013705739=1; is_force_toggle_superior_1857697013251147=1; is_force_toggle_superior_1857697018123275=1; is_force_toggle_superior_1857697017652299=1; is_force_toggle_superior_1857697047247939=1; is_force_toggle_superior_1857697046557700=1; is_force_toggle_superior_1857697043353611=1; is_force_toggle_superior_1857697015685131=1; is_force_toggle_superior_1857697041732939=1; is_force_toggle_superior_1857697041221642=1; is_force_toggle_superior_1857697040750602=1; is_force_toggle_superior_1857697040183371=1; is_force_toggle_superior_1857697015222281=1; is_force_toggle_superior_1857697014728715=1; is_force_toggle_superior_1857697012261962=1; is_force_toggle_superior_1857697012740298=1; is_force_toggle_superior_1857697011755018=1; is_force_toggle_superior_1857697002616840=1; tt_scid=6dTWVqZ852iE-gd8rQ6cflDIzBbDgv6DXYFucW9Q3WO-hPupZWi-4WEoIvoZMwpOf0b7; get_new_msg_timer_cycle=1773210627524; msToken=w0gKltAa9biD_7ya8TAzrtGtJKRFicJDGVZ2IVS_p2gqydsCngn6E5oda27dN5vxZJ1yrBfJceQwArRJstbHYEwes8HEf-9khxeFPsFakCGFW5Y7BqTE7vX8y0AfSMzc; is_force_toggle_superior_1857697278220372=1",
+      "csrfToken": "sWFf73LxNDQRgQw7gNNZqkDd"
+    },
+    "changdu": {
+      "cookie": "n_mh=Is1iB8GYEmIolPCbsKTNDXu5N6moq6Yvf_T7fcRre8M; passport_csrf_token=4342a5965714dcffc229b1063d5e3200; passport_csrf_token_default=4342a5965714dcffc229b1063d5e3200; is_staff_user=false; s_v_web_id=verify_mlpbdlmk_W6aDnWhq_Imam_4bXW_BVWD_y03DqJhduL0p; sid_guard=79f47e907692a9f27cf22a1549c06615%7C1771254814%7C5184000%7CFri%2C+17-Apr-2026+15%3A13%3A34+GMT; uid_tt=f6ec206c3a80bf9f7ca3b88d8ecb40bc; uid_tt_ss=f6ec206c3a80bf9f7ca3b88d8ecb40bc; sid_tt=79f47e907692a9f27cf22a1549c06615; sessionid=79f47e907692a9f27cf22a1549c06615; sessionid_ss=79f47e907692a9f27cf22a1549c06615; session_tlb_tag=sttt%7C7%7CefR-kHaSqfJ88ioVScBmFf_________Z5Ct6kUNFhDHbKMvm2wxrtCQfHqO00z74zqfassU2y8Q%3D; sid_ucp_v1=1.0.0-KDZmZTkzYzQxOTBhYzc3ZTkxNDY0OTUzYWQ0NDk4OGFhYjM0NjBjNTMKFwj8p8Cul8ylAhCe6MzMBhimDDgBQOoHGgJsZiIgNzlmNDdlOTA3NjkyYTlmMjdjZjIyYTE1NDljMDY2MTU; ssid_ucp_v1=1.0.0-KDZmZTkzYzQxOTBhYzc3ZTkxNDY0OTUzYWQ0NDk4OGFhYjM0NjBjNTMKFwj8p8Cul8ylAhCe6MzMBhimDDgBQOoHGgJsZiIgNzlmNDdlOTA3NjkyYTlmMjdjZjIyYTE1NDljMDY2MTU; tt_scid=UZjIhlB.czPQhp37s4EwPRO9RPM3duD2f-fb0aB7mFN7EuhtLFMZiCx3hnF9Tgeae46c; gfkadpd=4842,34653",
+      "distributorId": "1844565955364887",
+      "secretKey": "H53iZltmBXDndYt5ONW2h6tgCUxbG7kX",
+      "adUserId": "1291245239407612",
+      "rootAdUserId": "600762415841560",
+      "appId": "40011566",
+      "appType": "7",
+      "agwJsConv": "str"
+    }
+  },
+  "runtimeUserConfig": {
+    "feishu": {
+      "dramaStatusTableId": "tblDOyi2Lzs80sv0"
+    }
+  },
+  "nextRunTime": "2026-03-29T11:31:04.596Z",
+  "lastRunTime": "2026-03-29T11:11:04.596Z",
+  "stats": {
+    "totalBuilt": 16,
+    "successCount": 16,
+    "failCount": 0
+  },
+  "currentTask": null,
+  "taskHistory": [
+    {
+      "dramaName": "拥有透视眼，破烂王变鉴宝王",
+      "status": "success",
+      "rating": "黄标",
+      "date": 1774713600000,
+      "publishTime": 1774713600000,
+      "completedAt": "2026-03-29T04:11:39.662Z"
+    },
+    {
+      "dramaName": "逃离火坑",
+      "status": "success",
+      "rating": "黄标",
+      "date": 1774713600000,
+      "publishTime": 1774746000000,
+      "completedAt": "2026-03-29T03:50:24.813Z"
+    },
+    {
+      "dramaName": "今生也想遇见你",
+      "status": "success",
+      "rating": "黄标",
+      "date": 1774713600000,
+      "publishTime": 1774749600000,
+      "completedAt": "2026-03-29T03:29:05.251Z"
+    },
+    {
+      "dramaName": "网恋到恐怖BOSS逃跑被亲哭",
+      "status": "success",
+      "rating": "黄标",
+      "date": 1774713600000,
+      "publishTime": 1774749600000,
+      "completedAt": "2026-03-29T03:07:48.093Z"
+    },
+    {
+      "dramaName": "花钱就返利，我靠消费霸榜魔都",
+      "status": "success",
+      "rating": "黄标",
+      "date": 1774713600000,
+      "publishTime": 1774749600000,
+      "completedAt": "2026-03-29T02:46:34.268Z"
+    },
+    {
+      "dramaName": "替身皇子，满朝文武求我登基称帝",
+      "status": "success",
+      "rating": "黄标",
+      "date": 1774713600000,
+      "publishTime": 1774749600000,
+      "completedAt": "2026-03-29T02:25:14.759Z"
+    },
+    {
+      "dramaName": "我在都市召唤神明",
+      "status": "success",
+      "rating": "黄标",
+      "date": 1774713600000,
+      "publishTime": 1774749600000,
+      "completedAt": "2026-03-29T02:03:53.923Z"
+    },
+    {
+      "dramaName": "病娇弟弟赖上我",
+      "status": "success",
+      "rating": "黄标",
+      "date": 1774713600000,
+      "publishTime": 1774749600000,
+      "completedAt": "2026-03-29T01:03:48.543Z"
+    },
+    {
+      "dramaName": "贵母当家",
+      "status": "success",
+      "rating": "黄标",
+      "date": 1774713600000,
+      "publishTime": 1774771200000,
+      "completedAt": "2026-03-29T00:02:37.292Z"
+    },
+    {
+      "dramaName": "焚心为局",
+      "status": "success",
+      "rating": "黄标",
+      "date": 1774713600000,
+      "publishTime": 1774749600000,
+      "completedAt": "2026-03-28T22:33:09.436Z"
+    },
+    {
+      "dramaName": "被当成汉子茶骂了，但我是真汉子",
+      "status": "success",
+      "rating": "黄标",
+      "date": 1774713600000,
+      "publishTime": 1774749600000,
+      "completedAt": "2026-03-28T20:59:49.117Z"
+    },
+    {
+      "dramaName": "破案风云：我的前妻是首席调查官",
+      "status": "success",
+      "rating": "黄标",
+      "date": 1774713600000,
+      "publishTime": 1774749600000,
+      "completedAt": "2026-03-28T19:42:19.925Z"
+    },
+    {
+      "dramaName": "装纨绔十年，一朝君临天下",
+      "status": "success",
+      "rating": "红标",
+      "date": 1774713600000,
+      "publishTime": 1773799200000,
+      "completedAt": "2026-03-28T18:13:12.937Z"
+    },
+    {
+      "dramaName": "野性难驯第二季",
+      "status": "success",
+      "rating": "红标",
+      "date": 1774713600000,
+      "publishTime": 1774713900000,
+      "completedAt": "2026-03-28T17:04:10.114Z"
+    },
+    {
+      "dramaName": "报告女总裁，太子赘婿又掉马了",
+      "status": "success",
+      "rating": "黄标",
+      "date": 1774713600000,
+      "publishTime": 1774749600000,
+      "completedAt": "2026-03-28T16:43:54.500Z"
+    },
+    {
+      "dramaName": "开红包盲盒开成首富少奶奶",
+      "status": "success",
+      "rating": "黄标",
+      "date": 1774713600000,
+      "publishTime": 1774749600000,
+      "completedAt": "2026-03-28T16:22:43.345Z"
+    }
+  ]
+}
