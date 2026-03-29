@@ -145,10 +145,10 @@ else
     echo "📥 下载代码..."
     if [ -n "$GITHUB_TOKEN" ]; then
         echo "使用Token认证..."
-        git clone "https://${GITHUB_TOKEN}@github.com/wuchao05/changdu-web.git" .
+        git clone "https://${GITHUB_TOKEN}@github.com/wuchao05/changdu-web-new.git" .
     else
         echo "使用公开访问（如果是私有仓库，请设置GITHUB_TOKEN环境变量）..."
-        git clone "https://github.com/wuchao05/changdu-web.git" .
+        git clone "https://github.com/wuchao05/changdu-web-new.git" .
     fi
 
     # 3. 安装依赖
