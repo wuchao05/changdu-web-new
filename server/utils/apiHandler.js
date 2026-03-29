@@ -1,4 +1,5 @@
 import { buildHeaders, buildDownloadCenterHeaders } from '../config/headers.js'
+import { getDefaultDownloadCenterConfig } from './studioData.js'
 
 /**
  * 通用API处理函数
@@ -238,6 +239,27 @@ export function createDownloadCenterHandler(apiName, targetPath) {
       }
       // console.log('最终发送的 Cookie 长度:', headers.Cookie?.length || 0)
       // console.log('======================================')
+
+      if (isTaskListApi) {
+        const defaultDownloadCenterConfig = await getDefaultDownloadCenterConfig()
+        if (!defaultDownloadCenterConfig) {
+          ctx.status = 400
+          ctx.body = {
+            code: 400,
+            message: '未配置默认下载中心，请先在管理员后台设置默认项',
+          }
+          return
+        }
+
+        headers.appid = defaultDownloadCenterConfig.appId || headers.appid
+        headers.apptype = '7'
+        headers.distributorid =
+          defaultDownloadCenterConfig.distributorId || headers.distributorid
+        headers.Aduserid = defaultDownloadCenterConfig.adUserId || headers.Aduserid
+        headers.Rootaduserid =
+          defaultDownloadCenterConfig.rootAdUserId || headers.Rootaduserid
+        headers.Cookie = defaultDownloadCenterConfig.cookie || headers.Cookie
+      }
 
       if (isTaskListApi) {
         console.log('\n========== 【新剧抢跑-剧集状态】 ==========')

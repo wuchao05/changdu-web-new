@@ -5,7 +5,12 @@ import {
   getSessionUser,
   requireSession,
 } from '../utils/studioSession.js'
-import { sanitizeUser, resolveRuntimeContext, resolveUserChannel } from '../utils/studioData.js'
+import {
+  getDefaultDownloadCenterConfig,
+  sanitizeUser,
+  resolveRuntimeContext,
+  resolveUserChannel,
+} from '../utils/studioData.js'
 import { DEFAULT_BUILD_CONFIG, normalizeBuildConfig } from '../config/buildConfig.js'
 
 const router = new Router({
@@ -80,6 +85,7 @@ router.get('/me', async ctx => {
       user,
       requestedChannelId
     )
+    const defaultDownloadCenterConfig = await getDefaultDownloadCenterConfig()
     ctx.body = {
       code: 0,
       message: 'success',
@@ -127,6 +133,7 @@ router.get('/me', async ctx => {
           ? runtimeUser.douyinMaterialMatches
           : [],
         buildConfig: normalizeBuildConfig(channel?.juliang?.buildConfig || DEFAULT_BUILD_CONFIG),
+        downloadCenterConfig: defaultDownloadCenterConfig,
       },
     }
   } catch (error) {
@@ -136,6 +143,15 @@ router.get('/me', async ctx => {
       message: '获取登录状态失败',
       error: error.message,
     }
+  }
+})
+
+router.get('/download-center-config/default', requireSession, async ctx => {
+  const defaultDownloadCenterConfig = await getDefaultDownloadCenterConfig()
+  ctx.body = {
+    code: 0,
+    message: 'success',
+    data: defaultDownloadCenterConfig,
   }
 })
 

@@ -563,8 +563,7 @@ async function getFirstAvailableAccount(channelId) {
  * 创建剧集状态记录
  */
 async function createDramaStatusRecord(channelId, params) {
-  const { dramaName, publishTime, account, channelNameValue, status, douyinMaterial, rating } =
-    params
+  const { dramaName, publishTime, account, status, douyinMaterial, rating } = params
   const accessToken = await getFeishuAccessToken()
   const profile = getSchedulerProfile(channelId)
 
@@ -599,10 +598,6 @@ async function createDramaStatusRecord(channelId, params) {
 
   if (account) {
     fields['账户'] = account
-  }
-
-  if (channelNameValue) {
-    fields['渠道'] = channelNameValue
   }
 
   if (publishTime) {
@@ -1052,25 +1047,21 @@ async function processDrama(channelId, drama, downloadList, newDramaSet, options
     await createDramaRecord(channelId, dramaName, drama.publish_time, drama.book_id, rating)
     console.log(`[自动提交-${channelId}] 创建剧集清单记录成功: ${dramaName}`)
 
-    // 5. 记录当前渠道名称
-    const channelNameValue = profile.channelName
-
-    // 6. 根据下载状态确定飞书状态
+    // 5. 根据下载状态确定飞书状态
     const downloadData = getDownloadDataForDrama(downloadList, dramaName)
     const taskStatus = downloadData?.task_status
     const readyStatuses = AUTO_SUBMIT_CONFIG.taskStatus.readyStatuses
     const feishuStatus =
       taskStatus !== undefined && readyStatuses.includes(taskStatus) ? '待下载' : '待提交'
 
-    // 7. 获取抖音素材配置（根据当前渠道）
+    // 6. 获取抖音素材配置（根据当前渠道）
     const douyinMaterial = await getDouyinMaterialConfig(channelId)
 
-    // 8. 创建剧集状态记录
+    // 7. 创建剧集状态记录
     await createDramaStatusRecord(channelId, {
       dramaName,
       publishTime: drama.publish_time,
       account: availableAccount.account,
-      channelNameValue,
       status: feishuStatus,
       douyinMaterial: douyinMaterial || undefined, // 如果为空字符串则传 undefined
       rating, // 传递评级参数

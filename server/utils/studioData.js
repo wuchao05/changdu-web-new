@@ -24,9 +24,14 @@ export function getChannelsFilePath() {
   return path.join(getStudioDataDir(), 'channles.json')
 }
 
+export function getDownloadCenterConfigsFilePath() {
+  return path.join(getStudioDataDir(), 'download-center-configs.json')
+}
+
 export const STUDIO_DATA_DIR = getStudioDataDir
 export const USERINFO_DIR = getUserinfoDir
 export const CHANNELS_FILE_PATH = getChannelsFilePath
+export const DOWNLOAD_CENTER_CONFIGS_FILE_PATH = getDownloadCenterConfigsFilePath
 
 const DEFAULT_ADMIN_USER_ID = 'admin'
 
@@ -104,6 +109,23 @@ function defaultChannelConfig() {
   }
 }
 
+function defaultDownloadCenterConfig() {
+  return {
+    id: crypto.randomUUID(),
+    name: '',
+    owner: '',
+    secretKey: '',
+    appId: '',
+    cookie: '',
+    distributorId: '',
+    adUserId: '',
+    rootAdUserId: '',
+    isDefault: false,
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  }
+}
+
 function defaultAdminUser() {
   return {
     id: DEFAULT_ADMIN_USER_ID,
@@ -131,6 +153,46 @@ export function normalizeDouyinMaterialMatch(match = {}) {
     createdAt: match.createdAt || nowIso(),
     updatedAt: match.updatedAt || nowIso(),
   }
+}
+
+export function normalizeDownloadCenterConfig(config = {}) {
+  const base = defaultDownloadCenterConfig()
+  return {
+    id: String(config.id || base.id),
+    name: String(config.name || '').trim(),
+    owner: String(config.owner || '').trim(),
+    secretKey: String(config.secretKey || '').trim(),
+    appId: String(config.appId || '').trim(),
+    cookie: String(config.cookie || '').trim(),
+    distributorId: String(config.distributorId || '').trim(),
+    adUserId: String(config.adUserId || '').trim(),
+    rootAdUserId: String(config.rootAdUserId || '').trim(),
+    isDefault: Boolean(config.isDefault),
+    createdAt: config.createdAt || base.createdAt,
+    updatedAt: config.updatedAt || nowIso(),
+  }
+}
+
+function normalizeDownloadCenterConfigs(configs = []) {
+  if (!Array.isArray(configs)) {
+    return []
+  }
+
+  const normalizedConfigs = configs
+    .map(normalizeDownloadCenterConfig)
+    .filter(config => config.name || config.owner || config.cookie || config.secretKey || config.appId)
+
+  if (normalizedConfigs.length === 0) {
+    return []
+  }
+
+  const firstDefaultIndex = normalizedConfigs.findIndex(config => config.isDefault)
+  const defaultIndex = firstDefaultIndex >= 0 ? firstDefaultIndex : 0
+
+  return normalizedConfigs.map((config, index) => ({
+    ...config,
+    isDefault: index === defaultIndex,
+  }))
 }
 
 function normalizeDouyinMaterialMatches(matches = []) {
@@ -491,6 +553,16 @@ export async function ensureStudioData() {
     )
   }
 
+  try {
+    await fs.access(getDownloadCenterConfigsFilePath())
+  } catch {
+    await fs.writeFile(
+      getDownloadCenterConfigsFilePath(),
+      JSON.stringify({ configs: [], updatedAt: nowIso() }, null, 2),
+      'utf-8'
+    )
+  }
+
   const adminFile = path.join(getUserinfoDir(), `${DEFAULT_ADMIN_USER_ID}.json`)
   try {
     await fs.access(adminFile)
@@ -516,6 +588,33 @@ export async function writeChannels(channels) {
   }
   await fs.writeFile(getChannelsFilePath(), JSON.stringify(payload, null, 2), 'utf-8')
   return payload
+}
+
+export async function readDownloadCenterConfigs() {
+  await ensureStudioData()
+  const raw = await fs.readFile(getDownloadCenterConfigsFilePath(), 'utf-8')
+  const parsed = JSON.parse(raw)
+  const configs = normalizeDownloadCenterConfigs(parsed.configs)
+  return {
+    configs,
+    updatedAt: parsed.updatedAt || nowIso(),
+  }
+}
+
+export async function writeDownloadCenterConfigs(configs) {
+  await ensureStudioData()
+  const normalizedConfigs = normalizeDownloadCenterConfigs(configs)
+  const payload = {
+    configs: normalizedConfigs,
+    updatedAt: nowIso(),
+  }
+  await fs.writeFile(getDownloadCenterConfigsFilePath(), JSON.stringify(payload, null, 2), 'utf-8')
+  return payload
+}
+
+export async function getDefaultDownloadCenterConfig() {
+  const { configs } = await readDownloadCenterConfigs()
+  return configs.find(config => config.isDefault) || null
 }
 
 export async function listUsers() {

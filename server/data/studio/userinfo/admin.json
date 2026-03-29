@@ -39,8 +39,8 @@
         "enabled": true,
         "sortMode": "amount_desc",
         "usernames": [
-          "小何",
           "小红",
+          "小何",
           "虎哥",
           "岁月",
           "昱飞"
@@ -54,6 +54,118 @@
           "materialRange": "01-04",
           "createdAt": "2026-03-27T23:20:14.942Z",
           "updatedAt": "2026-03-27T23:20:14.942Z"
+        },
+        {
+          "id": "6179613c-1780-4ddc-813e-3a063572bf37",
+          "douyinAccount": "斯娜看剧",
+          "douyinAccountId": "34996393230",
+          "materialRange": "05-08",
+          "createdAt": "2026-03-29T13:46:45.875Z",
+          "updatedAt": "2026-03-29T13:46:45.875Z"
+        },
+        {
+          "id": "118a8d2d-69b4-4c95-a666-3501b79c84a1",
+          "douyinAccount": "葸辉好剧",
+          "douyinAccountId": "63222312178",
+          "materialRange": "09-12",
+          "createdAt": "2026-03-29T13:46:45.875Z",
+          "updatedAt": "2026-03-29T13:46:45.875Z"
+        },
+        {
+          "id": "333e5c39-e02d-469b-879d-ecea16804536",
+          "douyinAccount": "看家本领",
+          "douyinAccountId": "44897700956",
+          "materialRange": "13-16",
+          "createdAt": "2026-03-29T13:46:45.875Z",
+          "updatedAt": "2026-03-29T13:46:45.875Z"
+        },
+        {
+          "id": "a1e36041-0685-4d18-9eee-6bd36d8c4141",
+          "douyinAccount": "清妍短剧",
+          "douyinAccountId": "64838437844",
+          "materialRange": "17-20",
+          "createdAt": "2026-03-29T13:46:45.875Z",
+          "updatedAt": "2026-03-29T13:46:45.875Z"
+        },
+        {
+          "id": "ca345994-1617-4faa-97a3-d6d9ee2e6328",
+          "douyinAccount": "哈哈看剧",
+          "douyinAccountId": "55984719140",
+          "materialRange": "21-24",
+          "createdAt": "2026-03-29T13:46:45.875Z",
+          "updatedAt": "2026-03-29T13:46:45.875Z"
+        },
+        {
+          "id": "2758ac41-1f98-409c-8992-08ee3d2bc712",
+          "douyinAccount": "葸辉爆剧",
+          "douyinAccountId": "43744652258",
+          "materialRange": "25-28",
+          "createdAt": "2026-03-29T13:46:45.875Z",
+          "updatedAt": "2026-03-29T13:46:45.875Z"
+        },
+        {
+          "id": "8b7f02ff-0234-48e7-92ab-f2027dbd357f",
+          "douyinAccount": "萍通剧坊",
+          "douyinAccountId": "78879847",
+          "materialRange": "29-31",
+          "createdAt": "2026-03-29T13:46:45.875Z",
+          "updatedAt": "2026-03-29T13:46:45.875Z"
+        },
+        {
+          "id": "73fa39dc-2a43-4b29-b1ff-5347ff281c6e",
+          "douyinAccount": "奈煊剧场",
+          "douyinAccountId": "57727623480",
+          "materialRange": "32-33",
+          "createdAt": "2026-03-29T13:46:45.875Z",
+          "updatedAt": "2026-03-29T13:46:45.875Z"
+        },
+        {
+          "id": "cc85a6bb-90fe-4bd4-aa90-5d87da872865",
+          "douyinAccount": "婉纨好剧",
+          "douyinAccountId": "57619106433",
+          "materialRange": "34-37",
+          "createdAt": "2026-03-29T13:46:45.875Z",
+          "updatedAt": "2026-03-29T13:46:45.875Z"
+        },
+        {
+          "id": "cff21a93-f046-4524-9431-8573c009eff2",
+          "douyinAccount": "小红好剧",
+          "douyinAccountId": "54295884928",
+          "materialRange": "38-40",
+          "createdAt": "2026-03-29T13:46:45.875Z",
+          "updatedAt": "2026-03-29T13:46:45.875Z"
+        },
+        {
+          "id": "39327bb8-e0b2-4088-ae87-15b4e705532a",
+          "douyinAccount": "淼淼看剧",
+          "douyinAccountId": "80813816142",
+          "materialRange": "41-43",
+          "createdAt": "2026-03-29T13:46:45.875Z",
+          "updatedAt": "2026-03-29T13:46:45.875Z"
+        },
+        {
+          "id": "28db986c-7b7f-4689-b917-c06cfe18751c",
+          "douyinAccount": "宇宙好剧",
+          "douyinAccountId": "46327062331",
+          "materialRange": "44-46",
+          "createdAt": "2026-03-29T13:46:45.875Z",
+          "updatedAt": "2026-03-29T13:46:45.875Z"
+        },
+        {
+          "id": "82fe0055-fb3e-4746-8afe-b2abf3d590b7",
+          "douyinAccount": "微微看剧",
+          "douyinAccountId": "96638484344",
+          "materialRange": "47-49",
+          "createdAt": "2026-03-29T13:46:45.875Z",
+          "updatedAt": "2026-03-29T13:46:45.875Z"
+        },
+        {
+          "id": "761c8f78-21eb-49d4-a75d-9437a766ba66",
+          "douyinAccount": "明宇好剧",
+          "douyinAccountId": "80841198915",
+          "materialRange": "50-53",
+          "createdAt": "2026-03-29T13:46:45.875Z",
+          "updatedAt": "2026-03-29T13:46:45.875Z"
         }
       ]
     },
@@ -101,5 +213,5 @@
     "buildTimeWindowEnd": 20
   },
   "createdAt": "2026-03-26T13:32:12.621Z",
-  "updatedAt": "2026-03-29T13:19:43.487Z"
+  "updatedAt": "2026-03-29T13:48:49.174Z"
 }

@@ -41,6 +41,21 @@ export interface UserChannelBindingConfig {
   }>
 }
 
+export interface DownloadCenterConfig {
+  id: string
+  name: string
+  owner: string
+  secretKey: string
+  appId: string
+  cookie: string
+  distributorId: string
+  adUserId: string
+  rootAdUserId: string
+  isDefault: boolean
+  createdAt: string
+  updatedAt: string
+}
+
 export interface UserProfile {
   id: string
   nickname: string
@@ -153,6 +168,7 @@ export function getCurrentSession() {
     availableChannels: Array<{ id: string; name: string }>
     materialPreview: UserChannelBindingConfig['materialPreview']
     orderUserStats: UserChannelBindingConfig['orderUserStats']
+    downloadCenterConfig: DownloadCenterConfig | null
   }>('/session/me')
 }
 
@@ -217,6 +233,38 @@ export function updateChannel(id: string, payload: Partial<ChannelConfig>) {
 
 export function deleteChannel(id: string) {
   return request<void>(`/admin/channels/${id}`, {
+    method: 'DELETE',
+  })
+}
+
+export function listDownloadCenterConfigs() {
+  return request<DownloadCenterConfig[]>('/admin/download-center-configs')
+}
+
+export function getDefaultDownloadCenterConfig() {
+  return request<DownloadCenterConfig | null>('/admin/download-center-configs/default')
+}
+
+export function getSessionDefaultDownloadCenterConfig() {
+  return request<DownloadCenterConfig | null>('/session/download-center-config/default')
+}
+
+export function createDownloadCenterConfig(payload: Partial<DownloadCenterConfig>) {
+  return request<DownloadCenterConfig>('/admin/download-center-configs', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function updateDownloadCenterConfig(id: string, payload: Partial<DownloadCenterConfig>) {
+  return request<DownloadCenterConfig>(`/admin/download-center-configs/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function deleteDownloadCenterConfig(id: string) {
+  return request<void>(`/admin/download-center-configs/${id}`, {
     method: 'DELETE',
   })
 }

@@ -60,6 +60,24 @@
               :single-line="false"
             />
           </n-tab-pane>
+          <n-tab-pane name="download-center" tab="下载中心配置">
+            <div class="mb-4 flex items-center justify-between gap-3">
+              <n-input
+                v-model:value="downloadCenterKeyword"
+                clearable
+                placeholder="搜索常读名称或所属人"
+                class="max-w-sm"
+              />
+              <n-button type="primary" @click="openDownloadCenterModal()">新增配置</n-button>
+            </div>
+
+            <n-data-table
+              :columns="downloadCenterColumns"
+              :data="filteredDownloadCenterConfigs"
+              :bordered="false"
+              :single-line="false"
+            />
+          </n-tab-pane>
         </n-tabs>
       </n-card>
     </main>
@@ -888,6 +906,144 @@
       </n-drawer-content>
     </n-drawer>
 
+    <n-drawer
+      v-model:show="showDownloadCenterModal"
+      placement="right"
+      :width="downloadCenterDrawerWidth"
+      class="admin-form-drawer"
+    >
+      <n-drawer-content closable body-content-style="padding: 0">
+        <template #header>
+          <div class="drawer-hero drawer-hero--channel">
+            <div class="drawer-hero__icon">
+              <Icon icon="mdi:download-network-outline" class="h-6 w-6" />
+            </div>
+            <div class="min-w-0 flex-1">
+              <p class="drawer-hero__eyebrow">下载中心配置</p>
+              <h2 class="drawer-hero__title">
+                {{ editingDownloadCenterId ? '编辑下载中心配置' : '新增下载中心配置' }}
+              </h2>
+              <p class="drawer-hero__desc">
+                管理常读下载中心鉴权参数，服务端在请求 task_list 时会优先使用默认配置。
+              </p>
+            </div>
+          </div>
+        </template>
+
+        <div class="admin-form-drawer__body">
+          <div class="admin-form-drawer__content space-y-5">
+            <section class="drawer-panel drawer-panel--muted">
+              <div class="panel-head">
+                <div class="panel-head__icon panel-head__icon--violet">
+                  <Icon icon="mdi:card-account-details-outline" class="h-5 w-5" />
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="panel-head__eyebrow text-violet-600">基础信息</p>
+                  <h3 class="panel-head__title">配置标识</h3>
+                  <p class="panel-head__desc">
+                    常读名称和所属人用于后台识别。设置为默认后，服务端下载中心请求会优先读取这条配置。
+                  </p>
+                </div>
+              </div>
+              <n-form
+                :model="downloadCenterForm"
+                label-placement="top"
+                class="grid grid-cols-1 gap-3 md:grid-cols-2"
+              >
+                <n-form-item label="常读名称">
+                  <n-input v-model:value="downloadCenterForm.name" placeholder="请输入常读名称" />
+                </n-form-item>
+                <n-form-item label="所属人">
+                  <n-input v-model:value="downloadCenterForm.owner" placeholder="请输入所属人" />
+                </n-form-item>
+                <n-form-item label="设为默认" class="md:col-span-2">
+                  <div class="flex h-[42px] items-center gap-3">
+                    <n-switch v-model:value="downloadCenterForm.isDefault" />
+                    <span class="text-sm text-slate-500">
+                      {{
+                        downloadCenterConfigs.length <= 1
+                          ? '当前仅有一条配置，保存后会自动设为默认'
+                          : '默认配置会被服务端优先用于下载中心 task_list 请求'
+                      }}
+                    </span>
+                  </div>
+                </n-form-item>
+              </n-form>
+            </section>
+
+            <section class="drawer-panel drawer-panel--white">
+              <div class="panel-head">
+                <div class="panel-head__icon panel-head__icon--blue">
+                  <Icon icon="mdi:key-link" class="h-5 w-5" />
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="panel-head__eyebrow text-blue-600">常读配置</p>
+                  <h3 class="panel-head__title">渠道访问参数</h3>
+                  <p class="panel-head__desc">
+                    这里维护常读平台下载中心所需的关键鉴权字段，字段含义与现有常读配置保持一致。
+                  </p>
+                </div>
+              </div>
+              <n-form
+                :model="downloadCenterForm"
+                label-placement="top"
+                class="grid grid-cols-1 gap-3 md:grid-cols-2"
+              >
+                <n-form-item label="Secret Key">
+                  <n-input
+                    v-model:value="downloadCenterForm.secretKey"
+                    placeholder="请输入 Secret Key"
+                  />
+                </n-form-item>
+                <n-form-item label="appId">
+                  <n-input v-model:value="downloadCenterForm.appId" placeholder="请输入 appId" />
+                </n-form-item>
+                <n-form-item label="常读 Cookie" class="md:col-span-2">
+                  <n-input
+                    v-model:value="downloadCenterForm.cookie"
+                    type="textarea"
+                    :rows="4"
+                    placeholder="请输入常读 Cookie"
+                  />
+                </n-form-item>
+                <n-form-item label="distributorId">
+                  <n-input
+                    v-model:value="downloadCenterForm.distributorId"
+                    placeholder="请输入 distributorId"
+                  />
+                </n-form-item>
+                <n-form-item label="adUserId">
+                  <n-input
+                    v-model:value="downloadCenterForm.adUserId"
+                    placeholder="请输入 adUserId"
+                  />
+                </n-form-item>
+                <n-form-item label="rootAdUserId" class="md:col-span-2">
+                  <n-input
+                    v-model:value="downloadCenterForm.rootAdUserId"
+                    placeholder="请输入 rootAdUserId"
+                  />
+                </n-form-item>
+              </n-form>
+            </section>
+          </div>
+        </div>
+
+        <template #footer>
+          <div class="admin-form-drawer__footer">
+            <n-button @click="showDownloadCenterModal = false">取消</n-button>
+            <n-button
+              type="primary"
+              :loading="savingDownloadCenter"
+              @click="saveDownloadCenterConfig"
+            >
+              保存
+            </n-button>
+          </div>
+        </template>
+      </n-drawer-content>
+    </n-drawer>
+
   </div>
 </template>
 
@@ -926,6 +1082,7 @@ const apiConfigStore = useApiConfigStore()
 
 const users = ref<adminApi.UserProfile[]>([])
 const channels = ref<adminApi.ChannelConfig[]>([])
+const downloadCenterConfigs = ref<adminApi.DownloadCenterConfig[]>([])
 const overview = ref({
   userCount: 0,
   channelCount: 0,
@@ -934,12 +1091,16 @@ const overview = ref({
 })
 const userKeyword = ref('')
 const channelKeyword = ref('')
+const downloadCenterKeyword = ref('')
 const showUserModal = ref(false)
 const showChannelModal = ref(false)
+const showDownloadCenterModal = ref(false)
 const editingUserId = ref('')
 const editingChannelId = ref('')
+const editingDownloadCenterId = ref('')
 const savingUser = ref(false)
 const savingChannel = ref(false)
+const savingDownloadCenter = ref(false)
 const viewportWidth = ref(typeof window === 'undefined' ? 1440 : window.innerWidth)
 const orderUsernameDrafts = reactive<Record<string, string>>({})
 const materialMatchSearchDrafts = reactive<Record<string, string>>({})
@@ -976,10 +1137,25 @@ interface ChannelFormModel {
   adx: NonNullable<adminApi.ChannelConfig['adx']>
 }
 
+interface DownloadCenterConfigFormModel {
+  name: string
+  owner: string
+  secretKey: string
+  appId: string
+  cookie: string
+  distributorId: string
+  adUserId: string
+  rootAdUserId: string
+  isDefault: boolean
+}
+
 type DesktopPermissionKey = keyof adminApi.UserChannelBindingConfig['permissions']['desktopMenus']
 
 const userForm = reactive<UserFormModel>(createDefaultUserForm())
 const channelForm = reactive<ChannelFormModel>(createDefaultChannelForm())
+const downloadCenterForm = reactive<DownloadCenterConfigFormModel>(
+  createDefaultDownloadCenterForm()
+)
 
 const userTypeOptions = [
   { label: '管理员', value: 'admin' },
@@ -1084,6 +1260,13 @@ const channelDrawerWidth = computed(() => {
 
   return 1080
 })
+const downloadCenterDrawerWidth = computed(() => {
+  if (viewportWidth.value <= 768) {
+    return Math.max(viewportWidth.value - 16, 280)
+  }
+
+  return 860
+})
 
 const overviewCards = computed(() => [
   { label: '用户总数', value: overview.value.userCount },
@@ -1105,6 +1288,14 @@ const filteredChannels = computed(() => {
   const keyword = channelKeyword.value.trim().toLowerCase()
   if (!keyword) return channels.value
   return channels.value.filter(channel => channel.name.toLowerCase().includes(keyword))
+})
+const filteredDownloadCenterConfigs = computed(() => {
+  const keyword = downloadCenterKeyword.value.trim().toLowerCase()
+  if (!keyword) return downloadCenterConfigs.value
+  return downloadCenterConfigs.value.filter(
+    config =>
+      config.name.toLowerCase().includes(keyword) || config.owner.toLowerCase().includes(keyword)
+  )
 })
 const userColumns: DataTableColumns<adminApi.UserProfile> = [
   { title: '昵称', key: 'nickname' },
@@ -1175,6 +1366,40 @@ const channelColumns: DataTableColumns<adminApi.ChannelConfig> = [
             tertiary: true,
             type: 'error',
             onClick: () => confirmDeleteChannel(row),
+          },
+          () => '删除'
+        ),
+      ]),
+  },
+]
+const downloadCenterColumns: DataTableColumns<adminApi.DownloadCenterConfig> = [
+  {
+    title: '常读名称',
+    key: 'name',
+    render: row =>
+      h('div', { class: 'flex items-center gap-2' }, [
+        h('span', row.name || '-'),
+        row.isDefault ? h(NTag, { size: 'small', type: 'success', bordered: false }, () => '默认') : null,
+      ]),
+  },
+  { title: '所属人', key: 'owner' },
+  {
+    title: '操作',
+    key: 'actions',
+    render: row =>
+      h('div', { class: 'flex gap-2' }, [
+        h(
+          NButton,
+          { size: 'small', tertiary: true, onClick: () => openDownloadCenterModal(row) },
+          () => '编辑'
+        ),
+        h(
+          NButton,
+          {
+            size: 'small',
+            tertiary: true,
+            type: 'error',
+            onClick: () => confirmDeleteDownloadCenterConfig(row),
           },
           () => '删除'
         ),
@@ -1326,6 +1551,20 @@ function createDefaultChannelForm(): ChannelFormModel {
   }
 }
 
+function createDefaultDownloadCenterForm(): DownloadCenterConfigFormModel {
+  return {
+    name: '',
+    owner: '',
+    secretKey: '',
+    appId: '',
+    cookie: '',
+    distributorId: '',
+    adUserId: '',
+    rootAdUserId: '',
+    isDefault: false,
+  }
+}
+
 function resetUserForm() {
   const defaults = createDefaultUserForm()
   Object.keys(userForm).forEach(key => {
@@ -1350,6 +1589,10 @@ function resetUserForm() {
 
 function resetChannelForm() {
   Object.assign(channelForm, createDefaultChannelForm())
+}
+
+function resetDownloadCenterForm() {
+  Object.assign(downloadCenterForm, createDefaultDownloadCenterForm())
 }
 
 function addUserChannelMatch(channelId: string) {
@@ -1553,14 +1796,16 @@ function removeUserChannelMatch(channelId: string, matchId: string) {
 }
 
 async function loadData() {
-  const [overviewData, userList, channelList] = await Promise.all([
+  const [overviewData, userList, channelList, downloadCenterConfigList] = await Promise.all([
     adminApi.getAdminOverview(),
     adminApi.listUsers(),
     adminApi.listChannels(),
+    adminApi.listDownloadCenterConfigs(),
   ])
   overview.value = overviewData
   users.value = userList
   channels.value = channelList
+  downloadCenterConfigs.value = downloadCenterConfigList
 }
 
 function openUserModal(user?: adminApi.UserProfile) {
@@ -1582,6 +1827,15 @@ function openChannelModal(channel?: adminApi.ChannelConfig) {
     Object.assign(channelForm, JSON.parse(JSON.stringify(channel)))
   }
   showChannelModal.value = true
+}
+
+function openDownloadCenterModal(config?: adminApi.DownloadCenterConfig) {
+  editingDownloadCenterId.value = config?.id || ''
+  resetDownloadCenterForm()
+  if (config) {
+    Object.assign(downloadCenterForm, JSON.parse(JSON.stringify(config)))
+  }
+  showDownloadCenterModal.value = true
 }
 
 function updateDesktopPermission(
@@ -1641,6 +1895,43 @@ async function saveChannel() {
   }
 }
 
+async function saveDownloadCenterConfig() {
+  savingDownloadCenter.value = true
+  try {
+    if (!downloadCenterForm.name.trim() || !downloadCenterForm.owner.trim()) {
+      message.error('常读名称和所属人为必填项')
+      return
+    }
+
+    const payload = {
+      ...downloadCenterForm,
+      name: downloadCenterForm.name.trim(),
+      owner: downloadCenterForm.owner.trim(),
+      secretKey: downloadCenterForm.secretKey.trim(),
+      appId: downloadCenterForm.appId.trim(),
+      cookie: downloadCenterForm.cookie.trim(),
+      distributorId: downloadCenterForm.distributorId.trim(),
+      adUserId: downloadCenterForm.adUserId.trim(),
+      rootAdUserId: downloadCenterForm.rootAdUserId.trim(),
+    }
+
+    if (editingDownloadCenterId.value) {
+      await adminApi.updateDownloadCenterConfig(editingDownloadCenterId.value, payload)
+      message.success('下载中心配置已更新')
+    } else {
+      await adminApi.createDownloadCenterConfig(payload)
+      message.success('下载中心配置已创建')
+    }
+
+    showDownloadCenterModal.value = false
+    await loadData()
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '保存下载中心配置失败')
+  } finally {
+    savingDownloadCenter.value = false
+  }
+}
+
 function confirmDeleteUser(user: adminApi.UserProfile) {
   dialog.warning({
     title: '删除用户',
@@ -1676,6 +1967,24 @@ function confirmDeleteChannel(channel: adminApi.ChannelConfig) {
         await apiConfigStore.loadFromStorage()
       } catch (error) {
         message.error(error instanceof Error ? error.message : '删除渠道失败')
+      }
+    },
+  })
+}
+
+function confirmDeleteDownloadCenterConfig(config: adminApi.DownloadCenterConfig) {
+  dialog.warning({
+    title: '删除下载中心配置',
+    content: `确定删除常读配置「${config.name}」吗？`,
+    positiveText: '删除',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      try {
+        await adminApi.deleteDownloadCenterConfig(config.id)
+        message.success('下载中心配置已删除')
+        await loadData()
+      } catch (error) {
+        message.error(error instanceof Error ? error.message : '删除下载中心配置失败')
       }
     },
   })

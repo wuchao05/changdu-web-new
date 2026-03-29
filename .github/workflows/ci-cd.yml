@@ -216,7 +216,25 @@ jobs:
               sleep_seconds="${3:-5}"
 
               for attempt in $(seq 1 "$max_attempts"); do
-                if curl -fsS --connect-timeout 3 --max-time 5 "$healthcheck_url" > /dev/null 2>&1; then
+                if node -e "
+                const url = process.argv[1];
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 5000);
+
+                fetch(url, { signal: controller.signal })
+                  .then(response => {
+                    clearTimeout(timeout);
+                    if (!response.ok) {
+                      console.error('healthcheck status:', response.status);
+                      process.exit(1);
+                    }
+                  })
+                  .catch(error => {
+                    clearTimeout(timeout);
+                    console.error(error instanceof Error ? error.message : String(error));
+                    process.exit(1);
+                  });
+                " "$healthcheck_url" > /dev/null 2>&1; then
                   echo "✅ 健康检查通过（第 ${attempt}/${max_attempts} 次）"
                   return 0
                 fi

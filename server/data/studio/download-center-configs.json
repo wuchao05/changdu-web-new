@@ -1,0 +1,19 @@
+{
+  "configs": [
+    {
+      "id": "25bff237-e613-4615-b80e-973f58727f7a",
+      "name": "散柔",
+      "owner": "小小花园",
+      "secretKey": "t05gPUR5ke8zyihAj9AlSNsarEJzCDzC",
+      "appId": "40012555",
+      "cookie": "passport_csrf_token=cd0361c5714c1ec80a6072d1230fa113; passport_csrf_token_default=cd0361c5714c1ec80a6072d1230fa113; s_v_web_id=verify_mmiy5ce1_L3M3yjID_p3Kj_4jyM_Bc9s_IMyHI9ThAcIT; use_biz_token=true; is_staff_user=false; ttwid=1%7C_5JMtzO43VPt5pLSNqy2gBjasvKOgXjtfb3hJIoICGs%7C1774795182%7C1a3e1c0da5014b5edbdd65c569d0e5c3e6e3d8135c63fa3e69caeb3b4e480f34; passport_mfa_token=CjCDgOBw7umcAcBBMWSUb79DaGmvMHjl5z94kO%2Bva9OiQCzf8yWotQUhmVig01kzQwQaSgo8AAAAAAAAAAAAAFA9jHSG1VXq9MmsAVc9dUlZCsmrrO%2FwqrSaLvkuTDfffJxy5YBO66NBapF%2BpsVks2yIELa0jQ4Y9rHRbCACIgEDi8yBWg%3D%3D; d_ticket=e32b68ca40815c16703aac28f48ecf673a580; odin_tt=9680ff828ce94fe4257f87879e3c5f36681ab95b82e79758a61815fe823da9ae86bcc720f5cd4c90ab843b4bb1fff831e7909fd91289f362b82c25524c9dab99; n_mh=MPHRKGEs6Mdv8j9-lYQ_xItbJLeVCy02zT61y_-m6jI; sid_guard=b6a7b527b720878931da785f6b9c784a%7C1774795192%7C5184000%7CThu%2C+28-May-2026+14%3A39%3A52+GMT; uid_tt=e73a7c8e42b85fdb8e73a2ce4eb7552d; uid_tt_ss=e73a7c8e42b85fdb8e73a2ce4eb7552d; sid_tt=b6a7b527b720878931da785f6b9c784a; sessionid=b6a7b527b720878931da785f6b9c784a; sessionid_ss=b6a7b527b720878931da785f6b9c784a; session_tlb_tag=sttt%7C9%7Ctqe1J7cgh4kx2nhfa5x4Sv_________0Wjg7-Q3X9bGCOD86DObys4VJ7CMMiPU9H_AMRKqpBgE%3D; sid_ucp_v1=1.0.0-KDgxZDEzNWQ3YTU4ZmI2NWE2Y2Q2ZDQxZGE1NDJjYjAxODRjYjg1MzEKHgi66cCnt81WELjzpM4GGOolIAww15_drQY4AUDqBxoCbGYiIGI2YTdiNTI3YjcyMDg3ODkzMWRhNzg1ZjZiOWM3ODRh; ssid_ucp_v1=1.0.0-KDgxZDEzNWQ3YTU4ZmI2NWE2Y2Q2ZDQxZGE1NDJjYjAxODRjYjg1MzEKHgi66cCnt81WELjzpM4GGOolIAww15_drQY4AUDqBxoCbGYiIGI2YTdiNTI3YjcyMDg3ODkzMWRhNzg1ZjZiOWM3ODRh; loginType=0; adUserId=380892546610362; rootAdUserId=380892546610362; isUg=false; gfkadpd=4842%2C34653; allocateStatus=1; isOaLinkedMpSecondLevel=false; isH5RevisitAppSecondLevel=false; isOaLinkedMpThirdLevel=false; isH5RevisitAppThirdLevel=false; enableQuickApp=true; enableWechatH5=false; enableWechatApp=false; enableDouYinMp=false; enableDouYinBookMp=false; enableDouYinFreeSeriesMp=false; enableDouYinVipStoryMp=false; distributorId=1853806262085748",
+      "distributorId": "1853806262085748",
+      "adUserId": "380892546610362",
+      "rootAdUserId": "380892546610362",
+      "isDefault": true,
+      "createdAt": "2026-03-29T14:44:14.613Z",
+      "updatedAt": "2026-03-29T14:44:14.613Z"
+    }
+  ],
+  "updatedAt": "2026-03-29T14:44:14.613Z"
+}

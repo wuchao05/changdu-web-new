@@ -626,7 +626,6 @@ router.put('/bitable/records/:recordId/account', async ctx => {
     const updateRequestBody = {
       fields: {
         账户: account,
-        渠道: '默认渠道',
       },
     }
 

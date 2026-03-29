@@ -2,11 +2,15 @@ import Router from '@koa/router'
 import crypto from 'crypto'
 import {
   deleteUser,
+  getDefaultDownloadCenterConfig,
   listUsers,
   readChannels,
+  readDownloadCenterConfigs,
   sanitizeUser,
   writeChannels,
+  writeDownloadCenterConfigs,
   writeUser,
+  normalizeDownloadCenterConfig,
   normalizeChannel,
   normalizeUser,
 } from '../utils/studioData.js'
@@ -316,6 +320,121 @@ router.delete('/channels/:id', async ctx => {
   ctx.body = {
     code: 0,
     message: '渠道删除成功',
+  }
+})
+
+router.get('/download-center-configs', async ctx => {
+  const { configs } = await readDownloadCenterConfigs()
+  ctx.body = {
+    code: 0,
+    message: 'success',
+    data: configs,
+  }
+})
+
+router.get('/download-center-configs/default', async ctx => {
+  const config = await getDefaultDownloadCenterConfig()
+  ctx.body = {
+    code: 0,
+    message: 'success',
+    data: config,
+  }
+})
+
+router.post('/download-center-configs', async ctx => {
+  const payload = ctx.request.body || {}
+  const { configs } = await readDownloadCenterConfigs()
+
+  if (!payload.name || !payload.owner) {
+    ctx.status = 400
+    ctx.body = {
+      code: 400,
+      message: '常读名称和所属人为必填项',
+    }
+    return
+  }
+
+  const nextConfig = normalizeDownloadCenterConfig({
+    ...payload,
+    id: payload.id || crypto.randomUUID(),
+    isDefault: payload.isDefault || configs.length === 0,
+  })
+
+  const nextConfigs = nextConfig.isDefault
+    ? configs.map(config => ({ ...config, isDefault: false })).concat(nextConfig)
+    : configs.concat(nextConfig)
+
+  await writeDownloadCenterConfigs(nextConfigs)
+
+  ctx.body = {
+    code: 0,
+    message: '下载中心配置创建成功',
+    data: nextConfig,
+  }
+})
+
+router.put('/download-center-configs/:id', async ctx => {
+  const { id } = ctx.params
+  const payload = ctx.request.body || {}
+  const { configs } = await readDownloadCenterConfigs()
+  const index = configs.findIndex(config => config.id === id)
+
+  if (index < 0) {
+    ctx.status = 404
+    ctx.body = {
+      code: 404,
+      message: '下载中心配置不存在',
+    }
+    return
+  }
+
+  const updated = normalizeDownloadCenterConfig({
+    ...configs[index],
+    ...payload,
+    id,
+    updatedAt: new Date().toISOString(),
+  })
+
+  if (!updated.name || !updated.owner) {
+    ctx.status = 400
+    ctx.body = {
+      code: 400,
+      message: '常读名称和所属人为必填项',
+    }
+    return
+  }
+
+  const nextConfigs = configs.map((config, currentIndex) =>
+    currentIndex === index ? updated : { ...config, isDefault: updated.isDefault ? false : config.isDefault }
+  )
+
+  await writeDownloadCenterConfigs(nextConfigs)
+
+  ctx.body = {
+    code: 0,
+    message: '下载中心配置更新成功',
+    data: updated,
+  }
+})
+
+router.delete('/download-center-configs/:id', async ctx => {
+  const { id } = ctx.params
+  const { configs } = await readDownloadCenterConfigs()
+  const nextConfigs = configs.filter(config => config.id !== id)
+
+  if (nextConfigs.length === configs.length) {
+    ctx.status = 404
+    ctx.body = {
+      code: 404,
+      message: '下载中心配置不存在',
+    }
+    return
+  }
+
+  await writeDownloadCenterConfigs(nextConfigs)
+  ctx.body = {
+    code: 0,
+    message: '下载中心配置删除成功',
   }
 })
 
