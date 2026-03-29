@@ -24,6 +24,7 @@ import adminRoutes from './server/routes/admin.js'
 import buildWorkflowRoutes from './server/routes/buildWorkflow.js'
 import douyinMaterialRoutes from './server/routes/douyinMaterial.js'
 import authRoutes from './server/routes/auth.js'
+import publicRoutes from './server/routes/public.js'
 import autoSubmitRoutes from './server/routes/autoSubmit.js'
 import adxRoutes from './server/routes/adx.js'
 import buildConfigRoutes from './server/routes/buildConfig.js'
@@ -114,6 +115,7 @@ router.use('/api/djdata', djdataRoutes.routes(), djdataRoutes.allowedMethods())
 router.use(sessionRoutes.routes(), sessionRoutes.allowedMethods())
 router.use(adminRoutes.routes(), adminRoutes.allowedMethods())
 router.use('/api/auth', authRoutes.routes(), authRoutes.allowedMethods())
+router.use(publicRoutes.routes(), publicRoutes.allowedMethods())
 router.use('/api/build-config', buildConfigRoutes.routes(), buildConfigRoutes.allowedMethods())
 router.use('/api/adx', adxRoutes.routes(), adxRoutes.allowedMethods())
 router.use(debugRoutes.routes(), debugRoutes.allowedMethods())
