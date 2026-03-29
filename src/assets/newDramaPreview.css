@@ -1220,6 +1220,187 @@
   @apply flex items-center justify-center space-x-3 py-8 text-red-600;
 }
 
+html.theme-dark .new-drama-preview-page {
+  background:
+    radial-gradient(circle at top, rgba(30, 41, 59, 0.45), transparent 24%),
+    linear-gradient(180deg, #07111f 0%, #0b1220 100%);
+}
+
+html.theme-dark .new-drama-preview-page header,
+html.theme-dark .new-drama-preview-page .secondary-tab-sticky,
+html.theme-dark .new-drama-preview-page > div.sticky {
+  background-color: rgba(15, 23, 42, 0.92) !important;
+  border-color: rgba(148, 163, 184, 0.2) !important;
+  box-shadow: 0 12px 28px rgba(2, 6, 23, 0.35);
+}
+
+html.theme-dark .new-drama-preview-page h1,
+html.theme-dark .new-drama-preview-page h2,
+html.theme-dark .new-drama-preview-page h3,
+html.theme-dark .new-drama-preview-page .main-title,
+html.theme-dark .new-drama-preview-page .drama-title,
+html.theme-dark .new-drama-preview-page .empty-title,
+html.theme-dark .new-drama-preview-page .abstract-modal-title,
+html.theme-dark .new-drama-preview-page .auto-download-title {
+  color: #f8fafc !important;
+}
+
+html.theme-dark .new-drama-preview-page p,
+html.theme-dark .new-drama-preview-page .time-label,
+html.theme-dark .new-drama-preview-page .episode-text,
+html.theme-dark .new-drama-preview-page .pagination-info,
+html.theme-dark .new-drama-preview-page .auto-download-desc,
+html.theme-dark .new-drama-preview-page .auto-download-hint,
+html.theme-dark .new-drama-preview-page .auto-download-message,
+html.theme-dark .new-drama-preview-page .empty-description,
+html.theme-dark .new-drama-preview-page .drama-id {
+  color: #94a3b8 !important;
+}
+
+html.theme-dark .new-drama-preview-page .filter-section,
+html.theme-dark .new-drama-preview-page .secondary-tab-container {
+  color: #e2e8f0;
+}
+
+html.theme-dark .new-drama-preview-page .tab-switcher {
+  background: linear-gradient(135deg, #162033 0%, #1e293b 100%);
+  border-color: rgba(148, 163, 184, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+html.theme-dark .new-drama-preview-page .tab-switch-btn {
+  color: #cbd5e1;
+  border-color: transparent;
+}
+
+html.theme-dark .new-drama-preview-page .tab-switch-btn:hover {
+  color: #f8fafc;
+  background: rgba(30, 41, 59, 0.8);
+  border-color: rgba(148, 163, 184, 0.16);
+}
+
+html.theme-dark .new-drama-preview-page .tab-switch-btn.active {
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
+  color: #eff6ff;
+  border-color: rgba(96, 165, 250, 0.28);
+}
+
+html.theme-dark .new-drama-preview-page .secondary-tab-switcher {
+  background: rgba(15, 23, 42, 0.86);
+  border-color: rgba(148, 163, 184, 0.16);
+  box-shadow: 0 8px 18px rgba(2, 6, 23, 0.18);
+}
+
+html.theme-dark .new-drama-preview-page .secondary-tab-btn {
+  color: #94a3b8;
+}
+
+html.theme-dark .new-drama-preview-page .secondary-tab-btn:hover {
+  color: #e2e8f0;
+  background: rgba(30, 41, 59, 0.76);
+  border-color: rgba(148, 163, 184, 0.14);
+}
+
+html.theme-dark .new-drama-preview-page .secondary-tab-btn.active {
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.28) 0%, rgba(29, 78, 216, 0.38) 100%);
+  color: #dbeafe;
+  border-color: rgba(96, 165, 250, 0.22);
+}
+
+html.theme-dark .new-drama-preview-page .secondary-tab-count {
+  background: rgba(51, 65, 85, 0.9);
+  color: #cbd5e1;
+}
+
+html.theme-dark .new-drama-preview-page .secondary-tab-btn.active .secondary-tab-count {
+  background: rgba(147, 197, 253, 0.18);
+  color: #dbeafe;
+}
+
+html.theme-dark .new-drama-preview-page .refresh-btn-modern,
+html.theme-dark .new-drama-preview-page .pending-download-btn,
+html.theme-dark .new-drama-preview-page .view-all-btn-modern {
+  background: linear-gradient(135deg, #162033 0%, #1e293b 100%);
+  border-color: rgba(148, 163, 184, 0.16);
+  color: #cbd5e1;
+}
+
+html.theme-dark .new-drama-preview-page .refresh-btn-modern:hover,
+html.theme-dark .new-drama-preview-page .pending-download-btn:hover,
+html.theme-dark .new-drama-preview-page .view-all-btn-modern:hover {
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  border-color: rgba(148, 163, 184, 0.24);
+  color: #f8fafc;
+}
+
+html.theme-dark .new-drama-preview-page .auto-download-bar,
+html.theme-dark .new-drama-preview-page .pending-download-progress,
+html.theme-dark .new-drama-preview-page .not-found-dramas {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.92) 0%, rgba(15, 23, 42, 0.98) 100%);
+  border-color: rgba(96, 165, 250, 0.18);
+  box-shadow: 0 12px 28px rgba(2, 6, 23, 0.26);
+}
+
+html.theme-dark .new-drama-preview-page .drama-card,
+html.theme-dark .new-drama-preview-page .skeleton-drama-card,
+html.theme-dark .new-drama-preview-page .date-selector-container,
+html.theme-dark .new-drama-preview-page .abstract-modal {
+  background: linear-gradient(135deg, #0f172a 0%, #162033 100%);
+  border-color: rgba(148, 163, 184, 0.16);
+  box-shadow:
+    0 16px 40px rgba(2, 6, 23, 0.24),
+    0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+html.theme-dark .new-drama-preview-page .drama-card:hover {
+  border-color: rgba(96, 165, 250, 0.24);
+  box-shadow: 0 25px 50px -12px rgba(2, 6, 23, 0.55);
+}
+
+html.theme-dark .new-drama-preview-page .category-tag,
+html.theme-dark .new-drama-preview-page .abstract-button {
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.16) 0%, rgba(79, 70, 229, 0.22) 100%);
+  color: #bfdbfe;
+  border-color: rgba(96, 165, 250, 0.16);
+}
+
+html.theme-dark .new-drama-preview-page .drama-id {
+  background: rgba(30, 41, 59, 0.9);
+}
+
+html.theme-dark .new-drama-preview-page .pagination-btn,
+html.theme-dark .new-drama-preview-page .page-btn {
+  background: #162033;
+  border-color: rgba(148, 163, 184, 0.16);
+  color: #cbd5e1;
+}
+
+html.theme-dark .new-drama-preview-page .pagination-btn:hover,
+html.theme-dark .new-drama-preview-page .page-btn:hover {
+  background: #1e293b;
+  border-color: rgba(148, 163, 184, 0.24);
+}
+
+html.theme-dark .new-drama-preview-page .date-selector-row {
+  background: linear-gradient(135deg, #0f172a 0%, #162033 100%);
+  border-color: rgba(148, 163, 184, 0.16);
+}
+
+html.theme-dark .new-drama-preview-page .date-tab {
+  background: #162033;
+  border-color: rgba(148, 163, 184, 0.16);
+  color: #cbd5e1;
+}
+
+html.theme-dark .new-drama-preview-page .date-tab:not(.active):hover {
+  background: #1e293b;
+  color: #f8fafc;
+}
+
+html.theme-dark .new-drama-preview-page .abstract-modal-header {
+  border-color: rgba(148, 163, 184, 0.16);
+}
+
 .error-icon {
   @apply w-6 h-6;
 }

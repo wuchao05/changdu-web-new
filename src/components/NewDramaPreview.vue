@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-full bg-gradient-to-br from-slate-50 to-blue-50">
+  <div class="new-drama-preview-page min-h-full bg-gradient-to-br from-slate-50 to-blue-50">
     <!-- 顶部导航栏 -->
     <header
       class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200/60 shadow-sm"
