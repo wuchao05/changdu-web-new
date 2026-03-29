@@ -108,6 +108,11 @@ app.use(async (ctx, next) => {
 
 // API 路由
 
+// 健康检查端点
+router.get('/health', ctx => {
+  ctx.body = { status: 'ok', timestamp: new Date().toISOString() }
+})
+
 router.use('/api/feishu', feishuRoutes.routes(), feishuRoutes.allowedMethods())
 router.use('/api/novelsale', novelsaleRoutes.routes(), novelsaleRoutes.allowedMethods())
 router.use('/api/node/api', nodeRoutes.routes(), nodeRoutes.allowedMethods())
@@ -129,11 +134,6 @@ router.use(juliangRoutes.routes(), juliangRoutes.allowedMethods())
 router.use(thirdPartyRoutes.routes(), thirdPartyRoutes.allowedMethods())
 router.use(buildWorkflowRoutes.routes(), buildWorkflowRoutes.allowedMethods())
 router.use(autoSubmitRoutes.routes(), autoSubmitRoutes.allowedMethods())
-
-// 健康检查端点
-router.get('/health', ctx => {
-  ctx.body = { status: 'ok', timestamp: new Date().toISOString() }
-})
 
 app.use(router.routes())
 app.use(router.allowedMethods())
