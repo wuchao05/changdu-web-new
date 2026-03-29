@@ -978,13 +978,56 @@ async function fetchAutoSubmitDramas(channelId) {
   }
 }
 
+function selectBestDownloadTask(tasks = []) {
+  if (!Array.isArray(tasks) || tasks.length === 0) {
+    return null
+  }
+
+  const statusPriority = { 2: 1, 1: 2, 4: 3, 3: 4, 0: 5 }
+
+  return [...tasks].sort((a, b) => {
+    const statusDiff = (statusPriority[a.task_status] || 5) - (statusPriority[b.task_status] || 5)
+    if (statusDiff !== 0) {
+      return statusDiff
+    }
+
+    if (a.task_status === 2 && b.task_status === 2) {
+      return String(b.task_name || '').length - String(a.task_name || '').length
+    }
+
+    return 0
+  })[0]
+}
+
 /**
- * 根据剧名获取下载数据
+ * 根据短剧ID/剧名获取下载数据
  */
-function getDownloadDataForDrama(downloadList, dramaName) {
-  const name = dramaName?.trim()
-  if (!name) return null
-  return downloadList.find(item => item.book_name?.trim() === name) || null
+function getDownloadDataForDrama(downloadList, drama) {
+  if (!Array.isArray(downloadList) || downloadList.length === 0 || !drama) {
+    return null
+  }
+
+  const dramaBookId =
+    typeof drama === 'object' && drama !== null ? String(drama.book_id || '').trim() : ''
+  const dramaName =
+    typeof drama === 'string'
+      ? drama.trim()
+      : String(drama.series_name || drama.book_name || '').trim()
+
+  if (dramaBookId) {
+    const matchedByBookId = downloadList.filter(item => String(item.book_id || '').trim() === dramaBookId)
+    const bestByBookId = selectBestDownloadTask(matchedByBookId)
+    if (bestByBookId) {
+      return bestByBookId
+    }
+  }
+
+  if (!dramaName) {
+    return null
+  }
+
+  const matchedByName = downloadList.filter(item => String(item.book_name || '').trim() === dramaName)
+  return selectBestDownloadTask(matchedByName)
 }
 
 /**
@@ -998,8 +1041,8 @@ function sortDramasByPriority(dramas, downloadList, newDramaSet) {
     if (aIsNew !== bIsNew) return aIsNew ? -1 : 1
 
     // 优先级 2：飞书清单中不存在 && 下载中心有完成的任务
-    const aDownloadData = getDownloadDataForDrama(downloadList, a.series_name)
-    const bDownloadData = getDownloadDataForDrama(downloadList, b.series_name)
+    const aDownloadData = getDownloadDataForDrama(downloadList, a)
+    const bDownloadData = getDownloadDataForDrama(downloadList, b)
     const aCanAdd = !a.feishu_downloaded && !a.feishu_exists && aDownloadData?.task_status === 2
     const bCanAdd = !b.feishu_downloaded && !b.feishu_exists && bDownloadData?.task_status === 2
     if (aCanAdd !== bCanAdd) return aCanAdd ? -1 : 1
@@ -1047,7 +1090,7 @@ async function processDrama(channelId, drama, downloadList, newDramaSet, options
     console.log(`[自动提交-${channelId}] 创建剧集清单记录成功: ${dramaName}`)
 
     // 5. 根据下载状态确定飞书状态
-    const downloadData = getDownloadDataForDrama(downloadList, dramaName)
+    const downloadData = getDownloadDataForDrama(downloadList, drama)
     const taskStatus = downloadData?.task_status
     const readyStatuses = AUTO_SUBMIT_CONFIG.taskStatus.readyStatuses
     const feishuStatus =
@@ -1143,7 +1186,7 @@ async function runAutoSubmitCycle(channelId) {
         if (d.feishu_downloaded || d.feishu_exists) return false
 
         // 条件2: 下载中心有完成的任务
-        const downloadData = getDownloadDataForDrama(downloadList, d.series_name)
+        const downloadData = getDownloadDataForDrama(downloadList, d)
         if (!downloadData || downloadData.task_status !== 2) return false
 
         if (state.onlyRedFlag && !newDramaSet.has(d.book_id)) return false
