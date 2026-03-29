@@ -16,7 +16,14 @@ export function useUserAuth() {
   )
   const userLabels = computed(() => {
     if (!sessionStore.currentUser) return []
-    return [isAdmin.value ? '管理员' : '普通用户']
+
+    if (isAdmin.value) {
+      return ['管理员']
+    }
+
+    const userDisplayName =
+      sessionStore.currentUser.nickname || sessionStore.currentUser.account || '用户'
+    return [userDisplayName]
   })
   const isValidUser = computed(() => sessionStore.isAuthenticated)
 

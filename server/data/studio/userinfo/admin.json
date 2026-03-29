@@ -3,7 +3,7 @@
   "nickname": "管理员",
   "account": "admin",
   "password": "qwer1234",
-  "authToken": "cfe1a6760c578521262b2145f1d80a07b145f3d4cbe8c53c",
+  "authToken": "8b347a93ab901e5d69c3180a4af3327ea41a6c8de984f64d",
   "userType": "admin",
   "channelIds": [
     "5f0d85e6-26a0-4fe2-a0c5-30c78a8770df",
@@ -12,6 +12,7 @@
   "defaultChannelId": "5f0d85e6-26a0-4fe2-a0c5-30c78a8770df",
   "channelConfigs": {
     "5f0d85e6-26a0-4fe2-a0c5-30c78a8770df": {
+      "enabled": true,
       "feishu": {
         "dramaListTableId": "tblvuZhBd4drW26n",
         "dramaStatusTableId": "tblDOyi2Lzs80sv0",
@@ -24,7 +25,15 @@
         "buildTimeWindowEnd": 20
       },
       "permissions": {
-        "syncAccount": true
+        "syncAccount": true,
+        "desktopMenus": {
+          "download": false,
+          "materialClip": false,
+          "upload": false,
+          "juliangUpload": false,
+          "uploadBuild": false,
+          "juliangBuild": false
+        }
       },
       "orderUserStats": {
         "enabled": true,
@@ -49,6 +58,7 @@
       ]
     },
     "00514b91-884d-40f8-9e67-6a593a9df74f": {
+      "enabled": true,
       "feishu": {
         "dramaListTableId": "",
         "dramaStatusTableId": "",
@@ -61,7 +71,15 @@
         "buildTimeWindowEnd": 20
       },
       "permissions": {
-        "syncAccount": false
+        "syncAccount": false,
+        "desktopMenus": {
+          "download": false,
+          "materialClip": false,
+          "upload": false,
+          "juliangUpload": false,
+          "uploadBuild": false,
+          "juliangBuild": false
+        }
       },
       "orderUserStats": {
         "enabled": false,
@@ -83,5 +101,5 @@
     "buildTimeWindowEnd": 20
   },
   "createdAt": "2026-03-26T13:32:12.621Z",
-  "updatedAt": "2026-03-29T09:29:36.169Z"
+  "updatedAt": "2026-03-29T13:19:43.487Z"
 }

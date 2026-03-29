@@ -3,6 +3,7 @@ import type { BuildConfig } from './buildConfig'
 import { buildSessionHeaders } from '@/utils/sessionToken'
 
 export interface UserChannelBindingConfig {
+  enabled: boolean
   feishu: {
     dramaListTableId: string
     dramaStatusTableId: string
@@ -85,6 +86,7 @@ export interface UserProfile {
   updatedAt: string
   channelNames?: string[]
   defaultChannelName?: string
+  channelConfigEnabled?: boolean
 }
 
 export interface ChannelConfig {

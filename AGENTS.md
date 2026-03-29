@@ -42,3 +42,15 @@
 1. `pnpm lint`
 2. `pnpm type-check`
 3. `pnpm build`
+
+## Workflow
+
+- 以下工作流来自仓库维护者要求；若与当前运行环境的更高优先级指令冲突，以更高优先级指令为准。
+- **始终在 master 分支上进行代码修改**：所有代码变更必须直接在 master 分支上完成，不使用功能分支（除非用户明确要求）。
+- **自动提交并推送**：每次修改代码后自动提交并推送到远程 master 分支；只有当用户明确说明需要 review 代码时，才不自动提交和推送。
+- **工作流程**：
+  1. 确认当前在 master 分支（`git branch --show-current`）
+  2. 进行代码修改
+  3. 运行 lint 和 type-check
+  4. 提交代码到 master 分支
+  5. 立即推送到远程：`git push origin master`

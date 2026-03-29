@@ -36,7 +36,7 @@ function nowIso() {
 
 function defaultMaterialPreview() {
   return {
-    enabled: false,
+    enabled: true,
     intervalMinutes: 20,
     buildTimeWindowStart: 90,
     buildTimeWindowEnd: 20,
@@ -61,6 +61,7 @@ function defaultOrderUserStats() {
 
 function defaultUserChannelConfig() {
   return {
+    enabled: false,
     feishu: defaultFeishuConfig(),
     materialPreview: defaultMaterialPreview(),
     permissions: {
@@ -166,7 +167,11 @@ function normalizeFeishuConfig(feishu = {}) {
 }
 
 function normalizeUserChannelConfig(config = {}) {
+  const resolvedEnabled =
+    typeof config.enabled === 'boolean' ? config.enabled : hasCustomUserChannelConfig(config)
+
   return {
+    enabled: resolvedEnabled,
     feishu: normalizeFeishuConfig(config.feishu || config),
     materialPreview: {
       ...defaultMaterialPreview(),
@@ -190,6 +195,31 @@ function normalizeUserChannelConfig(config = {}) {
     },
     douyinMaterialMatches: normalizeDouyinMaterialMatches(config.douyinMaterialMatches),
   }
+}
+
+function hasCustomUserChannelConfig(config = {}) {
+  if (!config || typeof config !== 'object') {
+    return false
+  }
+
+  const hasExplicitMaterialPreview =
+    config.materialPreview &&
+    typeof config.materialPreview === 'object' &&
+    Object.keys(config.materialPreview).length > 0
+  const hasPermissionConfig =
+    Boolean(config.permissions?.syncAccount) ||
+    Object.values(config.permissions?.desktopMenus || {}).some(Boolean)
+  const hasOrderUserStats =
+    Boolean(config.orderUserStats?.enabled) ||
+    (Array.isArray(config.orderUserStats?.usernames) && config.orderUserStats.usernames.length > 0)
+
+  return (
+    hasFeishuConfig(normalizeFeishuConfig(config.feishu || config)) ||
+    hasExplicitMaterialPreview ||
+    hasPermissionConfig ||
+    hasOrderUserStats ||
+    normalizeDouyinMaterialMatches(config.douyinMaterialMatches).length > 0
+  )
 }
 
 function hasFeishuConfig(feishu = {}) {
@@ -295,16 +325,38 @@ export function ensureUserChannelConfig(user = {}, channelId = '') {
 }
 
 function getDefaultRuntimeFeishu(user = {}, defaultChannelId = '') {
-  return getUserChannelConfig(user, defaultChannelId).feishu
+  return getRuntimeUserChannelConfig(user, defaultChannelId).feishu
 }
 
 function getDefaultRuntimeMaterialPreview(user = {}, defaultChannelId = '') {
-  return getUserChannelConfig(user, defaultChannelId).materialPreview
+  return getRuntimeUserChannelConfig(user, defaultChannelId).materialPreview
+}
+
+function getReadonlyChannelRuntimeConfig() {
+  return {
+    ...defaultUserChannelConfig(),
+    enabled: false,
+    materialPreview: {
+      ...defaultMaterialPreview(),
+      enabled: false,
+    },
+  }
+}
+
+function getRuntimeUserChannelConfig(user = {}, channelId = '') {
+  const channelConfig = getUserChannelConfig(user, channelId)
+
+  if (user?.userType === 'admin' || channelConfig.enabled) {
+    return channelConfig
+  }
+
+  return getReadonlyChannelRuntimeConfig()
 }
 
 export function buildRuntimeUser(user = {}, channelId = '') {
   const normalizedUser = normalizeUser(user)
-  const channelConfig = getUserChannelConfig(normalizedUser, channelId)
+  const sourceChannelConfig = getUserChannelConfig(normalizedUser, channelId)
+  const channelConfig = getRuntimeUserChannelConfig(normalizedUser, channelId)
   const normalizedPermissions = {
     ...channelConfig.permissions,
     desktopMenus:
@@ -327,6 +379,8 @@ export function buildRuntimeUser(user = {}, channelId = '') {
     permissions: normalizedPermissions,
     orderUserStats: channelConfig.orderUserStats,
     douyinMaterialMatches: channelConfig.douyinMaterialMatches,
+    channelConfigEnabled:
+      normalizedUser.userType === 'admin' ? true : Boolean(sourceChannelConfig.enabled),
   }
 }
 

@@ -13,6 +13,18 @@
             >
               <Icon icon="mdi:chart-line" class="w-6 h-6 text-white" />
             </div>
+            <div v-if="isMobile && userLabels.length > 0" class="min-w-0 flex items-center">
+              <button
+                v-for="label in userLabels"
+                :key="`mobile-${label}`"
+                type="button"
+                class="user-label-badge user-label-badge--mobile"
+                :class="{ 'user-label-badge--clickable': isAdmin && label === '管理员' }"
+                @click="handleUserLabelClick(label)"
+              >
+                <span class="user-label-badge__text">{{ label }}</span>
+              </button>
+            </div>
             <div class="min-w-0" v-if="!isMobile">
               <div class="flex items-center gap-2">
                 <h1
@@ -28,7 +40,7 @@
                   :class="{ 'user-label-badge--clickable': isAdmin && label === '管理员' }"
                   @click="handleUserLabelClick(label)"
                 >
-                  {{ label }}
+                  <span class="user-label-badge__text">{{ label }}</span>
                 </button>
               </div>
               <p class="text-xs text-gray-500 hidden sm:block">{{ dashboardSubtitle }}</p>
@@ -1230,6 +1242,7 @@ onUnmounted(() => {
 }
 
 .user-label-badge {
+  max-width: 11rem;
   padding: 0.25rem 0.5rem;
   font-size: 0.75rem;
   font-weight: 500;
@@ -1238,6 +1251,17 @@ onUnmounted(() => {
   border-radius: 9999px;
   border: none;
   line-height: 1;
+}
+
+.user-label-badge--mobile {
+  max-width: 8.5rem;
+}
+
+.user-label-badge__text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .user-label-badge--clickable {
