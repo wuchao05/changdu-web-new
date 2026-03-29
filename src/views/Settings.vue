@@ -30,17 +30,30 @@
           <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div class="space-y-2">
               <label class="text-sm font-medium text-gray-700">显示模式</label>
-              <div
-                class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3"
-              >
-                <div>
-                  <h4 class="text-sm font-medium text-gray-900">暗黑模式</h4>
-                  <p class="text-xs text-gray-500">适合夜间使用，降低亮度刺激。</p>
+              <div class="space-y-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <h4 class="text-sm font-medium text-gray-900">夜间自动暗黑</h4>
+                    <p class="text-xs text-gray-500">每天 21:00 自动开启，次日 07:00 自动恢复。</p>
+                  </div>
+                  <n-switch
+                    v-model:value="localSettings.autoDarkMode"
+                    @update:value="updateAutoDarkMode"
+                  />
                 </div>
-                <n-switch
-                  v-model:value="localSettings.darkMode"
-                  @update:value="updateDarkMode"
-                />
+                <div class="flex items-center justify-between border-t border-gray-200 pt-3">
+                  <div>
+                    <h4 class="text-sm font-medium text-gray-900">手动暗黑模式</h4>
+                    <p class="text-xs text-gray-500">
+                      {{ localSettings.autoDarkMode ? '关闭自动暗黑后，可手动固定深色外观。' : '适合白天临时切换到深色。' }}
+                    </p>
+                  </div>
+                  <n-switch
+                    v-model:value="localSettings.darkMode"
+                    :disabled="localSettings.autoDarkMode"
+                    @update:value="updateDarkMode"
+                  />
+                </div>
               </div>
             </div>
             <div class="space-y-2">
@@ -184,6 +197,7 @@ const apiConfigStore = useApiConfigStore()
 
 const localSettings = ref({
   darkMode: false,
+  autoDarkMode: true,
   pageSize: 10,
   defaultDateRange: 'today' as 'today' | '3days' | '7days' | '30days' | 'all',
   autoRefresh: false,
@@ -211,6 +225,7 @@ function initLocalState() {
   const settings = settingsStore.settings
   localSettings.value = {
     darkMode: settings.darkMode,
+    autoDarkMode: settings.autoDarkMode,
     pageSize: settings.pageSize,
     defaultDateRange: settings.defaultDateRange,
     autoRefresh: settings.autoRefresh,
@@ -234,6 +249,11 @@ function updatePageSize(value: number) {
 function updateDarkMode(value: boolean) {
   settingsStore.updateSettings({ darkMode: value })
   message.success(`暗黑模式已${value ? '开启' : '关闭'}`)
+}
+
+function updateAutoDarkMode(value: boolean) {
+  settingsStore.updateSettings({ autoDarkMode: value })
+  message.success(`夜间自动暗黑已${value ? '开启' : '关闭'}`)
 }
 
 function updateDateRange(value: 'today' | '3days' | '7days' | '30days' | 'all') {
