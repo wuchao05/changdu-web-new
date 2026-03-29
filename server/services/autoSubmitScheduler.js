@@ -565,7 +565,6 @@ async function getFirstAvailableAccount(channelId) {
 async function createDramaStatusRecord(channelId, params) {
   const { dramaName, publishTime, account, status, douyinMaterial, rating } = params
   const accessToken = await getFeishuAccessToken()
-  const profile = getSchedulerProfile(channelId)
 
   // 计算日期时间戳（与前端逻辑一致）
   // 将首发时间转换为当天00:00:00的13位时间戳
