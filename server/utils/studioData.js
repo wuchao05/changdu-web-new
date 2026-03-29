@@ -7,7 +7,7 @@ import { DEFAULT_BUILD_CONFIG, normalizeBuildConfig } from '../config/buildConfi
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-const PREFERRED_STUDIO_DATA_DIR = process.env.STUDIO_DATA_DIR || '/data/changdu-web-studio'
+const PREFERRED_STUDIO_DATA_DIR = process.env.STUDIO_DATA_DIR || '/data/changdu-web/studio'
 const FALLBACK_STUDIO_DATA_DIR = path.join(__dirname, '../data/studio')
 
 let resolvedStudioDataDir = ''
