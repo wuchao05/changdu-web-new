@@ -134,13 +134,21 @@
 	              <n-form
 	                :model="userForm"
 	                label-placement="top"
+	                autocomplete="off"
 	                class="grid grid-cols-1 gap-3 md:grid-cols-2"
 	              >
                 <n-form-item label="昵称">
                   <n-input v-model:value="userForm.nickname" placeholder="请输入昵称" />
                 </n-form-item>
                 <n-form-item label="账号">
-                  <n-input v-model:value="userForm.account" placeholder="请输入账号" />
+                  <n-input
+                    v-model:value="userForm.account"
+                    placeholder="请输入账号"
+                    :input-props="{
+                      autocomplete: 'off',
+                      name: 'studio-user-account',
+                    }"
+                  />
                 </n-form-item>
                 <n-form-item label="密码">
                   <n-input
@@ -148,6 +156,10 @@
                     type="password"
                     show-password-on="click"
                     placeholder="留空表示不修改密码"
+                    :input-props="{
+                      autocomplete: 'new-password',
+                      name: 'studio-user-password',
+                    }"
                   />
                 </n-form-item>
                 <n-form-item label="用户类型">
