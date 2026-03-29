@@ -10,6 +10,11 @@ import {
   setSessionToken,
 } from '@/utils/sessionToken'
 
+interface SessionRequestError extends Error {
+  status?: number
+  code?: number
+}
+
 export const useSessionStore = defineStore('session', () => {
   const currentUser = ref<adminApi.UserProfile | null>(null)
   const currentRuntimeUser = ref<adminApi.UserProfile | null>(null)
@@ -59,14 +64,25 @@ export const useSessionStore = defineStore('session', () => {
 
     try {
       await syncAdminChannels()
-    } catch {
-      clearSessionToken()
-      clearSelectedChannelId()
-      currentUser.value = null
-      currentRuntimeUser.value = null
-      currentChannel.value = null
-      availableChannels.value = []
-      selectedChannelId.value = ''
+    } catch (error) {
+      const sessionError = error as SessionRequestError
+      const shouldClearSession =
+        sessionError?.status === 401 ||
+        sessionError?.code === 401 ||
+        sessionError?.message?.includes('未登录') ||
+        sessionError?.message?.includes('登录已失效')
+
+      if (shouldClearSession) {
+        clearSessionToken()
+        clearSelectedChannelId()
+        currentUser.value = null
+        currentRuntimeUser.value = null
+        currentChannel.value = null
+        availableChannels.value = []
+        selectedChannelId.value = ''
+      } else {
+        console.warn('[SessionStore] 会话校验失败，保留本地登录态，等待服务恢复:', error)
+      }
     } finally {
       initialized.value = true
     }

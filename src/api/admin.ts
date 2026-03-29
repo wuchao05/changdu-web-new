@@ -2,6 +2,11 @@ import { ENV } from '@/config/env'
 import type { BuildConfig } from './buildConfig'
 import { buildSessionHeaders } from '@/utils/sessionToken'
 
+interface RequestError extends Error {
+  status?: number
+  code?: number
+}
+
 export interface UserChannelBindingConfig {
   enabled: boolean
   feishu: {
@@ -137,7 +142,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   const result = await response.json()
   if (!response.ok || (result.code !== undefined && result.code !== 0)) {
-    throw new Error(result.message || '请求失败')
+    const error = new Error(result.message || '请求失败') as RequestError
+    error.status = response.status
+    error.code = result.code
+    throw error
   }
 
   return result.data as T
