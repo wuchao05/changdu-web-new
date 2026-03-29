@@ -13,9 +13,70 @@ body {
   overflow-y: auto;
 }
 
+html.theme-dark,
+body.theme-dark {
+  color-scheme: dark;
+}
+
 #app {
   min-height: 100vh;
   font-weight: normal;
+}
+
+html.theme-dark body {
+  background:
+    radial-gradient(circle at top, rgba(30, 41, 59, 0.45), transparent 28%),
+    linear-gradient(180deg, #07111f 0%, #0b1220 100%);
+}
+
+html.theme-dark .bg-white,
+html.theme-dark .bg-slate-50,
+html.theme-dark .bg-gray-50,
+html.theme-dark .bg-blue-50 {
+  background-color: #0f172a !important;
+}
+
+html.theme-dark [class*='bg-white/90'],
+html.theme-dark [class*='bg-white/80'],
+html.theme-dark [class*='bg-white/70'] {
+  background-color: rgba(15, 23, 42, 0.86) !important;
+}
+
+html.theme-dark [class*='from-slate-50'][class*='to-blue-50'] {
+  background-image: linear-gradient(135deg, #07111f 0%, #111827 100%) !important;
+}
+
+html.theme-dark .border-gray-200,
+html.theme-dark .border-slate-200,
+html.theme-dark .border-gray-100,
+html.theme-dark .border-slate-300,
+html.theme-dark .border-dashed {
+  border-color: rgba(148, 163, 184, 0.22) !important;
+}
+
+html.theme-dark .text-gray-900,
+html.theme-dark .text-slate-900,
+html.theme-dark .text-slate-950 {
+  color: #f8fafc !important;
+}
+
+html.theme-dark .text-gray-700,
+html.theme-dark .text-slate-700,
+html.theme-dark .text-slate-600,
+html.theme-dark .text-gray-600 {
+  color: #cbd5e1 !important;
+}
+
+html.theme-dark .text-gray-500,
+html.theme-dark .text-slate-500,
+html.theme-dark .text-slate-400,
+html.theme-dark .text-gray-400 {
+  color: #94a3b8 !important;
+}
+
+html.theme-dark .shadow-sm,
+html.theme-dark .shadow {
+  box-shadow: 0 12px 32px rgba(2, 6, 23, 0.35) !important;
 }
 
 /* 自定义滚动条 */
@@ -35,6 +96,14 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.3);
+}
+
+html.theme-dark ::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+}
+
+html.theme-dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.45);
 }
 
 /* 响应式字体大小 */

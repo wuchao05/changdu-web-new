@@ -29,6 +29,21 @@
           </template>
           <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div class="space-y-2">
+              <label class="text-sm font-medium text-gray-700">显示模式</label>
+              <div
+                class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3"
+              >
+                <div>
+                  <h4 class="text-sm font-medium text-gray-900">暗黑模式</h4>
+                  <p class="text-xs text-gray-500">适合夜间使用，降低亮度刺激。</p>
+                </div>
+                <n-switch
+                  v-model:value="localSettings.darkMode"
+                  @update:value="updateDarkMode"
+                />
+              </div>
+            </div>
+            <div class="space-y-2">
               <label class="text-sm font-medium text-gray-700">默认分页大小</label>
               <n-select
                 v-model:value="localSettings.pageSize"
@@ -168,6 +183,7 @@ const settingsStore = useSettingsStore()
 const apiConfigStore = useApiConfigStore()
 
 const localSettings = ref({
+  darkMode: false,
   pageSize: 10,
   defaultDateRange: 'today' as 'today' | '3days' | '7days' | '30days' | 'all',
   autoRefresh: false,
@@ -194,6 +210,7 @@ const dateRangeOptions = [
 function initLocalState() {
   const settings = settingsStore.settings
   localSettings.value = {
+    darkMode: settings.darkMode,
     pageSize: settings.pageSize,
     defaultDateRange: settings.defaultDateRange,
     autoRefresh: settings.autoRefresh,
@@ -212,6 +229,11 @@ watch(
 function updatePageSize(value: number) {
   settingsStore.updateSettings({ pageSize: value })
   message.success('分页大小已更新')
+}
+
+function updateDarkMode(value: boolean) {
+  settingsStore.updateSettings({ darkMode: value })
+  message.success(`暗黑模式已${value ? '开启' : '关闭'}`)
 }
 
 function updateDateRange(value: 'today' | '3days' | '7days' | '30days' | 'all') {

@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 export interface AppSettings {
+  darkMode: boolean
   pageSize: number
   defaultDateRange: 'today' | '3days' | '7days' | '30days' | 'all' // 默认查询天数
   autoRefresh: boolean
@@ -11,6 +12,7 @@ export interface AppSettings {
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
+  darkMode: false,
   pageSize: 10,
   defaultDateRange: 'today',
   autoRefresh: false,

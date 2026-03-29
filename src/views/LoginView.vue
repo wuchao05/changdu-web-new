@@ -138,6 +138,13 @@ async function handleSubmit() {
     linear-gradient(135deg, #f6f9ff 0%, #eef4ff 42%, #f8fbff 100%);
 }
 
+:global(html.theme-dark) .login-page {
+  background:
+    radial-gradient(circle at top left, rgba(59, 130, 246, 0.12), transparent 26%),
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.1), transparent 24%),
+    linear-gradient(135deg, #07111f 0%, #0f172a 42%, #111827 100%);
+}
+
 .login-page__backdrop {
   position: absolute;
   inset: 0;
@@ -208,6 +215,12 @@ async function handleSubmit() {
   filter: blur(10px);
 }
 
+:global(html.theme-dark) .login-shell__halo {
+  background:
+    radial-gradient(circle at top, rgba(30, 41, 59, 0.92), transparent 52%),
+    radial-gradient(circle at bottom right, rgba(37, 99, 235, 0.14), transparent 36%);
+}
+
 .login-card {
   position: relative;
   overflow: hidden;
@@ -221,6 +234,16 @@ async function handleSubmit() {
     0 40px 80px -48px rgba(15, 23, 42, 0.45),
     inset 0 1px 0 rgba(255, 255, 255, 0.88);
   backdrop-filter: blur(18px);
+}
+
+:global(html.theme-dark) .login-card {
+  border-color: rgba(148, 163, 184, 0.18);
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.94), rgba(15, 23, 42, 0.88)),
+    rgba(15, 23, 42, 0.9);
+  box-shadow:
+    0 24px 80px rgba(2, 6, 23, 0.45),
+    0 10px 30px rgba(15, 23, 42, 0.35);
 }
 
 .login-card::before {
