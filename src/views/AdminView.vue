@@ -929,6 +929,20 @@
                       placeholder="请输入 landingUrl"
                     />
                   </n-form-item>
+                  <n-form-item label="小程序资产流程版本" class="md:col-span-2">
+                    <div class="flex items-center gap-3">
+                      <n-switch
+                        v-model:value="channelForm.juliang.buildConfig.useNewMicroAppAssetFlow"
+                      />
+                      <span class="text-sm text-slate-500">
+                        {{
+                          channelForm.juliang.buildConfig.useNewMicroAppAssetFlow
+                            ? '新版：直接查询/创建小程序资产'
+                            : '老版：先查询/创建小程序，再查询/创建小程序资产'
+                        }}
+                      </span>
+                    </div>
+                  </n-form-item>
                   <n-form-item label="microAppName">
                     <n-input
                       v-model:value="channelForm.juliang.buildConfig.microAppName"
@@ -941,7 +955,19 @@
                       placeholder="请输入 microAppId"
                     />
                   </n-form-item>
-                  <n-form-item label="ccId">
+                  <n-form-item
+                    v-if="channelForm.juliang.buildConfig.useNewMicroAppAssetFlow"
+                    label="microAppInstanceId"
+                  >
+                    <n-input
+                      v-model:value="channelForm.juliang.buildConfig.microAppInstanceId"
+                      placeholder="请输入 microAppInstanceId"
+                    />
+                  </n-form-item>
+                  <n-form-item
+                    v-else
+                    label="ccId"
+                  >
                     <n-input
                       v-model:value="channelForm.juliang.buildConfig.ccId"
                       placeholder="请输入 ccId"
@@ -1775,8 +1801,10 @@ function createDefaultChannelForm(): ChannelFormModel {
         productId: '',
         productPlatformId: '',
         landingUrl: '',
+        useNewMicroAppAssetFlow: false,
         microAppName: '',
         microAppId: '',
+        microAppInstanceId: '',
         ccId: '',
         rechargeTemplateId: '',
         adCallbackConfigId: '1845407746151576',

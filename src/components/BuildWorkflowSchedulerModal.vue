@@ -215,6 +215,21 @@ function getCurrentEarliestBuildTime(drama: FeishuDramaRecord) {
   return getEarliestBuildTime(drama, currentBuildConfig.value || {})
 }
 
+function findConfiguredMicroAppAsset(
+  assets: Array<Record<string, any>> | undefined,
+  buildConfig: adminApi.ChannelConfig['juliang']['buildConfig'] | null
+) {
+  const microApps = Array.isArray(assets) ? assets : []
+  const targetInstanceId = String(buildConfig?.microAppInstanceId || '').trim()
+  const targetMicroAppId = String(buildConfig?.microAppId || '').trim()
+
+  return (
+    microApps.find(item => String(item?.micro_app_instance_id || '').trim() === targetInstanceId) ||
+    microApps.find(item => String(item?.micro_app_id || '').trim() === targetMicroAppId) ||
+    null
+  )
+}
+
 // 剧集列表表格列定义
 const dramasColumns: DataTableColumns<FeishuDramaRecord> = [
   {
@@ -329,7 +344,14 @@ const dramasColumns: DataTableColumns<FeishuDramaRecord> = [
 const assetizationSteps = computed(() => [
   { key: 1, title: '上传账户头像' },
   { key: 2, title: '创建推广链接' },
-  { key: 3, title: isCreatingMicroApp.value ? '创建小程序' : '查询小程序' },
+  {
+    key: 3,
+    title: currentBuildConfig.value?.useNewMicroAppAssetFlow
+      ? '跳过小程序'
+      : isCreatingMicroApp.value
+        ? '创建小程序'
+        : '查询小程序',
+  },
   { key: 4, title: '创建小程序资产' },
   { key: 5, title: '添加付费事件' },
 ])
@@ -1303,6 +1325,7 @@ async function executeAssetization(
   const dramaName = drama.fields['剧名']?.[0]?.text
   const bookId = drama.fields['短剧ID']?.value?.[0]?.text
   const accountId = drama.fields['账户']?.[0]?.text
+  const buildConfig = currentBuildConfig.value
 
   if (!dramaName || !bookId || !accountId) {
     throw new Error('剧集信息不完整')
@@ -1342,112 +1365,122 @@ async function executeAssetization(
   // 步骤3: 查询/创建小程序
   currentAssetizationStep.value = 3
   record.assetizationStep = 3
-  console.log('步骤3: 查询/创建小程序')
-
   let microApp
+  let assetMicroApp: Record<string, any> | null = null
 
-  // 1. 首先查询账户自己的已审核通过的小程序（search_type=1）
-  console.log('查询账户自己的小程序 (search_type=1)...')
-  const microAppResult = await buildWorkflowApi.queryMicroApp(accountId)
-
-  if (microAppResult.data?.micro_app && microAppResult.data.micro_app.length > 0) {
-    // 检查是否有已审核通过的小程序
-    const approvedMicroApp = microAppResult.data.micro_app.find(
-      (app: { status: number }) => app.status === 1
-    )
-    if (approvedMicroApp) {
-      microApp = approvedMicroApp
-      console.log('✓ 找到账户自己的已审核通过的小程序:', microApp.micro_app_instance_id)
+  if (buildConfig?.useNewMicroAppAssetFlow) {
+    console.log('步骤3: 新版流程跳过查询/创建小程序，直接使用配置里的小程序实例')
+    microApp = {
+      micro_app_instance_id: buildConfig.microAppInstanceId,
+      app_id: buildConfig.microAppId,
+      start_page: '',
     }
-  }
+  } else {
+    console.log('步骤3: 查询/创建小程序')
 
-  // 2. 如果没有找到账户自己的已审核通过的小程序，查询被共享的小程序（search_type=2）
-  if (!microApp) {
-    console.log('未找到账户自己的已审核通过的小程序，查询被共享的小程序 (search_type=2)...')
-    const approvedResult = await buildWorkflowApi.queryApprovedMicroApp(accountId)
+    // 1. 首先查询账户自己的已审核通过的小程序（search_type=1）
+    console.log('查询账户自己的小程序 (search_type=1)...')
+    const microAppResult = await buildWorkflowApi.queryMicroApp(accountId)
 
-    if (approvedResult.data?.found && approvedResult.data.micro_app) {
-      microApp = approvedResult.data.micro_app
-      console.log('✓ 找到被共享的已审核通过的小程序:', microApp.micro_app_instance_id)
-    }
-  }
-
-  // 3. 如果都没有找到，检查是否需要创建
-  if (!microApp) {
-    console.log('未找到任何已审核通过的小程序，检查是否需要创建...')
-
-    // 检查是否有未审核通过的小程序
     if (microAppResult.data?.micro_app && microAppResult.data.micro_app.length > 0) {
-      // 有小程序但都未审核通过，跳过搭建
-      const firstMicroApp = microAppResult.data.micro_app[0]
-      console.log('小程序存在但未审核通过，状态:', firstMicroApp.status)
-      const error = new Error('小程序未审核通过，跳过此剧集的搭建') as any
-      error.code = 'MICROAPP_NOT_APPROVED'
-      throw error
+      // 检查是否有已审核通过的小程序
+      const approvedMicroApp = microAppResult.data.micro_app.find(
+        (app: { status: number }) => app.status === 1
+      )
+      if (approvedMicroApp) {
+        microApp = approvedMicroApp
+        console.log('✓ 找到账户自己的已审核通过的小程序:', microApp.micro_app_instance_id)
+      }
     }
 
-    // 小程序不存在，自动创建
-    console.log('小程序不存在，开始自动创建')
-    isCreatingMicroApp.value = true
+    // 2. 如果没有找到账户自己的已审核通过的小程序，查询被共享的小程序（search_type=2）
+    if (!microApp) {
+      console.log('未找到账户自己的已审核通过的小程序，查询被共享的小程序 (search_type=2)...')
+      const approvedResult = await buildWorkflowApi.queryApprovedMicroApp(accountId)
 
-    const parsed = parsePromotionUrl(promotionResult.promotion_url)
-    const appId = extractAppIdFromParams(parsed.launchParams)
-
-    if (!appId) {
-      throw new Error('无法从推广链接参数中提取 app_id')
+      if (approvedResult.data?.found && approvedResult.data.micro_app) {
+        microApp = approvedResult.data.micro_app
+        console.log('✓ 找到被共享的已审核通过的小程序:', microApp.micro_app_instance_id)
+      }
     }
 
-    const cleanedParams = parsed.launchParams
-      .split('&')
-      .filter(param => !param.startsWith('app_id='))
-      .join('&')
+    // 3. 如果都没有找到，检查是否需要创建
+    if (!microApp) {
+      console.log('未找到任何已审核通过的小程序，检查是否需要创建...')
 
-    const microAppLink = generateMicroAppLink({
-      appId,
-      startPage: parsed.launchPage,
-      startParams: cleanedParams,
-    })
+      // 检查是否有未审核通过的小程序
+      if (microAppResult.data?.micro_app && microAppResult.data.micro_app.length > 0) {
+        // 有小程序但都未审核通过，跳过搭建
+        const firstMicroApp = microAppResult.data.micro_app[0]
+        console.log('小程序存在但未审核通过，状态:', firstMicroApp.status)
+        const error = new Error('小程序未审核通过，跳过此剧集的搭建') as any
+        error.code = 'MICROAPP_NOT_APPROVED'
+        throw error
+      }
 
-    // 调用创建 API
-    await buildWorkflowApi.createMicroApp({
-      account_id: accountId,
-      app_id: appId,
-      path: parsed.launchPage,
-      query: parsed.launchParams,
-      remark: promotionResult.promotion_name,
-      link: microAppLink,
-    })
+      // 小程序不存在，自动创建
+      console.log('小程序不存在，开始自动创建')
+      isCreatingMicroApp.value = true
 
-    console.log('小程序创建成功，等待30秒后查询...')
-    waitingCountdown.value = 30
-    for (let i = 30; i > 0; i--) {
-      waitingCountdown.value = i
-      await new Promise(resolve => setTimeout(resolve, 1000))
-    }
-    waitingCountdown.value = 0
+      const parsed = parsePromotionUrl(promotionResult.promotion_url)
+      const appId = extractAppIdFromParams(parsed.launchParams)
 
-    // 第一次重新查询
-    let recheckResult = await buildWorkflowApi.queryMicroApp(accountId)
+      if (!appId) {
+        throw new Error('无法从推广链接参数中提取 app_id')
+      }
 
-    if (!recheckResult.data?.micro_app || recheckResult.data.micro_app.length === 0) {
-      console.log('第一次未查询到小程序，等待10秒后重试...')
-      waitingCountdown.value = 10
-      for (let i = 10; i > 0; i--) {
+      const cleanedParams = parsed.launchParams
+        .split('&')
+        .filter(param => !param.startsWith('app_id='))
+        .join('&')
+
+      const microAppLink = generateMicroAppLink({
+        appId,
+        startPage: parsed.launchPage,
+        startParams: cleanedParams,
+      })
+
+      // 调用创建 API
+      await buildWorkflowApi.createMicroApp({
+        account_id: accountId,
+        app_id: appId,
+        path: parsed.launchPage,
+        query: parsed.launchParams,
+        remark: promotionResult.promotion_name,
+        link: microAppLink,
+      })
+
+      console.log('小程序创建成功，等待30秒后查询...')
+      waitingCountdown.value = 30
+      for (let i = 30; i > 0; i--) {
         waitingCountdown.value = i
         await new Promise(resolve => setTimeout(resolve, 1000))
       }
       waitingCountdown.value = 0
 
-      recheckResult = await buildWorkflowApi.queryMicroApp(accountId)
+      // 第一次重新查询
+      let recheckResult = await buildWorkflowApi.queryMicroApp(accountId)
 
       if (!recheckResult.data?.micro_app || recheckResult.data.micro_app.length === 0) {
-        isCreatingMicroApp.value = false
-        throw new Error('小程序创建后查询失败（已重试2次）')
-      }
-    }
+        console.log('第一次未查询到小程序，等待10秒后重试...')
+        waitingCountdown.value = 10
+        for (let i = 10; i > 0; i--) {
+          waitingCountdown.value = i
+          await new Promise(resolve => setTimeout(resolve, 1000))
+        }
+        waitingCountdown.value = 0
 
-    microApp = recheckResult.data.micro_app[0]
-    isCreatingMicroApp.value = false
+        recheckResult = await buildWorkflowApi.queryMicroApp(accountId)
+
+        if (!recheckResult.data?.micro_app || recheckResult.data.micro_app.length === 0) {
+          isCreatingMicroApp.value = false
+          throw new Error('小程序创建后查询失败（已重试2次）')
+        }
+      }
+
+      microApp = recheckResult.data.micro_app[0]
+      isCreatingMicroApp.value = false
+    }
   }
 
   // 步骤4: 查询/创建小程序资产
@@ -1458,7 +1491,30 @@ async function executeAssetization(
 
   let assetsId: string | number
 
-  if (assetsListResult.data?.micro_app && assetsListResult.data.micro_app.length > 0) {
+  if (buildConfig?.useNewMicroAppAssetFlow) {
+    assetMicroApp = findConfiguredMicroAppAsset(assetsListResult.data?.micro_app, buildConfig)
+    if (assetMicroApp) {
+      assetsId = assetMicroApp.assets_id
+      console.log('新版小程序资产已存在，assets_id:', assetsId)
+    } else {
+      console.log('新版小程序资产不存在，开始创建')
+      await buildWorkflowApi.createMicroAppAsset({
+        account_id: accountId,
+        micro_app_instance_id: buildConfig.microAppInstanceId,
+      })
+      const createdAssetsListResult = await buildWorkflowApi.listMicroAppAssets(accountId)
+      assetMicroApp = findConfiguredMicroAppAsset(createdAssetsListResult.data?.micro_app, buildConfig)
+      if (!assetMicroApp) {
+        throw new Error('新版小程序资产创建成功后，未查询到对应资产')
+      }
+      assetsId = assetMicroApp.assets_id
+    }
+    microApp = {
+      micro_app_instance_id: assetMicroApp.micro_app_instance_id || buildConfig.microAppInstanceId,
+      app_id: assetMicroApp.micro_app_id || buildConfig.microAppId,
+      start_page: '',
+    }
+  } else if (assetsListResult.data?.micro_app && assetsListResult.data.micro_app.length > 0) {
     assetsId = assetsListResult.data.micro_app[0].assets_id
     console.log('小程序资产已存在，assets_id:', assetsId)
   } else {

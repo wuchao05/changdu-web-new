@@ -76,9 +76,9 @@ function getRuntimeContext(input = null) {
 
 function getBuildConfig(input = null) {
   const buildConfig = getRuntimeContext(input)?.buildConfig || {}
+  const useNewMicroAppAssetFlow = Boolean(buildConfig.useNewMicroAppAssetFlow)
   const requiredKeys = [
     'secretKey',
-    'ccId',
     'microAppName',
     'microAppId',
     'productId',
@@ -86,6 +86,12 @@ function getBuildConfig(input = null) {
     'landingUrl',
     'rechargeTemplateId',
   ]
+
+  if (useNewMicroAppAssetFlow) {
+    requiredKeys.push('microAppInstanceId')
+  } else {
+    requiredKeys.push('ccId')
+  }
 
   for (const key of requiredKeys) {
     if (!buildConfig[key]) {
@@ -95,9 +101,11 @@ function getBuildConfig(input = null) {
 
   return {
     secretKey: buildConfig.secretKey,
+    useNewMicroAppAssetFlow,
     ccId: buildConfig.ccId,
     microAppName: buildConfig.microAppName,
     microAppId: buildConfig.microAppId,
+    microAppInstanceId: buildConfig.microAppInstanceId,
     source: buildConfig.source || BUILD_WORKFLOW_CONFIG.build.promotion.source,
     productId: buildConfig.productId,
     productPlatformId: buildConfig.productPlatformId,

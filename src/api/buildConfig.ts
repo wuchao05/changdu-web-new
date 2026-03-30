@@ -7,8 +7,10 @@ export interface BuildConfig {
   productId: string
   productPlatformId: string
   landingUrl: string
+  useNewMicroAppAssetFlow: boolean
   microAppName: string
   microAppId: string
+  microAppInstanceId: string
   ccId: string
   rechargeTemplateId: string
   adCallbackConfigId: string
@@ -29,8 +31,10 @@ export const DEFAULT_BUILD_CONFIG: BuildConfig = {
   productId: '',
   productPlatformId: '',
   landingUrl: '',
+  useNewMicroAppAssetFlow: false,
   microAppName: '',
   microAppId: '',
+  microAppInstanceId: '',
   ccId: '',
   rechargeTemplateId: '',
   adCallbackConfigId: '',
@@ -40,6 +44,10 @@ export const DEFAULT_BUILD_CONFIG: BuildConfig = {
 
 function normalizeStringValue(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : fallback
+}
+
+function normalizeBooleanValue(value: unknown, fallback = false): boolean {
+  return typeof value === 'boolean' ? value : fallback
 }
 
 function normalizeBuildConfig(payload: unknown): BuildConfig {
@@ -56,8 +64,10 @@ function normalizeBuildConfig(payload: unknown): BuildConfig {
     productId: normalizeStringValue(config.productId),
     productPlatformId: normalizeStringValue(config.productPlatformId),
     landingUrl: normalizeStringValue(config.landingUrl),
+    useNewMicroAppAssetFlow: normalizeBooleanValue(config.useNewMicroAppAssetFlow),
     microAppName: normalizeStringValue(config.microAppName),
     microAppId: normalizeStringValue(config.microAppId),
+    microAppInstanceId: normalizeStringValue(config.microAppInstanceId),
     ccId: normalizeStringValue(config.ccId),
     rechargeTemplateId: normalizeStringValue(config.rechargeTemplateId),
     adCallbackConfigId: normalizeStringValue(config.adCallbackConfigId),

@@ -390,9 +390,9 @@ function toOptionalAdCallbackConfigIdNumber(rawAdCallbackConfigId) {
 
 function getBuildConfig() {
   const buildConfig = getSchedulerRuntime().buildConfig || {}
+  const useNewMicroAppAssetFlow = Boolean(buildConfig.useNewMicroAppAssetFlow)
   const requiredKeys = [
     'secretKey',
-    'ccId',
     'microAppName',
     'microAppId',
     'productId',
@@ -400,6 +400,12 @@ function getBuildConfig() {
     'landingUrl',
     'rechargeTemplateId',
   ]
+
+  if (useNewMicroAppAssetFlow) {
+    requiredKeys.push('microAppInstanceId')
+  } else {
+    requiredKeys.push('ccId')
+  }
 
   for (const key of requiredKeys) {
     if (!buildConfig[key]) {
@@ -409,9 +415,11 @@ function getBuildConfig() {
 
   return {
     secretKey: buildConfig.secretKey,
+    useNewMicroAppAssetFlow,
     ccId: buildConfig.ccId,
     microAppName: buildConfig.microAppName,
     microAppId: buildConfig.microAppId,
+    microAppInstanceId: buildConfig.microAppInstanceId,
     source: buildConfig.source || BUILD_WORKFLOW_CONFIG.build.promotion.source,
     productId: buildConfig.productId,
     productPlatformId: buildConfig.productPlatformId,
@@ -428,6 +436,20 @@ function getBuildRuleConfig() {
 
 function getJuliangCookie() {
   return String(getSchedulerRuntime().juliang.cookie || '').trim()
+}
+
+function findConfiguredMicroAppAsset(assets = [], buildConfig = {}) {
+  const microApps = Array.isArray(assets) ? assets : []
+  const targetInstanceId = String(buildConfig.microAppInstanceId || '').trim()
+  const targetMicroAppId = String(buildConfig.microAppId || '').trim()
+
+  return (
+    microApps.find(
+      item => String(item?.micro_app_instance_id || '').trim() === targetInstanceId
+    ) ||
+    microApps.find(item => String(item?.micro_app_id || '').trim() === targetMicroAppId) ||
+    null
+  )
 }
 
 function getChangduDistributorId() {
@@ -1162,6 +1184,7 @@ async function executeAssetization(drama) {
   const dramaName = drama.fields['剧名']?.[0]?.text
   const bookId = drama.fields['短剧ID']?.value?.[0]?.text
   const accountId = drama.fields['账户']?.[0]?.text
+  const buildConfig = getBuildConfig()
 
   if (!dramaName || !bookId || !accountId) {
     throw new Error('剧集信息不完整')
@@ -1197,88 +1220,99 @@ async function executeAssetization(drama) {
   })
 
   // 步骤3: 查询/创建小程序
-  console.log('[后台搭建] 步骤3: 查询/创建小程序')
   let microApp
+  let assetMicroApp = null
 
-  // 1. 首先查询账户自己的已审核通过的小程序（search_type=1）
-  const microAppResult = await queryMicroApp(accountId)
-  if (microAppResult.hasValidMicroApp) {
-    // 找到账户自己的已审核通过的小程序，直接使用
-    microApp = microAppResult.result.data.micro_app[0]
-    console.log('[后台搭建] ✓ 使用账户自己的已审核通过的小程序:', microApp.micro_app_instance_id)
+  if (buildConfig.useNewMicroAppAssetFlow) {
+    console.log('[后台搭建] 步骤3: 新版流程跳过查询/创建小程序，直接使用配置里的小程序实例')
+    microApp = {
+      micro_app_instance_id: buildConfig.microAppInstanceId,
+      app_id: buildConfig.microAppId,
+      start_page: '',
+    }
   } else {
-    // 2. 没有找到账户自己的小程序，查询被共享的已审核通过的小程序（search_type=2）
-    console.log('[后台搭建] 未找到账户自己的已审核通过的小程序，查询被共享的小程序...')
-    const approvedResult = await queryApprovedMicroApp(accountId)
-    if (approvedResult.found && approvedResult.microApp) {
-      // 找到被共享的已审核通过的小程序，直接使用
-      microApp = approvedResult.microApp
-      console.log('[后台搭建] ✓ 使用被共享的已审核通过的小程序:', microApp.micro_app_instance_id)
+    console.log('[后台搭建] 步骤3: 查询/创建小程序')
+
+    // 1. 首先查询账户自己的已审核通过的小程序（search_type=1）
+    const microAppResult = await queryMicroApp(accountId)
+    if (microAppResult.hasValidMicroApp) {
+      // 找到账户自己的已审核通过的小程序，直接使用
+      microApp = microAppResult.result.data.micro_app[0]
+      console.log('[后台搭建] ✓ 使用账户自己的已审核通过的小程序:', microApp.micro_app_instance_id)
     } else {
-      // 3. 都没有找到，检查是否有未审核通过的小程序
-      console.log('[后台搭建] 未找到被共享的小程序，检查是否需要创建...')
-      const applets = microAppResult.result.data?.applets || []
-      if (applets.length > 0) {
-        // 有小程序但 status 都不等于 1，跳过这部剧
-        console.log('[后台搭建] ⚠️ 小程序存在但未审核通过，跳过这部剧')
-        console.log(
-          '[后台搭建] 小程序详情:',
-          applets.map(a => ({ instance_id: a.instance_id, status: a.status }))
-        )
-        const error = new Error('小程序未审核通过（status != 1），跳过此剧集的搭建')
-        error.code = 'MICROAPP_NOT_APPROVED'
-        throw error
+      // 2. 没有找到账户自己的小程序，查询被共享的已审核通过的小程序（search_type=2）
+      console.log('[后台搭建] 未找到账户自己的已审核通过的小程序，查询被共享的小程序...')
+      const approvedResult = await queryApprovedMicroApp(accountId)
+      if (approvedResult.found && approvedResult.microApp) {
+        // 找到被共享的已审核通过的小程序，直接使用
+        microApp = approvedResult.microApp
+        console.log('[后台搭建] ✓ 使用被共享的已审核通过的小程序:', microApp.micro_app_instance_id)
+      } else {
+        // 3. 都没有找到，检查是否有未审核通过的小程序
+        console.log('[后台搭建] 未找到被共享的小程序，检查是否需要创建...')
+        const applets = microAppResult.result.data?.applets || []
+        if (applets.length > 0) {
+          // 有小程序但 status 都不等于 1，跳过这部剧
+          console.log('[后台搭建] ⚠️ 小程序存在但未审核通过，跳过这部剧')
+          console.log(
+            '[后台搭建] 小程序详情:',
+            applets.map(a => ({ instance_id: a.instance_id, status: a.status }))
+          )
+          const error = new Error('小程序未审核通过（status != 1），跳过此剧集的搭建')
+          error.code = 'MICROAPP_NOT_APPROVED'
+          throw error
+        }
+        // applets 为空，需要创建小程序
+        console.log('[后台搭建] 小程序不存在，开始自动创建')
       }
-      // applets 为空，需要创建小程序
-      console.log('[后台搭建] 小程序不存在，开始自动创建')
-    }
-  }
-
-  // 如果没有有效小程序，则创建
-  if (!microApp) {
-    const parsed = parsePromotionUrl(promotionResult.promotion_url)
-    const appId = extractAppIdFromParams(parsed.launchParams)
-
-    if (!appId) {
-      throw new Error('无法从推广链接参数中提取 app_id')
     }
 
-    const cleanedParams = parsed.launchParams
-      .split('&')
-      .filter(param => !param.startsWith('app_id='))
-      .join('&')
+    // 如果没有有效小程序，则创建
+    if (!microApp) {
+      const parsed = parsePromotionUrl(promotionResult.promotion_url)
+      const appId = extractAppIdFromParams(parsed.launchParams)
 
-    const microAppLink = generateMicroAppLink({
-      appId,
-      startPage: parsed.launchPage,
-      startParams: cleanedParams,
-    })
+      if (!appId) {
+        throw new Error('无法从推广链接参数中提取 app_id')
+      }
 
-    await createMicroApp({
-      account_id: accountId,
-      app_id: appId,
-      path: parsed.launchPage,
-      query: parsed.launchParams,
-      remark: promotionResult.promotion_name,
-      link: microAppLink,
-    })
+      const cleanedParams = parsed.launchParams
+        .split('&')
+        .filter(param => !param.startsWith('app_id='))
+        .join('&')
 
-    console.log('[后台搭建] 小程序创建成功，等待30秒后查询...')
-    await new Promise(resolve => setTimeout(resolve, 30000))
+      const microAppLink = generateMicroAppLink({
+        appId,
+        startPage: parsed.launchPage,
+        startParams: cleanedParams,
+      })
 
-    let recheckResult = await queryMicroApp(accountId)
+      await createMicroApp({
+        account_id: accountId,
+        app_id: appId,
+        path: parsed.launchPage,
+        query: parsed.launchParams,
+        remark: promotionResult.promotion_name,
+        link: microAppLink,
+      })
 
-    if (!recheckResult.hasValidMicroApp) {
-      console.log('[后台搭建] 第一次未查询到有效小程序，等待10秒后重试...')
-      await new Promise(resolve => setTimeout(resolve, 10000))
-      recheckResult = await queryMicroApp(accountId)
+      console.log('[后台搭建] 小程序创建成功，等待30秒后查询...')
+      await new Promise(resolve => setTimeout(resolve, 30000))
+
+      let recheckResult = await queryMicroApp(accountId)
 
       if (!recheckResult.hasValidMicroApp) {
-        throw new Error('小程序创建后查询失败（已重试2次）')
-      }
-    }
+        console.log('[后台搭建] 第一次未查询到有效小程序，等待10秒后重试...')
+        await new Promise(resolve => setTimeout(resolve, 10000))
+        recheckResult = await queryMicroApp(accountId)
 
-    microApp = recheckResult.result.data.micro_app[0]
+        if (!recheckResult.hasValidMicroApp) {
+          throw new Error('小程序创建后查询失败（已重试2次）')
+        }
+      }
+
+      microApp = recheckResult.result.data.micro_app[0]
+    }
   }
 
   // 步骤4: 查询/创建小程序资产
@@ -1286,7 +1320,38 @@ async function executeAssetization(drama) {
   const assetsListResult = await listMicroAppAssets(accountId)
   let assetsId
 
-  if (assetsListResult.data?.micro_app && assetsListResult.data.micro_app.length > 0) {
+  if (buildConfig.useNewMicroAppAssetFlow) {
+    assetMicroApp = findConfiguredMicroAppAsset(assetsListResult.data?.micro_app, buildConfig)
+    if (assetMicroApp) {
+      assetsId = assetMicroApp.assets_id
+      console.log('[后台搭建] 新版小程序资产已存在:', assetsId)
+    } else {
+      console.log('[后台搭建] 新版小程序资产不存在，开始创建')
+      await createMicroAppAsset({
+        account_id: accountId,
+        micro_app_instance_id: buildConfig.microAppInstanceId,
+      })
+
+      const createdAssetsListResult = await listMicroAppAssets(accountId)
+      assetMicroApp = findConfiguredMicroAppAsset(createdAssetsListResult.data?.micro_app, buildConfig)
+      if (!assetMicroApp) {
+        throw new Error('新版小程序资产创建成功后，未查询到对应资产')
+      }
+      assetsId = assetMicroApp.assets_id
+      microApp = {
+        micro_app_instance_id: assetMicroApp.micro_app_instance_id || buildConfig.microAppInstanceId,
+        app_id: assetMicroApp.micro_app_id || buildConfig.microAppId,
+        start_page: '',
+      }
+    }
+    if (assetMicroApp) {
+      microApp = {
+        micro_app_instance_id: assetMicroApp.micro_app_instance_id || buildConfig.microAppInstanceId,
+        app_id: assetMicroApp.micro_app_id || buildConfig.microAppId,
+        start_page: '',
+      }
+    }
+  } else if (assetsListResult.data?.micro_app && assetsListResult.data.micro_app.length > 0) {
     assetsId = assetsListResult.data.micro_app[0].assets_id
     console.log('[后台搭建] 小程序资产已存在:', assetsId)
   } else {

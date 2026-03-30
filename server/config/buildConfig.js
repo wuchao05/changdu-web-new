@@ -19,8 +19,10 @@ export const DEFAULT_BUILD_CONFIG = {
   productId: BUILD_WORKFLOW_CONFIG.build.project.product_id,
   productPlatformId: BUILD_WORKFLOW_CONFIG.build.project.product_platform_id,
   landingUrl: BUILD_WORKFLOW_CONFIG.build.promotion.external_url,
+  useNewMicroAppAssetFlow: false,
   microAppName: BUILD_WORKFLOW_CONFIG.juliang.microAppName,
   microAppId: BUILD_WORKFLOW_CONFIG.juliang.microAppId,
+  microAppInstanceId: '',
   ccId: '1849832732821859',
   rechargeTemplateId: String(BUILD_WORKFLOW_CONFIG.changdu.rechargeTemplateId),
   adCallbackConfigId: String(BUILD_WORKFLOW_CONFIG.changdu.adCallbackConfigId),
@@ -30,6 +32,10 @@ export const DEFAULT_BUILD_CONFIG = {
 
 function normalizeStringValue(value, fallback = '') {
   return typeof value === 'string' ? value : fallback
+}
+
+function normalizeBooleanValue(value, fallback = false) {
+  return typeof value === 'boolean' ? value : fallback
 }
 
 export function normalizeBuildConfig(config = {}) {
@@ -42,8 +48,16 @@ export function normalizeBuildConfig(config = {}) {
       DEFAULT_BUILD_CONFIG.productPlatformId
     ),
     landingUrl: normalizeStringValue(config.landingUrl, DEFAULT_BUILD_CONFIG.landingUrl),
+    useNewMicroAppAssetFlow: normalizeBooleanValue(
+      config.useNewMicroAppAssetFlow,
+      DEFAULT_BUILD_CONFIG.useNewMicroAppAssetFlow
+    ),
     microAppName: normalizeStringValue(config.microAppName, DEFAULT_BUILD_CONFIG.microAppName),
     microAppId: normalizeStringValue(config.microAppId, DEFAULT_BUILD_CONFIG.microAppId),
+    microAppInstanceId: normalizeStringValue(
+      config.microAppInstanceId,
+      DEFAULT_BUILD_CONFIG.microAppInstanceId
+    ),
     ccId: normalizeStringValue(config.ccId, DEFAULT_BUILD_CONFIG.ccId),
     rechargeTemplateId: normalizeStringValue(
       config.rechargeTemplateId,
