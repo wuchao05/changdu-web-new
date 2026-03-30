@@ -1387,11 +1387,6 @@ const channelColumns: DataTableColumns<adminApi.ChannelConfig> = [
     },
   },
   {
-    title: 'appId',
-    key: 'changdu.appId',
-    render: row => row.changdu.appId || '-',
-  },
-  {
     title: '操作',
     key: 'actions',
     render: row =>
