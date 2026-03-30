@@ -589,6 +589,17 @@
                           <span class="channel-config-card__pill channel-config-card__pill--violet">
                             {{ item.config.douyinMaterialMatches.length }} 条规则
                           </span>
+                          <span
+                            class="channel-config-card__pill"
+                            :class="
+                              countConfiguredMaterialMatches(item.config.douyinMaterialMatches) > 0
+                                ? 'channel-config-card__pill--success'
+                                : 'channel-config-card__pill--danger'
+                            "
+                          >
+                            {{ countConfiguredMaterialMatches(item.config.douyinMaterialMatches) }}
+                            条有效规则
+                          </span>
                         </div>
                       </div>
 
@@ -2625,6 +2636,19 @@ watch(
 .channel-config-card__pill--violet {
   border-color: rgba(221, 214, 254, 0.95);
   color: #7c3aed;
+}
+
+.channel-config-card__pill--success {
+  border-color: rgba(187, 247, 208, 0.95);
+  background: rgba(240, 253, 244, 0.96);
+  color: #15803d;
+}
+
+.channel-config-card__pill--danger {
+  border-color: rgba(254, 202, 202, 0.98);
+  background: rgba(254, 242, 242, 0.98);
+  color: #dc2626;
+  box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.08);
 }
 
 .config-subpanel {
