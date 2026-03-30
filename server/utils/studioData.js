@@ -84,6 +84,10 @@ function defaultUserChannelConfig() {
     materialPreview: defaultMaterialPreview(),
     permissions: {
       syncAccount: false,
+      webMenus: {
+        overview: true,
+        report: true,
+      },
       desktopMenus: {
         download: false,
         materialClip: false,
@@ -244,6 +248,7 @@ function normalizeFeishuConfig(feishu = {}) {
 function normalizeUserChannelConfig(config = {}) {
   const resolvedEnabled =
     typeof config.enabled === 'boolean' ? config.enabled : hasCustomUserChannelConfig(config)
+  const defaultConfig = defaultUserChannelConfig()
 
   return {
     enabled: resolvedEnabled,
@@ -255,6 +260,16 @@ function normalizeUserChannelConfig(config = {}) {
     },
     permissions: {
       syncAccount: Boolean(config.permissions?.syncAccount),
+      webMenus: {
+        overview:
+          typeof config.permissions?.webMenus?.overview === 'boolean'
+            ? config.permissions.webMenus.overview
+            : defaultConfig.permissions.webMenus.overview,
+        report:
+          typeof config.permissions?.webMenus?.report === 'boolean'
+            ? config.permissions.webMenus.report
+            : defaultConfig.permissions.webMenus.report,
+      },
       desktopMenus: {
         download: Boolean(config.permissions?.desktopMenus?.download),
         materialClip: Boolean(config.permissions?.desktopMenus?.materialClip),
@@ -281,6 +296,9 @@ function hasCustomUserChannelConfig(config = {}) {
     config.materialPreview &&
     typeof config.materialPreview === 'object' &&
     Object.keys(config.materialPreview).length > 0
+  const hasExplicitWebPermissionConfig =
+    typeof config.permissions?.webMenus?.overview === 'boolean' ||
+    typeof config.permissions?.webMenus?.report === 'boolean'
   const hasPermissionConfig =
     Boolean(config.permissions?.syncAccount) ||
     Object.values(config.permissions?.desktopMenus || {}).some(Boolean)
@@ -291,6 +309,7 @@ function hasCustomUserChannelConfig(config = {}) {
   return (
     hasFeishuConfig(normalizeFeishuConfig(config.feishu || config)) ||
     hasExplicitMaterialPreview ||
+    hasExplicitWebPermissionConfig ||
     hasPermissionConfig ||
     hasOrderUserStats ||
     normalizeDouyinMaterialMatches(config.douyinMaterialMatches).length > 0
@@ -434,6 +453,13 @@ export function buildRuntimeUser(user = {}, channelId = '') {
   const channelConfig = getRuntimeUserChannelConfig(normalizedUser, channelId)
   const normalizedPermissions = {
     ...channelConfig.permissions,
+    webMenus:
+      normalizedUser.userType === 'admin'
+        ? {
+            overview: true,
+            report: true,
+          }
+        : channelConfig.permissions.webMenus,
     desktopMenus:
       normalizedUser.userType === 'admin'
         ? {

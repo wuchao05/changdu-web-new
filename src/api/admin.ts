@@ -22,6 +22,10 @@ export interface UserChannelBindingConfig {
   }
   permissions: {
     syncAccount: boolean
+    webMenus: {
+      overview: boolean
+      report: boolean
+    }
     desktopMenus: {
       download: boolean
       materialClip: boolean
@@ -82,6 +86,10 @@ export interface UserProfile {
   }
   permissions?: {
     syncAccount: boolean
+    webMenus: {
+      overview: boolean
+      report: boolean
+    }
     desktopMenus: {
       download: boolean
       materialClip: boolean

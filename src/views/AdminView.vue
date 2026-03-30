@@ -339,24 +339,56 @@
                             <p class="permission-group__eyebrow">Web 端</p>
                             <h4 class="permission-group__title">网页工作台权限</h4>
                             <p class="permission-group__desc">
-                              当前只有“同步账户”属于 Web 端入口，用于网页工作台内的账户同步操作。
+                              可控制当前用户在当前渠道下能否看到首页数据概览、数据报表，以及是否开放同步账户入口。
                             </p>
                           </div>
                         </div>
-                        <div class="permission-card permission-card--web">
-                          <div class="permission-card__body">
-                            <div class="min-w-0">
-                              <div class="permission-card__title-row">
-                                <p class="permission-card__title">同步账户</p>
-                                <span class="permission-card__badge permission-card__badge--web">
-                                  Web 端
-                                </span>
+                        <div class="permission-grid">
+                          <div
+                            v-for="permission in webPermissionOptions"
+                            :key="permission.key"
+                            class="permission-card permission-card--web"
+                          >
+                            <div class="permission-card__body">
+                              <div class="min-w-0">
+                                <div class="permission-card__title-row">
+                                  <p class="permission-card__title">{{ permission.label }}</p>
+                                  <span class="permission-card__badge permission-card__badge--web">
+                                    Web 端
+                                  </span>
+                                </div>
+                                <p class="permission-card__meta">
+                                  {{ permission.description }}
+                                </p>
                               </div>
-                              <p class="permission-card__meta">
-                                允许进入网页工作台的同步账户入口。
-                              </p>
+                              <n-switch
+                                :value="item.config.permissions.webMenus[permission.key]"
+                                @update:value="
+                                  value =>
+                                    updateWebPermission(
+                                      item.config.permissions.webMenus,
+                                      permission.key,
+                                      value
+                                    )
+                                "
+                              />
                             </div>
-                            <n-switch v-model:value="item.config.permissions.syncAccount" />
+                          </div>
+                          <div class="permission-card permission-card--web">
+                            <div class="permission-card__body">
+                              <div class="min-w-0">
+                                <div class="permission-card__title-row">
+                                  <p class="permission-card__title">同步账户</p>
+                                  <span class="permission-card__badge permission-card__badge--web">
+                                    Web 端
+                                  </span>
+                                </div>
+                                <p class="permission-card__meta">
+                                  允许进入网页工作台的同步账户入口。
+                                </p>
+                              </div>
+                              <n-switch v-model:value="item.config.permissions.syncAccount" />
+                            </div>
                           </div>
                         </div>
                       </section>
@@ -1206,6 +1238,7 @@ interface DownloadCenterConfigFormModel {
 }
 
 type DesktopPermissionKey = keyof adminApi.UserChannelBindingConfig['permissions']['desktopMenus']
+type WebPermissionKey = keyof adminApi.UserChannelBindingConfig['permissions']['webMenus']
 type BuildAdvanceHoursField = 'advanceHoursAfterTen' | 'advanceHoursBeforeTen'
 
 const userForm = reactive<UserFormModel>(createDefaultUserForm())
@@ -1217,6 +1250,22 @@ const downloadCenterForm = reactive<DownloadCenterConfigFormModel>(
 const userTypeOptions = [
   { label: '管理员', value: 'admin' },
   { label: '普通用户', value: 'normal' },
+]
+const webPermissionOptions: Array<{
+  key: WebPermissionKey
+  label: string
+  description: string
+}> = [
+  {
+    key: 'overview',
+    label: '数据概览',
+    description: '控制首页顶部数据概览卡片是否展示。',
+  },
+  {
+    key: 'report',
+    label: '数据报表',
+    description: '控制首页充值日报表格是否展示。',
+  },
 ]
 const desktopPermissionOptions: Array<{
   key: DesktopPermissionKey
@@ -1553,6 +1602,10 @@ function createDefaultUserChannelConfig(): adminApi.UserChannelBindingConfig {
     },
     permissions: {
       syncAccount: false,
+      webMenus: {
+        overview: true,
+        report: true,
+      },
       desktopMenus: {
         download: false,
         materialClip: false,
@@ -1605,6 +1658,18 @@ function normalizeUserChannelConfig(
       ...defaultConfig.permissions,
       ...(config?.permissions || {}),
       syncAccount: Boolean(config?.permissions?.syncAccount),
+      webMenus: {
+        ...defaultConfig.permissions.webMenus,
+        ...(config?.permissions?.webMenus || {}),
+        overview:
+          typeof config?.permissions?.webMenus?.overview === 'boolean'
+            ? config.permissions.webMenus.overview
+            : defaultConfig.permissions.webMenus.overview,
+        report:
+          typeof config?.permissions?.webMenus?.report === 'boolean'
+            ? config.permissions.webMenus.report
+            : defaultConfig.permissions.webMenus.report,
+      },
       desktopMenus: {
         ...defaultConfig.permissions.desktopMenus,
         ...(config?.permissions?.desktopMenus || {}),
@@ -1956,6 +2021,14 @@ function openDownloadCenterModal(config?: adminApi.DownloadCenterConfig) {
 function updateDesktopPermission(
   permissions: adminApi.UserChannelBindingConfig['permissions']['desktopMenus'],
   key: DesktopPermissionKey,
+  value: boolean
+) {
+  permissions[key] = value
+}
+
+function updateWebPermission(
+  permissions: adminApi.UserChannelBindingConfig['permissions']['webMenus'],
+  key: WebPermissionKey,
   value: boolean
 ) {
   permissions[key] = value

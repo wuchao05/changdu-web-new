@@ -196,7 +196,7 @@
       </div>
 
       <div v-else class="space-y-6">
-        <n-card :bordered="false" class="shadow-sm">
+        <n-card v-if="canAccessOverview" :bordered="false" class="shadow-sm">
           <template #header>
             <div class="flex items-center justify-between gap-4 flex-wrap">
               <div class="flex items-center gap-3">
@@ -280,7 +280,7 @@
         </n-card>
 
         <div class="space-y-6">
-          <n-card :bordered="false" class="shadow-sm">
+          <n-card v-if="canAccessReport" :bordered="false" class="shadow-sm">
             <template #header>
               <div class="flex flex-wrap items-start justify-between gap-4">
                 <div class="flex items-center gap-3">
@@ -581,6 +581,15 @@ const autoBuildDisabledReason = computed(() => {
 const canAccessSyncAccount = computed(
   () =>
     hasActiveChannel.value && Boolean(sessionStore.currentRuntimeUser?.permissions?.syncAccount)
+)
+const canAccessOverview = computed(
+  () =>
+    hasActiveChannel.value &&
+    Boolean(sessionStore.currentRuntimeUser?.permissions?.webMenus?.overview)
+)
+const canAccessReport = computed(
+  () =>
+    hasActiveChannel.value && Boolean(sessionStore.currentRuntimeUser?.permissions?.webMenus?.report)
 )
 const hasAccountTableId = computed(() => Boolean(apiConfigStore.config.accountTableId))
 const dashboardSubtitle = computed(() => '数据驱动，精准运营')
@@ -1117,7 +1126,14 @@ const autoRefresh = useAutoRefresh(() => {
 })
 
 async function fetchOverviewData() {
-  if (!hasActiveChannel.value) return
+  if (!hasActiveChannel.value || !canAccessOverview.value) {
+    overviewToday.value = null
+    overviewAll.value = null
+    monthRechargeAmount.value = 0
+    overviewUpdatedAt.value = ''
+    overviewError.value = ''
+    return
+  }
 
   overviewLoading.value = true
   overviewError.value = ''
@@ -1146,7 +1162,13 @@ async function fetchOverviewData() {
 }
 
 async function fetchReportData() {
-  if (!hasActiveChannel.value || !reportDateRange.value) return
+  if (!hasActiveChannel.value || !canAccessReport.value || !reportDateRange.value) {
+    reportData.value = null
+    reportError.value = ''
+    reportCurrentPage.value = 1
+    reportPagination.page = 1
+    return
+  }
 
   reportLoading.value = true
   reportError.value = ''
