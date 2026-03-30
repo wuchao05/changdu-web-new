@@ -280,7 +280,7 @@
         </n-card>
 
         <div class="space-y-6">
-          <n-card v-if="canAccessReport" :bordered="false" class="shadow-sm">
+          <n-card :bordered="false" class="shadow-sm">
             <template #header>
               <div class="flex flex-wrap items-start justify-between gap-4">
                 <div class="flex items-center gap-3">
@@ -375,7 +375,7 @@
             />
           </n-card>
 
-          <n-card :bordered="false" class="shadow-sm">
+          <n-card v-if="canAccessReport" :bordered="false" class="shadow-sm">
             <template #header>
               <div class="flex flex-wrap items-start justify-between gap-4">
                 <div class="flex items-center gap-3">
