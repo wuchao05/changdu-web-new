@@ -16,6 +16,7 @@ import {
   resolveChannelRuntimeById,
 } from '../utils/channelRuntime.js'
 import { normalizeRuntimeInstanceKey } from '../utils/runtimeInstance.js'
+import { getDefaultDownloadCenterConfig } from '../utils/studioData.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -238,6 +239,36 @@ function getRuntimeChangduHeaders(instanceKey) {
     ).trim(),
     distributorId: String(runtime.changdu.distributorId || '1842236883646506').trim(),
     agwJsConv: String(runtime.changdu.agwJsConv || 'str').trim(),
+  }
+}
+
+async function getDownloadCenterTaskListHeaders(channelId) {
+  await ensureSchedulerRuntime(channelId)
+  const runtimeHeaders = getRuntimeChangduHeaders(channelId)
+  const defaultDownloadCenterConfig = await getDefaultDownloadCenterConfig()
+
+  if (!defaultDownloadCenterConfig) {
+    return {
+      Appid: runtimeHeaders.appId,
+      Apptype: runtimeHeaders.appType,
+      Aduserid: runtimeHeaders.adUserId,
+      Rootaduserid: runtimeHeaders.rootAdUserId,
+      Distributorid: runtimeHeaders.distributorId,
+      Cookie: runtimeHeaders.cookie,
+    }
+  }
+
+  return {
+    Appid: String(defaultDownloadCenterConfig.appId || runtimeHeaders.appId).trim(),
+    Apptype: '7',
+    Aduserid: String(defaultDownloadCenterConfig.adUserId || runtimeHeaders.adUserId).trim(),
+    Rootaduserid: String(
+      defaultDownloadCenterConfig.rootAdUserId || runtimeHeaders.rootAdUserId
+    ).trim(),
+    Distributorid: String(
+      defaultDownloadCenterConfig.distributorId || runtimeHeaders.distributorId
+    ).trim(),
+    Cookie: String(defaultDownloadCenterConfig.cookie || runtimeHeaders.cookie).trim(),
   }
 }
 
@@ -840,28 +871,20 @@ async function getDownloadTaskList(channelId, startTime, endTime) {
   // 使用代理服务器
   const url = `https://www.changdunovel.com/node/api/platform/distributor/download_center/task_list/?${queryParams.toString()}`
 
-  await ensureSchedulerRuntime(channelId)
-  const changduHeaders = getRuntimeChangduHeaders(channelId)
-  const cookie = changduHeaders.cookie
-
-  const headerConfig = {
-    Appid: changduHeaders.appId,
-    Apptype: changduHeaders.appType,
-    Aduserid: changduHeaders.adUserId,
-    Rootaduserid: changduHeaders.rootAdUserId,
-    Distributorid: changduHeaders.distributorId,
-  }
+  const headerConfig = await getDownloadCenterTaskListHeaders(channelId)
 
   console.log(`[自动提交-${channelId}] task_list 请求头:`, {
     Distributorid: headerConfig.Distributorid,
-    cookieLength: cookie.length,
+    Appid: headerConfig.Appid,
+    Aduserid: headerConfig.Aduserid,
+    Rootaduserid: headerConfig.Rootaduserid,
+    cookieLength: headerConfig.Cookie.length,
   })
 
   const response = await fetch(url, {
     method: 'GET',
     headers: {
       ...headerConfig,
-      Cookie: cookie,
       'User-Agent':
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     },
