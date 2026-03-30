@@ -7,8 +7,8 @@ dayjs.extend(timezone)
 
 export const WORKFLOW_TIMEZONE = 'Asia/Shanghai'
 export const TEN_OCLOCK_HOUR = 10
-export const ADVANCE_HOURS_AFTER_TEN = 10
-export const ADVANCE_HOURS_BEFORE_TEN = 1
+export const DEFAULT_ADVANCE_HOURS_AFTER_TEN = 0
+export const DEFAULT_ADVANCE_HOURS_BEFORE_TEN = 0
 
 function normalizeCurrentTime(currentTime) {
   if (!currentTime) {
@@ -17,6 +17,27 @@ function normalizeCurrentTime(currentTime) {
   return dayjs.isDayjs(currentTime)
     ? currentTime.tz(WORKFLOW_TIMEZONE)
     : dayjs(currentTime).tz(WORKFLOW_TIMEZONE)
+}
+
+function normalizeAdvanceHoursValue(value, fallback = 0) {
+  const normalizedValue = Number(value)
+  if (!Number.isFinite(normalizedValue) || normalizedValue < 0) {
+    return fallback
+  }
+  return normalizedValue
+}
+
+export function resolveAdvanceHoursConfig(buildConfig = {}) {
+  return {
+    afterTen: normalizeAdvanceHoursValue(
+      buildConfig?.advanceHoursAfterTen,
+      DEFAULT_ADVANCE_HOURS_AFTER_TEN
+    ),
+    beforeTen: normalizeAdvanceHoursValue(
+      buildConfig?.advanceHoursBeforeTen,
+      DEFAULT_ADVANCE_HOURS_BEFORE_TEN
+    ),
+  }
 }
 
 /**
@@ -65,8 +86,11 @@ export function getDramaRating(drama) {
  * @param {import('dayjs').Dayjs} publishTime 上架时间
  * @returns {number}
  */
-export function getAdvanceHours(publishTime) {
-  return publishTime.hour() >= TEN_OCLOCK_HOUR ? ADVANCE_HOURS_AFTER_TEN : ADVANCE_HOURS_BEFORE_TEN
+export function getAdvanceHours(publishTime, buildConfig = {}) {
+  const advanceHoursConfig = resolveAdvanceHoursConfig(buildConfig)
+  return publishTime.hour() >= TEN_OCLOCK_HOUR
+    ? advanceHoursConfig.afterTen
+    : advanceHoursConfig.beforeTen
 }
 
 /**
@@ -74,10 +98,10 @@ export function getAdvanceHours(publishTime) {
  * @param {{ fields?: Record<string, any> }} drama 飞书剧集记录
  * @returns {import('dayjs').Dayjs | null}
  */
-export function getEarliestBuildTime(drama) {
+export function getEarliestBuildTime(drama, buildConfig = {}) {
   const publishTime = getDramaPublishTime(drama)
   if (!publishTime) return null
-  return publishTime.subtract(getAdvanceHours(publishTime), 'hour')
+  return publishTime.subtract(getAdvanceHours(publishTime, buildConfig), 'hour')
 }
 
 /**
@@ -86,8 +110,8 @@ export function getEarliestBuildTime(drama) {
  * @param {string | number | Date | import('dayjs').Dayjs} [currentTime] 当前时间
  * @returns {boolean}
  */
-export function canBuildDramaNow(drama, currentTime) {
-  const earliestBuildTime = getEarliestBuildTime(drama)
+export function canBuildDramaNow(drama, currentTime, buildConfig = {}) {
+  const earliestBuildTime = getEarliestBuildTime(drama, buildConfig)
   if (!earliestBuildTime) return false
   const now = normalizeCurrentTime(currentTime)
   return now.isAfter(earliestBuildTime) || now.isSame(earliestBuildTime)
@@ -105,9 +129,9 @@ export function selectHighestPriorityDrama(dramas, options = {}) {
     const publishTime = getDramaPublishTime(drama)
     if (!publishTime) return false
 
-    if (!canBuildDramaNow(drama, now)) {
-      const advanceHours = getAdvanceHours(publishTime)
-      const earliestBuildTime = getEarliestBuildTime(drama)
+    if (!canBuildDramaNow(drama, now, options.buildConfig)) {
+      const advanceHours = getAdvanceHours(publishTime, options.buildConfig)
+      const earliestBuildTime = getEarliestBuildTime(drama, options.buildConfig)
       options.onSkip?.(drama, {
         publishTime,
         earliestBuildTime,

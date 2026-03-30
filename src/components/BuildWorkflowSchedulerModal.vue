@@ -33,6 +33,7 @@ import {
   canBuildDramaNow,
   getDramaPublishTime,
   getEarliestBuildTime,
+  resolveAdvanceHoursConfig,
   selectHighestPriorityDrama,
 } from '@/shared/buildWorkflowRules'
 import { generateMicroAppLink, extractAppIdFromParams } from '@/utils/microAppLink'
@@ -176,6 +177,7 @@ const backgroundSchedulerStatus = ref<buildWorkflowApi.BackgroundSchedulerStatus
 const isLoadingBackgroundStatus = ref(false)
 const backgroundPollingTimer = ref<ReturnType<typeof setInterval> | null>(null) // 后台状态轮询定时器
 const materialPreviewConfig = ref<adminApi.UserChannelBindingConfig['materialPreview'] | null>(null)
+const currentBuildConfig = ref<adminApi.ChannelConfig['juliang']['buildConfig'] | null>(null)
 const materialPreviewStatus = ref<materialPreviewApi.MaterialPreviewStatus | null>(null)
 const isLoadingMaterialPreview = ref(false)
 const switchingMaterialPreview = ref(false)
@@ -191,12 +193,33 @@ const douyinConfigs = ref<DouyinMaterialConfig[]>([])
 
 // 获取当前日期（YYYYMMDD格式）
 const buildDate = computed(() => dayjs().tz('Asia/Shanghai').format('YYYYMMDD'))
+const advanceHoursConfig = computed(() => resolveAdvanceHoursConfig(currentBuildConfig.value || {}))
+
+function formatAdvanceRuleSegment(label: string, hours: number) {
+  return hours > 0 ? `${label}提前 ${hours} 小时可搭建` : `${label}必须等上架时间后才能搭建`
+}
+
+const advanceRuleDescription = computed(
+  () =>
+    `${formatAdvanceRuleSegment('上架时间在 10:00 及之后，', advanceHoursConfig.value.afterTen)}；${formatAdvanceRuleSegment('10:00 之前，', advanceHoursConfig.value.beforeTen)}`
+)
+
+function canBuildByCurrentRule(
+  drama: FeishuDramaRecord,
+  currentTime?: string | number | Date | Dayjs
+) {
+  return canBuildDramaNow(drama, currentTime, currentBuildConfig.value || {})
+}
+
+function getCurrentEarliestBuildTime(drama: FeishuDramaRecord) {
+  return getEarliestBuildTime(drama, currentBuildConfig.value || {})
+}
 
 // 剧集列表表格列定义
 const dramasColumns: DataTableColumns<FeishuDramaRecord> = [
   {
     type: 'selection',
-    disabled: row => !canBuildDramaNow(row),
+    disabled: row => !canBuildByCurrentRule(row),
   },
   {
     title: '剧名',
@@ -238,7 +261,7 @@ const dramasColumns: DataTableColumns<FeishuDramaRecord> = [
     key: 'earliestBuildTime',
     width: 160,
     render: row => {
-      const earliestBuildTime = getEarliestBuildTime(row)
+      const earliestBuildTime = getCurrentEarliestBuildTime(row)
       if (!earliestBuildTime) return '-'
       return earliestBuildTime.format('YYYY-MM-DD HH:mm')
     },
@@ -273,7 +296,7 @@ const dramasColumns: DataTableColumns<FeishuDramaRecord> = [
     fixed: 'right',
     render: row => {
       const isBuilding = manuallyBuildingIds.value.has(row.record_id)
-      const canBuild = canBuildDramaNow(row)
+      const canBuild = canBuildByCurrentRule(row)
       // 只有后台模式正在运行且有任务执行时，才禁用按钮
       const isBackgroundRunning = backgroundSchedulerStatus.value?.enabled === true
       const hasRunningTask =
@@ -383,6 +406,7 @@ watch(
 
 async function loadMaterialPreviewConfig() {
   const sessionData = await adminApi.getCurrentSession()
+  currentBuildConfig.value = sessionData.buildConfig
   materialPreviewConfig.value = sessionData.materialPreview || {
     enabled: false,
     intervalMinutes: 20,
@@ -474,7 +498,7 @@ async function loadPendingDramas() {
       return dateA - dateB
     })
     selectedRowKeys.value = selectedRowKeys.value.filter(recordId =>
-      dramas.value.some(drama => drama.record_id === recordId && canBuildDramaNow(drama))
+      dramas.value.some(drama => drama.record_id === recordId && canBuildByCurrentRule(drama))
     )
 
     console.log(`找到 ${dramas.value.length} 部待搭建剧集（已按日期排序）`)
@@ -547,6 +571,7 @@ async function executePollingCycle() {
     // 2. 选择最高优先级剧集
     const selectedDrama = selectHighestPriorityDrama(dramas.value, {
       currentTime: dayjs().tz(WORKFLOW_TIMEZONE),
+      buildConfig: currentBuildConfig.value || {},
       onSkip: (
         drama: any,
         context: { publishTime: Dayjs; earliestBuildTime: Dayjs | null; advanceHours: number }
@@ -888,14 +913,15 @@ function resetState() {
   stopBackgroundStatusPolling()
   stopMaterialPreviewPolling()
   materialPreviewStatus.value = null
+  currentBuildConfig.value = null
   materialPreviewConfig.value = null
   switchingMaterialPreview.value = false
 }
 
 // 开始搭建单个剧集
 async function handleBuildSingleDrama(drama: FeishuDramaRecord) {
-  if (!canBuildDramaNow(drama)) {
-    const earliestBuildTime = getEarliestBuildTime(drama)
+  if (!canBuildByCurrentRule(drama)) {
+    const earliestBuildTime = getCurrentEarliestBuildTime(drama)
     message.warning(
       earliestBuildTime
         ? `未到可搭建时间，最早可在 ${earliestBuildTime.format('YYYY-MM-DD HH:mm')} 提交搭建`
@@ -951,7 +977,7 @@ async function startAutoBuild() {
   const selectedDramas = dramas.value.filter(drama =>
     selectedRowKeys.value.includes(drama.record_id)
   )
-  const buildableSelectedDramas = selectedDramas.filter(drama => canBuildDramaNow(drama))
+  const buildableSelectedDramas = selectedDramas.filter(drama => canBuildByCurrentRule(drama))
 
   if (selectedDramas.length === 0) {
     message.warning('没有找到选中的剧集')
@@ -1855,7 +1881,7 @@ onBeforeUnmount(() => {
                   搭建时机
                 </div>
                 <div class="rules-note">
-                  上架时间在 10:00 及之后，提前 10 小时可搭建；10:00 之前，提前 1 小时可搭建
+                  {{ advanceRuleDescription }}
                 </div>
               </div>
               <div class="rules-section">
@@ -2045,7 +2071,7 @@ onBeforeUnmount(() => {
                     <div class="rule-title">剧集搭建优先级规则</div>
                     <div class="rule-note" style="margin-bottom: 8px">
                       <Icon icon="mdi:clock-outline" class="note-icon" />
-                      上架时间在 10:00 及之后，提前 10 小时可搭建；10:00 之前，提前 1 小时可搭建
+                      {{ advanceRuleDescription }}
                     </div>
                     <div class="rule-item">
                       <span class="priority-badge priority-1">优先级1</span>

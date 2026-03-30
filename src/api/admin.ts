@@ -187,6 +187,7 @@ export function getCurrentSession() {
     materialPreview: UserChannelBindingConfig['materialPreview']
     orderUserStats: UserChannelBindingConfig['orderUserStats']
     downloadCenterConfig: DownloadCenterConfig | null
+    buildConfig: BuildConfig
   }>('/session/me')
 }
 

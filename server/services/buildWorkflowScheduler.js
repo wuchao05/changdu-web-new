@@ -422,6 +422,10 @@ function getBuildConfig() {
   }
 }
 
+function getBuildRuleConfig() {
+  return getBuildConfig()
+}
+
 function getJuliangCookie() {
   return String(getSchedulerRuntime().juliang.cookie || '').trim()
 }
@@ -1643,6 +1647,7 @@ async function executePollingCycle() {
       )
       const selectedDrama = selectHighestPriorityDrama(dramas, {
         currentTime: now,
+        buildConfig: getBuildRuleConfig(),
         onSkip: (drama, context) => {
           const dramaName = drama.fields['剧名']?.[0]?.text || '未知'
           console.log(
@@ -1974,12 +1979,13 @@ async function buildSpecificDrama(dramaId) {
       throw new Error(`剧集 ${dramaName} 缺少上架时间，无法提交搭建`)
     }
 
-    const earliestBuildTime = getEarliestBuildTime(targetDrama)
+    const buildRuleConfig = getBuildRuleConfig()
+    const earliestBuildTime = getEarliestBuildTime(targetDrama, buildRuleConfig)
     if (!earliestBuildTime) {
       throw new Error(`剧集 ${dramaName} 缺少最早可搭建时间，无法提交搭建`)
     }
 
-    if (!canBuildDramaNow(targetDrama, new Date())) {
+    if (!canBuildDramaNow(targetDrama, new Date(), buildRuleConfig)) {
       throw new Error(
         `剧集 ${dramaName} 未到可搭建时间，最早可在 ${earliestBuildTime.format('YYYY-MM-DD HH:mm')} 提交搭建`
       )

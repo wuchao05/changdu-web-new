@@ -12,6 +12,8 @@ export interface BuildConfig {
   ccId: string
   rechargeTemplateId: string
   adCallbackConfigId: string
+  advanceHoursAfterTen: string
+  advanceHoursBeforeTen: string
 }
 
 type BuildConfigResponse = {
@@ -32,6 +34,8 @@ export const DEFAULT_BUILD_CONFIG: BuildConfig = {
   ccId: '',
   rechargeTemplateId: '',
   adCallbackConfigId: '',
+  advanceHoursAfterTen: '0',
+  advanceHoursBeforeTen: '0',
 }
 
 function normalizeStringValue(value: unknown, fallback = ''): string {
@@ -57,6 +61,8 @@ function normalizeBuildConfig(payload: unknown): BuildConfig {
     ccId: normalizeStringValue(config.ccId),
     rechargeTemplateId: normalizeStringValue(config.rechargeTemplateId),
     adCallbackConfigId: normalizeStringValue(config.adCallbackConfigId),
+    advanceHoursAfterTen: normalizeStringValue(config.advanceHoursAfterTen, '0'),
+    advanceHoursBeforeTen: normalizeStringValue(config.advanceHoursBeforeTen, '0'),
   }
 }
 

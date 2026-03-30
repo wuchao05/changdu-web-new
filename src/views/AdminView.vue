@@ -839,6 +839,18 @@
                       placeholder="默认 1845407746151576，留空则创建推广链接时不传"
                     />
                   </n-form-item>
+                  <n-form-item label="10点及之后提前搭建小时数">
+                    <n-input
+                      v-model:value="channelForm.juliang.buildConfig.advanceHoursAfterTen"
+                      placeholder="默认 0，表示必须等上架后才能搭建"
+                    />
+                  </n-form-item>
+                  <n-form-item label="10点之前提前搭建小时数">
+                    <n-input
+                      v-model:value="channelForm.juliang.buildConfig.advanceHoursBeforeTen"
+                      placeholder="默认 0，表示必须等上架后才能搭建"
+                    />
+                  </n-form-item>
                 </n-form>
               </section>
 
@@ -1547,6 +1559,8 @@ function createDefaultChannelForm(): ChannelFormModel {
         ccId: '',
         rechargeTemplateId: '',
         adCallbackConfigId: '1845407746151576',
+        advanceHoursAfterTen: '0',
+        advanceHoursBeforeTen: '0',
       },
     },
     changdu: {
