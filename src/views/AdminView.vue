@@ -847,7 +847,9 @@
                       class="w-full"
                       placeholder="默认 0，表示必须等上架后才能搭建"
                       @update:value="value => handleAdvanceHoursChange('advanceHoursAfterTen', value)"
-                    />
+                    >
+                      <template #suffix>小时</template>
+                    </n-input-number>
                   </n-form-item>
                   <n-form-item label="10点之前提前搭建小时数">
                     <n-input-number
@@ -857,7 +859,9 @@
                       class="w-full"
                       placeholder="默认 0，表示必须等上架后才能搭建"
                       @update:value="value => handleAdvanceHoursChange('advanceHoursBeforeTen', value)"
-                    />
+                    >
+                      <template #suffix>小时</template>
+                    </n-input-number>
                   </n-form-item>
                 </n-form>
               </section>
@@ -1383,7 +1387,18 @@ const channelColumns: DataTableColumns<adminApi.ChannelConfig> = [
     render: row => {
       const afterTen = formatAdvanceHoursDisplay(row.juliang.buildConfig.advanceHoursAfterTen)
       const beforeTen = formatAdvanceHoursDisplay(row.juliang.buildConfig.advanceHoursBeforeTen)
-      return `10点后 ${afterTen} 小时 / 10点前 ${beforeTen} 小时`
+      return h('div', { class: 'flex flex-wrap gap-2' }, [
+        h(
+          NTag,
+          { size: 'small', type: 'info', bordered: false, round: true },
+          () => `10点后 ${afterTen} 小时`
+        ),
+        h(
+          NTag,
+          { size: 'small', type: 'success', bordered: false, round: true },
+          () => `10点前 ${beforeTen} 小时`
+        ),
+      ])
     },
   },
   {
