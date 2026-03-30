@@ -1221,9 +1221,14 @@ class FeishuApiService {
    * 批量创建记录到账户表
    */
   async batchCreateAccounts(
-    accounts: Array<{ account: string; isUsed: string }>
+    accounts: Array<{ account: string; isUsed: string }>,
+    accountTableId?: string
   ): Promise<FeishuApiResponse<any>> {
-    const tableId = this.getAccountTableId()
+    const tableId = accountTableId || this.getAccountTableId()
+
+    if (!tableId) {
+      throw new Error('当前渠道未配置账户表 table_id')
+    }
 
     // 调用后端代理接口而不是直接调用飞书 API
     const response = await fetch(`${ENV.BASE_URL}/feishu/bitable/accounts/batch-create`, {

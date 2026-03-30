@@ -198,6 +198,11 @@ export function getCurrentSession() {
     runtimeUser: UserProfile | null
     channel: { id: string; name: string } | null
     availableChannels: Array<{ id: string; name: string }>
+    feishu: {
+      dramaListTableId: string
+      dramaStatusTableId: string
+      accountTableId: string
+    }
     materialPreview: UserChannelBindingConfig['materialPreview']
     orderUserStats: UserChannelBindingConfig['orderUserStats']
     downloadCenterConfig: DownloadCenterConfig | null

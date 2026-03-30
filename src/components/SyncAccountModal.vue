@@ -59,6 +59,7 @@ import { computed, ref, watch } from 'vue'
 import { NModal, NButton, NInputNumber, NDataTable, useMessage, type DataTableColumns } from 'naive-ui'
 import { getJuliangAccountList, editJuliangAccountRemark, type JuliangAccountItem } from '@/api/juliang'
 import { feishuApi } from '@/api/feishu'
+import * as adminApi from '@/api/admin'
 
 const props = defineProps<{
   visible: boolean
@@ -86,6 +87,8 @@ const matchedAccounts = ref<JuliangAccountItem[]>([])
 const abortController = ref<AbortController | null>(null)
 const availableAccountCount = ref<number | null>(null)
 const loadingCount = ref(false)
+const currentAccountTableId = ref('')
+const currentChannelName = ref('')
 
 const columns: DataTableColumns<JuliangAccountItem> = [
   {
@@ -122,7 +125,12 @@ const allAccountsHaveRemark = computed(() => {
 async function fetchAvailableAccountCount() {
   loadingCount.value = true
   try {
-    availableAccountCount.value = await feishuApi.getAvailableAccountCount()
+    if (!currentAccountTableId.value) {
+      availableAccountCount.value = null
+      return
+    }
+
+    availableAccountCount.value = await feishuApi.getAvailableAccountCount(currentAccountTableId.value)
   } catch (error) {
     console.error('获取可用账户数量失败:', error)
     availableAccountCount.value = null
@@ -131,7 +139,30 @@ async function fetchAvailableAccountCount() {
   }
 }
 
+async function loadCurrentChannelAccountTableId() {
+  const sessionData = await adminApi.getCurrentSession()
+  currentAccountTableId.value = String(sessionData?.feishu?.accountTableId || '').trim()
+  currentChannelName.value = String(sessionData?.channel?.name || '').trim()
+}
+
+function ensureCurrentAccountTableId() {
+  if (currentAccountTableId.value) {
+    return true
+  }
+
+  message.error(
+    currentChannelName.value
+      ? `当前渠道【${currentChannelName.value}】未配置账户表 table_id`
+      : '当前渠道未配置账户表 table_id'
+  )
+  return false
+}
+
 async function fetchAccounts() {
+  if (!ensureCurrentAccountTableId()) {
+    return
+  }
+
   loading.value = true
   matchedAccounts.value = []
   let offset = 1
@@ -244,6 +275,10 @@ async function addRemarks() {
 }
 
 async function syncToFeishu() {
+  if (!ensureCurrentAccountTableId()) {
+    return
+  }
+
   syncLoading.value = true
 
   try {
@@ -252,7 +287,7 @@ async function syncToFeishu() {
       isUsed: '否',
     }))
 
-    const result = await feishuApi.batchCreateAccounts(accounts)
+    const result = await feishuApi.batchCreateAccounts(accounts, currentAccountTableId.value)
 
     if (result.code === 0) {
       message.success(`成功添加 ${accounts.length} 个账户到飞书`)
@@ -290,7 +325,14 @@ watch(visible, newValue => {
     cancelRequests()
     resetModal()
   } else {
-    fetchAvailableAccountCount()
+    loadCurrentChannelAccountTableId()
+      .then(() => fetchAvailableAccountCount())
+      .catch(error => {
+        console.error('加载当前渠道账户表配置失败:', error)
+        currentAccountTableId.value = ''
+        currentChannelName.value = ''
+        availableAccountCount.value = null
+      })
   }
 })
 </script>
