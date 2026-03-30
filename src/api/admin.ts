@@ -40,6 +40,9 @@ export interface UserChannelBindingConfig {
     sortMode: 'manual' | 'amount_desc'
     usernames: string[]
   }
+  independentOrderStats: {
+    enabled: boolean
+  }
   douyinMaterialMatches: Array<{
     id: string
     douyinAccount: string
@@ -103,6 +106,9 @@ export interface UserProfile {
     enabled: boolean
     sortMode: 'manual' | 'amount_desc'
     usernames: string[]
+  }
+  independentOrderStats?: {
+    enabled: boolean
   }
   douyinMaterialMatches?: Array<{
     id: string

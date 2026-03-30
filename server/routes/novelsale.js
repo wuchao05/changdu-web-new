@@ -65,6 +65,12 @@ function normalizeOrderUserStatsConfig(config = {}) {
   }
 }
 
+function normalizeIndependentOrderStatsConfig(config = {}) {
+  return {
+    enabled: Boolean(config?.enabled),
+  }
+}
+
 function matchPromotionUser(promotionName, usernames = []) {
   const normalizedPromotionName = String(promotionName || '').trim()
   if (!normalizedPromotionName || !Array.isArray(usernames) || usernames.length === 0) {
@@ -77,6 +83,38 @@ function matchPromotionUser(promotionName, usernames = []) {
   }
 
   return matchedUsernames.sort((left, right) => right.length - left.length)[0]
+}
+
+function matchPromotionDouyinAccount(promotionName, douyinAccounts = []) {
+  const normalizedPromotionName = String(promotionName || '').trim()
+  if (!normalizedPromotionName || !Array.isArray(douyinAccounts) || douyinAccounts.length === 0) {
+    return ''
+  }
+
+  const matchedAccounts = douyinAccounts.filter(account => normalizedPromotionName.includes(account))
+  if (matchedAccounts.length === 0) {
+    return ''
+  }
+
+  return matchedAccounts.sort((left, right) => right.length - left.length)[0]
+}
+
+function filterOrdersByConfiguredDouyinAccounts(orders = [], douyinAccounts = []) {
+  if (!Array.isArray(orders) || orders.length === 0) {
+    return []
+  }
+
+  const normalizedAccounts = Array.isArray(douyinAccounts)
+    ? douyinAccounts.map(item => String(item || '').trim()).filter(Boolean)
+    : []
+
+  if (normalizedAccounts.length === 0) {
+    return []
+  }
+
+  return orders.filter(order =>
+    Boolean(matchPromotionDouyinAccount(order?.promotion_name, normalizedAccounts))
+  )
 }
 
 function calculateRechargeAmount(orders = []) {
@@ -237,6 +275,33 @@ async function resolveOrderUserStatsRuntime(ctx) {
   return normalizeOrderUserStatsConfig(runtimeContext.runtimeUser?.orderUserStats)
 }
 
+async function resolveIndependentOrderStatsRuntime(ctx) {
+  const sessionUser = await getSessionUser(ctx)
+  if (!sessionUser) {
+    return {
+      ...normalizeIndependentOrderStatsConfig(),
+      douyinAccounts: [],
+    }
+  }
+
+  const requestedChannelId = String(ctx.get('x-studio-channel-id') || '').trim()
+  const runtimeContext = await resolveRuntimeContext(sessionUser, requestedChannelId)
+  const independentOrderStats = normalizeIndependentOrderStatsConfig(
+    runtimeContext.runtimeUser?.independentOrderStats
+  )
+  const douyinAccounts = Array.isArray(runtimeContext.runtimeUser?.douyinMaterialMatches)
+    ? runtimeContext.runtimeUser.douyinMaterialMatches
+        .map(item => String(item?.douyinAccount || '').trim())
+        .filter(Boolean)
+        .filter((item, index, list) => list.indexOf(item) === index)
+    : []
+
+  return {
+    ...independentOrderStats,
+    douyinAccounts,
+  }
+}
+
 // 通过短剧名称获取 copyright_content_id，作为内部接口关键词查询失败时的兜底
 async function getDramaIdByTitle(title) {
   void title
@@ -281,16 +346,21 @@ router.get('/distributor/promotion/detail/v2', async ctx => {
   const channelDouyinAccounts = ctx.query.channel_douyin_accounts
   const selectedPromotionUserName = String(ctx.query.promotion_user_name || '').trim()
   const orderUserStatsConfig = await resolveOrderUserStatsRuntime(ctx)
+  const independentOrderStatsConfig = await resolveIndependentOrderStatsRuntime(ctx)
   const configuredPromotionUsernames = orderUserStatsConfig.enabled ? orderUserStatsConfig.usernames : []
-  const shouldBuildPromotionUserStats = configuredPromotionUsernames.length > 0
+  const shouldUseIndependentOrderStats = independentOrderStatsConfig.enabled
+  const shouldBuildPromotionUserStats =
+    !shouldUseIndependentOrderStats && configuredPromotionUsernames.length > 0
 
-  if (!channelDouyinAccounts && !shouldBuildPromotionUserStats) {
+  if (!channelDouyinAccounts && !shouldBuildPromotionUserStats && !shouldUseIndependentOrderStats) {
     await createGetHandler('Promotion Detail', '/novelsale/distributor/promotion/detail/v2/')(ctx)
     return
   }
 
   console.log('🔍 [订单统计] 开始拉取全量数据用于本地统计', {
     channelDouyinAccounts: channelDouyinAccounts || '',
+    independentOrderStatsEnabled: shouldUseIndependentOrderStats,
+    independentDouyinAccounts: independentOrderStatsConfig.douyinAccounts,
     promotionUsers: configuredPromotionUsernames,
     selectedPromotionUserName,
   })
@@ -319,7 +389,13 @@ router.get('/distributor/promotion/detail/v2', async ctx => {
     orderFetchLimitHit = orderFetchLimitHit || rangeResult.limitHit
   }
 
-  const douyinFilteredOrders = filterOrdersByDouyinAccounts(allOrders, channelDouyinAccounts)
+  const independentlyFilteredOrders = shouldUseIndependentOrderStats
+    ? filterOrdersByConfiguredDouyinAccounts(allOrders, independentOrderStatsConfig.douyinAccounts)
+    : allOrders
+  const douyinFilteredOrders = filterOrdersByDouyinAccounts(
+    independentlyFilteredOrders,
+    channelDouyinAccounts
+  )
   const promotionUserSummaries = shouldBuildPromotionUserStats
     ? buildPromotionUserSummaries(douyinFilteredOrders, configuredPromotionUsernames)
     : []
@@ -352,6 +428,7 @@ router.get('/distributor/promotion/detail/v2', async ctx => {
     all_total: douyinFilteredOrders.length,
     all_total_amount: allTotalAmount,
     active_promotion_user_name: resolvedActivePromotionUserName,
+    independent_order_stats_enabled: shouldUseIndependentOrderStats,
     promotion_user_stats_enabled: shouldBuildPromotionUserStats,
     promotion_user_summaries: promotionUserSummaries,
     order_fetch_limit_hit: orderFetchLimitHit,

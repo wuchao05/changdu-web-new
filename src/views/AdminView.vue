@@ -576,7 +576,16 @@
                             为当前渠道单独维护抖音号、抖音号 ID 和素材范围。
                           </p>
                         </div>
-                        <div class="flex flex-wrap items-center gap-2">
+                        <div class="flex flex-wrap items-center justify-end gap-3">
+                          <div class="toggle-hero">
+                            <div>
+                              <p class="toggle-hero__title">独立订单统计</p>
+                              <p class="toggle-hero__desc">
+                                打开后，订单统计只展示推广链来源命中当前抖音号名称的订单。
+                              </p>
+                            </div>
+                            <n-switch v-model:value="item.config.independentOrderStats.enabled" />
+                          </div>
                           <span class="channel-config-card__pill channel-config-card__pill--violet">
                             {{ item.config.douyinMaterialMatches.length }} 条规则
                           </span>
@@ -1659,6 +1668,9 @@ function createDefaultUserChannelConfig(): adminApi.UserChannelBindingConfig {
       sortMode: 'manual',
       usernames: [],
     },
+    independentOrderStats: {
+      enabled: false,
+    },
     douyinMaterialMatches: [],
   }
 }
@@ -1731,6 +1743,11 @@ function normalizeUserChannelConfig(
             .filter(Boolean)
             .filter((item, index, list) => list.indexOf(item) === index)
         : [],
+    },
+    independentOrderStats: {
+      ...defaultConfig.independentOrderStats,
+      ...(config?.independentOrderStats || {}),
+      enabled: Boolean(config?.independentOrderStats?.enabled),
     },
     douyinMaterialMatches,
   }

@@ -351,6 +351,61 @@
             >
               常读平台限制，最多只能拉到最近 1w 条订单数据，当前统计结果可能不准确
             </n-alert>
+            <div v-if="isIndependentOrderStatsMode" class="mb-4">
+              <div class="independent-order-summary">
+                <div class="independent-order-summary__card">
+                  <p
+                    class="independent-order-summary__label"
+                    :class="{ 'order-user-tab__skeleton order-user-tab__skeleton--meta': ordersLoading }"
+                  >
+                    {{ ordersLoading ? '' : '当前时间范围总充值' }}
+                  </p>
+                  <p
+                    class="independent-order-summary__value"
+                    :class="{ 'order-user-tab__skeleton order-user-tab__skeleton--amount': ordersLoading }"
+                  >
+                    {{ ordersLoading ? '' : formatCurrency(independentOrderStatsSummary.totalAmount) }}
+                  </p>
+                  <p
+                    class="independent-order-summary__meta"
+                    :class="{ 'order-user-tab__skeleton order-user-tab__skeleton--meta': ordersLoading }"
+                  >
+                    {{
+                      ordersLoading
+                        ? ''
+                        : `${formatNumberValue(independentOrderStatsSummary.paidOrderCount)} 单支付成功`
+                    }}
+                  </p>
+                </div>
+                <div class="independent-order-summary__card">
+                  <p
+                    class="independent-order-summary__label"
+                    :class="{ 'order-user-tab__skeleton order-user-tab__skeleton--meta': ordersLoading }"
+                  >
+                    {{ ordersLoading ? '' : '当前时间范围总订单' }}
+                  </p>
+                  <p
+                    class="independent-order-summary__value"
+                    :class="{ 'order-user-tab__skeleton order-user-tab__skeleton--amount': ordersLoading }"
+                  >
+                    {{ ordersLoading ? '' : formatNumberValue(independentOrderStatsSummary.totalOrders) }}
+                  </p>
+                  <p
+                    class="independent-order-summary__meta"
+                    :class="{ 'order-user-tab__skeleton order-user-tab__skeleton--meta': ordersLoading }"
+                  >
+                    {{
+                      ordersLoading
+                        ? ''
+                        : independentOrderStatsSummary.accountSummaryText
+                    }}
+                  </p>
+                </div>
+              </div>
+              <p v-if="!ordersLoading" class="independent-order-summary__hint">
+                仅展示推广链来源包含当前渠道抖音号名称的订单，无法查看其他人的订单数据。
+              </p>
+            </div>
             <div v-if="orderUserCardItems.length > 0" class="mb-4">
               <div class="order-user-tabs">
                 <button
@@ -729,6 +784,22 @@ const configuredOrderUsernames = computed(() => {
   const usernames = sessionStore.currentRuntimeUser?.orderUserStats?.usernames
   return Array.isArray(usernames) ? usernames.filter(Boolean) : []
 })
+const independentOrderDouyinAccounts = computed(() => {
+  const matches = sessionStore.currentRuntimeUser?.douyinMaterialMatches
+  if (!Array.isArray(matches)) {
+    return []
+  }
+
+  return matches
+    .map(match => String(match?.douyinAccount || '').trim())
+    .filter(Boolean)
+    .filter((item, index, list) => list.indexOf(item) === index)
+})
+const isIndependentOrderStatsMode = computed(
+  () =>
+    Boolean(ordersData.value?.independent_order_stats_enabled) ||
+    Boolean(sessionStore.currentRuntimeUser?.independentOrderStats?.enabled)
+)
 const orderUserSortMode = computed(() =>
   sessionStore.currentRuntimeUser?.orderUserStats?.sortMode === 'amount_desc'
     ? 'amount_desc'
@@ -755,6 +826,10 @@ const orderSummaryUsernames = computed(() =>
 const allOrderRows = computed<OrderItem[]>(() => ordersData.value?.data || [])
 
 const orderRows = computed<OrderItem[]>(() => {
+  if (isIndependentOrderStatsMode.value) {
+    return allOrderRows.value
+  }
+
   if (!activePromotionUserName.value) {
     return allOrderRows.value
   }
@@ -767,6 +842,10 @@ const orderRows = computed<OrderItem[]>(() => {
 })
 
 const orderUserTabs = computed(() => {
+  if (isIndependentOrderStatsMode.value) {
+    return []
+  }
+
   const summaries = Array.isArray(ordersData.value?.promotion_user_summaries)
     ? ordersData.value?.promotion_user_summaries || []
     : []
@@ -811,6 +890,10 @@ const orderUserTabs = computed(() => {
 })
 
 const orderUserCardItems = computed(() => {
+  if (isIndependentOrderStatsMode.value) {
+    return []
+  }
+
   if (orderUserTabs.value.length > 0) {
     return orderUserTabs.value
   }
@@ -835,6 +918,22 @@ const orderUserCardItems = computed(() => {
       meta: '加载中',
     })),
   ]
+})
+
+const independentOrderStatsSummary = computed(() => {
+  const paidOrderCount = allOrderRows.value.filter(order => order.pay_status === 0).length
+  const accountCount = independentOrderDouyinAccounts.value.length
+  const accountSummaryText =
+    accountCount > 0
+      ? `已按 ${accountCount} 个抖音号规则过滤`
+      : '当前渠道未配置抖音号名称'
+
+  return {
+    totalOrders: Number(ordersData.value?.total || 0),
+    totalAmount: Number(ordersData.value?.total_amount || 0),
+    paidOrderCount,
+    accountSummaryText,
+  }
 })
 
 const payStatusOptions = [
@@ -1238,6 +1337,12 @@ async function fetchOrdersData() {
     }
     const response = await getOrders(params)
     ordersData.value = response
+    if (response.independent_order_stats_enabled) {
+      activePromotionUserName.value = ''
+      ordersCurrentPage.value = 1
+      ordersPagination.page = 1
+      return
+    }
     const nextSummaryUsernames = Array.isArray(response.promotion_user_summaries)
       ? response.promotion_user_summaries.map(item => item.username)
       : []
@@ -1787,6 +1892,47 @@ onUnmounted(() => {
   cursor: not-allowed;
 }
 
+.independent-order-summary {
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.independent-order-summary__card {
+  border: 1px solid rgba(251, 191, 36, 0.22);
+  border-radius: 1rem;
+  padding: 0.95rem 1rem;
+  background:
+    radial-gradient(circle at top right, rgba(253, 224, 71, 0.2), transparent 46%),
+    linear-gradient(135deg, rgba(255, 251, 235, 0.96), rgba(255, 247, 237, 0.98));
+  box-shadow: 0 14px 34px -24px rgba(194, 65, 12, 0.26);
+}
+
+.independent-order-summary__label {
+  font-size: 0.82rem;
+  color: rgb(120 113 108);
+}
+
+.independent-order-summary__value {
+  margin-top: 0.45rem;
+  font-size: 1.8rem;
+  line-height: 1;
+  font-weight: 700;
+  color: rgb(146 64 14);
+}
+
+.independent-order-summary__meta {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: rgb(120 113 108);
+}
+
+.independent-order-summary__hint {
+  margin-top: 0.7rem;
+  font-size: 0.8rem;
+  color: rgb(120 113 108);
+}
+
 .order-user-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -1944,6 +2090,12 @@ onUnmounted(() => {
   }
   100% {
     background-position: -100% 50%;
+  }
+}
+
+@media (min-width: 768px) {
+  .independent-order-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

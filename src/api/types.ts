@@ -82,6 +82,7 @@ export interface OrderData {
   all_total_amount?: number // 全部订单总充值金额（单位：分，启用按用户统计时返回）
   active_promotion_user_name?: string // 当前选中的推广用户名
   promotion_user_stats_enabled?: boolean // 是否启用按用户统计订单
+  independent_order_stats_enabled?: boolean // 是否启用独立订单统计
   promotion_user_summaries?: PromotionUserSummary[]
   order_fetch_limit_hit?: boolean // 是否命中常读平台 1w 条订单限制
   data: OrderItem[]

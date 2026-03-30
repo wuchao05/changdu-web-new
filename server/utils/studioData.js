@@ -77,6 +77,12 @@ function defaultOrderUserStats() {
   }
 }
 
+function defaultIndependentOrderStats() {
+  return {
+    enabled: false,
+  }
+}
+
 function defaultUserChannelConfig() {
   return {
     enabled: false,
@@ -98,6 +104,7 @@ function defaultUserChannelConfig() {
       },
     },
     orderUserStats: defaultOrderUserStats(),
+    independentOrderStats: defaultIndependentOrderStats(),
     douyinMaterialMatches: [],
   }
 }
@@ -283,6 +290,11 @@ function normalizeUserChannelConfig(config = {}) {
       ...defaultOrderUserStats(),
       ...normalizeOrderUserStats(config.orderUserStats),
     },
+    independentOrderStats: {
+      ...defaultIndependentOrderStats(),
+      ...(config.independentOrderStats || {}),
+      enabled: Boolean(config.independentOrderStats?.enabled),
+    },
     douyinMaterialMatches: normalizeDouyinMaterialMatches(config.douyinMaterialMatches),
   }
 }
@@ -305,6 +317,7 @@ function hasCustomUserChannelConfig(config = {}) {
   const hasOrderUserStats =
     Boolean(config.orderUserStats?.enabled) ||
     (Array.isArray(config.orderUserStats?.usernames) && config.orderUserStats.usernames.length > 0)
+  const hasIndependentOrderStats = Boolean(config.independentOrderStats?.enabled)
 
   return (
     hasFeishuConfig(normalizeFeishuConfig(config.feishu || config)) ||
@@ -312,6 +325,7 @@ function hasCustomUserChannelConfig(config = {}) {
     hasExplicitWebPermissionConfig ||
     hasPermissionConfig ||
     hasOrderUserStats ||
+    hasIndependentOrderStats ||
     normalizeDouyinMaterialMatches(config.douyinMaterialMatches).length > 0
   )
 }
@@ -479,6 +493,7 @@ export function buildRuntimeUser(user = {}, channelId = '') {
     materialPreview: channelConfig.materialPreview,
     permissions: normalizedPermissions,
     orderUserStats: channelConfig.orderUserStats,
+    independentOrderStats: channelConfig.independentOrderStats,
     douyinMaterialMatches: channelConfig.douyinMaterialMatches,
     channelConfigEnabled:
       normalizedUser.userType === 'admin' ? true : Boolean(sourceChannelConfig.enabled),
