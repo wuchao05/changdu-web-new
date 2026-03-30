@@ -27,14 +27,18 @@ export async function loginWithAccount(account, password) {
     return null
   }
 
+  const nextToken = createToken()
   const nextUser = {
     ...user,
-    authToken: createToken(),
+    authTokens: Array.isArray(user.authTokens) ? user.authTokens.concat(nextToken) : [nextToken],
     updatedAt: new Date().toISOString(),
   }
 
   await writeUser(nextUser)
-  return nextUser
+  return {
+    token: nextToken,
+    user: nextUser,
+  }
 }
 
 export async function logoutSession(ctx) {
@@ -46,7 +50,9 @@ export async function logoutSession(ctx) {
 
   await writeUser({
     ...user,
-    authToken: '',
+    authTokens: Array.isArray(user.authTokens)
+      ? user.authTokens.filter(currentToken => currentToken !== token)
+      : [],
     updatedAt: new Date().toISOString(),
   })
 }

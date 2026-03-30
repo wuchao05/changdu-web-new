@@ -39,6 +39,19 @@ function nowIso() {
   return new Date().toISOString()
 }
 
+function normalizeAuthTokens(user = {}) {
+  const authTokens = Array.isArray(user.authTokens)
+    ? user.authTokens
+    : String(user.authToken || '').trim()
+      ? [String(user.authToken || '').trim()]
+      : []
+
+  return authTokens
+    .map(token => String(token || '').trim())
+    .filter(Boolean)
+    .filter((token, index, list) => list.indexOf(token) === index)
+}
+
 function defaultMaterialPreview() {
   return {
     enabled: true,
@@ -132,7 +145,7 @@ function defaultAdminUser() {
     nickname: '管理员',
     account: 'admin',
     password: 'qwer1234',
-    authToken: '',
+    authTokens: [],
     userType: 'admin',
     channelIds: [],
     defaultChannelId: '',
@@ -473,7 +486,7 @@ export function normalizeUser(user = {}) {
     nickname: String(user.nickname || '').trim(),
     account: String(user.account || '').trim(),
     password: String(user.password || '').trim(),
-    authToken: String(user.authToken || '').trim(),
+    authTokens: normalizeAuthTokens(user),
     userType: user.userType === 'admin' ? 'admin' : 'normal',
     channelIds,
     defaultChannelId: resolvedDefaultChannelId,
@@ -655,6 +668,7 @@ export async function deleteUser(userId) {
 export function sanitizeUser(user) {
   const rest = { ...user }
   delete rest.password
+  delete rest.authTokens
   delete rest.authToken
   return rest
 }
@@ -667,7 +681,7 @@ export async function findUserByAccount(account) {
 export async function findUserByToken(token) {
   if (!token) return null
   const users = await listUsers()
-  return users.find(user => user.authToken === token) || null
+  return users.find(user => Array.isArray(user.authTokens) && user.authTokens.includes(token)) || null
 }
 
 export async function resolveUserChannel(user) {

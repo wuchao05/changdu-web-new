@@ -30,8 +30,8 @@ router.post('/login', async ctx => {
       return
     }
 
-    const user = await loginWithAccount(String(account).trim(), String(password).trim())
-    if (!user) {
+    const sessionResult = await loginWithAccount(String(account).trim(), String(password).trim())
+    if (!sessionResult) {
       ctx.status = 401
       ctx.body = {
         code: 401,
@@ -40,12 +40,13 @@ router.post('/login', async ctx => {
       return
     }
 
+    const { user, token } = sessionResult
     const channel = await resolveUserChannel(user)
     ctx.body = {
       code: 0,
       message: '登录成功',
       data: {
-        token: user.authToken,
+        token,
         user: sanitizeUser(user),
         channel: channel ? { id: channel.id, name: channel.name } : null,
       },

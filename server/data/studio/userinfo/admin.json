@@ -3,7 +3,9 @@
   "nickname": "管理员",
   "account": "admin",
   "password": "qwer1234",
-  "authToken": "8b347a93ab901e5d69c3180a4af3327ea41a6c8de984f64d",
+  "authTokens": [
+    "8b347a93ab901e5d69c3180a4af3327ea41a6c8de984f64d"
+  ],
   "userType": "admin",
   "channelIds": [
     "5f0d85e6-26a0-4fe2-a0c5-30c78a8770df",
