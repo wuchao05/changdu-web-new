@@ -754,8 +754,52 @@
 	              <n-form :model="channelForm" label-placement="top">
 	                <n-form-item label="渠道名称" class="mb-0">
 	                  <n-input v-model:value="channelForm.name" placeholder="请输入渠道名称" />
-                </n-form-item>
+	                </n-form-item>
               </n-form>
+
+              <div class="advance-config-block">
+                <div class="advance-config-block__header">
+                  <div>
+                    <p class="advance-config-block__title">智能搭建时机</p>
+                    <p class="advance-config-block__desc">
+                      按当前渠道控制可提前搭建时间。填 0 表示不能提前，必须等上架时间后才能搭建。
+                    </p>
+                  </div>
+                  <n-tag size="small" type="info" :bordered="false" round>渠道绑定</n-tag>
+                </div>
+
+                <div class="advance-config-grid">
+                  <div class="advance-config-item">
+                    <p class="advance-config-item__title">10点及之后</p>
+                    <p class="advance-config-item__desc">适用于上架时间在 10:00 及之后的剧</p>
+                    <n-input-number
+                      :value="getAdvanceHoursInputValue(channelForm.juliang.buildConfig.advanceHoursAfterTen)"
+                      :min="0"
+                      :precision="0"
+                      class="w-full"
+                      placeholder="默认 0"
+                      @update:value="value => handleAdvanceHoursChange('advanceHoursAfterTen', value)"
+                    >
+                      <template #suffix>小时</template>
+                    </n-input-number>
+                  </div>
+
+                  <div class="advance-config-item">
+                    <p class="advance-config-item__title">10点之前</p>
+                    <p class="advance-config-item__desc">适用于上架时间在 10:00 之前的剧</p>
+                    <n-input-number
+                      :value="getAdvanceHoursInputValue(channelForm.juliang.buildConfig.advanceHoursBeforeTen)"
+                      :min="0"
+                      :precision="0"
+                      class="w-full"
+                      placeholder="默认 0"
+                      @update:value="value => handleAdvanceHoursChange('advanceHoursBeforeTen', value)"
+                    >
+                      <template #suffix>小时</template>
+                    </n-input-number>
+                  </div>
+                </div>
+              </div>
             </section>
 
 	            <div class="grid grid-cols-1 gap-5 xl:grid-cols-2">
@@ -838,30 +882,6 @@
                       v-model:value="channelForm.juliang.buildConfig.adCallbackConfigId"
                       placeholder="默认 1845407746151576，留空则创建推广链接时不传"
                     />
-                  </n-form-item>
-                  <n-form-item label="10点及之后提前搭建小时数">
-                    <n-input-number
-                      :value="getAdvanceHoursInputValue(channelForm.juliang.buildConfig.advanceHoursAfterTen)"
-                      :min="0"
-                      :precision="0"
-                      class="w-full"
-                      placeholder="默认 0，表示必须等上架后才能搭建"
-                      @update:value="value => handleAdvanceHoursChange('advanceHoursAfterTen', value)"
-                    >
-                      <template #suffix>小时</template>
-                    </n-input-number>
-                  </n-form-item>
-                  <n-form-item label="10点之前提前搭建小时数">
-                    <n-input-number
-                      :value="getAdvanceHoursInputValue(channelForm.juliang.buildConfig.advanceHoursBeforeTen)"
-                      :min="0"
-                      :precision="0"
-                      class="w-full"
-                      placeholder="默认 0，表示必须等上架后才能搭建"
-                      @update:value="value => handleAdvanceHoursChange('advanceHoursBeforeTen', value)"
-                    >
-                      <template #suffix>小时</template>
-                    </n-input-number>
                   </n-form-item>
                 </n-form>
               </section>
@@ -2319,6 +2339,65 @@ watch(
   color: #64748b;
 }
 
+.advance-config-block {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 1.15rem;
+  border: 1px solid rgba(191, 219, 254, 0.65);
+  background:
+    radial-gradient(circle at top right, rgba(219, 234, 254, 0.7), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.96));
+  box-shadow: 0 18px 36px -32px rgba(37, 99, 235, 0.28);
+}
+
+.advance-config-block__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.85rem;
+  margin-bottom: 0.95rem;
+}
+
+.advance-config-block__title {
+  font-size: 0.96rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.advance-config-block__desc {
+  margin-top: 0.3rem;
+  font-size: 0.82rem;
+  line-height: 1.65;
+  color: #64748b;
+}
+
+.advance-config-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.advance-config-item {
+  padding: 0.9rem 0.95rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(226, 232, 240, 0.96);
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.advance-config-item__title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.advance-config-item__desc {
+  margin-top: 0.26rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: #64748b;
+}
+
 .channel-config-card {
   padding: 1rem;
   border: 1px solid rgba(191, 219, 254, 0.55);
@@ -2802,10 +2881,15 @@ watch(
 
   .drawer-hero,
   .panel-head,
+  .advance-config-block__header,
   .channel-config-card__head,
   .config-subpanel__head--split,
   .material-match-card__summary {
     flex-direction: column;
+  }
+
+  .advance-config-grid {
+    grid-template-columns: 1fr;
   }
 
   .drawer-hero__icon,
