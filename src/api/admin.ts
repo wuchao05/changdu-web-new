@@ -72,6 +72,7 @@ export interface UserProfile {
   id: string
   nickname: string
   account: string
+  brandName: string
   userType: 'admin' | 'normal'
   channelIds: string[]
   defaultChannelId: string

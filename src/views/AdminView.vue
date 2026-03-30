@@ -246,6 +246,14 @@
                     }"
                   />
                 </n-form-item>
+                <n-form-item label="业务前缀" class="md:col-span-2">
+                  <div class="space-y-2">
+                    <n-input v-model:value="userForm.brandName" placeholder="默认小红" />
+                    <p class="text-xs text-slate-500">
+                      用到账户备注、推广链命名、搭建流程中的项目和广告命名。
+                    </p>
+                  </div>
+                </n-form-item>
                 <n-form-item label="密码">
                   <n-input
                     v-model:value="userForm.password"
@@ -1384,6 +1392,7 @@ const editingOrderUsername = reactive({
 interface UserFormModel {
   nickname: string
   account: string
+  brandName: string
   password: string
   userType: 'admin' | 'normal'
   channelIds: string[]
@@ -1768,6 +1777,7 @@ function createDefaultUserForm(): UserFormModel {
   return {
     nickname: '',
     account: '',
+    brandName: '小红',
     password: '',
     userType: 'normal',
     channelIds: [],

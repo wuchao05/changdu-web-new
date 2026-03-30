@@ -91,6 +91,7 @@ function createDefaultState() {
         dramaStatusTableId: '',
         accountTableId: '',
       },
+      brandName: '小红',
       douyinMaterialMatches: [],
     },
     enabled: false,
@@ -156,6 +157,7 @@ function normalizeRuntimeUserConfig(runtimeContext = {}) {
       dramaStatusTableId: String(runtimeUser.feishu?.dramaStatusTableId || '').trim(),
       accountTableId: String(runtimeUser.feishu?.accountTableId || '').trim(),
     },
+    brandName: String(runtimeUser.brandName || '小红').trim() || '小红',
     douyinMaterialMatches: Array.isArray(runtimeUser.douyinMaterialMatches)
       ? runtimeUser.douyinMaterialMatches.map(item => ({
           douyinAccount: String(item?.douyinAccount || '').trim(),
@@ -273,6 +275,13 @@ function getOpenApiChannelConfig(channelId) {
     distributorId: CHANGDU_DISTRIBUTOR_ID,
     secretKey: CHANGDU_SECRET_KEY,
   }
+}
+
+function getSchedulerBrandName(channelId) {
+  return (
+    String(ensureSchedulerEntry(channelId).state.runtimeUserConfig?.brandName || '小红').trim() ||
+    '小红'
+  )
 }
 
 // ============== 工具函数 ==============
@@ -1138,7 +1147,7 @@ async function processDrama(channelId, drama, downloadList, newDramaSet, options
     // 10. 更新巨量账户备注
     if (availableAccount.account) {
       try {
-        const remark = `小红-${dramaName}`
+        const remark = `${getSchedulerBrandName(channelId)}-${dramaName}`
         await editJuliangAccountRemark(channelId, availableAccount.account, remark)
         console.log(`[自动提交-${channelId}] 更新巨量账户备注成功: ${availableAccount.account}`)
       } catch (juliangError) {

@@ -46,8 +46,8 @@ export function parsePromotionUrl(url) {
  * @param {string} dramaName 剧名
  * @returns {string} 推广链接名称
  */
-export function generatePromotionName(dramaName) {
-  return `小红短剧-${cleanDramaName(dramaName)}`
+export function generatePromotionName(dramaName, brandName = '小红') {
+  return `${brandName}短剧-${cleanDramaName(dramaName)}`
 }
 
 /**
@@ -57,8 +57,8 @@ export function generatePromotionName(dramaName) {
  * @param {string} accountId 广告账户ID
  * @returns {string} 推广链接名称
  */
-export function generateSmartPromotionName(douyinAccount, dramaName, accountId) {
-  return `小红短剧-${douyinAccount}-${cleanDramaName(dramaName)}-${accountId}`
+export function generateSmartPromotionName(douyinAccount, dramaName, accountId, brandName = '小红') {
+  return `${brandName}短剧-${douyinAccount}-${cleanDramaName(dramaName)}-${accountId}`
 }
 
 // ============== 小程序链接生成工具 ==============

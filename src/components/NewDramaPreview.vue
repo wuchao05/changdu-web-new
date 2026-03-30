@@ -920,6 +920,9 @@ const router = useRouter()
 const apiConfigStore = useApiConfigStore()
 const douyinMaterialStore = useDouyinMaterialStore()
 const sessionStore = useSessionStore()
+const currentBrandName = computed(
+  () => sessionStore.currentRuntimeUser?.brandName || sessionStore.currentUser?.brandName || '小红'
+)
 
 // 格式化抖音号素材配置
 function formatDouyinMaterialConfig(): string {
@@ -2144,7 +2147,7 @@ async function handleAddDownload(
 
         if (finalAccountId) {
           try {
-            const remark = `小红-${dramaName}`
+            const remark = `${currentBrandName.value}-${dramaName}`
             const { editJuliangAccountRemark } = await import('@/api/juliang')
             await editJuliangAccountRemark({
               account_id: finalAccountId,

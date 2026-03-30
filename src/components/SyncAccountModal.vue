@@ -90,6 +90,7 @@ const loadingCount = ref(false)
 const currentAccountTableId = ref('')
 const currentChannelName = ref('')
 const currentAdvertiserName = ref('')
+const currentBrandName = ref('小红')
 
 const columns: DataTableColumns<JuliangAccountItem> = [
   {
@@ -120,7 +121,7 @@ const columns: DataTableColumns<JuliangAccountItem> = [
 
 const allAccountsHaveRemark = computed(() => {
   if (matchedAccounts.value.length === 0) return false
-  return matchedAccounts.value.every(account => account.advertiser_remark === '小红')
+  return matchedAccounts.value.every(account => account.advertiser_remark === currentBrandName.value)
 })
 
 async function fetchAvailableAccountCount() {
@@ -145,6 +146,8 @@ async function loadCurrentChannelAccountTableId() {
   currentAccountTableId.value = String(sessionData?.feishu?.accountTableId || '').trim()
   currentChannelName.value = String(sessionData?.channel?.name || '').trim()
   currentAdvertiserName.value = String(sessionData?.buildConfig?.advertiserName || '').trim()
+  currentBrandName.value =
+    String(sessionData?.runtimeUser?.brandName || sessionData?.user?.brandName || '小红').trim() || '小红'
 }
 
 function ensureCurrentAccountTableId() {
@@ -245,13 +248,13 @@ async function addRemarks() {
       try {
         const result = await editJuliangAccountRemark({
           account_id: account.advertiser_id.toString(),
-          remark: '小红',
+          remark: currentBrandName.value,
         })
 
         if (result.code === 0) {
           success = true
           successCount += 1
-          account.advertiser_remark = '小红'
+          account.advertiser_remark = currentBrandName.value
         } else {
           retryCount += 1
         }

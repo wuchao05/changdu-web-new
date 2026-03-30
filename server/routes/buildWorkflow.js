@@ -35,8 +35,8 @@ function cleanDramaName(name) {
 }
 
 // 工具函数：生成推广链接名称
-function generatePromotionName(dramaName) {
-  return `小红短剧-${cleanDramaName(dramaName)}`
+function generatePromotionName(dramaName, brandName = '小红') {
+  return `${brandName}短剧-${cleanDramaName(dramaName)}`
 }
 
 function getCoverImagePath() {
@@ -72,6 +72,16 @@ function getRuntimeContext(input = null) {
     return input
   }
   return null
+}
+
+function getRuntimeBrandName(input = null) {
+  if (input?.state?.buildWorkflowContext?.runtimeUser?.brandName) {
+    return String(input.state.buildWorkflowContext.runtimeUser.brandName).trim() || '小红'
+  }
+  if (input?.runtimeUser?.brandName) {
+    return String(input.runtimeUser.brandName).trim() || '小红'
+  }
+  return '小红'
 }
 
 function getBuildConfig(input = null) {
@@ -224,7 +234,7 @@ router.post('/create-promotion-link', async ctx => {
     }
 
     // 使用传入的 promotion_name，如果没有则使用默认格式
-    const finalPromotionName = promotion_name || generatePromotionName(drama_name)
+    const finalPromotionName = promotion_name || generatePromotionName(drama_name, getRuntimeBrandName(ctx))
 
     console.log('========== 创建推广链接 ==========')
     console.log('book_id:', book_id)
@@ -1010,7 +1020,9 @@ router.post('/create-project', async ctx => {
     // 使用前端传递的项目名称，如果没有则使用默认规则
     const finalProjectName =
       project_name ||
-      (douyin_account_name ? `${drama_name}-小红-${douyin_account_name}` : `${drama_name}`)
+      (douyin_account_name
+        ? `${drama_name}-${getRuntimeBrandName(ctx)}-${douyin_account_name}`
+        : `${drama_name}`)
 
     // 根据需求文档和 curl 示例构建完整请求体
     const requestBody = {
@@ -1615,7 +1627,12 @@ router.post('/validate-and-create-microapp', async ctx => {
 
         // 4. 创建推广链接并创建小程序
         console.log(`  -> 为账户 ${accountId} 创建推广链接...`)
-        const promotionUrl = await createPromotionLinkForMicroapp(drama_name, book_id, runtime)
+        const promotionUrl = await createPromotionLinkForMicroapp(
+          drama_name,
+          book_id,
+          runtime,
+          getRuntimeBrandName(ctx)
+        )
 
         // 解析推广链接
         const parsed = parsePromotionUrl(promotionUrl.promotion_url)
@@ -1807,13 +1824,13 @@ async function queryMicroAppForAccount(accountId, cookie, runtime) {
 /**
  * 为小程序创建推广链接
  */
-async function createPromotionLinkForMicroapp(drama_name, book_id, runtime) {
+async function createPromotionLinkForMicroapp(drama_name, book_id, runtime, brandName = '小红') {
   const buildConfig = getBuildConfig(runtime)
   const requestBody = {
     distributor_id: getChangduDistributorIdNumber(runtime),
     book_id: book_id || '', // 使用传入的 book_id
     index: BUILD_WORKFLOW_CONFIG.promotion.index,
-    promotion_name: `小红短剧-${cleanDramaName(drama_name)}`,
+    promotion_name: `${brandName}短剧-${cleanDramaName(drama_name)}`,
     recharge_template_id: buildConfig.rechargeTemplateId,
     media_source: BUILD_WORKFLOW_CONFIG.promotion.mediaSource,
     price: BUILD_WORKFLOW_CONFIG.promotion.price,

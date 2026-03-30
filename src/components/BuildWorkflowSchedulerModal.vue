@@ -178,6 +178,7 @@ const isLoadingBackgroundStatus = ref(false)
 const backgroundPollingTimer = ref<ReturnType<typeof setInterval> | null>(null) // 后台状态轮询定时器
 const materialPreviewConfig = ref<adminApi.UserChannelBindingConfig['materialPreview'] | null>(null)
 const currentBuildConfig = ref<adminApi.ChannelConfig['juliang']['buildConfig'] | null>(null)
+const currentBrandName = ref('小红')
 const materialPreviewStatus = ref<materialPreviewApi.MaterialPreviewStatus | null>(null)
 const isLoadingMaterialPreview = ref(false)
 const switchingMaterialPreview = ref(false)
@@ -429,6 +430,8 @@ watch(
 async function loadMaterialPreviewConfig() {
   const sessionData = await adminApi.getCurrentSession()
   currentBuildConfig.value = sessionData.buildConfig
+  currentBrandName.value =
+    String(sessionData?.runtimeUser?.brandName || sessionData?.user?.brandName || '小红').trim() || '小红'
   materialPreviewConfig.value = sessionData.materialPreview || {
     enabled: false,
     intervalMinutes: 20,
@@ -1354,7 +1357,8 @@ async function executeAssetization(
   const assetPromotionName = generateSmartPromotionName(
     primaryDouyinConfig.douyinAccount,
     dramaName,
-    accountId
+    accountId,
+    currentBrandName.value
   )
   const promotionResult = await buildWorkflowApi.createPromotionLink({
     book_id: bookId,
@@ -1663,7 +1667,12 @@ async function buildBatchForDouyin(
   }
 
   const cleanDramaName = sanitizeDramaName(dramaName)
-  const promotionName = generateSmartPromotionName(config.douyinAccount, cleanDramaName, accountId)
+  const promotionName = generateSmartPromotionName(
+    config.douyinAccount,
+    cleanDramaName,
+    accountId,
+    currentBrandName.value
+  )
 
   const promotionResult = await buildWorkflowApi.createPromotionLink({
     book_id: bookId,
@@ -1696,7 +1705,7 @@ async function buildBatchForDouyin(
 
   // 1. 创建项目
   record.failedStep = '创建项目'
-  const projectName = `小红-${config.douyinAccount}-${dramaName}-${buildDate.value}`
+  const projectName = `${currentBrandName.value}-${config.douyinAccount}-${dramaName}-${buildDate.value}`
 
   const projectResult = await buildWorkflowApi.createProject({
     account_id: accountId,
@@ -1775,7 +1784,7 @@ async function buildBatchForDouyin(
 
   // 5. 创建广告（最多重试1次）
   record.failedStep = '创建广告'
-  const adName = `小红-${config.douyinAccount}-${dramaName}-${buildDate.value}`
+  const adName = `${currentBrandName.value}-${config.douyinAccount}-${dramaName}-${buildDate.value}`
 
   let promotionId: string | undefined
   let retryCount = 0

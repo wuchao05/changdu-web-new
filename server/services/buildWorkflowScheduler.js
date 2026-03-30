@@ -18,6 +18,7 @@ import {
   filterMaterials,
   sortMaterialsBySequence,
   sanitizeDramaName,
+  generatePromotionName,
   generateSmartPromotionName,
   formatBuildDate,
   parseDouyinMaterialFromFeishu,
@@ -58,6 +59,7 @@ function createDefaultSchedulerState() {
       feishu: {
         dramaStatusTableId: '',
       },
+      brandName: '小红',
     },
     nextRunTime: null,
     lastRunTime: null,
@@ -155,6 +157,9 @@ async function ensureSchedulerRuntime(channelRuntime = null, instanceKey = getAc
             ''
         ).trim(),
       },
+      brandName: String(
+        channelRuntime.runtimeUser?.brandName || channelRuntime.runtimeUserConfig?.brandName || '小红'
+      ).trim(),
     }
     return normalizedRuntime
   }
@@ -438,6 +443,10 @@ function getJuliangCookie() {
   return String(getSchedulerRuntime().juliang.cookie || '').trim()
 }
 
+function getRuntimeBrandName() {
+  return String(getActiveSchedulerState().runtimeUserConfig?.brandName || '小红').trim() || '小红'
+}
+
 function findConfiguredMicroAppAsset(assets = [], buildConfig = {}) {
   const microApps = Array.isArray(assets) ? assets : []
   const targetInstanceId = String(buildConfig.microAppInstanceId || '').trim()
@@ -474,7 +483,7 @@ function getChangduDistributorIdNumber() {
  */
 async function createPromotionLink(params) {
   const { book_id, drama_name, promotion_name } = params
-  const finalPromotionName = promotion_name || `小红-${sanitizeDramaName(drama_name)}`
+  const finalPromotionName = promotion_name || generatePromotionName(drama_name, getRuntimeBrandName())
   const buildConfig = getBuildConfig()
 
   const requestBody = {
@@ -900,7 +909,10 @@ async function createProject(params) {
   const buildConfig = getBuildConfig()
 
   const finalProjectName =
-    project_name || (douyin_account_name ? `${drama_name}-小红-${douyin_account_name}` : drama_name)
+    project_name ||
+    (douyin_account_name
+      ? `${drama_name}-${getRuntimeBrandName()}-${douyin_account_name}`
+      : drama_name)
 
   const requestBody = {
     track_url_group_info: {},
@@ -1211,7 +1223,8 @@ async function executeAssetization(drama) {
   const assetPromotionName = generateSmartPromotionName(
     primaryDouyinConfig[0].douyinAccount,
     dramaName,
-    accountId
+    accountId,
+    getRuntimeBrandName()
   )
   const promotionResult = await createPromotionLink({
     book_id: bookId,
@@ -1409,7 +1422,12 @@ async function buildBatchForDouyin(drama, config, initData, dramaName, accountId
   }
 
   const cleanDramaName = sanitizeDramaName(dramaName)
-  const promotionName = generateSmartPromotionName(config.douyinAccount, cleanDramaName, accountId)
+  const promotionName = generateSmartPromotionName(
+    config.douyinAccount,
+    cleanDramaName,
+    accountId,
+    getRuntimeBrandName()
+  )
 
   let promotionResult
   try {
@@ -1446,7 +1464,7 @@ async function buildBatchForDouyin(drama, config, initData, dramaName, accountId
   initData.app_type = 2
 
   // 1. 创建项目
-  const projectName = `小红-${config.douyinAccount}-${dramaName}-${buildDate}`
+  const projectName = `${getRuntimeBrandName()}-${config.douyinAccount}-${dramaName}-${buildDate}`
   let projectResult
   try {
     projectResult = await createProject({
@@ -1528,7 +1546,7 @@ async function buildBatchForDouyin(drama, config, initData, dramaName, accountId
   }
 
   // 5. 创建广告
-  const adName = `小红-${config.douyinAccount}-${dramaName}-${buildDate}`
+  const adName = `${getRuntimeBrandName()}-${config.douyinAccount}-${dramaName}-${buildDate}`
   let promotionCreateResult
   try {
     promotionCreateResult = await createPromotion({

@@ -57,8 +57,8 @@ export function formatDate(date: Date): string {
  * @param dramaName 剧名
  * @returns 推广链接名称
  */
-export function generatePromotionName(dramaName: string): string {
-  return `小红短剧-${cleanDramaName(dramaName)}`
+export function generatePromotionName(dramaName: string, brandName = '小红'): string {
+  return `${brandName}短剧-${cleanDramaName(dramaName)}`
 }
 
 /**
@@ -71,9 +71,10 @@ export function generatePromotionName(dramaName: string): string {
 export function generateSmartPromotionName(
   douyinAccount: string,
   dramaName: string,
-  accountId: string
+  accountId: string,
+  brandName = '小红'
 ): string {
-  return `小红短剧-${douyinAccount}-${cleanDramaName(dramaName)}-${accountId}`
+  return `${brandName}短剧-${douyinAccount}-${cleanDramaName(dramaName)}-${accountId}`
 }
 
 /**
