@@ -1040,6 +1040,12 @@
                       placeholder="请输入 advertiserName"
                     />
                   </n-form-item>
+                  <n-form-item v-if="channelForm.juliang.buildConfig.useNewMicroAppAssetFlow" label="ebpid">
+                    <n-input
+                      v-model:value="channelForm.juliang.buildConfig.ebpid"
+                      placeholder="请输入 ebpid"
+                    />
+                  </n-form-item>
                   <n-form-item label="microAppName">
                     <n-input
                       v-model:value="channelForm.juliang.buildConfig.microAppName"
@@ -1905,6 +1911,7 @@ function createDefaultChannelForm(): ChannelFormModel {
         landingUrl: '',
         useNewMicroAppAssetFlow: false,
         advertiserName: '',
+        ebpid: '',
         microAppName: '',
         microAppId: '',
         microAppInstanceId: '',
