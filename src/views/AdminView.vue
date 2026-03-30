@@ -840,15 +840,23 @@
                     />
                   </n-form-item>
                   <n-form-item label="10点及之后提前搭建小时数">
-                    <n-input
-                      v-model:value="channelForm.juliang.buildConfig.advanceHoursAfterTen"
+                    <n-input-number
+                      :value="getAdvanceHoursInputValue(channelForm.juliang.buildConfig.advanceHoursAfterTen)"
+                      :min="0"
+                      :precision="0"
+                      class="w-full"
                       placeholder="默认 0，表示必须等上架后才能搭建"
+                      @update:value="value => handleAdvanceHoursChange('advanceHoursAfterTen', value)"
                     />
                   </n-form-item>
                   <n-form-item label="10点之前提前搭建小时数">
-                    <n-input
-                      v-model:value="channelForm.juliang.buildConfig.advanceHoursBeforeTen"
+                    <n-input-number
+                      :value="getAdvanceHoursInputValue(channelForm.juliang.buildConfig.advanceHoursBeforeTen)"
+                      :min="0"
+                      :precision="0"
+                      class="w-full"
                       placeholder="默认 0，表示必须等上架后才能搭建"
+                      @update:value="value => handleAdvanceHoursChange('advanceHoursBeforeTen', value)"
                     />
                   </n-form-item>
                 </n-form>
@@ -1174,6 +1182,7 @@ interface DownloadCenterConfigFormModel {
 }
 
 type DesktopPermissionKey = keyof adminApi.UserChannelBindingConfig['permissions']['desktopMenus']
+type BuildAdvanceHoursField = 'advanceHoursAfterTen' | 'advanceHoursBeforeTen'
 
 const userForm = reactive<UserFormModel>(createDefaultUserForm())
 const channelForm = reactive<ChannelFormModel>(createDefaultChannelForm())
@@ -1369,6 +1378,15 @@ const channelColumns: DataTableColumns<adminApi.ChannelConfig> = [
     render: row => row.juliang.buildConfig.microAppName || '-',
   },
   {
+    title: '提前搭建规则',
+    key: 'juliang.buildConfig.advanceHours',
+    render: row => {
+      const afterTen = formatAdvanceHoursDisplay(row.juliang.buildConfig.advanceHoursAfterTen)
+      const beforeTen = formatAdvanceHoursDisplay(row.juliang.buildConfig.advanceHoursBeforeTen)
+      return `10点后 ${afterTen} 小时 / 10点前 ${beforeTen} 小时`
+    },
+  },
+  {
     title: 'appId',
     key: 'changdu.appId',
     render: row => row.changdu.appId || '-',
@@ -1430,6 +1448,26 @@ const downloadCenterColumns: DataTableColumns<adminApi.DownloadCenterConfig> = [
       ]),
   },
 ]
+
+function normalizeAdvanceHoursValue(value: string | number | null | undefined) {
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue) || numericValue < 0) {
+    return 0
+  }
+  return Math.floor(numericValue)
+}
+
+function getAdvanceHoursInputValue(value: string | number | null | undefined) {
+  return normalizeAdvanceHoursValue(value)
+}
+
+function handleAdvanceHoursChange(field: BuildAdvanceHoursField, value: number | null) {
+  channelForm.juliang.buildConfig[field] = String(normalizeAdvanceHoursValue(value))
+}
+
+function formatAdvanceHoursDisplay(value: string | number | null | undefined) {
+  return String(normalizeAdvanceHoursValue(value))
+}
 
 function createDefaultUserForm(): UserFormModel {
   return {
