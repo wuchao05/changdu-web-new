@@ -226,8 +226,8 @@
                 >
                   <Icon
                     icon="mdi:refresh"
-                    class="h-5 w-5 text-emerald-600 transition-transform duration-300"
-                    :class="{ 'animate-spin': overviewLoading }"
+                    class="h-5 w-5 text-emerald-600 transition-opacity duration-300"
+                    :class="{ 'opacity-60': overviewLoading }"
                   />
                 </button>
               </div>
@@ -242,17 +242,44 @@
                 <div class="flex items-center justify-between gap-4">
                   <div class="min-w-0">
                     <div class="flex items-center space-x-2 mb-2">
-                      <div class="w-3 h-3 rounded-full animate-pulse" :class="card.dotClass"></div>
-                      <p class="text-sm font-medium" :class="card.labelClass">{{ card.label }}</p>
+                      <div
+                        class="w-3 h-3 rounded-full"
+                        :class="
+                          overviewLoading
+                            ? 'overview-skeleton overview-skeleton--dot'
+                            : `${card.dotClass} animate-pulse`
+                        "
+                      ></div>
+                      <p
+                        class="text-sm font-medium"
+                        :class="[
+                          card.labelClass,
+                          overviewLoading ? 'overview-skeleton overview-skeleton--label' : '',
+                        ]"
+                      >
+                        {{ overviewLoading ? '' : card.label }}
+                      </p>
                     </div>
-                    <p class="text-2xl lg:text-3xl font-bold" :class="card.labelClass">
-                      <n-spin v-if="overviewLoading" size="small" />
-                      <span v-else>{{ card.value }}</span>
+                    <p
+                      class="text-2xl lg:text-3xl font-bold"
+                      :class="[
+                        card.labelClass,
+                        overviewLoading ? 'overview-skeleton overview-skeleton--value' : '',
+                      ]"
+                    >
+                      {{ overviewLoading ? '' : card.value }}
                     </p>
                     <div class="mt-2 flex items-center gap-2 text-xs">
-                      <p :class="card.metaClass">{{ card.meta }}</p>
+                      <p
+                        :class="[
+                          card.metaClass,
+                          overviewLoading ? 'overview-skeleton overview-skeleton--meta' : '',
+                        ]"
+                      >
+                        {{ overviewLoading ? '' : card.meta }}
+                      </p>
                       <div
-                        v-if="card.diffValue !== null && card.diffValue !== 0"
+                        v-if="!overviewLoading && card.diffValue !== null && card.diffValue !== 0"
                         class="flex items-center gap-1"
                         :class="card.diffValue > 0 ? 'text-red-500' : 'text-green-500'"
                       >
@@ -270,8 +297,15 @@
                       </div>
                     </div>
                   </div>
-                  <div class="overview-card-icon" :class="card.iconClass">
-                    <Icon :icon="card.icon" class="h-5 w-5 text-white" />
+                  <div
+                    class="overview-card-icon"
+                    :class="[card.iconClass, { 'overview-card-icon--loading': overviewLoading }]"
+                  >
+                    <div
+                      v-if="overviewLoading"
+                      class="overview-skeleton overview-skeleton--icon"
+                    ></div>
+                    <Icon v-else :icon="card.icon" class="h-5 w-5 text-white" />
                   </div>
                 </div>
               </div>
@@ -490,7 +524,6 @@ import {
   NInput,
   NModal,
   NSelect,
-  NSpin,
   NTooltip,
   type DropdownOption,
   type FormInst,
@@ -1614,6 +1647,62 @@ onUnmounted(() => {
 
 .overview-card:hover .overview-card-icon {
   transform: scale(1.08);
+}
+
+.overview-card-icon--loading {
+  background: rgba(255, 255, 255, 0.55) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.32);
+}
+
+.overview-skeleton {
+  position: relative;
+  color: transparent !important;
+  overflow: hidden;
+}
+
+.overview-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    rgba(226, 232, 240, 0.55) 0%,
+    rgba(255, 255, 255, 0.9) 48%,
+    rgba(226, 232, 240, 0.55) 100%
+  );
+  background-size: 220% 100%;
+  animation: order-tab-skeleton 1.45s ease-in-out infinite;
+}
+
+.overview-skeleton--dot {
+  min-width: 0.75rem;
+  min-height: 0.75rem;
+  border-radius: 9999px;
+}
+
+.overview-skeleton--label {
+  width: 4.5rem;
+  min-height: 1rem;
+  border-radius: 0.5rem;
+}
+
+.overview-skeleton--value {
+  width: 6.4rem;
+  min-height: 2rem;
+  border-radius: 0.75rem;
+}
+
+.overview-skeleton--meta {
+  width: 5rem;
+  min-height: 0.9rem;
+  border-radius: 0.5rem;
+}
+
+.overview-skeleton--icon {
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 0.45rem;
 }
 
 .user-label-badge {
