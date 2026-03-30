@@ -2096,6 +2096,24 @@ async function saveUser() {
   try {
     delete (userForm as Record<string, unknown>).materialPreview
     syncUserChannelConfigs()
+
+    for (const channelId of userForm.channelIds) {
+      const channelConfig = userForm.channelConfigs?.[channelId]
+      if (!channelConfig?.independentOrderStats?.enabled) {
+        continue
+      }
+
+      const validMatchCount = countConfiguredMaterialMatches(channelConfig.douyinMaterialMatches)
+      if (validMatchCount > 0) {
+        continue
+      }
+
+      const channelName =
+        channels.value.find(channel => channel.id === channelId)?.name || `渠道 ${channelId}`
+      message.error(`【${channelName}】开启独立订单统计前，至少需要配置 1 条有效的抖音号匹配素材规则`)
+      return
+    }
+
     if (userForm.defaultChannelId && !userForm.channelIds.includes(userForm.defaultChannelId)) {
       message.error('默认渠道必须属于可访问渠道之一')
       return
