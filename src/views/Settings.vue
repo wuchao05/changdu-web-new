@@ -109,7 +109,7 @@
                   :max="600"
                   :step="30"
                   class="w-full"
-                  @update:value="value => value && updateRefreshInterval(value)"
+                  @update:value="(value: number | null) => value && updateRefreshInterval(value)"
                 />
                 <p class="text-xs text-gray-500">建议 60-300 秒</p>
               </div>

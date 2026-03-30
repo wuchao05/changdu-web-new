@@ -171,20 +171,35 @@ router.post('/api/juliang/edit_account_remark', async ctx => {
     // 从请求体中获取参数（不再需要前端传配置）
     const { account_id, remark } = ctx.request.body
     const juliangConfig = await getRuntimeJuliangConfig(ctx)
-
-    // 调用巨量引擎 API，使用后端配置
-    const response = await fetch(
-      'https://business.oceanengine.com/nbs/api/bm/promotion/edit_account_remark',
-      {
-        method: 'POST',
-        headers: {
+    const useNewJuliangFlow = Boolean(juliangConfig.buildConfig?.useNewMicroAppAssetFlow)
+    const ebpid = String(juliangConfig.buildConfig?.ebpid || '').trim()
+    const requestUrl = useNewJuliangFlow
+      ? `https://business.oceanengine.com/api/ebp/promotion/common/edit_account_remark?ebpid=${ebpid}`
+      : 'https://business.oceanengine.com/nbs/api/bm/promotion/edit_account_remark'
+    const requestHeaders = useNewJuliangFlow
+      ? {
+          Cookie: juliangConfig.cookie,
+          'Content-Type': 'application/json',
+        }
+      : {
           'Content-Type': 'application/json',
           Cookie: juliangConfig.cookie,
           'X-CSRFToken': juliangConfig.csrfToken,
-        },
-        body: JSON.stringify({ account_id, remark }),
-      }
-    )
+        }
+    const requestBody = useNewJuliangFlow
+      ? { accountId: account_id, remark }
+      : { account_id, remark }
+
+    if (useNewJuliangFlow && !ebpid) {
+      throw new Error('当前渠道已启用新版巨量，但未配置 ebpid')
+    }
+
+    // 调用巨量引擎 API，使用后端配置
+    const response = await fetch(requestUrl, {
+      method: 'POST',
+      headers: requestHeaders,
+      body: JSON.stringify(requestBody),
+    })
 
     const data = await response.json()
     ctx.body = data

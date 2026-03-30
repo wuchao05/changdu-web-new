@@ -465,7 +465,7 @@
                                 <n-switch
                                   :value="item.config.permissions.webMenus[permission.key]"
                                   @update:value="
-                                    value =>
+                                    (value: boolean) =>
                                       updateWebPermission(
                                         item.config.permissions.webMenus,
                                         permission.key,
@@ -538,7 +538,7 @@
                                 <n-switch
                                   :value="item.config.permissions.desktopMenus[permission.key]"
                                   @update:value="
-                                    value =>
+                                    (value: boolean) =>
                                       updateDesktopPermission(
                                         item.config.permissions.desktopMenus,
                                         permission.key,
@@ -943,7 +943,8 @@
                       class="w-full"
                       placeholder="默认 0"
                       @update:value="
-                        value => handleAdvanceHoursChange('advanceHoursAfterTen', value)
+                        (value: number | null) =>
+                          handleAdvanceHoursChange('advanceHoursAfterTen', value)
                       "
                     >
                       <template #suffix>小时</template>
@@ -964,7 +965,8 @@
                       class="w-full"
                       placeholder="默认 0"
                       @update:value="
-                        value => handleAdvanceHoursChange('advanceHoursBeforeTen', value)
+                        (value: number | null) =>
+                          handleAdvanceHoursChange('advanceHoursBeforeTen', value)
                       "
                     >
                       <template #suffix>小时</template>
