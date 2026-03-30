@@ -48,6 +48,7 @@
 
             <div v-if="hasChannelTabs" class="hidden md:flex items-center min-w-0 flex-1">
               <div class="channel-tabs-shell compact">
+                <span class="channel-tabs-prefix">渠道</span>
                 <button
                   v-for="channel in channelTabs"
                   :key="channel.id"
@@ -131,8 +132,10 @@
                   <Icon icon="mdi:account-circle" class="h-5 w-5" />
                 </span>
                 <span class="account-entry-content max-sm:hidden">
-                  <span class="account-entry-name">{{ accountDisplayName }}</span>
-                  <span class="account-entry-role">{{ accountRoleLabel }}</span>
+                  <span class="account-entry-row">
+                    <span class="account-entry-name">{{ accountDisplayName }}</span>
+                  </span>
+                  <span class="account-entry-hint">账号操作</span>
                 </span>
                 <Icon icon="mdi:chevron-down" class="h-4 w-4 text-slate-400 max-sm:hidden" />
               </button>
@@ -147,6 +150,7 @@
       >
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div class="channel-tabs-shell">
+            <span class="channel-tabs-prefix">渠道</span>
             <button
               v-for="channel in channelTabs"
               :key="channel.id"
@@ -607,15 +611,16 @@ const accountDisplayName = computed(
     sessionStore.currentUser?.account ||
     '当前账号'
 )
-const accountRoleLabel = computed(() => (sessionStore.isAdmin ? '管理员' : '普通用户'))
 const accountMenuOptions = computed<DropdownOption[]>(() => [
   {
     key: 'change-password',
     label: '修改密码',
+    icon: () => h(Icon, { icon: 'mdi:lock-reset', class: 'h-4 w-4' }),
   },
   {
     key: 'logout',
     label: '退出登录',
+    icon: () => h(Icon, { icon: 'mdi:logout-variant', class: 'h-4 w-4' }),
   },
 ])
 const changePasswordRules: FormRules = {
@@ -1357,45 +1362,52 @@ onUnmounted(() => {
 <style scoped>
 .channel-tabs-shell {
   display: inline-flex;
+  align-items: center;
   max-width: 100%;
-  gap: 0.5rem;
-  padding: 0.35rem;
-  border-radius: 1rem;
-  background: linear-gradient(135deg, rgba(241, 245, 249, 0.9), rgba(226, 232, 240, 0.95));
+  gap: 0.35rem;
+  padding: 0.28rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  background: rgba(255, 255, 255, 0.84);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.8),
-    0 12px 32px -20px rgba(15, 23, 42, 0.35);
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 10px 24px -20px rgba(15, 23, 42, 0.22);
   overflow-x: auto;
 }
 
 .account-entry-button {
   display: inline-flex;
   align-items: center;
-  gap: 0.65rem;
-  padding: 0.45rem 0.7rem 0.45rem 0.45rem;
+  gap: 0.6rem;
+  min-height: 2.75rem;
+  padding: 0.35rem 0.7rem 0.35rem 0.4rem;
   border-radius: 9999px;
   border: 1px solid rgba(226, 232, 240, 0.95);
-  background: rgba(255, 255, 255, 0.88);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.92));
   color: rgb(51 65 85);
-  box-shadow: 0 10px 25px -18px rgba(15, 23, 42, 0.45);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.96),
+    0 12px 24px -22px rgba(15, 23, 42, 0.28);
   transition: all 0.2s ease;
 }
 
 .account-entry-button:hover {
-  border-color: rgba(59, 130, 246, 0.28);
+  border-color: rgba(148, 163, 184, 0.78);
   color: rgb(15 23 42);
-  box-shadow: 0 16px 32px -24px rgba(37, 99, 235, 0.45);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.98),
+    0 16px 30px -24px rgba(15, 23, 42, 0.32);
 }
 
 .account-entry-avatar {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
+  width: 2.1rem;
+  height: 2.1rem;
   border-radius: 9999px;
-  background: linear-gradient(135deg, rgb(59 130 246), rgb(14 165 233));
-  color: white;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.16), rgba(14, 165, 233, 0.2));
+  color: rgb(37 99 235);
   flex-shrink: 0;
 }
 
@@ -1403,23 +1415,31 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.account-entry-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
   min-width: 0;
 }
 
 .account-entry-name {
-  max-width: 8rem;
+  max-width: 7rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 0.875rem;
-  font-weight: 600;
-  line-height: 1.1;
+  font-weight: 700;
+  line-height: 1;
 }
 
-.account-entry-role {
-  font-size: 0.75rem;
-  color: rgb(100 116 139);
-  line-height: 1.1;
+.account-entry-hint {
+  font-size: 0.72rem;
+  color: rgb(148 163 184);
+  line-height: 1;
 }
 
 :deep(.change-password-modal) {
@@ -1427,52 +1447,92 @@ onUnmounted(() => {
 }
 
 .channel-tabs-shell.compact {
-  gap: 0.35rem;
-  padding: 0.25rem;
+  gap: 0.3rem;
+  padding: 0.24rem 0.28rem 0.24rem 0.24rem;
   margin-left: 0.75rem;
-  background: linear-gradient(135deg, rgba(248, 250, 252, 0.96), rgba(241, 245, 249, 0.98));
+  background: rgba(248, 250, 252, 0.94);
+}
+
+.channel-tabs-prefix {
+  flex-shrink: 0;
+  padding: 0 0.55rem 0 0.5rem;
+  color: rgb(148 163 184);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .channel-tab-button {
   display: inline-flex;
   align-items: center;
-  gap: 0.55rem;
+  gap: 0.45rem;
   min-width: fit-content;
-  padding: 0.7rem 1rem;
-  border-radius: 0.85rem;
-  color: rgb(71 85 105);
-  font-size: 0.95rem;
+  min-height: 2.15rem;
+  padding: 0.5rem 0.78rem;
+  border-radius: 9999px;
+  color: rgb(100 116 139);
+  font-size: 0.87rem;
   font-weight: 600;
-  transition: all 0.25s ease;
+  transition: all 0.2s ease;
 }
 
 .channel-tab-button:hover {
   color: rgb(15 23 42);
-  background: rgba(255, 255, 255, 0.65);
+  background: rgba(241, 245, 249, 0.92);
 }
 
 .channel-tab-button.active {
-  color: white;
-  background: linear-gradient(135deg, rgb(59 130 246), rgb(37 99 235));
+  color: rgb(30 64 175);
+  background: linear-gradient(180deg, rgba(239, 246, 255, 0.98), rgba(219, 234, 254, 0.98));
+  border: 1px solid rgba(147, 197, 253, 0.95);
   box-shadow:
-    0 10px 28px -18px rgba(37, 99, 235, 0.9),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    inset 0 1px 0 rgba(255, 255, 255, 0.96),
+    0 8px 18px -16px rgba(37, 99, 235, 0.45);
 }
 
 .channel-tabs-shell.compact .channel-tab-button {
-  padding: 0.55rem 0.9rem;
+  min-height: 2rem;
+  padding: 0.44rem 0.72rem;
 }
 
 .channel-tab-dot {
-  width: 0.55rem;
-  height: 0.55rem;
+  width: 0.4rem;
+  height: 0.4rem;
   border-radius: 9999px;
   background: currentColor;
-  opacity: 0.35;
+  opacity: 0.28;
 }
 
 .channel-tab-button.active .channel-tab-dot {
-  opacity: 0.95;
+  opacity: 0.8;
+}
+
+:deep(.n-dropdown-menu) {
+  padding: 0.4rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(226, 232, 240, 0.96);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 18px 42px -28px rgba(15, 23, 42, 0.3);
+  backdrop-filter: blur(16px);
+}
+
+:deep(.n-dropdown-option) {
+  border-radius: 0.8rem;
+}
+
+:deep(.n-dropdown-option-body) {
+  min-width: 9rem;
+  padding: 0.68rem 0.78rem;
+  font-weight: 600;
+}
+
+:deep(.n-dropdown-option-body__prefix) {
+  margin-right: 0.55rem;
+  color: rgb(100 116 139);
+}
+
+:deep(.n-dropdown-option-body:hover) {
+  background: rgba(241, 245, 249, 0.92);
 }
 
 .overview-card {
