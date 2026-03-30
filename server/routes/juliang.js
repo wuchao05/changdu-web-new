@@ -41,6 +41,7 @@ function buildEbpAccountListPayload(params = {}) {
       'advertiser_followed',
       'advertiser_status',
       'advertiser_status_name',
+      'advertiser_remark',
       'group_name_full_path',
       'sub_shared_wallet_id',
       'sub_shared_wallet_name',
