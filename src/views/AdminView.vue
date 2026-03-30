@@ -1001,6 +1001,14 @@
                   label-placement="top"
                   class="grid grid-cols-1 gap-3 md:grid-cols-2"
                 >
+                  <n-form-item label="常读 Cookie" class="md:col-span-2">
+                    <n-input
+                      v-model:value="channelForm.changdu.cookie"
+                      type="textarea"
+                      :rows="3"
+                      placeholder="请输入常读 Cookie"
+                    />
+                  </n-form-item>
                   <n-form-item label="Secret Key">
                     <n-input
                       v-model:value="channelForm.changdu.secretKey"
@@ -1009,14 +1017,6 @@
                   </n-form-item>
                   <n-form-item label="appId">
                     <n-input v-model:value="channelForm.changdu.appId" placeholder="请输入 appId" />
-                  </n-form-item>
-                  <n-form-item label="常读 Cookie" class="md:col-span-2">
-                    <n-input
-                      v-model:value="channelForm.changdu.cookie"
-                      type="textarea"
-                      :rows="3"
-                      placeholder="请输入常读 Cookie"
-                    />
                   </n-form-item>
                   <n-form-item label="distributorId">
                     <n-input
