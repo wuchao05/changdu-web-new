@@ -1,7 +1,5 @@
 <template>
-  <UnauthorizedGuide v-if="!isValidUser" />
-
-  <div v-else class="min-h-full bg-gradient-to-br from-slate-50 to-blue-50">
+  <div class="min-h-full bg-gradient-to-br from-slate-50 to-blue-50">
     <header
       class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200/60 shadow-sm"
     >
@@ -533,7 +531,6 @@ import type { DataTableColumns } from 'naive-ui'
 import BuildWorkflowSchedulerModal from '@/components/BuildWorkflowSchedulerModal.vue'
 import SyncAccountModal from '@/components/SyncAccountModal.vue'
 import DateRangePicker from '@/components/DateRangePicker.vue'
-import UnauthorizedGuide from '@/views/UnauthorizedGuide.vue'
 import * as adminApi from '@/api/admin'
 import { useApiConfigStore } from '@/stores/apiConfig'
 import { useDouyinMaterialStore } from '@/stores/douyinMaterial'
@@ -564,7 +561,7 @@ const apiConfigStore = useApiConfigStore()
 const douyinMaterialStore = useDouyinMaterialStore()
 const sessionStore = useSessionStore()
 const settingsStore = useSettingsStore()
-const { isAdmin, isValidUser, userLabels } = useUserAuth()
+const { isAdmin, userLabels } = useUserAuth()
 const { dynamicTitle } = useDynamicTitle()
 
 const showAutoBuildModal = ref(false)

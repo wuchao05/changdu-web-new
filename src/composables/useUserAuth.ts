@@ -25,8 +25,6 @@ export function useUserAuth() {
       sessionStore.currentUser.nickname || sessionStore.currentUser.account || '用户'
     return [userDisplayName]
   })
-  const isValidUser = computed(() => sessionStore.isAuthenticated)
-
   return {
     isAdmin,
     currentUserId,
@@ -34,6 +32,5 @@ export function useUserAuth() {
     userRoleTheme,
     userRoleIcon,
     userLabels,
-    isValidUser,
   }
 }
