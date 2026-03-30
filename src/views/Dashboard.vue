@@ -13,14 +13,15 @@
             >
               <Icon icon="mdi:chart-line" class="w-6 h-6 text-white" />
             </div>
-            <div v-if="isMobile && userLabels.length > 0" class="min-w-0 flex items-center">
+            <div
+              v-if="isMobile && mobileUserLabels.length > 0"
+              class="min-w-0 flex items-center"
+            >
               <button
-                v-for="label in userLabels"
+                v-for="label in mobileUserLabels"
                 :key="`mobile-${label}`"
                 type="button"
                 class="user-label-badge user-label-badge--mobile"
-                :class="{ 'user-label-badge--clickable': isAdmin && label === '管理员' }"
-                @click="handleUserLabelClick(label)"
               >
                 <span class="user-label-badge__text">{{ label }}</span>
               </button>
@@ -33,12 +34,10 @@
                   {{ dynamicTitle }}
                 </h1>
                 <button
-                  v-for="label in userLabels"
+                  v-for="label in desktopUserLabels"
                   :key="label"
                   type="button"
                   class="user-label-badge"
-                  :class="{ 'user-label-badge--clickable': isAdmin && label === '管理员' }"
-                  @click="handleUserLabelClick(label)"
                 >
                   <span class="user-label-badge__text">{{ label }}</span>
                 </button>
@@ -605,6 +604,10 @@ const autoRefreshLabel = computed(() =>
     ? `自动刷新已开启，每 ${autoRefreshIntervalSeconds.value} 秒更新一次`
     : '自动刷新未开启，可在设置中心开启'
 )
+const desktopUserLabels = computed(() => userLabels.value.filter(Boolean))
+const mobileUserLabels = computed(() =>
+  userLabels.value.filter(label => Boolean(label) && label !== '管理员')
+)
 const accountDisplayName = computed(
   () =>
     sessionStore.currentRuntimeUser?.nickname ||
@@ -612,18 +615,32 @@ const accountDisplayName = computed(
     sessionStore.currentUser?.account ||
     '当前账号'
 )
-const accountMenuOptions = computed<DropdownOption[]>(() => [
-  {
-    key: 'change-password',
-    label: '修改密码',
-    icon: () => h(Icon, { icon: 'mdi:lock-reset', class: 'h-4 w-4' }),
-  },
-  {
-    key: 'logout',
-    label: '退出登录',
-    icon: () => h(Icon, { icon: 'mdi:logout-variant', class: 'h-4 w-4' }),
-  },
-])
+const accountMenuOptions = computed<DropdownOption[]>(() => {
+  const options: DropdownOption[] = []
+
+  if (sessionStore.isAdmin) {
+    options.push({
+      key: 'admin',
+      label: '管理员后台',
+      icon: () => h(Icon, { icon: 'mdi:shield-crown-outline', class: 'h-4 w-4' }),
+    })
+  }
+
+  options.push(
+    {
+      key: 'change-password',
+      label: '修改密码',
+      icon: () => h(Icon, { icon: 'mdi:lock-reset', class: 'h-4 w-4' }),
+    },
+    {
+      key: 'logout',
+      label: '退出登录',
+      icon: () => h(Icon, { icon: 'mdi:logout-variant', class: 'h-4 w-4' }),
+    }
+  )
+
+  return options
+})
 const changePasswordRules: FormRules = {
   currentPassword: {
     required: true,
@@ -1204,12 +1221,6 @@ function handleAutoBuildClick() {
   showAutoBuildModal.value = true
 }
 
-function handleUserLabelClick(label: string) {
-  if (isAdmin.value && label === '管理员') {
-    void router.push('/admin')
-  }
-}
-
 function resetChangePasswordForm() {
   changePasswordForm.currentPassword = ''
   changePasswordForm.newPassword = ''
@@ -1239,6 +1250,11 @@ async function handleLogout() {
 }
 
 async function handleAccountMenuSelect(key: string) {
+  if (key === 'admin') {
+    await router.push('/admin')
+    return
+  }
+
   if (key === 'change-password') {
     openChangePasswordModal()
     return
