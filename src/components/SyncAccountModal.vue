@@ -89,6 +89,7 @@ const availableAccountCount = ref<number | null>(null)
 const loadingCount = ref(false)
 const currentAccountTableId = ref('')
 const currentChannelName = ref('')
+const currentAdvertiserName = ref('')
 
 const columns: DataTableColumns<JuliangAccountItem> = [
   {
@@ -143,6 +144,7 @@ async function loadCurrentChannelAccountTableId() {
   const sessionData = await adminApi.getCurrentSession()
   currentAccountTableId.value = String(sessionData?.feishu?.accountTableId || '').trim()
   currentChannelName.value = String(sessionData?.channel?.name || '').trim()
+  currentAdvertiserName.value = String(sessionData?.buildConfig?.advertiserName || '').trim()
 }
 
 function ensureCurrentAccountTableId() {
@@ -184,8 +186,11 @@ async function fetchAccounts() {
       }
 
       const filtered = response.data.data_list.filter((item: JuliangAccountItem) => {
+        const matchesAdvertiserName = currentAdvertiserName.value
+          ? item.advertiser_name?.includes(currentAdvertiserName.value)
+          : true
         return (
-          item.advertiser_name?.includes('山宥麦') &&
+          matchesAdvertiserName &&
           item.advertiser_status_name === '审核通过' &&
           !item.advertiser_remark
         )

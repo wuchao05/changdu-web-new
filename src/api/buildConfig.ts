@@ -8,6 +8,7 @@ export interface BuildConfig {
   productPlatformId: string
   landingUrl: string
   useNewMicroAppAssetFlow: boolean
+  advertiserName: string
   microAppName: string
   microAppId: string
   microAppInstanceId: string
@@ -32,6 +33,7 @@ export const DEFAULT_BUILD_CONFIG: BuildConfig = {
   productPlatformId: '',
   landingUrl: '',
   useNewMicroAppAssetFlow: false,
+  advertiserName: '',
   microAppName: '',
   microAppId: '',
   microAppInstanceId: '',
@@ -65,6 +67,7 @@ function normalizeBuildConfig(payload: unknown): BuildConfig {
     productPlatformId: normalizeStringValue(config.productPlatformId),
     landingUrl: normalizeStringValue(config.landingUrl),
     useNewMicroAppAssetFlow: normalizeBooleanValue(config.useNewMicroAppAssetFlow),
+    advertiserName: normalizeStringValue(config.advertiserName),
     microAppName: normalizeStringValue(config.microAppName),
     microAppId: normalizeStringValue(config.microAppId),
     microAppInstanceId: normalizeStringValue(config.microAppInstanceId),

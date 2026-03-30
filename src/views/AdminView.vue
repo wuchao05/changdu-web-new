@@ -1034,6 +1034,12 @@
                       placeholder="请输入 landingUrl"
                     />
                   </n-form-item>
+                  <n-form-item label="advertiserName">
+                    <n-input
+                      v-model:value="channelForm.juliang.buildConfig.advertiserName"
+                      placeholder="请输入 advertiserName"
+                    />
+                  </n-form-item>
                   <n-form-item label="microAppName">
                     <n-input
                       v-model:value="channelForm.juliang.buildConfig.microAppName"
@@ -1898,6 +1904,7 @@ function createDefaultChannelForm(): ChannelFormModel {
         productPlatformId: '',
         landingUrl: '',
         useNewMicroAppAssetFlow: false,
+        advertiserName: '',
         microAppName: '',
         microAppId: '',
         microAppInstanceId: '',

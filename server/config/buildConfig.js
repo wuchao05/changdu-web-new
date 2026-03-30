@@ -20,6 +20,7 @@ export const DEFAULT_BUILD_CONFIG = {
   productPlatformId: BUILD_WORKFLOW_CONFIG.build.project.product_platform_id,
   landingUrl: BUILD_WORKFLOW_CONFIG.build.promotion.external_url,
   useNewMicroAppAssetFlow: false,
+  advertiserName: '',
   microAppName: BUILD_WORKFLOW_CONFIG.juliang.microAppName,
   microAppId: BUILD_WORKFLOW_CONFIG.juliang.microAppId,
   microAppInstanceId: '',
@@ -51,6 +52,10 @@ export function normalizeBuildConfig(config = {}) {
     useNewMicroAppAssetFlow: normalizeBooleanValue(
       config.useNewMicroAppAssetFlow,
       DEFAULT_BUILD_CONFIG.useNewMicroAppAssetFlow
+    ),
+    advertiserName: normalizeStringValue(
+      config.advertiserName,
+      DEFAULT_BUILD_CONFIG.advertiserName
     ),
     microAppName: normalizeStringValue(config.microAppName, DEFAULT_BUILD_CONFIG.microAppName),
     microAppId: normalizeStringValue(config.microAppId, DEFAULT_BUILD_CONFIG.microAppId),
