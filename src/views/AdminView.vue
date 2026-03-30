@@ -1456,6 +1456,20 @@ const channelColumns: DataTableColumns<adminApi.ChannelConfig> = [
     render: row => {
       const afterTen = formatAdvanceHoursDisplay(row.juliang.buildConfig.advanceHoursAfterTen)
       const beforeTen = formatAdvanceHoursDisplay(row.juliang.buildConfig.advanceHoursBeforeTen)
+
+      if (!afterTen.allowed && !beforeTen.allowed) {
+        return h(
+          NTag,
+          {
+            size: 'small',
+            type: 'warning',
+            bordered: false,
+            round: true,
+          },
+          () => '不允许提前搭建'
+        )
+      }
+
       return h('div', { class: 'flex flex-wrap gap-2' }, [
         h(
           NTag,
