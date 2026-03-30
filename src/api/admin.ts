@@ -269,6 +269,13 @@ export function updateChannel(id: string, payload: Partial<ChannelConfig>) {
   })
 }
 
+export function reorderChannels(channelIds: string[]) {
+  return request<ChannelConfig[]>('/admin/channels/reorder', {
+    method: 'PUT',
+    body: JSON.stringify({ channelIds }),
+  })
+}
+
 export function deleteChannel(id: string) {
   return request<void>(`/admin/channels/${id}`, {
     method: 'DELETE',

@@ -190,6 +190,46 @@ router.get('/channels', async ctx => {
   }
 })
 
+router.put('/channels/reorder', async ctx => {
+  const payload = ctx.request.body || {}
+  const channelIds = Array.isArray(payload.channelIds) ? payload.channelIds : []
+  const { channels } = await readChannels()
+  const currentChannelIds = channels.map(channel => channel.id)
+
+  if (channelIds.length !== channels.length) {
+    ctx.status = 400
+    ctx.body = {
+      code: 400,
+      message: '渠道排序数据不完整',
+    }
+    return
+  }
+
+  const requestedIds = channelIds.map(item => String(item || '').trim()).filter(Boolean)
+  const hasSameSet =
+    requestedIds.length === currentChannelIds.length &&
+    currentChannelIds.every(id => requestedIds.includes(id))
+
+  if (!hasSameSet) {
+    ctx.status = 400
+    ctx.body = {
+      code: 400,
+      message: '渠道排序数据无效',
+    }
+    return
+  }
+
+  const channelMap = new Map(channels.map(channel => [channel.id, channel]))
+  const reorderedChannels = requestedIds.map(id => channelMap.get(id)).filter(Boolean)
+  await writeChannels(reorderedChannels)
+
+  ctx.body = {
+    code: 0,
+    message: '渠道排序已更新',
+    data: reorderedChannels,
+  }
+})
+
 router.get('/channels/:id', async ctx => {
   const { id } = ctx.params
   const { channels } = await readChannels()

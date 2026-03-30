@@ -53,12 +53,108 @@
               <n-button type="primary" @click="openChannelModal()">新增渠道</n-button>
             </div>
 
+            <div v-if="isChannelSortingByKeyword" class="channel-sort-tip">
+              正在按关键词筛选，当前仅展示结果，清空搜索后可拖拽调整渠道顺序。
+            </div>
+
             <n-data-table
+              v-if="isChannelSortingByKeyword"
               :columns="channelColumns"
               :data="filteredChannels"
               :bordered="false"
               :single-line="false"
             />
+
+            <div v-else class="channel-sort-board">
+              <div class="channel-sort-board__head">
+                <span class="channel-sort-board__title">渠道顺序</span>
+                <span class="channel-sort-board__desc">
+                  拖拽左侧手柄调整顺序，保存后用户侧渠道展示顺序会同步更新。
+                </span>
+              </div>
+
+              <draggable
+                v-model="channels"
+                item-key="id"
+                handle=".channel-sort-card__handle"
+                ghost-class="channel-sort-card--ghost"
+                chosen-class="channel-sort-card--chosen"
+                class="channel-sort-list"
+                @end="handleChannelSortEnd"
+              >
+                <template #item="{ element: channel, index }">
+                  <div class="channel-sort-card">
+                    <div class="channel-sort-card__main">
+                      <button
+                        type="button"
+                        class="channel-sort-card__handle"
+                        :disabled="sortingChannels"
+                        title="拖拽调整顺序"
+                      >
+                        <Icon icon="mdi:drag-vertical" class="h-5 w-5" />
+                      </button>
+
+                      <div class="channel-sort-card__content">
+                        <div class="channel-sort-card__title-row">
+                          <span class="channel-sort-card__index">{{ index + 1 }}</span>
+                          <span class="channel-sort-card__name">{{ channel.name || '未命名渠道' }}</span>
+                        </div>
+                        <div class="channel-sort-card__meta">
+                          <n-tag size="small" :bordered="false" round type="info">
+                            {{ channel.juliang.buildConfig.microAppName || '未配置小程序名称' }}
+                          </n-tag>
+                          <n-tag size="small" :bordered="false" round>
+                            {{
+                              channel.juliang.buildConfig.useNewMicroAppAssetFlow ? '新版资产流程' : '老版资产流程'
+                            }}
+                          </n-tag>
+                          <n-tag
+                            size="small"
+                            :bordered="false"
+                            round
+                            :type="
+                              formatAdvanceHoursDisplay(channel.juliang.buildConfig.advanceHoursAfterTen).allowed ||
+                              formatAdvanceHoursDisplay(channel.juliang.buildConfig.advanceHoursBeforeTen).allowed
+                                ? 'success'
+                                : 'warning'
+                            "
+                          >
+                            {{
+                              formatAdvanceHoursDisplay(channel.juliang.buildConfig.advanceHoursAfterTen).allowed ||
+                              formatAdvanceHoursDisplay(channel.juliang.buildConfig.advanceHoursBeforeTen).allowed
+                                ? '允许提前搭建'
+                                : '不允许提前搭建'
+                            }}
+                          </n-tag>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="channel-sort-card__actions">
+                      <n-button
+                        size="small"
+                        tertiary
+                        :disabled="sortingChannels"
+                        @click="openChannelModal(channel)"
+                      >
+                        编辑
+                      </n-button>
+                      <n-button
+                        size="small"
+                        tertiary
+                        type="error"
+                        :disabled="sortingChannels"
+                        @click="confirmDeleteChannel(channel)"
+                      >
+                        删除
+                      </n-button>
+                    </div>
+                  </div>
+                </template>
+              </draggable>
+
+              <div v-if="sortingChannels" class="channel-sort-board__saving">正在保存渠道顺序...</div>
+            </div>
           </n-tab-pane>
           <n-tab-pane name="download-center" tab="下载中心配置">
             <div class="mb-4 flex items-center justify-between gap-3">
@@ -1224,6 +1320,7 @@ import {
   useMessage,
   type DataTableColumns,
 } from 'naive-ui'
+import draggable from 'vuedraggable'
 import * as adminApi from '@/api/admin'
 import { useSessionStore } from '@/stores/session'
 import { useApiConfigStore } from '@/stores/apiConfig'
@@ -1255,6 +1352,7 @@ const editingDownloadCenterId = ref('')
 const savingUser = ref(false)
 const savingChannel = ref(false)
 const savingDownloadCenter = ref(false)
+const sortingChannels = ref(false)
 const viewportWidth = ref(typeof window === 'undefined' ? 1440 : window.innerWidth)
 const orderUsernameDrafts = reactive<Record<string, string>>({})
 const materialMatchSearchDrafts = reactive<Record<string, string>>({})
@@ -1461,6 +1559,7 @@ const filteredChannels = computed(() => {
   if (!keyword) return channels.value
   return channels.value.filter(channel => channel.name.toLowerCase().includes(keyword))
 })
+const isChannelSortingByKeyword = computed(() => Boolean(channelKeyword.value.trim()))
 const filteredDownloadCenterConfigs = computed(() => {
   const keyword = downloadCenterKeyword.value.trim().toLowerCase()
   if (!keyword) return downloadCenterConfigs.value
@@ -2081,6 +2180,31 @@ async function loadData() {
   downloadCenterConfigs.value = downloadCenterConfigList
 }
 
+async function handleChannelSortEnd(event: { oldIndex?: number; newIndex?: number }) {
+  if (sortingChannels.value || isChannelSortingByKeyword.value) {
+    return
+  }
+  if (event.oldIndex === event.newIndex) {
+    return
+  }
+
+  const previousChannels = channels.value.map(channel => ({ ...channel }))
+  sortingChannels.value = true
+
+  try {
+    const reorderedChannels = await adminApi.reorderChannels(channels.value.map(channel => channel.id))
+    channels.value = reorderedChannels
+    await sessionStore.loadSession()
+    await apiConfigStore.loadFromStorage()
+    message.success('渠道顺序已更新')
+  } catch (error) {
+    channels.value = previousChannels
+    message.error(error instanceof Error ? error.message : '保存渠道顺序失败')
+  } finally {
+    sortingChannels.value = false
+  }
+}
+
 function openUserModal(user?: adminApi.UserProfile) {
   editingUserId.value = user?.id || ''
   resetUserForm()
@@ -2529,6 +2653,151 @@ watch(
   font-size: 0.88rem;
   line-height: 1.65;
   color: #64748b;
+}
+
+.channel-sort-tip {
+  margin-bottom: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px dashed #cbd5e1;
+  border-radius: 1rem;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 0.84rem;
+}
+
+.channel-sort-board {
+  padding: 1rem;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 1.2rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96));
+}
+
+.channel-sort-board__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.channel-sort-board__title {
+  font-size: 0.96rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.channel-sort-board__desc,
+.channel-sort-board__saving {
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.channel-sort-board__saving {
+  margin-top: 0.9rem;
+}
+
+.channel-sort-list {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.channel-sort-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.05rem;
+  border: 1px solid rgba(191, 219, 254, 0.72);
+  border-radius: 1rem;
+  background:
+    radial-gradient(circle at top right, rgba(219, 234, 254, 0.55), transparent 36%),
+    rgba(255, 255, 255, 0.96);
+  box-shadow: 0 16px 34px -28px rgba(37, 99, 235, 0.28);
+}
+
+.channel-sort-card--ghost {
+  opacity: 0.5;
+}
+
+.channel-sort-card--chosen {
+  border-color: rgba(96, 165, 250, 0.96);
+}
+
+.channel-sort-card__main {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.channel-sort-card__handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 0;
+  border-radius: 0.85rem;
+  background: rgba(219, 234, 254, 0.8);
+  color: #2563eb;
+  cursor: grab;
+  flex-shrink: 0;
+}
+
+.channel-sort-card__handle:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.channel-sort-card__content {
+  min-width: 0;
+  flex: 1;
+}
+
+.channel-sort-card__title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.channel-sort-card__index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.7rem;
+  height: 1.7rem;
+  padding: 0 0.45rem;
+  border-radius: 9999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.channel-sort-card__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.96rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.channel-sort-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.65rem;
+}
+
+.channel-sort-card__actions {
+  display: flex;
+  gap: 0.55rem;
+  flex-shrink: 0;
 }
 
 .advance-config-block {
