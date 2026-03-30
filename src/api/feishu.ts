@@ -498,6 +498,7 @@ class FeishuApiService {
    * @returns 更新结果
    */
   async updateDramaAccount(recordId: string, account: string, publishTime?: string): Promise<any> {
+    const tableId = this.getDramaListTableId()
     // 通过后端代理调用飞书API，避免CORS问题
     const response = await fetch(`${ENV.BASE_URL}/feishu/bitable/records/${recordId}/account`, {
       method: 'PUT',
@@ -505,6 +506,7 @@ class FeishuApiService {
       body: JSON.stringify({
         account: account,
         publishTime: publishTime,
+        table_id: tableId,
       }),
     })
 
@@ -650,10 +652,14 @@ class FeishuApiService {
    * @returns 剧集清单数据
    */
   async getDramaListWithDownloadStatus(): Promise<any> {
+    const tableId = this.getDramaListTableId()
     // 通过后端代理调用飞书API，避免CORS问题
     const response = await fetch(`${ENV.BASE_URL}/feishu/bitable/drama-list`, {
       method: 'POST',
       headers: FEISHU_API_CONFIG.headers,
+      body: JSON.stringify({
+        table_id: tableId,
+      }),
     })
 
     if (!response.ok) {
