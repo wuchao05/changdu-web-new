@@ -1048,6 +1048,8 @@ class FeishuApiService {
     signal?: AbortSignal,
     includeBookId: boolean = true
   ): Promise<FeishuSearchRecordResponse> {
+    const resolvedTableId = tableId || this.getDramaStatusTableId()
+
     // 如果提供了日期，添加日期过滤条件
     const filter = date
       ? {
@@ -1082,7 +1084,7 @@ class FeishuApiService {
       method: 'POST',
       headers: FEISHU_API_CONFIG.headers,
       body: JSON.stringify({
-        table_id: tableId,
+        table_id: resolvedTableId,
         field_names: fieldNames,
         page_size: 100,
         filter,
@@ -1116,6 +1118,7 @@ class FeishuApiService {
     signal?: AbortSignal,
     includeBookId: boolean = false
   ): Promise<FeishuSearchRecordResponse> {
+    const resolvedTableId = tableId || this.getDramaStatusTableId()
     const conditions: Array<{ field_name: string; operator: string; value: string[] }> = [
       {
         field_name: '当前状态',
@@ -1156,7 +1159,7 @@ class FeishuApiService {
       method: 'POST',
       headers: FEISHU_API_CONFIG.headers,
       body: JSON.stringify({
-        table_id: tableId,
+        table_id: resolvedTableId,
         field_names: fieldNames,
         page_size: 100,
         filter,
