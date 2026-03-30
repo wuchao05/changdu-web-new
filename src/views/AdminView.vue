@@ -1390,13 +1390,23 @@ const channelColumns: DataTableColumns<adminApi.ChannelConfig> = [
       return h('div', { class: 'flex flex-wrap gap-2' }, [
         h(
           NTag,
-          { size: 'small', type: 'info', bordered: false, round: true },
-          () => `10点后 ${afterTen} 小时`
+          {
+            size: 'small',
+            type: afterTen.allowed ? 'info' : 'warning',
+            bordered: false,
+            round: true,
+          },
+          () => `10点后 ${afterTen.label}`
         ),
         h(
           NTag,
-          { size: 'small', type: 'success', bordered: false, round: true },
-          () => `10点前 ${beforeTen} 小时`
+          {
+            size: 'small',
+            type: beforeTen.allowed ? 'success' : 'warning',
+            bordered: false,
+            round: true,
+          },
+          () => `10点前 ${beforeTen.label}`
         ),
       ])
     },
@@ -1476,7 +1486,18 @@ function handleAdvanceHoursChange(field: BuildAdvanceHoursField, value: number |
 }
 
 function formatAdvanceHoursDisplay(value: string | number | null | undefined) {
-  return String(normalizeAdvanceHoursValue(value))
+  const normalizedValue = normalizeAdvanceHoursValue(value)
+  if (normalizedValue === 0) {
+    return {
+      allowed: false,
+      label: '不允许提前搭建',
+    }
+  }
+
+  return {
+    allowed: true,
+    label: `提前 ${normalizedValue} 小时搭建`,
+  }
 }
 
 function createDefaultUserForm(): UserFormModel {
