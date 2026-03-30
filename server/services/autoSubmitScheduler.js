@@ -16,7 +16,7 @@ import {
   resolveChannelRuntimeById,
 } from '../utils/channelRuntime.js'
 import { normalizeRuntimeInstanceKey } from '../utils/runtimeInstance.js'
-import { getDefaultDownloadCenterConfig } from '../utils/studioData.js'
+import { resolveDownloadCenterRequestHeaders } from '../utils/downloadCenterHeaders.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -245,31 +245,14 @@ function getRuntimeChangduHeaders(instanceKey) {
 async function getDownloadCenterTaskListHeaders(channelId) {
   await ensureSchedulerRuntime(channelId)
   const runtimeHeaders = getRuntimeChangduHeaders(channelId)
-  const defaultDownloadCenterConfig = await getDefaultDownloadCenterConfig()
-
-  if (!defaultDownloadCenterConfig) {
-    return {
-      Appid: runtimeHeaders.appId,
-      Apptype: runtimeHeaders.appType,
-      Aduserid: runtimeHeaders.adUserId,
-      Rootaduserid: runtimeHeaders.rootAdUserId,
-      Distributorid: runtimeHeaders.distributorId,
-      Cookie: runtimeHeaders.cookie,
-    }
-  }
-
-  return {
-    Appid: String(defaultDownloadCenterConfig.appId || runtimeHeaders.appId).trim(),
-    Apptype: '7',
-    Aduserid: String(defaultDownloadCenterConfig.adUserId || runtimeHeaders.adUserId).trim(),
-    Rootaduserid: String(
-      defaultDownloadCenterConfig.rootAdUserId || runtimeHeaders.rootAdUserId
-    ).trim(),
-    Distributorid: String(
-      defaultDownloadCenterConfig.distributorId || runtimeHeaders.distributorId
-    ).trim(),
-    Cookie: String(defaultDownloadCenterConfig.cookie || runtimeHeaders.cookie).trim(),
-  }
+  return resolveDownloadCenterRequestHeaders({
+    appid: runtimeHeaders.appId,
+    apptype: runtimeHeaders.appType,
+    distributorid: runtimeHeaders.distributorId,
+    Aduserid: runtimeHeaders.adUserId,
+    Rootaduserid: runtimeHeaders.rootAdUserId,
+    Cookie: runtimeHeaders.cookie,
+  })
 }
 
 function getOpenApiChannelConfig(channelId) {
@@ -874,8 +857,8 @@ async function getDownloadTaskList(channelId, startTime, endTime) {
   const headerConfig = await getDownloadCenterTaskListHeaders(channelId)
 
   console.log(`[自动提交-${channelId}] task_list 请求头:`, {
-    Distributorid: headerConfig.Distributorid,
-    Appid: headerConfig.Appid,
+    Distributorid: headerConfig.distributorid,
+    Appid: headerConfig.appid,
     Aduserid: headerConfig.Aduserid,
     Rootaduserid: headerConfig.Rootaduserid,
     cookieLength: headerConfig.Cookie.length,

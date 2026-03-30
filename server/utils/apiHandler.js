@@ -1,5 +1,5 @@
 import { buildHeaders, buildDownloadCenterHeaders } from '../config/headers.js'
-import { getDefaultDownloadCenterConfig } from './studioData.js'
+import { resolveDownloadCenterRequestHeaders } from './downloadCenterHeaders.js'
 
 /**
  * 通用API处理函数
@@ -192,7 +192,6 @@ export function createDownloadCenterHandler(apiName, targetPath) {
     }
 
     try {
-      const isTaskListApi = targetPath.includes('/download_center/task_list')
       // 统一将所有请求转换为 GET 请求发送给后端
       let params = {}
 
@@ -230,45 +229,19 @@ export function createDownloadCenterHandler(apiName, targetPath) {
       const headers = buildDownloadCenterHeaders(ctx)
       // console.log('buildDownloadCenterHeaders 返回的 Cookie 长度:', headers.Cookie?.length || 0)
 
-      // 如果参数中有 cookie，使用参数的 cookie；否则使用 buildDownloadCenterHeaders 已经设置的值
-      if (cookieFromParams && cookieFromParams !== headers.Cookie) {
-        headers.Cookie = cookieFromParams
-        // console.log('使用 cookieFromParams 覆盖，长度:', cookieFromParams.length)
-      } else {
-        // console.log('使用 buildDownloadCenterHeaders 的 Cookie')
-      }
-      // console.log('最终发送的 Cookie 长度:', headers.Cookie?.length || 0)
-      // console.log('======================================')
+      const resolvedHeaders = await resolveDownloadCenterRequestHeaders({
+        ...headers,
+        ...(cookieFromParams ? { Cookie: cookieFromParams } : {}),
+      })
 
-      if (isTaskListApi) {
-        const defaultDownloadCenterConfig = await getDefaultDownloadCenterConfig()
-        if (!defaultDownloadCenterConfig) {
-          ctx.status = 400
-          ctx.body = {
-            code: 400,
-            message: '未配置默认下载中心，请先在管理员后台设置默认项',
-          }
-          return
-        }
-
-        headers.appid = defaultDownloadCenterConfig.appId || headers.appid
-        headers.apptype = '7'
-        headers.distributorid =
-          defaultDownloadCenterConfig.distributorId || headers.distributorid
-        headers.Aduserid = defaultDownloadCenterConfig.adUserId || headers.Aduserid
-        headers.Rootaduserid =
-          defaultDownloadCenterConfig.rootAdUserId || headers.Rootaduserid
-        headers.Cookie = defaultDownloadCenterConfig.cookie || headers.Cookie
-      }
-
-      if (isTaskListApi) {
+      if (targetPath.includes('/download_center/task_list')) {
         console.log('\n========== 【新剧抢跑-剧集状态】 ==========')
         console.log('⏰ 时间:', new Date().toLocaleString('zh-CN'))
         console.log('📝 API名称:', apiName)
         console.log('🌐 请求方法:', ctx.method)
         console.log('🎯 目标URL:', targetUrl)
         console.log('📋 请求参数:', params)
-        console.log('📦 请求真实服务端请求头:', headers)
+        console.log('📦 请求真实服务端请求头:', resolvedHeaders)
         console.log('=========================================\n')
       }
 
@@ -285,7 +258,7 @@ export function createDownloadCenterHandler(apiName, targetPath) {
       // 统一使用 GET 方法发送给后端
       const response = await fetch(targetUrl, {
         method: 'GET',
-        headers: headers,
+        headers: resolvedHeaders,
       })
 
       const data = await response.text()

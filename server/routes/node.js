@@ -2,6 +2,7 @@ import Router from '@koa/router'
 import { PassThrough, Readable } from 'stream'
 import { createDownloadCenterHandler } from '../utils/apiHandler.js'
 import { buildDownloadCenterHeaders } from '../config/headers.js'
+import { resolveDownloadCenterRequestHeaders } from '../utils/downloadCenterHeaders.js'
 
 const router = new Router()
 
@@ -67,7 +68,7 @@ router.get('/platform/distributor/download_center/proxy_download', async ctx => 
     // if (cookie) params.append('cookie', String(cookie))
 
     const targetUrl = `https://www.changdunovel.com/node/api/platform/distributor/download_center/get_url/?${params.toString()}`
-    const headers = buildDownloadCenterHeaders(ctx)
+    const headers = await resolveDownloadCenterRequestHeaders(buildDownloadCenterHeaders(ctx))
 
     const urlResp = await fetch(targetUrl, { method: 'GET', headers, redirect: 'follow' })
     if (!urlResp.ok) {
