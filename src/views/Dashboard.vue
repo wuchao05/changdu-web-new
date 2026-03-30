@@ -120,6 +120,23 @@
               </template>
               <span class="ml-1 max-sm:hidden">设置</span>
             </n-button>
+
+            <n-dropdown
+              trigger="click"
+              :options="accountMenuOptions"
+              @select="handleAccountMenuSelect"
+            >
+              <button type="button" class="account-entry-button">
+                <span class="account-entry-avatar">
+                  <Icon icon="mdi:account-circle" class="h-5 w-5" />
+                </span>
+                <span class="account-entry-content max-sm:hidden">
+                  <span class="account-entry-name">{{ accountDisplayName }}</span>
+                  <span class="account-entry-role">{{ accountRoleLabel }}</span>
+                </span>
+                <Icon icon="mdi:chevron-down" class="h-4 w-4 text-slate-400 max-sm:hidden" />
+              </button>
+            </n-dropdown>
           </div>
         </div>
       </div>
@@ -401,6 +418,55 @@
       @update:show="showAutoBuildModal = $event"
     />
     <SyncAccountModal v-model:visible="showSyncAccountModal" />
+    <n-modal
+      :show="showChangePasswordModal"
+      preset="card"
+      title="修改密码"
+      class="change-password-modal"
+      :mask-closable="false"
+      @update:show="handleChangePasswordModalVisible"
+    >
+      <n-form
+        ref="changePasswordFormRef"
+        :model="changePasswordForm"
+        :rules="changePasswordRules"
+        label-placement="top"
+      >
+        <n-form-item label="当前密码" path="currentPassword">
+          <n-input
+            v-model:value="changePasswordForm.currentPassword"
+            type="password"
+            show-password-on="click"
+            placeholder="请输入当前密码"
+          />
+        </n-form-item>
+        <n-form-item label="新密码" path="newPassword">
+          <n-input
+            v-model:value="changePasswordForm.newPassword"
+            type="password"
+            show-password-on="click"
+            placeholder="请输入新密码"
+          />
+        </n-form-item>
+        <n-form-item label="确认新密码" path="confirmPassword">
+          <n-input
+            v-model:value="changePasswordForm.confirmPassword"
+            type="password"
+            show-password-on="click"
+            placeholder="请再次输入新密码"
+            @keyup.enter="handleChangePassword"
+          />
+        </n-form-item>
+      </n-form>
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <n-button @click="closeChangePasswordModal">取消</n-button>
+          <n-button type="primary" :loading="savingPassword" @click="handleChangePassword">
+            保存密码
+          </n-button>
+        </div>
+      </template>
+    </n-modal>
   </div>
 </template>
 
@@ -408,12 +474,30 @@
 import { computed, h, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
-import { useMessage, NAlert, NButton, NCard, NDataTable, NSelect, NSpin, NTooltip } from 'naive-ui'
+import {
+  useMessage,
+  NAlert,
+  NButton,
+  NCard,
+  NDataTable,
+  NDropdown,
+  NForm,
+  NFormItem,
+  NInput,
+  NModal,
+  NSelect,
+  NSpin,
+  NTooltip,
+  type DropdownOption,
+  type FormInst,
+  type FormRules,
+} from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 import BuildWorkflowSchedulerModal from '@/components/BuildWorkflowSchedulerModal.vue'
 import SyncAccountModal from '@/components/SyncAccountModal.vue'
 import DateRangePicker from '@/components/DateRangePicker.vue'
 import UnauthorizedGuide from '@/views/UnauthorizedGuide.vue'
+import * as adminApi from '@/api/admin'
 import { useApiConfigStore } from '@/stores/apiConfig'
 import { useDouyinMaterialStore } from '@/stores/douyinMaterial'
 import { useUserAuth } from '@/composables/useUserAuth'
@@ -448,6 +532,7 @@ const { dynamicTitle } = useDynamicTitle()
 
 const showAutoBuildModal = ref(false)
 const showSyncAccountModal = ref(false)
+const showChangePasswordModal = ref(false)
 const isMobile = ref(false)
 const overviewLoading = ref(false)
 const overviewError = ref('')
@@ -465,10 +550,17 @@ const reportCurrentPage = ref(1)
 const ordersCurrentPage = ref(1)
 const payStatus = ref(-1)
 const activePromotionUserName = ref('')
+const savingPassword = ref(false)
+const changePasswordFormRef = ref<FormInst | null>(null)
 
 type DateRangeValue = [string, string] | null
 const reportDateRange = ref<DateRangeValue>(null)
 const orderDateRange = ref<DateRangeValue>(null)
+const changePasswordForm = reactive({
+  currentPassword: '',
+  newPassword: '',
+  confirmPassword: '',
+})
 
 const hasMaterialRules = computed(() => douyinMaterialStore.matches.length > 0)
 const autoBuildDisabledReason = computed(() => {
@@ -508,6 +600,69 @@ const autoRefreshLabel = computed(() =>
     ? `自动刷新已开启，每 ${autoRefreshIntervalSeconds.value} 秒更新一次`
     : '自动刷新未开启，可在设置中心开启'
 )
+const accountDisplayName = computed(
+  () =>
+    sessionStore.currentRuntimeUser?.nickname ||
+    sessionStore.currentUser?.nickname ||
+    sessionStore.currentUser?.account ||
+    '当前账号'
+)
+const accountRoleLabel = computed(() => (sessionStore.isAdmin ? '管理员' : '普通用户'))
+const accountMenuOptions = computed<DropdownOption[]>(() => [
+  {
+    key: 'change-password',
+    label: '修改密码',
+  },
+  {
+    key: 'logout',
+    label: '退出登录',
+  },
+])
+const changePasswordRules: FormRules = {
+  currentPassword: {
+    required: true,
+    message: '请输入当前密码',
+    trigger: ['blur', 'input'],
+  },
+  newPassword: [
+    {
+      required: true,
+      message: '请输入新密码',
+      trigger: ['blur', 'input'],
+    },
+    {
+      validator: (_rule, value: string) => {
+        if (!String(value || '').trim()) {
+          return new Error('请输入新密码')
+        }
+        if (String(value || '').trim().length < 6) {
+          return new Error('新密码至少需要 6 位')
+        }
+        if (String(value || '').trim() === String(changePasswordForm.currentPassword || '').trim()) {
+          return new Error('新密码不能与当前密码相同')
+        }
+        return true
+      },
+      trigger: ['blur', 'input'],
+    },
+  ],
+  confirmPassword: [
+    {
+      required: true,
+      message: '请再次输入新密码',
+      trigger: ['blur', 'input'],
+    },
+    {
+      validator: (_rule, value: string) => {
+        if (String(value || '').trim() !== String(changePasswordForm.newPassword || '').trim()) {
+          return new Error('两次输入的新密码不一致')
+        }
+        return true
+      },
+      trigger: ['blur', 'input'],
+    },
+  ],
+}
 const configuredOrderUsernames = computed(() => {
   const usernames = sessionStore.currentRuntimeUser?.orderUserStats?.usernames
   return Array.isArray(usernames) ? usernames.filter(Boolean) : []
@@ -1049,6 +1204,64 @@ function handleUserLabelClick(label: string) {
   }
 }
 
+function resetChangePasswordForm() {
+  changePasswordForm.currentPassword = ''
+  changePasswordForm.newPassword = ''
+  changePasswordForm.confirmPassword = ''
+  changePasswordFormRef.value?.restoreValidation()
+}
+
+function openChangePasswordModal() {
+  showChangePasswordModal.value = true
+}
+
+function closeChangePasswordModal() {
+  showChangePasswordModal.value = false
+  resetChangePasswordForm()
+}
+
+function handleChangePasswordModalVisible(value: boolean) {
+  showChangePasswordModal.value = value
+  if (!value) {
+    resetChangePasswordForm()
+  }
+}
+
+async function handleLogout() {
+  await sessionStore.logout()
+  await router.replace('/login')
+}
+
+async function handleAccountMenuSelect(key: string) {
+  if (key === 'change-password') {
+    openChangePasswordModal()
+    return
+  }
+
+  if (key === 'logout') {
+    await handleLogout()
+  }
+}
+
+async function handleChangePassword() {
+  try {
+    await changePasswordFormRef.value?.validate()
+    savingPassword.value = true
+    await adminApi.changePassword(
+      changePasswordForm.currentPassword.trim(),
+      changePasswordForm.newPassword.trim()
+    )
+    message.success('密码修改成功')
+    closeChangePasswordModal()
+  } catch (error) {
+    if (error instanceof Error) {
+      message.error(error.message)
+    }
+  } finally {
+    savingPassword.value = false
+  }
+}
+
 async function handleChannelChange(value: string) {
   if (!value || value === sessionStore.selectedChannelId) {
     return
@@ -1153,6 +1366,64 @@ onUnmounted(() => {
     inset 0 1px 0 rgba(255, 255, 255, 0.8),
     0 12px 32px -20px rgba(15, 23, 42, 0.35);
   overflow-x: auto;
+}
+
+.account-entry-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.45rem 0.7rem 0.45rem 0.45rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  background: rgba(255, 255, 255, 0.88);
+  color: rgb(51 65 85);
+  box-shadow: 0 10px 25px -18px rgba(15, 23, 42, 0.45);
+  transition: all 0.2s ease;
+}
+
+.account-entry-button:hover {
+  border-color: rgba(59, 130, 246, 0.28);
+  color: rgb(15 23 42);
+  box-shadow: 0 16px 32px -24px rgba(37, 99, 235, 0.45);
+}
+
+.account-entry-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, rgb(59 130 246), rgb(14 165 233));
+  color: white;
+  flex-shrink: 0;
+}
+
+.account-entry-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.account-entry-name {
+  max-width: 8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.account-entry-role {
+  font-size: 0.75rem;
+  color: rgb(100 116 139);
+  line-height: 1.1;
+}
+
+:deep(.change-password-modal) {
+  width: min(92vw, 420px);
 }
 
 .channel-tabs-shell.compact {

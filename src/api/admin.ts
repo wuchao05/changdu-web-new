@@ -168,6 +168,16 @@ export function logout() {
   })
 }
 
+export function changePassword(currentPassword: string, newPassword: string) {
+  return request<void>('/session/password', {
+    method: 'POST',
+    body: JSON.stringify({
+      currentPassword,
+      newPassword,
+    }),
+  })
+}
+
 export function getCurrentSession() {
   return request<{
     user: UserProfile

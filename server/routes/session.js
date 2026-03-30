@@ -10,6 +10,7 @@ import {
   sanitizeUser,
   resolveRuntimeContext,
   resolveUserChannel,
+  writeUser,
 } from '../utils/studioData.js'
 import { DEFAULT_BUILD_CONFIG, normalizeBuildConfig } from '../config/buildConfig.js'
 
@@ -66,6 +67,51 @@ router.post('/logout', requireSession, async ctx => {
   ctx.body = {
     code: 0,
     message: '已退出登录',
+  }
+})
+
+router.post('/password', requireSession, async ctx => {
+  const { currentPassword, newPassword } = ctx.request.body || {}
+  const normalizedCurrentPassword = String(currentPassword || '').trim()
+  const normalizedNewPassword = String(newPassword || '').trim()
+  const sessionUser = ctx.state.sessionUser
+
+  if (!normalizedCurrentPassword || !normalizedNewPassword) {
+    ctx.status = 400
+    ctx.body = {
+      code: 400,
+      message: '当前密码和新密码不能为空',
+    }
+    return
+  }
+
+  if (sessionUser.password !== normalizedCurrentPassword) {
+    ctx.status = 400
+    ctx.body = {
+      code: 400,
+      message: '当前密码不正确',
+    }
+    return
+  }
+
+  if (normalizedCurrentPassword === normalizedNewPassword) {
+    ctx.status = 400
+    ctx.body = {
+      code: 400,
+      message: '新密码不能与当前密码相同',
+    }
+    return
+  }
+
+  await writeUser({
+    ...sessionUser,
+    password: normalizedNewPassword,
+    updatedAt: new Date().toISOString(),
+  })
+
+  ctx.body = {
+    code: 0,
+    message: '密码修改成功',
   }
 })
 
