@@ -402,9 +402,9 @@
                   </p>
                 </div>
               </div>
-              <p v-if="!ordersLoading" class="independent-order-summary__hint">
-                仅展示推广链来源包含当前渠道抖音号名称的订单，无法查看其他人的订单数据。
-              </p>
+              <!-- <p v-if="!ordersLoading" class="independent-order-summary__hint"> -->
+              <!--   仅展示推广链来源包含当前渠道抖音号名称的订单，无法查看其他人的订单数据。 -->
+              <!-- </p> -->
             </div>
             <div v-if="orderUserCardItems.length > 0" class="mb-4">
               <div class="order-user-tabs">
