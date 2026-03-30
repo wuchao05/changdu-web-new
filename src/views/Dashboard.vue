@@ -427,6 +427,7 @@
       preset="card"
       title="修改密码"
       class="change-password-modal"
+      :style="{ width: isMobile ? 'calc(100vw - 2rem)' : '460px' }"
       :mask-closable="false"
       @update:show="handleChangePasswordModalVisible"
     >
@@ -1443,7 +1444,12 @@ onUnmounted(() => {
 }
 
 :deep(.change-password-modal) {
-  width: min(92vw, 420px);
+  max-width: calc(100vw - 2rem);
+}
+
+:deep(.change-password-modal .n-card) {
+  border-radius: 1.1rem;
+  box-shadow: 0 28px 60px -36px rgba(15, 23, 42, 0.35);
 }
 
 .channel-tabs-shell.compact {
