@@ -25,7 +25,7 @@ export const DEFAULT_BUILD_CONFIG = {
   microAppInstanceId: '',
   ccId: '1849832732821859',
   rechargeTemplateId: String(BUILD_WORKFLOW_CONFIG.changdu.rechargeTemplateId),
-  adCallbackConfigId: String(BUILD_WORKFLOW_CONFIG.changdu.adCallbackConfigId),
+  adCallbackConfigId: '',
   advanceHoursAfterTen: '0',
   advanceHoursBeforeTen: '0',
 }

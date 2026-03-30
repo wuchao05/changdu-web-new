@@ -1804,7 +1804,7 @@ function createDefaultChannelForm(): ChannelFormModel {
         microAppInstanceId: '',
         ccId: '',
         rechargeTemplateId: '',
-        adCallbackConfigId: '1845407746151576',
+        adCallbackConfigId: '',
         advanceHoursAfterTen: '0',
         advanceHoursBeforeTen: '0',
       },
