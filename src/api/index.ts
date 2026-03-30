@@ -209,6 +209,7 @@ export interface BatchSubmitItem {
   series_name: string
   publish_time: string
   manualRedFlag?: boolean
+  fromSearchResult?: boolean
 }
 
 export interface BatchSubmitResponse {

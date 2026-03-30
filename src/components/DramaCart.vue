@@ -89,6 +89,7 @@ export interface CartItem {
   series_name: string
   publish_time: string
   manualRedFlag?: boolean // 是否手动开启红标
+  fromSearchResult?: boolean // 是否来自搜索结果
 }
 
 // 飞行小球类型

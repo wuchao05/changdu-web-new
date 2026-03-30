@@ -638,6 +638,22 @@ async function createDramaStatusRecord(channelId, params) {
   return result
 }
 
+function resolveDramaRating(drama, newDramaSet, options = {}) {
+  const manualRedFlag = options.manualRedFlag === true
+  const fromSearchResult = options.fromSearchResult === true
+  const isRedFlagDrama = manualRedFlag || newDramaSet.has(drama.book_id)
+
+  if (isRedFlagDrama) {
+    return '红标'
+  }
+
+  if (fromSearchResult) {
+    return '绿标'
+  }
+
+  return '黄标'
+}
+
 /**
  * 更新账户使用状态
  */
@@ -1057,7 +1073,6 @@ function sortDramasByPriority(dramas, downloadList, newDramaSet) {
 async function processDrama(channelId, drama, downloadList, newDramaSet, options = {}) {
   await ensureSchedulerRuntime(channelId)
   const dramaName = drama.series_name
-  const manualRedFlag = options.manualRedFlag === true
 
   try {
     // 1. 检查可用账户
@@ -1082,8 +1097,7 @@ async function processDrama(channelId, drama, downloadList, newDramaSet, options
     }
 
     // 3. 确定评级
-    const isRedFlagDrama = manualRedFlag || newDramaSet.has(drama.book_id)
-    const rating = isRedFlagDrama ? '红标' : undefined
+    const rating = resolveDramaRating(drama, newDramaSet, options)
 
     // 4. 创建飞书剧集清单记录
     await createDramaRecord(channelId, dramaName, drama.publish_time, drama.book_id, rating)
@@ -1509,6 +1523,7 @@ async function executeBatchSubmit(items, runtimeContext = null) {
       // 调用处理单部剧的函数
       const result = await processDrama(channelId, drama, downloadList, new Set(), {
         manualRedFlag: item.manualRedFlag,
+        fromSearchResult: item.fromSearchResult,
       })
 
       if (result.success) {

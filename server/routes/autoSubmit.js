@@ -161,7 +161,8 @@ router.post('/reset-stats', async ctx => {
  *     book_id: string,
  *     series_name: string,
  *     publish_time: string,
- *     manualRedFlag?: boolean
+ *     manualRedFlag?: boolean,
+ *     fromSearchResult?: boolean
  *   }>
  * }
  */

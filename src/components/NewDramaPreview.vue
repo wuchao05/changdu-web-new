@@ -1704,6 +1704,7 @@ function handleAddToCart(payload: {
     series_name: (drama as any).series_name || (drama as any).book_name || '未知剧名',
     publish_time: drama.publish_time || '',
     manualRedFlag: isManualRedFlag(drama.book_id),
+    fromSearchResult: searchKeyword.value.trim().length > 0,
   }
 
   // 添加到购物车（带动画）
@@ -1743,6 +1744,7 @@ async function syncToFeishu(payload: { drama: NewDramaItem | RankingDramaItem })
     await handleAddDownload(drama, {
       overrideIsRedFlag: isRedFlag,
       manualRedFlag: isManualRedFlag(drama.book_id),
+      fromSearchResult: searchKeyword.value.trim().length > 0,
     })
   } finally {
     // 清除锁
@@ -2014,6 +2016,28 @@ function formatCountdown(seconds: number): string {
 interface AddDownloadOptions {
   overrideIsRedFlag?: boolean
   manualRedFlag?: boolean
+  fromSearchResult?: boolean
+}
+
+function resolveDramaRating(
+  drama: NewDramaItem | RankingDramaItem,
+  options: AddDownloadOptions = {}
+) {
+  const isRedFlagDrama =
+    options.manualRedFlag === true ||
+    (options.overrideIsRedFlag !== undefined
+      ? options.overrideIsRedFlag
+      : comparedNewDramas.value.has(drama.book_id))
+
+  if (isRedFlagDrama) {
+    return '红标'
+  }
+
+  if (options.fromSearchResult === true) {
+    return '绿标'
+  }
+
+  return '黄标'
 }
 
 // 处理新增待下载流程
@@ -2063,20 +2087,7 @@ async function handleAddDownload(
 
     // 剧集不存在或名称不完全匹配，继续创建新记录
     try {
-      let rating: string | undefined
-      const isRedFlagDrama =
-        options.manualRedFlag === true ||
-        (options.overrideIsRedFlag !== undefined
-          ? options.overrideIsRedFlag
-          : comparedNewDramas.value.has(drama.book_id))
-
-      if (isRedFlagDrama) {
-        rating = '红标'
-      } else if (searchKeyword.value.trim().length > 0) {
-        rating = '绿标'
-      } else {
-        rating = '黄标'
-      }
+      const rating = resolveDramaRating(drama, options)
 
       const createResult = await feishuApi.createDramaRecord(
         dramaName,
@@ -2086,9 +2097,6 @@ async function handleAddDownload(
         rating
       )
       console.log('新增记录成功:', createResult)
-
-      // 确定评级
-      const ratingValue = undefined
 
       // 获取可用账户
       const availableAccount = await feishuApi.getAvailableChannelAccount()
@@ -2128,7 +2136,7 @@ async function handleAddDownload(
           finalAccountId,
           feishuStatus,
           douyinMaterial || undefined, // 如果为空字符串则传 undefined
-          ratingValue
+          rating
         )
         console.log('剧集状态记录创建成功，已分配账户:', finalAccountId, '状态:', feishuStatus)
 
