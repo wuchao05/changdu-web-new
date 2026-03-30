@@ -886,7 +886,16 @@
                   </div>
                   <div class="min-w-0 flex-1">
                     <p class="panel-head__eyebrow text-emerald-600">巨量配置</p>
-                    <h3 class="panel-head__title">投放与搭建参数</h3>
+                    <div class="panel-head__title-row">
+                      <h3 class="panel-head__title">投放与搭建参数</h3>
+                      <n-radio-group
+                        v-model:value="channelForm.juliang.buildConfig.useNewMicroAppAssetFlow"
+                        size="small"
+                      >
+                        <n-radio-button :value="false">老版</n-radio-button>
+                        <n-radio-button :value="true">新版</n-radio-button>
+                      </n-radio-group>
+                    </div>
                     <!-- <p class="panel-head__desc"> -->
                     <!--   维护巨量 Cookie、小程序信息和创建推广链接所需的核心参数。 -->
                     <!-- </p> -->
@@ -928,20 +937,6 @@
                       v-model:value="channelForm.juliang.buildConfig.landingUrl"
                       placeholder="请输入 landingUrl"
                     />
-                  </n-form-item>
-                  <n-form-item label="小程序资产流程版本" class="md:col-span-2">
-                    <div class="flex items-center gap-3">
-                      <n-switch
-                        v-model:value="channelForm.juliang.buildConfig.useNewMicroAppAssetFlow"
-                      />
-                      <span class="text-sm text-slate-500">
-                        {{
-                          channelForm.juliang.buildConfig.useNewMicroAppAssetFlow
-                            ? '新版：直接查询/创建小程序资产'
-                            : '老版：先查询/创建小程序，再查询/创建小程序资产'
-                        }}
-                      </span>
-                    </div>
                   </n-form-item>
                   <n-form-item label="microAppName">
                     <n-input
@@ -1218,6 +1213,8 @@ import {
   NFormItem,
   NInput,
   NInputNumber,
+  NRadioButton,
+  NRadioGroup,
   NSelect,
   NSwitch,
   NTabs,
@@ -2517,6 +2514,14 @@ watch(
   font-size: 1.08rem;
   font-weight: 800;
   color: #0f172a;
+}
+
+.panel-head__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.16rem;
 }
 
 .panel-head__desc {
