@@ -87,56 +87,56 @@
       placement="right"
       :width="userDrawerWidth"
       class="admin-form-drawer"
-	    >
-	      <n-drawer-content closable body-content-style="padding: 0">
-	        <template #header>
-	          <div class="drawer-hero drawer-hero--user">
-	            <div class="drawer-hero__icon">
-	              <Icon icon="mdi:account-cog-outline" class="h-6 w-6" />
-	            </div>
-	            <div class="min-w-0 flex-1">
-	              <p class="drawer-hero__eyebrow">用户配置</p>
-	              <h2 class="drawer-hero__title">
-	                {{ editingUserId ? '编辑用户' : '新增用户' }}
-	              </h2>
-	              <p class="drawer-hero__desc">
-	                统一维护账号、渠道权限和运行时配置，页面上下文会保留在右侧抽屉中。
-	              </p>
-	              <div class="drawer-hero__meta">
-	                <span class="drawer-hero__pill">
-	                  <Icon icon="mdi:account-circle-outline" class="h-4 w-4" />
-	                  {{ userForm.nickname || userForm.account || '未命名用户' }}
-	                </span>
-	                <span class="drawer-hero__pill">
-	                  <Icon icon="mdi:source-branch" class="h-4 w-4" />
-	                  {{ selectedUserChannelForms.length }} 个渠道配置
-	                </span>
-	              </div>
-	            </div>
-	          </div>
-	        </template>
+    >
+      <n-drawer-content closable body-content-style="padding: 0">
+        <template #header>
+          <div class="drawer-hero drawer-hero--user">
+            <div class="drawer-hero__icon">
+              <Icon icon="mdi:account-cog-outline" class="h-6 w-6" />
+            </div>
+            <div class="min-w-0 flex-1">
+              <p class="drawer-hero__eyebrow">用户配置</p>
+              <h2 class="drawer-hero__title">
+                {{ editingUserId ? '编辑用户' : '新增用户' }}
+              </h2>
+              <!-- <p class="drawer-hero__desc"> -->
+              <!--   统一维护账号、渠道权限和运行时配置，页面上下文会保留在右侧抽屉中。 -->
+              <!-- </p> -->
+              <div class="drawer-hero__meta">
+                <span class="drawer-hero__pill">
+                  <Icon icon="mdi:account-circle-outline" class="h-4 w-4" />
+                  {{ userForm.nickname || userForm.account || '未命名用户' }}
+                </span>
+                <span class="drawer-hero__pill">
+                  <Icon icon="mdi:source-branch" class="h-4 w-4" />
+                  {{ selectedUserChannelForms.length }} 个渠道配置
+                </span>
+              </div>
+            </div>
+          </div>
+        </template>
 
-	        <div class="admin-form-drawer__body">
-	          <div class="admin-form-drawer__content space-y-5">
-	            <section class="drawer-panel drawer-panel--muted">
-	              <div class="panel-head">
-	                <div class="panel-head__icon panel-head__icon--blue">
-	                  <Icon icon="mdi:badge-account-horizontal-outline" class="h-5 w-5" />
-	                </div>
-	                <div class="min-w-0 flex-1">
-	                  <p class="panel-head__eyebrow text-blue-600">基础信息</p>
-	                  <h3 class="panel-head__title">账号与渠道归属</h3>
-	                  <p class="panel-head__desc">
-	                    先确认昵称、登录账号、身份类型和默认渠道，再继续配置分渠道能力。
-	                  </p>
-	                </div>
-	              </div>
-	              <n-form
-	                :model="userForm"
-	                label-placement="top"
-	                autocomplete="off"
-	                class="grid grid-cols-1 gap-3 md:grid-cols-2"
-	              >
+        <div class="admin-form-drawer__body">
+          <div class="admin-form-drawer__content space-y-5">
+            <section class="drawer-panel drawer-panel--muted">
+              <div class="panel-head">
+                <div class="panel-head__icon panel-head__icon--blue">
+                  <Icon icon="mdi:badge-account-horizontal-outline" class="h-5 w-5" />
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="panel-head__eyebrow text-blue-600">基础信息</p>
+                  <h3 class="panel-head__title">账号与渠道归属</h3>
+                  <!-- <p class="panel-head__desc"> -->
+                  <!--   先确认昵称、登录账号、身份类型和默认渠道，再继续配置分渠道能力。 -->
+                  <!-- </p> -->
+                </div>
+              </div>
+              <n-form
+                :model="userForm"
+                label-placement="top"
+                autocomplete="off"
+                class="grid grid-cols-1 gap-3 md:grid-cols-2"
+              >
                 <n-form-item label="昵称">
                   <n-input v-model:value="userForm.nickname" placeholder="请输入昵称" />
                 </n-form-item>
@@ -185,536 +185,550 @@
               </n-form>
             </section>
 
-	            <section class="drawer-panel drawer-panel--white">
-	              <div class="panel-head">
-	                <div class="panel-head__icon panel-head__icon--emerald">
-	                  <Icon icon="mdi:tune-variant" class="h-5 w-5" />
-	                </div>
-	                <div class="min-w-0 flex-1">
-	                  <p class="panel-head__eyebrow text-emerald-600">按渠道配置</p>
-	                  <h3 class="panel-head__title">运行时业务参数</h3>
-	                  <p class="panel-head__desc">
-	                  同一个用户可以在不同渠道下分别配置飞书表和抖音匹配素材，运行时会跟随当前渠道切换。
-	                  </p>
-	                </div>
-	              </div>
-	              <div v-if="selectedUserChannelForms.length > 0" class="space-y-4">
-	                <div
-	                  v-for="item in selectedUserChannelForms"
-	                  :key="item.channel.id"
-	                  class="channel-config-card"
-	                >
-	                  <div class="channel-config-card__head">
-	                    <div class="min-w-0 flex-1">
-	                      <div class="flex flex-wrap items-center gap-2">
-	                        <p class="channel-config-card__title">{{ item.channel.name }}</p>
-	                        <n-tag
-	                          v-if="userForm.defaultChannelId === item.channel.id"
-	                          size="small"
-	                          type="success"
-	                          bordered
-	                        >
-	                          默认渠道
-	                        </n-tag>
-	                      </div>
-	                      <p class="channel-config-card__desc">
-	                        当前渠道下的飞书表、素材预览、权限和抖音素材映射都会独立生效。
-	                      </p>
-	                    </div>
-	                    <div class="channel-config-card__meta">
-	                      <span class="channel-config-card__pill">
-	                        <Icon icon="mdi:television-play" class="h-4 w-4" />
-	                        {{ item.config.enabled ? '专属配置已启用' : '仅查看数据' }}
-	                      </span>
-	                      <span class="channel-config-card__pill">
-	                        <Icon icon="mdi:link-variant" class="h-4 w-4" />
-	                        {{ countConfiguredMaterialMatches(item.config.douyinMaterialMatches) }} 条有效规则
-	                      </span>
-	                    </div>
-	                  </div>
-	                  <div class="channel-config-card__switch">
-	                    <div>
-	                      <p class="channel-config-card__switch-title">启用专属配置</p>
-	                      <p class="channel-config-card__switch-desc">
-	                        打开后才会展示并启用当前渠道下的飞书、素材预览、权限和抖音匹配素材配置。
-	                      </p>
-	                    </div>
-	                    <n-switch v-model:value="item.config.enabled" />
-	                  </div>
-	                  <div v-if="item.config.enabled" class="mt-1">
-	                    <div class="config-subpanel">
-	                      <div class="config-subpanel__head">
-	                        <div>
-	                          <p class="text-sm font-semibold text-emerald-600">飞书表格 ID</p>
-	                          <p class="mt-1 text-sm text-slate-500">
-	                        为当前渠道配置剧集清单、剧集状态和账户表的 table_id。
-	                          </p>
-	                        </div>
-	                      </div>
-	                    <n-form
-	                      :model="item.config"
-	                      label-placement="top"
-	                      class="grid grid-cols-1 gap-3 md:grid-cols-2"
-                    >
-                      <n-form-item label="剧集清单 table_id">
-                        <n-input
-                          v-model:value="item.config.feishu.dramaListTableId"
-                          placeholder="请输入剧集清单 table_id"
-                        />
-                      </n-form-item>
-                      <n-form-item label="剧集状态 table_id">
-                        <n-input
-                          v-model:value="item.config.feishu.dramaStatusTableId"
-                          placeholder="请输入剧集状态 table_id"
-                        />
-                      </n-form-item>
-                      <n-form-item label="账户 table_id" class="md:col-span-2">
-                        <n-input
-                          v-model:value="item.config.feishu.accountTableId"
-                          placeholder="请输入账户 table_id"
-                        />
-                      </n-form-item>
-                    </n-form>
-                  </div>
-
-	                  <div class="config-subpanel config-subpanel--sky">
-	                    <div class="config-subpanel__head config-subpanel__head--split">
-	                      <div>
-	                        <p class="text-sm font-semibold text-sky-600">素材预览</p>
-	                        <p class="mt-1 text-sm text-slate-500">
-	                          控制当前用户在当前渠道下的素材预览开关、轮询间隔和搭建时间窗口。
-	                        </p>
-	                      </div>
-	                      <div class="toggle-hero">
-	                        <div>
-	                          <p class="toggle-hero__title">启用素材预览</p>
-	                          <p class="toggle-hero__desc">建议默认开启，便于预览管理器按渠道工作。</p>
-	                        </div>
-	                        <n-switch v-model:value="item.config.materialPreview.enabled" />
-	                      </div>
-	                    </div>
-	                    <n-form
-	                      :model="item.config.materialPreview"
-	                      label-placement="top"
-	                      class="grid grid-cols-1 gap-3 md:grid-cols-2"
-	                    >
-	                      <n-form-item label="轮询间隔（分钟）">
-	                        <n-input-number
-	                          v-model:value="item.config.materialPreview.intervalMinutes"
-                          :min="1"
-                          :precision="0"
-                          class="w-full"
-                        />
-                      </n-form-item>
-                      <n-form-item label="搭建时间窗口起始（分钟前）">
-                        <n-input-number
-                          v-model:value="item.config.materialPreview.buildTimeWindowStart"
-                          :min="1"
-                          :precision="0"
-                          class="w-full"
-                        />
-                      </n-form-item>
-                      <n-form-item label="搭建时间窗口结束（分钟前）">
-                        <n-input-number
-                          v-model:value="item.config.materialPreview.buildTimeWindowEnd"
-                          :min="0"
-                          :precision="0"
-                          class="w-full"
-                        />
-                      </n-form-item>
-                    </n-form>
-                  </div>
-
-	                  <div class="config-subpanel">
-                    <div class="mb-3">
-                      <p class="text-sm font-semibold text-amber-600">权限控制</p>
-                      <p class="mt-1 text-sm text-slate-500">
-                        按终端划分当前用户在当前渠道下可访问哪些工作台入口。
+            <section class="drawer-panel drawer-panel--white">
+              <div class="panel-head">
+                <div class="panel-head__icon panel-head__icon--emerald">
+                  <Icon icon="mdi:tune-variant" class="h-5 w-5" />
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="panel-head__eyebrow text-emerald-600">按渠道配置</p>
+                  <h3 class="panel-head__title">运行时业务参数</h3>
+                  <!-- <p class="panel-head__desc"> -->
+                  <!--   同一个用户可以在不同渠道下分别配置飞书表和抖音匹配素材，运行时会跟随当前渠道切换。 -->
+                  <!-- </p> -->
+                </div>
+              </div>
+              <div v-if="selectedUserChannelForms.length > 0" class="space-y-4">
+                <div
+                  v-for="item in selectedUserChannelForms"
+                  :key="item.channel.id"
+                  class="channel-config-card"
+                >
+                  <div class="channel-config-card__head">
+                    <div class="min-w-0 flex-1">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <p class="channel-config-card__title">{{ item.channel.name }}</p>
+                        <n-tag
+                          v-if="userForm.defaultChannelId === item.channel.id"
+                          size="small"
+                          type="success"
+                          bordered
+                        >
+                          默认渠道
+                        </n-tag>
+                      </div>
+                      <p class="channel-config-card__desc">
+                        当前渠道下的飞书表、素材预览、权限和抖音素材映射都会独立生效。
                       </p>
                     </div>
-                    <div class="permission-groups">
-                      <section class="permission-group permission-group--web">
-                        <div class="permission-group__header">
-                          <div>
-                            <p class="permission-group__eyebrow">Web 端</p>
-                            <h4 class="permission-group__title">网页工作台权限</h4>
-                            <p class="permission-group__desc">
-                              可控制当前用户在当前渠道下能否看到首页数据概览、数据报表，以及是否开放同步账户入口。
-                            </p>
-                          </div>
-                        </div>
-                        <div class="permission-grid">
-                          <div
-                            v-for="permission in webPermissionOptions"
-                            :key="permission.key"
-                            class="permission-card permission-card--web"
-                          >
-                            <div class="permission-card__body">
-                              <div class="min-w-0">
-                                <div class="permission-card__title-row">
-                                  <p class="permission-card__title">{{ permission.label }}</p>
-                                  <span class="permission-card__badge permission-card__badge--web">
-                                    Web 端
-                                  </span>
-                                </div>
-                                <p class="permission-card__meta">
-                                  {{ permission.description }}
-                                </p>
-                              </div>
-                              <n-switch
-                                :value="item.config.permissions.webMenus[permission.key]"
-                                @update:value="
-                                  value =>
-                                    updateWebPermission(
-                                      item.config.permissions.webMenus,
-                                      permission.key,
-                                      value
-                                    )
-                                "
-                              />
-                            </div>
-                          </div>
-                          <div class="permission-card permission-card--web">
-                            <div class="permission-card__body">
-                              <div class="min-w-0">
-                                <div class="permission-card__title-row">
-                                  <p class="permission-card__title">同步账户</p>
-                                  <span class="permission-card__badge permission-card__badge--web">
-                                    Web 端
-                                  </span>
-                                </div>
-                                <p class="permission-card__meta">
-                                  允许进入网页工作台的同步账户入口。
-                                </p>
-                              </div>
-                              <n-switch v-model:value="item.config.permissions.syncAccount" />
-                            </div>
-                          </div>
-                        </div>
-                      </section>
-                      <section class="permission-group permission-group--desktop">
-                        <div class="permission-group__header">
-                          <div>
-                            <p class="permission-group__eyebrow">客户端</p>
-                            <h4 class="permission-group__title">客户端入口权限</h4>
-                            <p class="permission-group__desc">
-                              建议优先开启前四项；“上传搭建”和“形天上传”根据实际投放流程按需开启。
-                            </p>
-                          </div>
-                        </div>
-                        <div class="permission-grid">
-                          <div
-                            v-for="permission in desktopPermissionOptions"
-                            :key="permission.key"
-                            class="permission-card"
-                            :class="{
-                              'permission-card--recommended': permission.recommended,
-                            }"
-                          >
-                            <div class="permission-card__body">
-                              <div class="min-w-0">
-                                <div class="permission-card__title-row">
-                                  <p class="permission-card__title">
-                                    {{ permission.label }}
-                                  </p>
-                                  <span
-                                    class="permission-card__badge"
-                                    :class="
-                                      permission.recommended
-                                        ? 'permission-card__badge--recommended'
-                                        : 'permission-card__badge--optional'
-                                    "
-                                  >
-                                    {{ permission.recommended ? '推荐开启' : '按需开启' }}
-                                  </span>
-                                </div>
-                                <p class="permission-card__meta">
-                                  {{ permission.description }}
-                                </p>
-                              </div>
-                              <n-switch
-                                :value="
-                                  item.config.permissions.desktopMenus[permission.key]
-                                "
-                                @update:value="
-                                  value =>
-                                    updateDesktopPermission(
-                                      item.config.permissions.desktopMenus,
-                                      permission.key,
-                                      value
-                                    )
-                                "
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </section>
+                    <div class="channel-config-card__meta">
+                      <span class="channel-config-card__pill">
+                        <Icon icon="mdi:television-play" class="h-4 w-4" />
+                        {{ item.config.enabled ? '专属配置已启用' : '仅查看数据' }}
+                      </span>
+                      <span class="channel-config-card__pill">
+                        <Icon icon="mdi:link-variant" class="h-4 w-4" />
+                        {{ countConfiguredMaterialMatches(item.config.douyinMaterialMatches) }}
+                        条有效规则
+                      </span>
                     </div>
                   </div>
-
-	                  <div class="config-subpanel">
-                    <div class="mb-3">
-                      <p class="text-sm font-semibold text-rose-600">订单按用户统计</p>
-                      <p class="mt-1 text-sm text-slate-500">
-                        开启后，首页订单统计会按“推广链来源包含用户名”自动生成专属 tab，
-                        并展示当前时间段该用户名对应的充值总金额。
+                  <div class="channel-config-card__switch">
+                    <div>
+                      <p class="channel-config-card__switch-title">启用专属配置</p>
+                      <p class="channel-config-card__switch-desc">
+                        打开后才会展示并启用当前渠道下的飞书、素材预览、权限和抖音匹配素材配置。
                       </p>
                     </div>
-                    <n-form
-                      :model="item.config.orderUserStats"
-                      label-placement="top"
-                      class="grid grid-cols-1 gap-3 md:grid-cols-2"
-                    >
-                      <n-form-item label="启用按用户统计订单">
-                        <div class="flex h-[42px] items-center">
-                          <n-switch v-model:value="item.config.orderUserStats.enabled" />
-                        </div>
-                      </n-form-item>
-                      <n-form-item label="排序方式">
-                        <n-select
-                          v-model:value="item.config.orderUserStats.sortMode"
-                          :options="orderUserSortModeOptions"
-                        />
-                      </n-form-item>
-                      <n-form-item label="用户名列表" class="md:col-span-2">
-                        <div class="w-full space-y-3">
-                          <div
-                            v-if="item.config.orderUserStats.usernames.length > 0"
-                            class="order-usernames-list"
-                          >
-                            <div
-                              v-for="(username, usernameIndex) in item.config.orderUserStats
-                                .usernames"
-                              :key="`${item.channel.id}-${usernameIndex}-${username}`"
-                              class="order-username-chip"
-                              :class="{
-                                'order-username-chip--dragging':
-                                  draggedOrderUsername.channelId === item.channel.id &&
-                                  draggedOrderUsername.index === usernameIndex,
-                              }"
-                              draggable="true"
-                              @dragstart="
-                                handleOrderUsernameDragStart(item.channel.id, usernameIndex)
-                              "
-                              @dragend="resetOrderUsernameDrag"
-                              @dragover.prevent
-                              @drop="handleOrderUsernameDrop(item.channel.id, usernameIndex)"
-                              @dblclick="
-                                startEditOrderUsername(item.channel.id, usernameIndex, username)
-                              "
-                            >
-                              <template
-                                v-if="
-                                  editingOrderUsername.channelId === item.channel.id &&
-                                  editingOrderUsername.index === usernameIndex
-                                "
-                              >
-                                <n-input
-                                  :value="editingOrderUsername.value"
-                                  size="small"
-                                  maxlength="20"
-                                  placeholder="请输入用户名"
-                                  @update:value="editingOrderUsername.value = $event"
-                                  @blur="submitEditOrderUsername(item.channel.id)"
-                                  @keyup.enter="submitEditOrderUsername(item.channel.id)"
-                                  @keyup.esc="cancelEditOrderUsername"
-                                />
-                              </template>
-                              <template v-else>
-                                <span class="order-username-chip__handle">⋮⋮</span>
-                                <span class="order-username-chip__text">{{ username }}</span>
-                                <button
-                                  type="button"
-                                  class="order-username-chip__remove"
-                                  @click.stop="removeOrderUsername(item.channel.id, usernameIndex)"
-                                >
-                                  删除
-                                </button>
-                              </template>
-                            </div>
-                          </div>
-                          <div v-else class="order-username-empty">
-                            暂无用户名，先在下方新增，再拖拽调整顺序。
-                          </div>
-                          <div class="flex flex-col gap-2 md:flex-row">
-                            <n-input
-                              :value="orderUsernameDrafts[item.channel.id] || ''"
-                              maxlength="20"
-                              placeholder="输入用户名后点击新增，例如：虎哥"
-                              @update:value="updateOrderUsernameDraft(item.channel.id, $event)"
-                              @keyup.enter="addOrderUsername(item.channel.id)"
-                            />
-                            <n-button
-                              tertiary
-                              type="primary"
-                              @click="addOrderUsername(item.channel.id)"
-                            >
-                              新增用户名
-                            </n-button>
-                          </div>
-                          <p class="text-xs text-slate-400">
-                            支持拖拽排序，双击用户名可直接修改。列表顺序会同步决定首页订单统计 tab
-                            的展示顺序。
+                    <n-switch v-model:value="item.config.enabled" />
+                  </div>
+                  <div v-if="item.config.enabled" class="mt-1">
+                    <div class="config-subpanel">
+                      <div class="config-subpanel__head">
+                        <div>
+                          <p class="text-sm font-semibold text-emerald-600">飞书表格 ID</p>
+                          <p class="mt-1 text-sm text-slate-500">
+                            为当前渠道配置剧集清单、剧集状态和账户表的 table_id。
                           </p>
                         </div>
-                      </n-form-item>
-                    </n-form>
+                      </div>
+                      <n-form
+                        :model="item.config"
+                        label-placement="top"
+                        class="grid grid-cols-1 gap-3 md:grid-cols-2"
+                      >
+                        <n-form-item label="剧集清单 table_id">
+                          <n-input
+                            v-model:value="item.config.feishu.dramaListTableId"
+                            placeholder="请输入剧集清单 table_id"
+                          />
+                        </n-form-item>
+                        <n-form-item label="剧集状态 table_id">
+                          <n-input
+                            v-model:value="item.config.feishu.dramaStatusTableId"
+                            placeholder="请输入剧集状态 table_id"
+                          />
+                        </n-form-item>
+                        <n-form-item label="账户 table_id" class="md:col-span-2">
+                          <n-input
+                            v-model:value="item.config.feishu.accountTableId"
+                            placeholder="请输入账户 table_id"
+                          />
+                        </n-form-item>
+                      </n-form>
+                    </div>
+
+                    <div class="config-subpanel config-subpanel--sky">
+                      <div class="config-subpanel__head config-subpanel__head--split">
+                        <div>
+                          <p class="text-sm font-semibold text-sky-600">素材预览</p>
+                          <p class="mt-1 text-sm text-slate-500">
+                            控制当前用户在当前渠道下的素材预览开关、轮询间隔和搭建时间窗口。
+                          </p>
+                        </div>
+                        <div class="toggle-hero">
+                          <div>
+                            <p class="toggle-hero__title">启用素材预览</p>
+                            <p class="toggle-hero__desc">
+                              建议默认开启，便于预览管理器按渠道工作。
+                            </p>
+                          </div>
+                          <n-switch v-model:value="item.config.materialPreview.enabled" />
+                        </div>
+                      </div>
+                      <n-form
+                        :model="item.config.materialPreview"
+                        label-placement="top"
+                        class="grid grid-cols-1 gap-3 md:grid-cols-2"
+                      >
+                        <n-form-item label="轮询间隔（分钟）">
+                          <n-input-number
+                            v-model:value="item.config.materialPreview.intervalMinutes"
+                            :min="1"
+                            :precision="0"
+                            class="w-full"
+                          />
+                        </n-form-item>
+                        <n-form-item label="搭建时间窗口起始（分钟前）">
+                          <n-input-number
+                            v-model:value="item.config.materialPreview.buildTimeWindowStart"
+                            :min="1"
+                            :precision="0"
+                            class="w-full"
+                          />
+                        </n-form-item>
+                        <n-form-item label="搭建时间窗口结束（分钟前）">
+                          <n-input-number
+                            v-model:value="item.config.materialPreview.buildTimeWindowEnd"
+                            :min="0"
+                            :precision="0"
+                            class="w-full"
+                          />
+                        </n-form-item>
+                      </n-form>
+                    </div>
+
+                    <div class="config-subpanel">
+                      <div class="mb-3">
+                        <p class="text-sm font-semibold text-amber-600">权限控制</p>
+                        <p class="mt-1 text-sm text-slate-500">
+                          按终端划分当前用户在当前渠道下可访问哪些工作台入口。
+                        </p>
+                      </div>
+                      <div class="permission-groups">
+                        <section class="permission-group permission-group--web">
+                          <div class="permission-group__header">
+                            <div>
+                              <p class="permission-group__eyebrow">Web 端</p>
+                              <h4 class="permission-group__title">网页工作台权限</h4>
+                              <p class="permission-group__desc">
+                                可控制当前用户在当前渠道下能否看到首页数据概览、数据报表，以及是否开放同步账户入口。
+                              </p>
+                            </div>
+                          </div>
+                          <div class="permission-grid">
+                            <div
+                              v-for="permission in webPermissionOptions"
+                              :key="permission.key"
+                              class="permission-card permission-card--web"
+                            >
+                              <div class="permission-card__body">
+                                <div class="min-w-0">
+                                  <div class="permission-card__title-row">
+                                    <p class="permission-card__title">{{ permission.label }}</p>
+                                    <span
+                                      class="permission-card__badge permission-card__badge--web"
+                                    >
+                                      Web 端
+                                    </span>
+                                  </div>
+                                  <p class="permission-card__meta">
+                                    {{ permission.description }}
+                                  </p>
+                                </div>
+                                <n-switch
+                                  :value="item.config.permissions.webMenus[permission.key]"
+                                  @update:value="
+                                    value =>
+                                      updateWebPermission(
+                                        item.config.permissions.webMenus,
+                                        permission.key,
+                                        value
+                                      )
+                                  "
+                                />
+                              </div>
+                            </div>
+                            <div class="permission-card permission-card--web">
+                              <div class="permission-card__body">
+                                <div class="min-w-0">
+                                  <div class="permission-card__title-row">
+                                    <p class="permission-card__title">同步账户</p>
+                                    <span
+                                      class="permission-card__badge permission-card__badge--web"
+                                    >
+                                      Web 端
+                                    </span>
+                                  </div>
+                                  <p class="permission-card__meta">
+                                    允许进入网页工作台的同步账户入口。
+                                  </p>
+                                </div>
+                                <n-switch v-model:value="item.config.permissions.syncAccount" />
+                              </div>
+                            </div>
+                          </div>
+                        </section>
+                        <section class="permission-group permission-group--desktop">
+                          <div class="permission-group__header">
+                            <div>
+                              <p class="permission-group__eyebrow">客户端</p>
+                              <h4 class="permission-group__title">客户端入口权限</h4>
+                              <p class="permission-group__desc">
+                                建议优先开启前四项；“上传搭建”和“形天上传”根据实际投放流程按需开启。
+                              </p>
+                            </div>
+                          </div>
+                          <div class="permission-grid">
+                            <div
+                              v-for="permission in desktopPermissionOptions"
+                              :key="permission.key"
+                              class="permission-card"
+                              :class="{
+                                'permission-card--recommended': permission.recommended,
+                              }"
+                            >
+                              <div class="permission-card__body">
+                                <div class="min-w-0">
+                                  <div class="permission-card__title-row">
+                                    <p class="permission-card__title">
+                                      {{ permission.label }}
+                                    </p>
+                                    <span
+                                      class="permission-card__badge"
+                                      :class="
+                                        permission.recommended
+                                          ? 'permission-card__badge--recommended'
+                                          : 'permission-card__badge--optional'
+                                      "
+                                    >
+                                      {{ permission.recommended ? '推荐开启' : '按需开启' }}
+                                    </span>
+                                  </div>
+                                  <p class="permission-card__meta">
+                                    {{ permission.description }}
+                                  </p>
+                                </div>
+                                <n-switch
+                                  :value="item.config.permissions.desktopMenus[permission.key]"
+                                  @update:value="
+                                    value =>
+                                      updateDesktopPermission(
+                                        item.config.permissions.desktopMenus,
+                                        permission.key,
+                                        value
+                                      )
+                                  "
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </section>
+                      </div>
+                    </div>
+
+                    <div class="config-subpanel">
+                      <div class="mb-3">
+                        <p class="text-sm font-semibold text-rose-600">订单按用户统计</p>
+                        <p class="mt-1 text-sm text-slate-500">
+                          开启后，首页订单统计会按“推广链来源包含用户名”自动生成专属 tab，
+                          并展示当前时间段该用户名对应的充值总金额。
+                        </p>
+                      </div>
+                      <n-form
+                        :model="item.config.orderUserStats"
+                        label-placement="top"
+                        class="grid grid-cols-1 gap-3 md:grid-cols-2"
+                      >
+                        <n-form-item label="启用按用户统计订单">
+                          <div class="flex h-[42px] items-center">
+                            <n-switch v-model:value="item.config.orderUserStats.enabled" />
+                          </div>
+                        </n-form-item>
+                        <n-form-item label="排序方式">
+                          <n-select
+                            v-model:value="item.config.orderUserStats.sortMode"
+                            :options="orderUserSortModeOptions"
+                          />
+                        </n-form-item>
+                        <n-form-item label="用户名列表" class="md:col-span-2">
+                          <div class="w-full space-y-3">
+                            <div
+                              v-if="item.config.orderUserStats.usernames.length > 0"
+                              class="order-usernames-list"
+                            >
+                              <div
+                                v-for="(username, usernameIndex) in item.config.orderUserStats
+                                  .usernames"
+                                :key="`${item.channel.id}-${usernameIndex}-${username}`"
+                                class="order-username-chip"
+                                :class="{
+                                  'order-username-chip--dragging':
+                                    draggedOrderUsername.channelId === item.channel.id &&
+                                    draggedOrderUsername.index === usernameIndex,
+                                }"
+                                draggable="true"
+                                @dragstart="
+                                  handleOrderUsernameDragStart(item.channel.id, usernameIndex)
+                                "
+                                @dragend="resetOrderUsernameDrag"
+                                @dragover.prevent
+                                @drop="handleOrderUsernameDrop(item.channel.id, usernameIndex)"
+                                @dblclick="
+                                  startEditOrderUsername(item.channel.id, usernameIndex, username)
+                                "
+                              >
+                                <template
+                                  v-if="
+                                    editingOrderUsername.channelId === item.channel.id &&
+                                    editingOrderUsername.index === usernameIndex
+                                  "
+                                >
+                                  <n-input
+                                    :value="editingOrderUsername.value"
+                                    size="small"
+                                    maxlength="20"
+                                    placeholder="请输入用户名"
+                                    @update:value="editingOrderUsername.value = $event"
+                                    @blur="submitEditOrderUsername(item.channel.id)"
+                                    @keyup.enter="submitEditOrderUsername(item.channel.id)"
+                                    @keyup.esc="cancelEditOrderUsername"
+                                  />
+                                </template>
+                                <template v-else>
+                                  <span class="order-username-chip__handle">⋮⋮</span>
+                                  <span class="order-username-chip__text">{{ username }}</span>
+                                  <button
+                                    type="button"
+                                    class="order-username-chip__remove"
+                                    @click.stop="
+                                      removeOrderUsername(item.channel.id, usernameIndex)
+                                    "
+                                  >
+                                    删除
+                                  </button>
+                                </template>
+                              </div>
+                            </div>
+                            <div v-else class="order-username-empty">
+                              暂无用户名，先在下方新增，再拖拽调整顺序。
+                            </div>
+                            <div class="flex flex-col gap-2 md:flex-row">
+                              <n-input
+                                :value="orderUsernameDrafts[item.channel.id] || ''"
+                                maxlength="20"
+                                placeholder="输入用户名后点击新增，例如：虎哥"
+                                @update:value="updateOrderUsernameDraft(item.channel.id, $event)"
+                                @keyup.enter="addOrderUsername(item.channel.id)"
+                              />
+                              <n-button
+                                tertiary
+                                type="primary"
+                                @click="addOrderUsername(item.channel.id)"
+                              >
+                                新增用户名
+                              </n-button>
+                            </div>
+                            <p class="text-xs text-slate-400">
+                              支持拖拽排序，双击用户名可直接修改。列表顺序会同步决定首页订单统计 tab
+                              的展示顺序。
+                            </p>
+                          </div>
+                        </n-form-item>
+                      </n-form>
+                    </div>
+
+                    <div class="config-subpanel config-subpanel--violet">
+                      <div class="config-subpanel__head config-subpanel__head--split">
+                        <div>
+                          <p class="text-sm font-semibold text-violet-600">抖音号匹配素材</p>
+                          <p class="mt-1 text-sm text-slate-500">
+                            为当前渠道单独维护抖音号、抖音号 ID 和素材范围。
+                          </p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                          <span class="channel-config-card__pill channel-config-card__pill--violet">
+                            {{ item.config.douyinMaterialMatches.length }} 条规则
+                          </span>
+                        </div>
+                      </div>
+
+                      <div class="material-match-toolbar">
+                        <n-input
+                          :value="materialMatchSearchDrafts[item.channel.id] || ''"
+                          clearable
+                          placeholder="搜索抖音号、ID 或素材范围..."
+                          class="material-match-search"
+                          @update:value="updateMaterialMatchSearchDraft(item.channel.id, $event)"
+                        >
+                          <template #prefix>
+                            <Icon icon="mdi:magnify" />
+                          </template>
+                        </n-input>
+                        <p class="material-match-toolbar__meta">
+                          {{
+                            getFilteredMaterialMatches(
+                              item.channel.id,
+                              item.config.douyinMaterialMatches
+                            ).length
+                          }}
+                          / {{ item.config.douyinMaterialMatches.length }} 条可见
+                        </p>
+                      </div>
+
+                      <div
+                        v-if="item.config.douyinMaterialMatches.length > 0"
+                        class="material-match-list"
+                      >
+                        <div
+                          v-for="match in getFilteredMaterialMatches(
+                            item.channel.id,
+                            item.config.douyinMaterialMatches
+                          )"
+                          :key="match.id"
+                          class="material-match-card"
+                        >
+                          <div class="material-match-card__summary">
+                            <div class="material-match-card__items">
+                              <div class="material-match-card__item">
+                                <Icon icon="mdi:account" class="h-4 w-4 text-slate-500" />
+                                <span class="material-match-card__name">
+                                  {{ match.douyinAccount || '未填写抖音号' }}
+                                </span>
+                              </div>
+                              <div
+                                class="material-match-card__item material-match-card__item--muted"
+                              >
+                                <span class="material-match-card__label">ID</span>
+                                <span>{{ match.douyinAccountId || '未填写' }}</span>
+                              </div>
+                              <Icon
+                                icon="mdi:arrow-right"
+                                class="hidden h-4 w-4 text-slate-300 md:block"
+                              />
+                              <div
+                                class="material-match-card__item material-match-card__item--range"
+                              >
+                                <Icon icon="mdi:video-outline" class="h-4 w-4 text-slate-500" />
+                                <span class="material-match-card__range">
+                                  {{ match.materialRange || '未填写素材范围' }}
+                                </span>
+                              </div>
+                            </div>
+                            <div class="material-match-card__actions">
+                              <n-button
+                                size="small"
+                                @click="
+                                  isEditingUserChannelMatch(item.channel.id, match.id)
+                                    ? cancelEditUserChannelMatch(item.channel.id)
+                                    : startEditUserChannelMatch(item.channel.id, match.id)
+                                "
+                              >
+                                {{
+                                  isEditingUserChannelMatch(item.channel.id, match.id)
+                                    ? '收起'
+                                    : '编辑'
+                                }}
+                              </n-button>
+                              <n-button
+                                size="small"
+                                type="error"
+                                tertiary
+                                @click="removeUserChannelMatch(item.channel.id, match.id)"
+                              >
+                                删除
+                              </n-button>
+                            </div>
+                          </div>
+                          <div
+                            v-if="isEditingUserChannelMatch(item.channel.id, match.id)"
+                            class="material-match-card__editor"
+                          >
+                            <n-input
+                              v-model:value="match.douyinAccount"
+                              placeholder="请输入抖音号名称"
+                            />
+                            <n-input
+                              v-model:value="match.douyinAccountId"
+                              placeholder="请输入抖音号 ID"
+                            />
+                            <n-input
+                              v-model:value="match.materialRange"
+                              placeholder="请输入素材范围，如 01-04"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div
+                        v-else
+                        class="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500"
+                      >
+                        当前渠道暂无匹配规则，点击下方“添加规则”开始配置。
+                      </div>
+
+                      <div
+                        v-if="
+                          item.config.douyinMaterialMatches.length > 0 &&
+                          getFilteredMaterialMatches(
+                            item.channel.id,
+                            item.config.douyinMaterialMatches
+                          ).length === 0
+                        "
+                        class="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-500"
+                      >
+                        没有匹配到搜索结果，换个关键词试试。
+                      </div>
+
+                      <div class="material-match-actions">
+                        <n-button
+                          type="primary"
+                          tertiary
+                          @click="addUserChannelMatch(item.channel.id)"
+                        >
+                          <template #icon>
+                            <Icon icon="mdi:plus" />
+                          </template>
+                          添加规则
+                        </n-button>
+                      </div>
+                    </div>
+                    <div v-if="!item.config.enabled" class="channel-config-card__empty">
+                      当前渠道只作为数据查看渠道使用，未启用专属配置，因此不会展示飞书、素材预览、权限和抖音匹配素材配置项。
+                    </div>
                   </div>
-
-	                  <div class="config-subpanel config-subpanel--violet">
-	                    <div class="config-subpanel__head config-subpanel__head--split">
-	                      <div>
-	                        <p class="text-sm font-semibold text-violet-600">抖音号匹配素材</p>
-	                        <p class="mt-1 text-sm text-slate-500">
-	                          为当前渠道单独维护抖音号、抖音号 ID 和素材范围。
-	                        </p>
-	                      </div>
-	                      <div class="flex flex-wrap items-center gap-2">
-	                        <span class="channel-config-card__pill channel-config-card__pill--violet">
-	                          {{ item.config.douyinMaterialMatches.length }} 条规则
-	                        </span>
-	                      </div>
-	                    </div>
-
-	                    <div class="material-match-toolbar">
-	                      <n-input
-	                        :value="materialMatchSearchDrafts[item.channel.id] || ''"
-	                        clearable
-	                        placeholder="搜索抖音号、ID 或素材范围..."
-	                        class="material-match-search"
-	                        @update:value="updateMaterialMatchSearchDraft(item.channel.id, $event)"
-	                      >
-	                        <template #prefix>
-	                          <Icon icon="mdi:magnify" />
-	                        </template>
-	                      </n-input>
-	                      <p class="material-match-toolbar__meta">
-	                        {{
-	                          getFilteredMaterialMatches(
-	                            item.channel.id,
-	                            item.config.douyinMaterialMatches
-	                          ).length
-	                        }}
-	                        / {{ item.config.douyinMaterialMatches.length }} 条可见
-	                      </p>
-	                    </div>
-
-	                    <div
-	                      v-if="item.config.douyinMaterialMatches.length > 0"
-	                      class="material-match-list"
-	                    >
-	                      <div
-	                        v-for="match in getFilteredMaterialMatches(
-	                          item.channel.id,
-	                          item.config.douyinMaterialMatches
-	                        )"
-	                        :key="match.id"
-	                        class="material-match-card"
-	                      >
-	                        <div class="material-match-card__summary">
-	                          <div class="material-match-card__items">
-	                            <div class="material-match-card__item">
-	                              <Icon icon="mdi:account" class="h-4 w-4 text-slate-500" />
-	                              <span class="material-match-card__name">
-	                                {{ match.douyinAccount || '未填写抖音号' }}
-	                              </span>
-	                            </div>
-	                            <div class="material-match-card__item material-match-card__item--muted">
-	                              <span class="material-match-card__label">ID</span>
-	                              <span>{{ match.douyinAccountId || '未填写' }}</span>
-	                            </div>
-	                            <Icon
-	                              icon="mdi:arrow-right"
-	                              class="hidden h-4 w-4 text-slate-300 md:block"
-	                            />
-	                            <div class="material-match-card__item material-match-card__item--range">
-	                              <Icon icon="mdi:video-outline" class="h-4 w-4 text-slate-500" />
-	                              <span class="material-match-card__range">
-	                                {{ match.materialRange || '未填写素材范围' }}
-	                              </span>
-	                            </div>
-	                          </div>
-	                          <div class="material-match-card__actions">
-	                            <n-button
-	                              size="small"
-	                              @click="
-	                                isEditingUserChannelMatch(item.channel.id, match.id)
-	                                  ? cancelEditUserChannelMatch(item.channel.id)
-	                                  : startEditUserChannelMatch(item.channel.id, match.id)
-	                              "
-	                            >
-	                              {{
-	                                isEditingUserChannelMatch(item.channel.id, match.id)
-	                                  ? '收起'
-	                                  : '编辑'
-	                              }}
-	                            </n-button>
-	                            <n-button
-	                              size="small"
-	                              type="error"
-	                              tertiary
-	                              @click="removeUserChannelMatch(item.channel.id, match.id)"
-	                            >
-	                              删除
-	                            </n-button>
-	                          </div>
-	                        </div>
-	                        <div
-	                          v-if="isEditingUserChannelMatch(item.channel.id, match.id)"
-	                          class="material-match-card__editor"
-	                        >
-	                          <n-input
-	                            v-model:value="match.douyinAccount"
-	                            placeholder="请输入抖音号名称"
-	                          />
-	                          <n-input
-	                            v-model:value="match.douyinAccountId"
-	                            placeholder="请输入抖音号 ID"
-	                          />
-	                          <n-input
-	                            v-model:value="match.materialRange"
-	                            placeholder="请输入素材范围，如 01-04"
-	                          />
-	                        </div>
-	                      </div>
-	                    </div>
-
-	                    <div
-	                      v-else
-	                      class="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500"
-	                    >
-	                      当前渠道暂无匹配规则，点击下方“添加规则”开始配置。
-	                    </div>
-
-	                    <div
-	                      v-if="
-	                        item.config.douyinMaterialMatches.length > 0 &&
-	                        getFilteredMaterialMatches(item.channel.id, item.config.douyinMaterialMatches)
-	                          .length === 0
-	                      "
-	                      class="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-500"
-	                    >
-	                      没有匹配到搜索结果，换个关键词试试。
-	                    </div>
-
-	                    <div class="material-match-actions">
-	                      <n-button type="primary" tertiary @click="addUserChannelMatch(item.channel.id)">
-	                        <template #icon>
-	                          <Icon icon="mdi:plus" />
-	                        </template>
-	                        添加规则
-	                      </n-button>
-	                    </div>
-	                  </div>
-	                  <div
-	                    v-if="!item.config.enabled"
-	                    class="channel-config-card__empty"
-	                  >
-	                    当前渠道只作为数据查看渠道使用，未启用专属配置，因此不会展示飞书、素材预览、权限和抖音匹配素材配置项。
-	                  </div>
-	                </div>
-	              </div>
-	              </div>
+                </div>
+              </div>
               <div
                 v-else
                 class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-8 text-center text-sm text-slate-500"
@@ -739,54 +753,52 @@
       placement="right"
       :width="channelDrawerWidth"
       class="admin-form-drawer"
-	    >
-	      <n-drawer-content closable body-content-style="padding: 0">
-	        <template #header>
-	          <div class="drawer-hero drawer-hero--channel">
-	            <div class="drawer-hero__icon">
-	              <Icon icon="mdi:lan-connect" class="h-6 w-6" />
-	            </div>
-	            <div class="min-w-0 flex-1">
-	              <p class="drawer-hero__eyebrow">渠道配置</p>
-	              <h2 class="drawer-hero__title">
-	                {{ editingChannelId ? '编辑渠道' : '新增渠道' }}
-	              </h2>
-	              <p class="drawer-hero__desc">
-	                集中维护渠道标识、巨量投放参数、常读访问参数和 ADX 凭证。
-	              </p>
-	              <div class="drawer-hero__meta">
-	                <span class="drawer-hero__pill">
-	                  <Icon icon="mdi:tag-outline" class="h-4 w-4" />
-	                  {{ channelForm.name || '未命名渠道' }}
-	                </span>
-	                <span class="drawer-hero__pill">
-	                  <Icon icon="mdi:rocket-launch-outline" class="h-4 w-4" />
-	                  {{ channelForm.juliang.buildConfig.microAppName || '待配置投放参数' }}
-	                </span>
-	              </div>
-	            </div>
-	          </div>
-	        </template>
+    >
+      <n-drawer-content closable body-content-style="padding: 0">
+        <template #header>
+          <div class="drawer-hero drawer-hero--channel">
+            <div class="drawer-hero__icon">
+              <Icon icon="mdi:lan-connect" class="h-6 w-6" />
+            </div>
+            <div class="min-w-0 flex-1">
+              <p class="drawer-hero__eyebrow">渠道配置</p>
+              <h2 class="drawer-hero__title">
+                {{ editingChannelId ? '编辑渠道' : '新增渠道' }}
+              </h2>
+              <!-- <p class="drawer-hero__desc"> -->
+              <!--   集中维护渠道标识、巨量投放参数、常读访问参数和 ADX 凭证。 -->
+              <!-- </p> -->
+              <div class="drawer-hero__meta">
+                <span class="drawer-hero__pill">
+                  <Icon icon="mdi:tag-outline" class="h-4 w-4" />
+                  {{ channelForm.name || '未命名渠道' }}
+                </span>
+                <span class="drawer-hero__pill">
+                  <Icon icon="mdi:rocket-launch-outline" class="h-4 w-4" />
+                  {{ channelForm.juliang.buildConfig.microAppName || '待配置投放参数' }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </template>
 
-	        <div class="admin-form-drawer__body">
-	          <div class="admin-form-drawer__content space-y-5">
-	            <section class="drawer-panel drawer-panel--muted">
-	              <div class="panel-head">
-	                <div class="panel-head__icon panel-head__icon--blue">
-	                  <Icon icon="mdi:label-outline" class="h-5 w-5" />
-	                </div>
-	                <div class="min-w-0 flex-1">
-	                  <p class="panel-head__eyebrow text-blue-600">基础信息</p>
-	                  <h3 class="panel-head__title">渠道标识</h3>
-	                  <p class="panel-head__desc">
-	                    用于管理员后台展示、用户关联和运行时配置映射。
-	                  </p>
-	                </div>
-	              </div>
-	              <n-form :model="channelForm" label-placement="top">
-	                <n-form-item label="渠道名称" class="mb-0">
-	                  <n-input v-model:value="channelForm.name" placeholder="请输入渠道名称" />
-	                </n-form-item>
+        <div class="admin-form-drawer__body">
+          <div class="admin-form-drawer__content space-y-5">
+            <section class="drawer-panel drawer-panel--muted">
+              <div class="panel-head">
+                <div class="panel-head__icon panel-head__icon--blue">
+                  <Icon icon="mdi:label-outline" class="h-5 w-5" />
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="panel-head__eyebrow text-blue-600">基础信息</p>
+                  <h3 class="panel-head__title">渠道标识</h3>
+                  <!-- <p class="panel-head__desc">用于管理员后台展示、用户关联和运行时配置映射。</p> -->
+                </div>
+              </div>
+              <n-form :model="channelForm" label-placement="top">
+                <n-form-item label="渠道名称" class="mb-0">
+                  <n-input v-model:value="channelForm.name" placeholder="请输入渠道名称" />
+                </n-form-item>
               </n-form>
 
               <div class="advance-config-block">
@@ -805,12 +817,18 @@
                     <p class="advance-config-item__title">10点及之后</p>
                     <p class="advance-config-item__desc">适用于上架时间在 10:00 及之后的剧</p>
                     <n-input-number
-                      :value="getAdvanceHoursInputValue(channelForm.juliang.buildConfig.advanceHoursAfterTen)"
+                      :value="
+                        getAdvanceHoursInputValue(
+                          channelForm.juliang.buildConfig.advanceHoursAfterTen
+                        )
+                      "
                       :min="0"
                       :precision="0"
                       class="w-full"
                       placeholder="默认 0"
-                      @update:value="value => handleAdvanceHoursChange('advanceHoursAfterTen', value)"
+                      @update:value="
+                        value => handleAdvanceHoursChange('advanceHoursAfterTen', value)
+                      "
                     >
                       <template #suffix>小时</template>
                     </n-input-number>
@@ -820,12 +838,18 @@
                     <p class="advance-config-item__title">10点之前</p>
                     <p class="advance-config-item__desc">适用于上架时间在 10:00 之前的剧</p>
                     <n-input-number
-                      :value="getAdvanceHoursInputValue(channelForm.juliang.buildConfig.advanceHoursBeforeTen)"
+                      :value="
+                        getAdvanceHoursInputValue(
+                          channelForm.juliang.buildConfig.advanceHoursBeforeTen
+                        )
+                      "
                       :min="0"
                       :precision="0"
                       class="w-full"
                       placeholder="默认 0"
-                      @update:value="value => handleAdvanceHoursChange('advanceHoursBeforeTen', value)"
+                      @update:value="
+                        value => handleAdvanceHoursChange('advanceHoursBeforeTen', value)
+                      "
                     >
                       <template #suffix>小时</template>
                     </n-input-number>
@@ -834,24 +858,24 @@
               </div>
             </section>
 
-	            <div class="grid grid-cols-1 gap-5 xl:grid-cols-2">
-	              <section class="drawer-panel drawer-panel--white">
-	                <div class="panel-head">
-	                  <div class="panel-head__icon panel-head__icon--emerald">
-	                    <Icon icon="mdi:bullhorn-outline" class="h-5 w-5" />
-	                  </div>
-	                  <div class="min-w-0 flex-1">
-	                    <p class="panel-head__eyebrow text-emerald-600">巨量配置</p>
-	                    <h3 class="panel-head__title">投放与搭建参数</h3>
-	                    <p class="panel-head__desc">
-	                      维护巨量 Cookie、小程序信息和创建推广链接所需的核心参数。
-	                    </p>
-	                  </div>
-	                </div>
-	                <n-form
-	                  :model="channelForm"
-	                  label-placement="top"
-	                  class="grid grid-cols-1 gap-3 md:grid-cols-2"
+            <div class="grid grid-cols-1 gap-5 xl:grid-cols-2">
+              <section class="drawer-panel drawer-panel--white">
+                <div class="panel-head">
+                  <div class="panel-head__icon panel-head__icon--emerald">
+                    <Icon icon="mdi:bullhorn-outline" class="h-5 w-5" />
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <p class="panel-head__eyebrow text-emerald-600">巨量配置</p>
+                    <h3 class="panel-head__title">投放与搭建参数</h3>
+                    <!-- <p class="panel-head__desc"> -->
+                    <!--   维护巨量 Cookie、小程序信息和创建推广链接所需的核心参数。 -->
+                    <!-- </p> -->
+                  </div>
+                </div>
+                <n-form
+                  :model="channelForm"
+                  label-placement="top"
+                  class="grid grid-cols-1 gap-3 md:grid-cols-2"
                 >
                   <n-form-item label="巨量 Cookie" class="md:col-span-2">
                     <n-input
@@ -918,22 +942,22 @@
                 </n-form>
               </section>
 
-	              <section class="drawer-panel drawer-panel--white">
-	                <div class="panel-head">
-	                  <div class="panel-head__icon panel-head__icon--violet">
-	                    <Icon icon="mdi:key-chain-variant" class="h-5 w-5" />
-	                  </div>
-	                  <div class="min-w-0 flex-1">
-	                    <p class="panel-head__eyebrow text-violet-600">常读配置</p>
-	                    <h3 class="panel-head__title">渠道访问参数</h3>
-	                    <p class="panel-head__desc">
-	                      统一维护 Secret Key、常读 Cookie、账号标识和 ADX 访问凭证。
-	                    </p>
-	                  </div>
-	                </div>
-	                <n-form
-	                  :model="channelForm"
-	                  label-placement="top"
+              <section class="drawer-panel drawer-panel--white">
+                <div class="panel-head">
+                  <div class="panel-head__icon panel-head__icon--violet">
+                    <Icon icon="mdi:key-chain-variant" class="h-5 w-5" />
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <p class="panel-head__eyebrow text-violet-600">常读配置</p>
+                    <h3 class="panel-head__title">渠道访问参数</h3>
+                    <!-- <p class="panel-head__desc"> -->
+                    <!--   统一维护 Secret Key、常读 Cookie、账号标识和 ADX 访问凭证。 -->
+                    <!-- </p> -->
+                  </div>
+                </div>
+                <n-form
+                  :model="channelForm"
+                  label-placement="top"
                   class="grid grid-cols-1 gap-3 md:grid-cols-2"
                 >
                   <n-form-item label="Secret Key">
@@ -1131,7 +1155,6 @@
         </template>
       </n-drawer-content>
     </n-drawer>
-
   </div>
 </template>
 
@@ -1524,7 +1547,9 @@ const downloadCenterColumns: DataTableColumns<adminApi.DownloadCenterConfig> = [
     render: row =>
       h('div', { class: 'flex items-center gap-2' }, [
         h('span', row.name || '-'),
-        row.isDefault ? h(NTag, { size: 'small', type: 'success', bordered: false }, () => '默认') : null,
+        row.isDefault
+          ? h(NTag, { size: 'small', type: 'success', bordered: false }, () => '默认')
+          : null,
       ]),
   },
   { title: '所属人', key: 'owner' },
@@ -1812,8 +1837,9 @@ function updateMaterialMatchSearchDraft(channelId: string, value: string) {
 function countConfiguredMaterialMatches(
   matches: adminApi.UserChannelBindingConfig['douyinMaterialMatches']
 ) {
-  return matches.filter(match => match.douyinAccount && match.douyinAccountId && match.materialRange)
-    .length
+  return matches.filter(
+    match => match.douyinAccount && match.douyinAccountId && match.materialRange
+  ).length
 }
 
 function getFilteredMaterialMatches(
@@ -2854,8 +2880,9 @@ watch(
 }
 
 .material-match-card__range {
-  font-family: ui-monospace, SFMono-Regular, SFMono-Regular, Menlo, Monaco, Consolas,
-    'Liberation Mono', 'Courier New', monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
   font-size: 0.92rem;
   font-weight: 700;
 }

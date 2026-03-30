@@ -29,12 +29,12 @@
       "permissions": {
         "syncAccount": true,
         "desktopMenus": {
-          "download": false,
-          "materialClip": false,
+          "download": true,
+          "materialClip": true,
           "upload": false,
-          "juliangUpload": false,
+          "juliangUpload": true,
           "uploadBuild": false,
-          "juliangBuild": false
+          "juliangBuild": true
         }
       },
       "orderUserStats": {
@@ -215,5 +215,5 @@
     "buildTimeWindowEnd": 20
   },
   "createdAt": "2026-03-26T13:32:12.621Z",
-  "updatedAt": "2026-03-29T13:48:49.174Z"
+  "updatedAt": "2026-03-30T05:45:11.321Z"
 }

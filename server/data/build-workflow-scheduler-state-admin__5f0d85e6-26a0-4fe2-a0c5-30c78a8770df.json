@@ -42,15 +42,144 @@
       "dramaStatusTableId": "tblDOyi2Lzs80sv0"
     }
   },
-  "nextRunTime": "2026-03-29T11:31:04.596Z",
-  "lastRunTime": "2026-03-29T11:11:04.596Z",
+  "nextRunTime": "2026-03-30T06:09:36.427Z",
+  "lastRunTime": "2026-03-30T05:49:36.427Z",
   "stats": {
-    "totalBuilt": 16,
-    "successCount": 16,
-    "failCount": 0
+    "totalBuilt": 31,
+    "successCount": 31,
+    "failCount": 1
   },
   "currentTask": null,
   "taskHistory": [
+    {
+      "dramaName": "山野潜龙带飞全村",
+      "status": "success",
+      "rating": "绿标",
+      "date": 1774800000000,
+      "publishTime": 1774576800000,
+      "completedAt": "2026-03-30T05:50:48.269Z"
+    },
+    {
+      "dramaName": "妈，打扰您安息了",
+      "status": "success",
+      "rating": "绿标",
+      "date": 1774800000000,
+      "publishTime": 1774742400000,
+      "completedAt": "2026-03-30T05:29:36.407Z"
+    },
+    {
+      "dramaName": "二十载语，换一世新生",
+      "status": "success",
+      "rating": null,
+      "date": 1774800000000,
+      "publishTime": 1774836000000,
+      "completedAt": "2026-03-30T03:19:13.083Z"
+    },
+    {
+      "dramaName": "卿卿佳人",
+      "status": "success",
+      "rating": null,
+      "date": 1774800000000,
+      "publishTime": 1774839600000,
+      "completedAt": "2026-03-30T02:57:58.405Z"
+    },
+    {
+      "dramaName": "偷我记忆上清北，我重生反击",
+      "status": "success",
+      "rating": "黄标",
+      "date": 1774800000000,
+      "publishTime": 1774832400000,
+      "completedAt": "2026-03-30T00:06:56.772Z"
+    },
+    {
+      "dramaName": "下山讨债第一天，先助人为乐",
+      "status": "success",
+      "rating": "黄标",
+      "date": 1774800000000,
+      "publishTime": 1774857600000,
+      "completedAt": "2026-03-29T22:05:34.708Z"
+    },
+    {
+      "dramaName": "看透世间假意后，我择一人终老",
+      "status": "success",
+      "rating": "黄标",
+      "date": 1774800000000,
+      "publishTime": 1774854000000,
+      "completedAt": "2026-03-29T21:04:23.416Z"
+    },
+    {
+      "dramaName": "不爱之后，我与他死对头高调相恋",
+      "status": "success",
+      "rating": "黄标",
+      "date": 1774800000000,
+      "publishTime": 1774850400000,
+      "completedAt": "2026-03-29T20:04:07.673Z"
+    },
+    {
+      "dramaName": "末日灾变之七日求生",
+      "status": "success",
+      "rating": "黄标",
+      "date": 1774800000000,
+      "publishTime": 1774846800000,
+      "completedAt": "2026-03-29T19:02:55.073Z"
+    },
+    {
+      "dramaName": "吻过玫瑰的疤痕",
+      "status": "success",
+      "rating": "黄标",
+      "date": 1774800000000,
+      "publishTime": 1774800300000,
+      "completedAt": "2026-03-29T18:41:45.646Z"
+    },
+    {
+      "dramaName": "天生反派：开局拿下校花",
+      "status": "failed",
+      "rating": "黄标",
+      "date": 1774800000000,
+      "publishTime": 1774800300000,
+      "error": "所有抖音号批次均失败: 小红看剧: [创建项目] 与项目ID=7622749055852625983的名称重复; 斯娜看剧: [创建项目] 与项目ID=7622749047338598441的名称重复; 葸辉好剧: [创建项目] 与项目ID=7622749112795693094的名称重复; 看家本领: [创建项目] 与项目ID=7622749113444565042的名称重复; 清妍短剧: [创建项目] 与项目ID=7622749048286134313的名称重复; 哈哈看剧: [创建项目] 与项目ID=7622749119275630655的名称重复; 葸辉爆剧: [创建项目] 与项目ID=7622749121778450442的名称重复; 萍通剧坊: [创建项目] 与项目ID=7622749154414149686的名称重复; 奈煊剧场: [创建项目] 与项目ID=7622749187251142675的名称重复; 婉纨好剧: [创建项目] 与项目ID=7622749170697306121的名称重复; 排桐剧场: [创建项目] 与项目ID=7622749216813793290的名称重复; 小红好剧: [创建项目] 与项目ID=7622749236677017606的名称重复; 淼淼看剧: [创建项目] 与项目ID=7622749250023997482的名称重复; 宇宙好剧: [创建项目] 与项目ID=7622749276707225627的名称重复; 微微看剧: [创建项目] 与项目ID=7622749247927222278的名称重复; 明宇好剧: [创建项目] 与项目ID=7622749302976725030的名称重复",
+      "completedAt": "2026-03-29T18:40:42.025Z"
+    },
+    {
+      "dramaName": "别惹，她有神明降落",
+      "status": "success",
+      "rating": "黄标",
+      "date": 1774800000000,
+      "publishTime": 1774800600000,
+      "completedAt": "2026-03-29T18:20:19.288Z"
+    },
+    {
+      "dramaName": "恶毒女配改命手册",
+      "status": "success",
+      "rating": "黄标",
+      "date": 1774800000000,
+      "publishTime": 1774836000000,
+      "completedAt": "2026-03-29T17:59:12.616Z"
+    },
+    {
+      "dramaName": "师姐别这样，我的麒麟臂压不住了",
+      "status": "success",
+      "rating": "黄标",
+      "date": 1774800000000,
+      "publishTime": 1774836000000,
+      "completedAt": "2026-03-29T17:38:03.690Z"
+    },
+    {
+      "dramaName": "河湾藏旧事，捞绳记浮生",
+      "status": "success",
+      "rating": "黄标",
+      "date": 1774800000000,
+      "publishTime": 1774836000000,
+      "completedAt": "2026-03-29T16:49:57.911Z"
+    },
+    {
+      "dramaName": "邪物典当铺：只收凶物诡宝",
+      "status": "success",
+      "rating": "黄标",
+      "date": 1774800000000,
+      "publishTime": 1774836000000,
+      "completedAt": "2026-03-29T16:06:45.182Z"
+    },
     {
       "dramaName": "拥有透视眼，破烂王变鉴宝王",
       "status": "success",
@@ -82,102 +211,6 @@
       "date": 1774713600000,
       "publishTime": 1774749600000,
       "completedAt": "2026-03-29T03:07:48.093Z"
-    },
-    {
-      "dramaName": "花钱就返利，我靠消费霸榜魔都",
-      "status": "success",
-      "rating": "黄标",
-      "date": 1774713600000,
-      "publishTime": 1774749600000,
-      "completedAt": "2026-03-29T02:46:34.268Z"
-    },
-    {
-      "dramaName": "替身皇子，满朝文武求我登基称帝",
-      "status": "success",
-      "rating": "黄标",
-      "date": 1774713600000,
-      "publishTime": 1774749600000,
-      "completedAt": "2026-03-29T02:25:14.759Z"
-    },
-    {
-      "dramaName": "我在都市召唤神明",
-      "status": "success",
-      "rating": "黄标",
-      "date": 1774713600000,
-      "publishTime": 1774749600000,
-      "completedAt": "2026-03-29T02:03:53.923Z"
-    },
-    {
-      "dramaName": "病娇弟弟赖上我",
-      "status": "success",
-      "rating": "黄标",
-      "date": 1774713600000,
-      "publishTime": 1774749600000,
-      "completedAt": "2026-03-29T01:03:48.543Z"
-    },
-    {
-      "dramaName": "贵母当家",
-      "status": "success",
-      "rating": "黄标",
-      "date": 1774713600000,
-      "publishTime": 1774771200000,
-      "completedAt": "2026-03-29T00:02:37.292Z"
-    },
-    {
-      "dramaName": "焚心为局",
-      "status": "success",
-      "rating": "黄标",
-      "date": 1774713600000,
-      "publishTime": 1774749600000,
-      "completedAt": "2026-03-28T22:33:09.436Z"
-    },
-    {
-      "dramaName": "被当成汉子茶骂了，但我是真汉子",
-      "status": "success",
-      "rating": "黄标",
-      "date": 1774713600000,
-      "publishTime": 1774749600000,
-      "completedAt": "2026-03-28T20:59:49.117Z"
-    },
-    {
-      "dramaName": "破案风云：我的前妻是首席调查官",
-      "status": "success",
-      "rating": "黄标",
-      "date": 1774713600000,
-      "publishTime": 1774749600000,
-      "completedAt": "2026-03-28T19:42:19.925Z"
-    },
-    {
-      "dramaName": "装纨绔十年，一朝君临天下",
-      "status": "success",
-      "rating": "红标",
-      "date": 1774713600000,
-      "publishTime": 1773799200000,
-      "completedAt": "2026-03-28T18:13:12.937Z"
-    },
-    {
-      "dramaName": "野性难驯第二季",
-      "status": "success",
-      "rating": "红标",
-      "date": 1774713600000,
-      "publishTime": 1774713900000,
-      "completedAt": "2026-03-28T17:04:10.114Z"
-    },
-    {
-      "dramaName": "报告女总裁，太子赘婿又掉马了",
-      "status": "success",
-      "rating": "黄标",
-      "date": 1774713600000,
-      "publishTime": 1774749600000,
-      "completedAt": "2026-03-28T16:43:54.500Z"
-    },
-    {
-      "dramaName": "开红包盲盒开成首富少奶奶",
-      "status": "success",
-      "rating": "黄标",
-      "date": 1774713600000,
-      "publishTime": 1774749600000,
-      "completedAt": "2026-03-28T16:22:43.345Z"
     }
   ]
 }
