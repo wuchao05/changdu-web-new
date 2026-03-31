@@ -4,7 +4,7 @@
   "account": "admin",
   "password": "qwer1234",
   "authTokens": [
-    "8b347a93ab901e5d69c3180a4af3327ea41a6c8de984f64d"
+    "105851f2677b59575690c66f004b7e076522f0cbad629e5f"
   ],
   "userType": "admin",
   "channelIds": [
@@ -28,6 +28,10 @@
       },
       "permissions": {
         "syncAccount": true,
+        "webMenus": {
+          "overview": true,
+          "report": true
+        },
         "desktopMenus": {
           "download": true,
           "materialClip": true,
@@ -47,6 +51,9 @@
           "岁月",
           "昱飞"
         ]
+      },
+      "independentOrderStats": {
+        "enabled": false
       },
       "douyinMaterialMatches": [
         {
@@ -186,6 +193,10 @@
       },
       "permissions": {
         "syncAccount": false,
+        "webMenus": {
+          "overview": true,
+          "report": true
+        },
         "desktopMenus": {
           "download": false,
           "materialClip": false,
@@ -199,6 +210,9 @@
         "enabled": false,
         "sortMode": "manual",
         "usernames": []
+      },
+      "independentOrderStats": {
+        "enabled": false
       },
       "douyinMaterialMatches": []
     }
@@ -215,5 +229,5 @@
     "buildTimeWindowEnd": 20
   },
   "createdAt": "2026-03-26T13:32:12.621Z",
-  "updatedAt": "2026-03-30T05:45:11.321Z"
+  "updatedAt": "2026-03-30T15:58:53.260Z"
 }

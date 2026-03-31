@@ -42,15 +42,87 @@
       "dramaStatusTableId": "tblDOyi2Lzs80sv0"
     }
   },
-  "nextRunTime": "2026-03-30T06:09:36.427Z",
-  "lastRunTime": "2026-03-30T05:49:36.427Z",
+  "nextRunTime": "2026-03-31T03:43:42.305Z",
+  "lastRunTime": "2026-03-31T03:23:42.305Z",
   "stats": {
-    "totalBuilt": 31,
-    "successCount": 31,
+    "totalBuilt": 40,
+    "successCount": 40,
     "failCount": 1
   },
   "currentTask": null,
   "taskHistory": [
+    {
+      "dramaName": "三根刺的恩情",
+      "status": "success",
+      "rating": "黄标",
+      "date": 1774886400000,
+      "publishTime": 1774922400000,
+      "completedAt": "2026-03-31T03:25:01.194Z"
+    },
+    {
+      "dramaName": "重生后我不替闺蜜接生，她急了",
+      "status": "success",
+      "rating": "黄标",
+      "date": 1774886400000,
+      "publishTime": 1774922400000,
+      "completedAt": "2026-03-31T03:03:42.235Z"
+    },
+    {
+      "dramaName": "开局暴打村霸，狂飙1988",
+      "status": "success",
+      "rating": "黄标",
+      "date": 1774886400000,
+      "publishTime": 1774922400000,
+      "completedAt": "2026-03-31T02:42:31.553Z"
+    },
+    {
+      "dramaName": "母女双穿，豪门婆媳一心想苟富贵",
+      "status": "success",
+      "rating": "黄标",
+      "date": 1774886400000,
+      "publishTime": 1774922400000,
+      "completedAt": "2026-03-31T02:21:17.717Z"
+    },
+    {
+      "dramaName": "越界女兄弟",
+      "status": "success",
+      "rating": "绿标",
+      "date": 1774886400000,
+      "publishTime": 1774918800000,
+      "completedAt": "2026-03-31T01:06:28.216Z"
+    },
+    {
+      "dramaName": "咬一口软月光",
+      "status": "success",
+      "rating": "黄标",
+      "date": 1774886400000,
+      "publishTime": 1774887000000,
+      "completedAt": "2026-03-30T17:04:48.304Z"
+    },
+    {
+      "dramaName": "搬砖的我，闪婚女神后白月光悔哭了",
+      "status": "success",
+      "rating": "绿标",
+      "date": 1774886400000,
+      "publishTime": 1774888200000,
+      "completedAt": "2026-03-30T16:43:41.469Z"
+    },
+    {
+      "dramaName": "三餐和良辰",
+      "status": "success",
+      "rating": "绿标",
+      "date": 1774886400000,
+      "publishTime": 1774887360000,
+      "completedAt": "2026-03-30T16:22:35.947Z"
+    },
+    {
+      "dramaName": "等你开口说爱我",
+      "status": "success",
+      "rating": null,
+      "date": 1774800000000,
+      "publishTime": 1774836000000,
+      "completedAt": "2026-03-30T08:04:32.797Z"
+    },
     {
       "dramaName": "山野潜龙带飞全村",
       "status": "success",
@@ -139,78 +211,6 @@
       "publishTime": 1774800300000,
       "error": "所有抖音号批次均失败: 小红看剧: [创建项目] 与项目ID=7622749055852625983的名称重复; 斯娜看剧: [创建项目] 与项目ID=7622749047338598441的名称重复; 葸辉好剧: [创建项目] 与项目ID=7622749112795693094的名称重复; 看家本领: [创建项目] 与项目ID=7622749113444565042的名称重复; 清妍短剧: [创建项目] 与项目ID=7622749048286134313的名称重复; 哈哈看剧: [创建项目] 与项目ID=7622749119275630655的名称重复; 葸辉爆剧: [创建项目] 与项目ID=7622749121778450442的名称重复; 萍通剧坊: [创建项目] 与项目ID=7622749154414149686的名称重复; 奈煊剧场: [创建项目] 与项目ID=7622749187251142675的名称重复; 婉纨好剧: [创建项目] 与项目ID=7622749170697306121的名称重复; 排桐剧场: [创建项目] 与项目ID=7622749216813793290的名称重复; 小红好剧: [创建项目] 与项目ID=7622749236677017606的名称重复; 淼淼看剧: [创建项目] 与项目ID=7622749250023997482的名称重复; 宇宙好剧: [创建项目] 与项目ID=7622749276707225627的名称重复; 微微看剧: [创建项目] 与项目ID=7622749247927222278的名称重复; 明宇好剧: [创建项目] 与项目ID=7622749302976725030的名称重复",
       "completedAt": "2026-03-29T18:40:42.025Z"
-    },
-    {
-      "dramaName": "别惹，她有神明降落",
-      "status": "success",
-      "rating": "黄标",
-      "date": 1774800000000,
-      "publishTime": 1774800600000,
-      "completedAt": "2026-03-29T18:20:19.288Z"
-    },
-    {
-      "dramaName": "恶毒女配改命手册",
-      "status": "success",
-      "rating": "黄标",
-      "date": 1774800000000,
-      "publishTime": 1774836000000,
-      "completedAt": "2026-03-29T17:59:12.616Z"
-    },
-    {
-      "dramaName": "师姐别这样，我的麒麟臂压不住了",
-      "status": "success",
-      "rating": "黄标",
-      "date": 1774800000000,
-      "publishTime": 1774836000000,
-      "completedAt": "2026-03-29T17:38:03.690Z"
-    },
-    {
-      "dramaName": "河湾藏旧事，捞绳记浮生",
-      "status": "success",
-      "rating": "黄标",
-      "date": 1774800000000,
-      "publishTime": 1774836000000,
-      "completedAt": "2026-03-29T16:49:57.911Z"
-    },
-    {
-      "dramaName": "邪物典当铺：只收凶物诡宝",
-      "status": "success",
-      "rating": "黄标",
-      "date": 1774800000000,
-      "publishTime": 1774836000000,
-      "completedAt": "2026-03-29T16:06:45.182Z"
-    },
-    {
-      "dramaName": "拥有透视眼，破烂王变鉴宝王",
-      "status": "success",
-      "rating": "黄标",
-      "date": 1774713600000,
-      "publishTime": 1774713600000,
-      "completedAt": "2026-03-29T04:11:39.662Z"
-    },
-    {
-      "dramaName": "逃离火坑",
-      "status": "success",
-      "rating": "黄标",
-      "date": 1774713600000,
-      "publishTime": 1774746000000,
-      "completedAt": "2026-03-29T03:50:24.813Z"
-    },
-    {
-      "dramaName": "今生也想遇见你",
-      "status": "success",
-      "rating": "黄标",
-      "date": 1774713600000,
-      "publishTime": 1774749600000,
-      "completedAt": "2026-03-29T03:29:05.251Z"
-    },
-    {
-      "dramaName": "网恋到恐怖BOSS逃跑被亲哭",
-      "status": "success",
-      "rating": "黄标",
-      "date": 1774713600000,
-      "publishTime": 1774749600000,
-      "completedAt": "2026-03-29T03:07:48.093Z"
     }
   ]
 }
