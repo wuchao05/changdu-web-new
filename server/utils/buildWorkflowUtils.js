@@ -345,15 +345,18 @@ export function sortMaterialsBySequence(materials) {
 }
 
 /**
- * 格式化日期为 YYYYMMDD 格式
- * @param {Date} [date] 日期对象，默认为当前日期
- * @returns {string} 格式化后的日期字符串
+ * 格式化搭建时间为 YYYYMMDDHHmmss 格式
+ * @param {Date} [date] 日期对象，默认为当前时间
+ * @returns {string} 格式化后的时间戳字符串
  */
 export function formatBuildDate(date = new Date()) {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
-  return `${year}${month}${day}`
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  const seconds = String(date.getSeconds()).padStart(2, '0')
+  return `${year}${month}${day}${hours}${minutes}${seconds}`
 }
 
 // ============== 抖音素材配置解析工具 ==============

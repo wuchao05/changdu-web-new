@@ -192,9 +192,11 @@ const manuallyBuildingIds = ref<Set<string>>(new Set())
 // 抖音号配置列表（从飞书状态表的"抖音素材"字段解析）
 const douyinConfigs = ref<DouyinMaterialConfig[]>([])
 
-// 获取当前日期（YYYYMMDD格式）
-const buildDate = computed(() => dayjs().tz('Asia/Shanghai').format('YYYYMMDD'))
 const advanceHoursConfig = computed(() => resolveAdvanceHoursConfig(currentBuildConfig.value || {}))
+
+function getBuildTimestamp() {
+  return dayjs().tz('Asia/Shanghai').format('YYYYMMDDHHmmss')
+}
 
 function formatAdvanceRuleSegment(label: string, hours: number) {
   return hours > 0 ? `${label}提前 ${hours} 小时可搭建` : `${label}必须等上架时间后才能搭建`
@@ -1601,6 +1603,7 @@ async function executeSetup(
     throw new Error('该剧集没有配置抖音号，请检查飞书状态表的"抖音素材"字段')
   }
 
+  const buildTimestamp = getBuildTimestamp()
   const skippedBatches: Array<{ account: string; reason: string }> = []
   let hasSuccessBatch = false
 
@@ -1610,7 +1613,15 @@ async function executeSetup(
       // 更新当前批次信息
       currentBatchInfo.value = `正在搭建抖音号-${config.douyinAccount}`
 
-      await buildBatchForDouyin(drama, config, initData, record, dramaName, accountId)
+      await buildBatchForDouyin(
+        drama,
+        config,
+        initData,
+        record,
+        dramaName,
+        accountId,
+        buildTimestamp
+      )
       record.completedBatches++
       hasSuccessBatch = true
       console.log(`✅ 抖音号 ${config.douyinAccount} 批次完成`)
@@ -1664,7 +1675,8 @@ async function buildBatchForDouyin(
   initData: InitializationData,
   record: AutoBuildRecord,
   dramaName: string,
-  accountId: string
+  accountId: string,
+  buildTimestamp: string
 ): Promise<void> {
   // 0. 创建推广链接（每个批次独立，用于广告）
   record.failedStep = '创建推广链接'
@@ -1712,7 +1724,7 @@ async function buildBatchForDouyin(
 
   // 1. 创建项目
   record.failedStep = '创建项目'
-  const projectName = `${currentBrandName.value}-${config.douyinAccount}-${dramaName}-${buildDate.value}`
+  const projectName = `${currentBrandName.value}-${config.douyinAccount}-${dramaName}-${buildTimestamp}`
 
   const projectResult = await buildWorkflowApi.createProject({
     account_id: accountId,
@@ -1791,7 +1803,7 @@ async function buildBatchForDouyin(
 
   // 5. 创建广告（最多重试1次）
   record.failedStep = '创建广告'
-  const adName = `${currentBrandName.value}-${config.douyinAccount}-${dramaName}-${buildDate.value}`
+  const adName = `${currentBrandName.value}-${config.douyinAccount}-${dramaName}-${buildTimestamp}`
 
   let promotionId: string | undefined
   let retryCount = 0

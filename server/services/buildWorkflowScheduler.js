@@ -1419,7 +1419,7 @@ async function executeAssetization(drama) {
 /**
  * 为单个抖音号批次创建项目和广告
  */
-async function buildBatchForDouyin(drama, config, initData, dramaName, accountId, buildDate) {
+async function buildBatchForDouyin(drama, config, initData, dramaName, accountId, buildTimestamp) {
   const bookId = drama.fields['短剧ID']?.value?.[0]?.text
   if (!bookId) {
     throw new Error('短剧ID不存在')
@@ -1468,7 +1468,7 @@ async function buildBatchForDouyin(drama, config, initData, dramaName, accountId
   initData.app_type = 2
 
   // 1. 创建项目
-  const projectName = `${getRuntimeBrandName()}-${config.douyinAccount}-${dramaName}-${buildDate}`
+  const projectName = `${getRuntimeBrandName()}-${config.douyinAccount}-${dramaName}-${buildTimestamp}`
   let projectResult
   try {
     projectResult = await createProject({
@@ -1550,7 +1550,7 @@ async function buildBatchForDouyin(drama, config, initData, dramaName, accountId
   }
 
   // 5. 创建广告
-  const adName = `${getRuntimeBrandName()}-${config.douyinAccount}-${dramaName}-${buildDate}`
+  const adName = `${getRuntimeBrandName()}-${config.douyinAccount}-${dramaName}-${buildTimestamp}`
   let promotionCreateResult
   try {
     promotionCreateResult = await createPromotion({
@@ -1598,14 +1598,21 @@ async function executeSetup(drama, initData) {
     throw new Error('没有配置抖音号')
   }
 
-  const buildDate = formatBuildDate()
+  const buildTimestamp = formatBuildDate()
   const skippedBatches = []
   let hasSuccessBatch = false
 
   for (const config of douyinConfigs) {
     try {
       console.log(`[后台搭建] 正在搭建抖音号: ${config.douyinAccount}`)
-      await buildBatchForDouyin(drama, config, { ...initData }, dramaName, accountId, buildDate)
+      await buildBatchForDouyin(
+        drama,
+        config,
+        { ...initData },
+        dramaName,
+        accountId,
+        buildTimestamp
+      )
       hasSuccessBatch = true
       console.log(`[后台搭建] ✅ 抖音号 ${config.douyinAccount} 批次完成`)
     } catch (error) {
