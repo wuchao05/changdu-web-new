@@ -89,6 +89,27 @@ class FeishuApiService {
     return apiConfigStore.config.accountTableId || ''
   }
 
+  private async queryChannelAccounts(accountTableId?: string): Promise<any[]> {
+    const response = await fetch(`${ENV.BASE_URL}/feishu/bitable/channel-accounts`, {
+      method: 'POST',
+      headers: FEISHU_API_CONFIG.headers,
+      body: JSON.stringify({
+        accountTableId: accountTableId || this.getAccountTableId(),
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const result = await response.json()
+    if (result.code !== 0) {
+      throw new Error(result.msg || '查询账户失败')
+    }
+
+    return Array.isArray(result.data?.items) ? result.data.items : []
+  }
+
   /**
    * 通用请求方法
    */
@@ -348,28 +369,13 @@ class FeishuApiService {
    * @returns 是否有可用账户
    */
   async checkAvailableChannelAccounts(accountTableId?: string): Promise<boolean> {
-    // 通过后端代理调用飞书API，避免CORS问题
-    const response = await fetch(`${ENV.BASE_URL}/feishu/bitable/channel-accounts`, {
-      method: 'POST',
-      headers: FEISHU_API_CONFIG.headers,
-      body: JSON.stringify({
-        accountTableId: accountTableId || this.getAccountTableId(),
-      }),
-    })
+    const items = await this.queryChannelAccounts(accountTableId)
+    const hasAvailableAccount = items.some((item: any) => item.fields['是否已用'] === '否')
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
+    if (!hasAvailableAccount && items.length > 0) {
+      await this.resetAllChannelAccountsUnused(accountTableId)
+      return true
     }
-
-    const result = await response.json()
-    if (result.code !== 0) {
-      throw new Error(result.msg || '查询账户失败')
-    }
-
-    // 检查是否有"是否已用"为"否"的记录
-    const hasAvailableAccount = result.data.items.some(
-      (item: any) => item.fields['是否已用'] === '否'
-    )
 
     return hasAvailableAccount
   }
@@ -382,26 +388,14 @@ class FeishuApiService {
   async getAvailableChannelAccount(
     accountTableId?: string
   ): Promise<{ account: string; recordId: string } | null> {
-    // 通过后端代理调用飞书API，避免CORS问题
-    const response = await fetch(`${ENV.BASE_URL}/feishu/bitable/channel-accounts`, {
-      method: 'POST',
-      headers: FEISHU_API_CONFIG.headers,
-      body: JSON.stringify({
-        accountTableId: accountTableId || this.getAccountTableId(),
-      }),
-    })
+    let items = await this.queryChannelAccounts(accountTableId)
+    let availableAccount = items.find((item: any) => item.fields['是否已用'] === '否')
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
+    if (!availableAccount && items.length > 0) {
+      await this.resetAllChannelAccountsUnused(accountTableId)
+      items = await this.queryChannelAccounts(accountTableId)
+      availableAccount = items.find((item: any) => item.fields['是否已用'] === '否')
     }
-
-    const result = await response.json()
-    if (result.code !== 0) {
-      throw new Error(result.msg || '查询账户失败')
-    }
-
-    // 查找第一个"是否已用"为"否"的记录
-    const availableAccount = result.data.items.find((item: any) => item.fields['是否已用'] === '否')
 
     if (!availableAccount) {
       return null
@@ -415,18 +409,13 @@ class FeishuApiService {
   }
 
   /**
-   * 查询账户表，获取多个未使用的账户（用于小程序验证重试）
-   * @param count 需要获取的账户数量
+   * 将当前账户表的所有账户重置为未使用
    * @param accountTableId 账户表 table_id（可选，默认使用当前渠道的账户表）
-   * @returns 未使用的账户信息数组（account 字段即为巨量账户ID）
+   * @returns 重置结果
    */
-  async getAvailableChannelAccountCandidates(
-    count: number = 5,
-    accountTableId?: string
-  ): Promise<Array<{ account: string; recordId: string }> | null> {
-    // 通过后端代理调用飞书API，避免CORS问题
-    const response = await fetch(`${ENV.BASE_URL}/feishu/bitable/channel-accounts`, {
-      method: 'POST',
+  async resetAllChannelAccountsUnused(accountTableId?: string): Promise<any> {
+    const response = await fetch(`${ENV.BASE_URL}/feishu/bitable/channel-accounts/reset-unused`, {
+      method: 'PUT',
       headers: FEISHU_API_CONFIG.headers,
       body: JSON.stringify({
         accountTableId: accountTableId || this.getAccountTableId(),
@@ -439,11 +428,24 @@ class FeishuApiService {
 
     const result = await response.json()
     if (result.code !== 0) {
-      throw new Error(result.msg || '查询账户失败')
+      throw new Error(result.msg || '重置账户状态失败')
     }
 
-    // 查找"是否已用"为"否"的记录，最多返回 count 个
-    const availableAccounts = result.data.items
+    return result
+  }
+
+  /**
+   * 查询账户表，获取多个未使用的账户（用于小程序验证重试）
+   * @param count 需要获取的账户数量
+   * @param accountTableId 账户表 table_id（可选，默认使用当前渠道的账户表）
+   * @returns 未使用的账户信息数组（account 字段即为巨量账户ID）
+   */
+  async getAvailableChannelAccountCandidates(
+    count: number = 5,
+    accountTableId?: string
+  ): Promise<Array<{ account: string; recordId: string }> | null> {
+    const items = await this.queryChannelAccounts(accountTableId)
+    const availableAccounts = items
       .filter((item: any) => item.fields['是否已用'] === '否')
       .slice(0, count)
 
@@ -464,28 +466,8 @@ class FeishuApiService {
    * @returns 可用账户数量
    */
   async getAvailableAccountCount(accountTableId?: string): Promise<number> {
-    // 通过后端代理调用飞书API，避免CORS问题
-    const response = await fetch(`${ENV.BASE_URL}/feishu/bitable/channel-accounts`, {
-      method: 'POST',
-      headers: FEISHU_API_CONFIG.headers,
-      body: JSON.stringify({
-        accountTableId: accountTableId || this.getAccountTableId(),
-      }),
-    })
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
-    }
-
-    const result = await response.json()
-    if (result.code !== 0) {
-      throw new Error(result.msg || '查询账户失败')
-    }
-
-    // 统计"是否已用"为"否"的记录数量
-    const availableCount = result.data.items.filter(
-      (item: any) => item.fields['是否已用'] === '否'
-    ).length
+    const items = await this.queryChannelAccounts(accountTableId)
+    const availableCount = items.filter((item: any) => item.fields['是否已用'] === '否').length
 
     return availableCount
   }
@@ -620,26 +602,8 @@ class FeishuApiService {
     accountName: string,
     accountTableId?: string
   ): Promise<string | null> {
-    // 通过后端代理调用飞书API，避免CORS问题
-    const response = await fetch(`${ENV.BASE_URL}/feishu/bitable/channel-accounts`, {
-      method: 'POST',
-      headers: FEISHU_API_CONFIG.headers,
-      body: JSON.stringify({
-        accountTableId: accountTableId || this.getAccountTableId(),
-      }),
-    })
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
-    }
-
-    const result = await response.json()
-    if (result.code !== 0) {
-      throw new Error(result.msg || '查询账户失败')
-    }
-
-    // 查找匹配的账户记录
-    const matchedAccount = result.data.items.find((item: any) => {
+    const items = await this.queryChannelAccounts(accountTableId)
+    const matchedAccount = items.find((item: any) => {
       const accountText = item.fields['账户']?.[0]?.text
       return accountText === accountName
     })

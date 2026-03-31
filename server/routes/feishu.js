@@ -887,6 +887,164 @@ router.put('/bitable/channel-accounts/:recordId/unused', async ctx => {
   }
 })
 
+// 飞书批量重置账户是否已用状态为"否"代理 API（支持动态账户表）
+router.put('/bitable/channel-accounts/reset-unused', async ctx => {
+  try {
+    const { accountTableId } = ctx.request.body || {}
+    const targetTableId = accountTableId || FEISHU_CONFIG.table_ids.account
+
+    console.log(
+      '[爆剧爆剪-新增待下载] 批量重置飞书账户未使用状态:',
+      JSON.stringify(
+        {
+          targetTableId,
+        },
+        null,
+        2
+      )
+    )
+
+    const tokenResponse = await fetch(`${FEISHU_CONFIG.api_base_url}${FEISHU_CONFIG.token_endpoint}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        app_id: FEISHU_CONFIG.app_id,
+        app_secret: FEISHU_CONFIG.app_secret,
+      }),
+    })
+
+    const tokenData = await tokenResponse.text()
+    let tokenJson
+    try {
+      tokenJson = JSON.parse(tokenData)
+    } catch {
+      ctx.status = tokenResponse.status
+      ctx.body = tokenData
+      return
+    }
+
+    if (tokenJson.code !== 0) {
+      ctx.status = 400
+      ctx.body = { error: 'Failed to get access token', details: tokenJson }
+      return
+    }
+
+    const accessToken = tokenJson.tenant_access_token
+
+    const searchResponse = await fetch(
+      `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.app_token}/tables/${targetTableId}/records/search?ignore_consistency_check=true`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          field_names: ['是否已用'],
+          page_size: 1000,
+        }),
+      }
+    )
+
+    const searchData = await searchResponse.text()
+    let searchJson
+    try {
+      searchJson = JSON.parse(searchData)
+    } catch {
+      ctx.status = searchResponse.status
+      ctx.body = searchData
+      return
+    }
+
+    if (!searchResponse.ok || searchJson.code !== 0) {
+      ctx.status = searchResponse.status || 500
+      ctx.body = searchJson
+      return
+    }
+
+    const items = Array.isArray(searchJson?.data?.items) ? searchJson.data.items : []
+    if (items.length === 0) {
+      ctx.body = {
+        code: 0,
+        msg: 'success',
+        data: {
+          resetCount: 0,
+        },
+      }
+      return
+    }
+
+    const chunkSize = 200
+    const records = items.map(item => ({
+      record_id: item.record_id,
+      fields: {
+        是否已用: '否',
+      },
+    }))
+
+    for (let index = 0; index < records.length; index += chunkSize) {
+      const response = await fetch(
+        `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.app_token}/tables/${targetTableId}/records/batch_update?ignore_consistency_check=true`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            records: records.slice(index, index + chunkSize),
+          }),
+        }
+      )
+
+      const data = await response.text()
+      let jsonData
+      try {
+        jsonData = JSON.parse(data)
+      } catch {
+        ctx.status = response.status
+        ctx.body = data
+        return
+      }
+
+      if (!response.ok || jsonData.code !== 0) {
+        ctx.status = response.status || 500
+        ctx.body = jsonData
+        return
+      }
+    }
+
+    console.log(
+      '[爆剧爆剪-新增待下载] 批量重置飞书账户未使用状态完成:',
+      JSON.stringify(
+        {
+          targetTableId,
+          resetCount: records.length,
+        },
+        null,
+        2
+      )
+    )
+
+    ctx.body = {
+      code: 0,
+      msg: 'success',
+      data: {
+        resetCount: records.length,
+      },
+    }
+  } catch (error) {
+    ctx.status = 500
+    ctx.body = {
+      error: 'Internal Server Error',
+      message: error.message,
+      timestamp: new Date().toISOString(),
+    }
+  }
+})
+
 // 飞书剧集清单查询代理API - 获取剧名和是否已下载状态
 router.post('/bitable/drama-list', async ctx => {
   try {
