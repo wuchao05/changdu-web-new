@@ -343,7 +343,10 @@ const dramasColumns: DataTableColumns<FeishuDramaRecord> = [
 
 // 资产化步骤定义
 const assetizationSteps = computed(() => [
-  { key: 1, title: '上传账户头像' },
+  {
+    key: 1,
+    title: currentBuildConfig.value?.useNewMicroAppAssetFlow ? '跳过账户头像' : '上传账户头像',
+  },
   { key: 2, title: '创建推广链接' },
   {
     key: 3,
@@ -1320,7 +1323,7 @@ async function executeSingleDramaBuild(
   }
 }
 
-// 执行资产化（6步）
+// 执行资产化
 async function executeAssetization(
   drama: FeishuDramaRecord,
   record: AutoBuildRecord
@@ -1334,17 +1337,21 @@ async function executeAssetization(
     throw new Error('剧集信息不完整')
   }
 
-  // 步骤1: 上传账户头像
+  // 步骤1: 上传账户头像（新版巨量跳过）
   currentAssetizationStep.value = 1
   record.assetizationStep = 1
-  console.log('步骤1: 上传账户头像')
-  const avatarUploadResult = await buildWorkflowApi.uploadAvatarImage(accountId)
-  await buildWorkflowApi.saveAvatar({
-    account_id: accountId,
-    web_uri: avatarUploadResult.data.image_info.web_uri,
-    width: 300,
-    height: 300,
-  })
+  if (buildConfig?.useNewMicroAppAssetFlow) {
+    console.log('步骤1: 当前渠道为新版巨量，跳过上传账户头像')
+  } else {
+    console.log('步骤1: 上传账户头像')
+    const avatarUploadResult = await buildWorkflowApi.uploadAvatarImage(accountId)
+    await buildWorkflowApi.saveAvatar({
+      account_id: accountId,
+      web_uri: avatarUploadResult.data.image_info.web_uri,
+      width: 300,
+      height: 300,
+    })
+  }
 
   // 步骤2: 创建推广链接（用于小程序资产）
   currentAssetizationStep.value = 2

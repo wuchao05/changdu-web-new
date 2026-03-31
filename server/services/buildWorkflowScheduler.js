@@ -1204,15 +1204,19 @@ async function executeAssetization(drama) {
 
   console.log(`[后台搭建] 开始资产化: ${dramaName}`)
 
-  // 步骤1: 上传账户头像
-  console.log('[后台搭建] 步骤1: 上传账户头像')
-  const avatarUploadResult = await uploadAvatarImage(accountId)
-  await saveAvatar({
-    account_id: accountId,
-    web_uri: avatarUploadResult.data.image_info.web_uri,
-    width: 300,
-    height: 300,
-  })
+  // 步骤1: 上传账户头像（新版巨量跳过）
+  if (buildConfig.useNewMicroAppAssetFlow) {
+    console.log('[后台搭建] 步骤1: 当前渠道为新版巨量，跳过上传账户头像')
+  } else {
+    console.log('[后台搭建] 步骤1: 上传账户头像')
+    const avatarUploadResult = await uploadAvatarImage(accountId)
+    await saveAvatar({
+      account_id: accountId,
+      web_uri: avatarUploadResult.data.image_info.web_uri,
+      width: 300,
+      height: 300,
+    })
+  }
 
   // 步骤2: 创建推广链接（用于小程序资产）
   console.log('[后台搭建] 步骤2: 创建推广链接')
