@@ -1191,16 +1191,21 @@ class FeishuApiService {
    * @param status 新状态
    * @param tableId 表格ID（可选）
    * @param buildTime 搭建时间（可选，13位时间戳）
+   * @param remark 备注（可选，传空字符串可清空备注）
    */
   async updateDramaStatus(
     recordId: string,
     status: string,
     tableId?: string,
-    buildTime?: number
+    buildTime?: number,
+    remark?: string
   ): Promise<FeishuApiResponse<any>> {
     const body: any = { status, table_id: tableId }
     if (buildTime) {
       body.build_time = buildTime
+    }
+    if (remark !== undefined) {
+      body.remark = remark
     }
 
     const response = await fetch(`${ENV.BASE_URL}/feishu/bitable/drama-status/${recordId}/status`, {

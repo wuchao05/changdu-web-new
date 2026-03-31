@@ -307,7 +307,7 @@ async function updateDramaStatus(recordId, status, buildTime, tableId, remark) {
   if (buildTime) {
     fields['搭建时间'] = buildTime
   }
-  if (remark) {
+  if (remark !== undefined) {
     fields['备注'] = remark
   }
 
@@ -1661,7 +1661,7 @@ async function buildSingleDrama(drama) {
 
     // 更新飞书状态
     const buildTime = Date.now()
-    await updateDramaStatus(drama.record_id, '已完成', buildTime, getStatusUpdateTableId(drama))
+    await updateDramaStatus(drama.record_id, '已完成', buildTime, getStatusUpdateTableId(drama), '')
 
     console.log(`[后台搭建] ✅ 剧集 ${dramaName} 完成`)
     return { success: true, dramaName }

@@ -1155,7 +1155,8 @@ async function executeBuildProcess() {
           drama.record_id,
           '已完成',
           drama._tableId || FEISHU_CONFIG.table_ids.drama_status,
-          buildTime
+          buildTime,
+          ''
         )
         console.log(`✅ 剧集 ${record.dramaName} 状态已更新为"已完成"，搭建时间: ${buildTime}`)
       } catch (statusError) {
@@ -1270,7 +1271,8 @@ async function executeSingleDramaBuild(
         drama.record_id,
         '已完成',
         drama._tableId || FEISHU_CONFIG.table_ids.drama_status,
-        buildTime
+        buildTime,
+        ''
       )
       console.log(`✅ 剧集 ${record.dramaName} 状态已更新为"已完成"，搭建时间: ${buildTime}`)
     } catch (statusError) {

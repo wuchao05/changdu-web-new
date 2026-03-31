@@ -2323,7 +2323,7 @@ router.post('/bitable/accounts/batch-create', async ctx => {
 router.put('/bitable/drama-status/:recordId/status', async ctx => {
   try {
     const { recordId } = ctx.params
-    const { status, table_id, build_time } = ctx.request.body
+    const { status, table_id, build_time, remark } = ctx.request.body
 
     if (!recordId || !status) {
       ctx.status = 400
@@ -2374,6 +2374,9 @@ router.put('/bitable/drama-status/:recordId/status', async ctx => {
     // 如果传了搭建时间，同时更新搭建时间字段
     if (build_time) {
       updateRequestBody.fields['搭建时间'] = build_time
+    }
+    if (Object.prototype.hasOwnProperty.call(ctx.request.body || {}, 'remark')) {
+      updateRequestBody.fields['备注'] = typeof remark === 'string' ? remark : ''
     }
 
     // 调用飞书更新记录API
