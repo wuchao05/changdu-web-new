@@ -923,6 +923,7 @@ const sessionStore = useSessionStore()
 const currentBrandName = computed(
   () => sessionStore.currentRuntimeUser?.brandName || sessionStore.currentUser?.brandName || '小红'
 )
+const accountRecycleEnabled = ref(false)
 
 // 格式化抖音号素材配置
 function formatDouyinMaterialConfig(): string {
@@ -1807,9 +1808,12 @@ async function handleDateConfirm(selectedDate: string) {
       // 不存在记录，直接检查账户并创建剪辑记录
       try {
         // 检查是否有可用账户
-        const hasAvailableAccount = await feishuApi.checkAvailableChannelAccounts()
+        const hasAvailableAccount = await feishuApi.checkAvailableChannelAccounts(
+          undefined,
+          accountRecycleEnabled.value
+        )
         if (!hasAvailableAccount) {
-          showSuccessToast('无可用账户，请及时联系管理员添加并完成录户')
+          showSuccessToast('无可用账户，请联系管理员')
           return // 中断后续流程
         }
 
@@ -1817,10 +1821,13 @@ async function handleDateConfirm(selectedDate: string) {
         const ratingValue = undefined
 
         // 获取可用账户
-        const availableAccount = await feishuApi.getAvailableChannelAccount()
+        const availableAccount = await feishuApi.getAvailableChannelAccount(
+          undefined,
+          accountRecycleEnabled.value
+        )
 
         if (!availableAccount) {
-          showSuccessToast('暂无可用的账户，请及时联系管理员添加并完成录户')
+          showSuccessToast('无可用账户，请联系管理员')
           return
         }
 
@@ -1855,7 +1862,7 @@ async function handleDateConfirm(selectedDate: string) {
           }
         } else {
           // 没有可用账户，终止流程
-          showSuccessToast('暂无可用的账户，请及时联系管理员添加并完成录户')
+          showSuccessToast('无可用账户，请联系管理员')
           return
         }
       } catch (accountError) {
@@ -2064,9 +2071,12 @@ async function handleAddDownload(
 
     // 使用当前渠道配置的账户表
     // 注意：不传 accountTableId 参数，让 feishuApi 内部自动判断使用哪个表ID
-    const hasAvailableAccount = await feishuApi.checkAvailableChannelAccounts()
+    const hasAvailableAccount = await feishuApi.checkAvailableChannelAccounts(
+      undefined,
+      accountRecycleEnabled.value
+    )
     if (!hasAvailableAccount) {
-      showSuccessToast('无可用账户，请及时联系管理员添加并完成录户')
+      showSuccessToast('无可用账户，请联系管理员')
       return // 中断后续流程
     }
 
@@ -2102,10 +2112,13 @@ async function handleAddDownload(
       console.log('新增记录成功:', createResult)
 
       // 获取可用账户
-      const availableAccount = await feishuApi.getAvailableChannelAccount()
+      const availableAccount = await feishuApi.getAvailableChannelAccount(
+        undefined,
+        accountRecycleEnabled.value
+      )
 
       if (!availableAccount) {
-        showSuccessToast(`暂无可用的账户，无法添加剧集"${dramaName}"`)
+        showSuccessToast('无可用账户，请联系管理员')
         console.log('暂无可用的账户，流程中断')
         return
       }
@@ -2114,7 +2127,7 @@ async function handleAddDownload(
       const finalRecordId = availableAccount.recordId
 
       if (!finalAccountId || !finalRecordId) {
-        showSuccessToast(`暂无可用的账户，无法添加剧集"${dramaName}"`)
+        showSuccessToast('无可用账户，请联系管理员')
         console.log('暂无可用的账户，流程中断')
         return
       }
@@ -3429,6 +3442,7 @@ onMounted(async () => {
     })
     if (response.ok) {
       const { data } = await response.json()
+      accountRecycleEnabled.value = Boolean(data?.buildConfig?.recycleAccountsWhenExhausted)
       if (data && data.platforms?.changdu) {
         apiConfigStore.updateFromAuthConfig({
           platforms: data.platforms,

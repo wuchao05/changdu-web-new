@@ -21,6 +21,7 @@ export const DEFAULT_BUILD_CONFIG = {
   landingUrl: BUILD_WORKFLOW_CONFIG.build.promotion.external_url,
   useNewMicroAppAssetFlow: false,
   clearExistingProjectsBeforeBuild: false,
+  recycleAccountsWhenExhausted: false,
   advertiserName: '',
   ebpid: '',
   microAppName: BUILD_WORKFLOW_CONFIG.juliang.microAppName,
@@ -58,6 +59,10 @@ export function normalizeBuildConfig(config = {}) {
     clearExistingProjectsBeforeBuild: normalizeBooleanValue(
       config.clearExistingProjectsBeforeBuild,
       DEFAULT_BUILD_CONFIG.clearExistingProjectsBeforeBuild
+    ),
+    recycleAccountsWhenExhausted: normalizeBooleanValue(
+      config.recycleAccountsWhenExhausted,
+      DEFAULT_BUILD_CONFIG.recycleAccountsWhenExhausted
     ),
     advertiserName: normalizeStringValue(
       config.advertiserName,

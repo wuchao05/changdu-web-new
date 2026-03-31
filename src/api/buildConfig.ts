@@ -9,6 +9,7 @@ export interface BuildConfig {
   landingUrl: string
   useNewMicroAppAssetFlow: boolean
   clearExistingProjectsBeforeBuild: boolean
+  recycleAccountsWhenExhausted: boolean
   advertiserName: string
   ebpid: string
   microAppName: string
@@ -36,6 +37,7 @@ export const DEFAULT_BUILD_CONFIG: BuildConfig = {
   landingUrl: '',
   useNewMicroAppAssetFlow: false,
   clearExistingProjectsBeforeBuild: false,
+  recycleAccountsWhenExhausted: false,
   advertiserName: '',
   ebpid: '',
   microAppName: '',
@@ -74,6 +76,7 @@ function normalizeBuildConfig(payload: unknown): BuildConfig {
     clearExistingProjectsBeforeBuild: normalizeBooleanValue(
       config.clearExistingProjectsBeforeBuild
     ),
+    recycleAccountsWhenExhausted: normalizeBooleanValue(config.recycleAccountsWhenExhausted),
     advertiserName: normalizeStringValue(config.advertiserName),
     ebpid: normalizeStringValue(config.ebpid),
     microAppName: normalizeStringValue(config.microAppName),

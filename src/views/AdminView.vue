@@ -1020,9 +1020,14 @@
                       placeholder="请输入巨量 Cookie"
                     />
                   </n-form-item>
-                  <n-form-item label="搭建前清理历史项目">
+                  <n-form-item label="项目清理">
                     <n-switch
                       v-model:value="channelForm.juliang.buildConfig.clearExistingProjectsBeforeBuild"
+                    />
+                  </n-form-item>
+                  <n-form-item label="账户回收">
+                    <n-switch
+                      v-model:value="channelForm.juliang.buildConfig.recycleAccountsWhenExhausted"
                     />
                   </n-form-item>
                   <n-form-item label="Source">
@@ -1928,6 +1933,7 @@ function createDefaultChannelForm(): ChannelFormModel {
         landingUrl: '',
         useNewMicroAppAssetFlow: false,
         clearExistingProjectsBeforeBuild: false,
+        recycleAccountsWhenExhausted: false,
         advertiserName: '',
         ebpid: '',
         microAppName: '',

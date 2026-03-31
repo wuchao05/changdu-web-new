@@ -368,11 +368,14 @@ class FeishuApiService {
    * @param accountTableId 账户表 table_id（可选，默认使用当前渠道的账户表）
    * @returns 是否有可用账户
    */
-  async checkAvailableChannelAccounts(accountTableId?: string): Promise<boolean> {
+  async checkAvailableChannelAccounts(
+    accountTableId?: string,
+    autoRecycleWhenExhausted = false
+  ): Promise<boolean> {
     const items = await this.queryChannelAccounts(accountTableId)
     const hasAvailableAccount = items.some((item: any) => item.fields['是否已用'] === '否')
 
-    if (!hasAvailableAccount && items.length > 0) {
+    if (!hasAvailableAccount && autoRecycleWhenExhausted && items.length > 0) {
       await this.resetAllChannelAccountsUnused(accountTableId)
       return true
     }
@@ -386,12 +389,13 @@ class FeishuApiService {
    * @returns 未使用的账户信息（account 字段即为巨量账户ID）
    */
   async getAvailableChannelAccount(
-    accountTableId?: string
+    accountTableId?: string,
+    autoRecycleWhenExhausted = false
   ): Promise<{ account: string; recordId: string } | null> {
     let items = await this.queryChannelAccounts(accountTableId)
     let availableAccount = items.find((item: any) => item.fields['是否已用'] === '否')
 
-    if (!availableAccount && items.length > 0) {
+    if (!availableAccount && autoRecycleWhenExhausted && items.length > 0) {
       await this.resetAllChannelAccountsUnused(accountTableId)
       items = await this.queryChannelAccounts(accountTableId)
       availableAccount = items.find((item: any) => item.fields['是否已用'] === '否')
