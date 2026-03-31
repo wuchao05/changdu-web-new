@@ -308,7 +308,14 @@
                   :key="item.channel.id"
                   class="channel-config-card"
                 >
-                  <div class="channel-config-card__head">
+                  <div
+                    class="channel-config-card__head"
+                    role="button"
+                    tabindex="0"
+                    @click="toggleUserChannelSection(item.channel.id)"
+                    @keydown.enter.prevent="toggleUserChannelSection(item.channel.id)"
+                    @keydown.space.prevent="toggleUserChannelSection(item.channel.id)"
+                  >
                     <div class="min-w-0 flex-1">
                       <div class="flex flex-wrap items-center gap-2">
                         <p class="channel-config-card__title">{{ item.channel.name }}</p>
@@ -335,18 +342,41 @@
                         {{ countConfiguredMaterialMatches(item.config.douyinMaterialMatches) }}
                         条有效规则
                       </span>
+                      <button
+                        type="button"
+                        class="channel-config-card__toggle"
+                        @click.stop="toggleUserChannelSection(item.channel.id)"
+                      >
+                        <Icon
+                          :icon="
+                            isUserChannelSectionExpanded(item.channel.id)
+                              ? 'mdi:chevron-up'
+                              : 'mdi:chevron-down'
+                          "
+                          class="h-4 w-4"
+                        />
+                        {{
+                          isUserChannelSectionExpanded(item.channel.id) ? '收起配置' : '展开配置'
+                        }}
+                      </button>
                     </div>
                   </div>
-                  <div class="channel-config-card__switch">
+                  <div class="channel-config-card__switch" @click.stop>
                     <div>
                       <p class="channel-config-card__switch-title">启用专属配置</p>
                       <p class="channel-config-card__switch-desc">
                         打开后才会展示并启用当前渠道下的飞书、素材预览、权限和抖音匹配素材配置。
                       </p>
                     </div>
-                    <n-switch v-model:value="item.config.enabled" />
+                    <n-switch
+                      :value="item.config.enabled"
+                      @update:value="
+                        (value: boolean) =>
+                          handleUserChannelEnabledChange(item.channel.id, item.config, value)
+                      "
+                    />
                   </div>
-                  <div v-if="item.config.enabled" class="mt-1">
+                  <div v-if="isUserChannelSectionExpanded(item.channel.id)" class="mt-1">
                     <div class="config-subpanel">
                       <div class="config-subpanel__head">
                         <div>
@@ -1389,6 +1419,7 @@ const viewportWidth = ref(typeof window === 'undefined' ? 1440 : window.innerWid
 const orderUsernameDrafts = reactive<Record<string, string>>({})
 const materialMatchSearchDrafts = reactive<Record<string, string>>({})
 const editingMaterialMatchIds = reactive<Record<string, string>>({})
+const userChannelExpandedState = reactive<Record<string, boolean>>({})
 const draggedOrderUsername = reactive({
   channelId: '',
   index: -1,
@@ -1992,6 +2023,9 @@ function resetUserForm() {
   Object.keys(editingMaterialMatchIds).forEach(key => {
     delete editingMaterialMatchIds[key]
   })
+  Object.keys(userChannelExpandedState).forEach(key => {
+    delete userChannelExpandedState[key]
+  })
   cancelEditOrderUsername()
   resetOrderUsernameDrag()
 }
@@ -2184,9 +2218,44 @@ function syncUserChannelConfigs() {
   })
 
   userForm.channelConfigs = nextConfigs
+  syncUserChannelExpandedState(selectedChannelIds)
 
   if (userForm.defaultChannelId && !selectedChannelIds.includes(userForm.defaultChannelId)) {
     userForm.defaultChannelId = ''
+  }
+}
+
+function syncUserChannelExpandedState(selectedChannelIds: string[]) {
+  const nextSelectedSet = new Set(selectedChannelIds)
+  Object.keys(userChannelExpandedState).forEach(channelId => {
+    if (!nextSelectedSet.has(channelId)) {
+      delete userChannelExpandedState[channelId]
+    }
+  })
+
+  selectedChannelIds.forEach(channelId => {
+    if (typeof userChannelExpandedState[channelId] !== 'boolean') {
+      userChannelExpandedState[channelId] = false
+    }
+  })
+}
+
+function isUserChannelSectionExpanded(channelId: string) {
+  return Boolean(userChannelExpandedState[channelId])
+}
+
+function toggleUserChannelSection(channelId: string) {
+  userChannelExpandedState[channelId] = !isUserChannelSectionExpanded(channelId)
+}
+
+function handleUserChannelEnabledChange(
+  channelId: string,
+  config: adminApi.UserChannelBindingConfig,
+  value: boolean
+) {
+  config.enabled = value
+  if (value) {
+    userChannelExpandedState[channelId] = true
   }
 }
 
@@ -2913,6 +2982,7 @@ watch(
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 0.9rem;
+  cursor: pointer;
 }
 
 .channel-config-card__title {
@@ -2933,6 +3003,30 @@ watch(
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.45rem;
+}
+
+.channel-config-card__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.34rem 0.7rem;
+  border: 1px solid rgba(191, 219, 254, 0.85);
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #1d4ed8;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.channel-config-card__toggle:hover {
+  background: rgba(239, 246, 255, 0.98);
+  border-color: rgba(147, 197, 253, 0.95);
+  color: #1e40af;
 }
 
 .channel-config-card__switch {
