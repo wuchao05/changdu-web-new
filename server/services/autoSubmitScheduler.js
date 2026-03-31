@@ -545,6 +545,72 @@ async function getAvailableChannelAccounts(channelId) {
   return availableAccounts
 }
 
+function isAccountRecycleEnabled(channelId) {
+  return Boolean(getSchedulerRuntime(channelId).buildConfig?.recycleAccountsWhenExhausted)
+}
+
+async function resetAllChannelAccountsUnused(channelId) {
+  const accessToken = await getFeishuAccessToken()
+  const profile = getSchedulerProfile(channelId)
+
+  const response = await fetch(
+    `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.app_token}/tables/${profile.accountTableId}/records/search?ignore_consistency_check=true`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        field_names: ['是否已用'],
+        page_size: 1000,
+      }),
+    }
+  )
+
+  const result = await safeJsonParse(response, '查询账户列表')
+  if (result.code !== 0) {
+    throw new Error(`查询账户列表失败: ${result.msg}`)
+  }
+
+  const accounts = Array.isArray(result.data?.items) ? result.data.items : []
+  if (accounts.length === 0) {
+    return { resetCount: 0 }
+  }
+
+  const records = accounts.map(item => ({
+    record_id: item.record_id,
+    fields: {
+      是否已用: '否',
+    },
+  }))
+
+  const chunkSize = 200
+  for (let index = 0; index < records.length; index += chunkSize) {
+    const batchResponse = await fetch(
+      `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.app_token}/tables/${profile.accountTableId}/records/batch_update?ignore_consistency_check=true`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          records: records.slice(index, index + chunkSize),
+        }),
+      }
+    )
+
+    const batchResult = await safeJsonParse(batchResponse, '批量重置账户状态')
+    if (batchResult.code !== 0) {
+      throw new Error(`批量重置账户状态失败: ${batchResult.msg}`)
+    }
+  }
+
+  console.log(`[自动提交-${channelId}] 账户池已回收，共重置 ${records.length} 个账户`)
+  return { resetCount: records.length }
+}
+
 /**
  * 获取抖音素材配置（根据当前渠道）
  * @returns {string} 格式化后的抖音素材配置字符串
@@ -561,7 +627,12 @@ async function getDouyinMaterialConfig(channelId) {
  * 获取第一个可用账户
  */
 async function getFirstAvailableAccount(channelId) {
-  const accounts = await getAvailableChannelAccounts(channelId)
+  let accounts = await getAvailableChannelAccounts(channelId)
+  if (accounts.length === 0 && isAccountRecycleEnabled(channelId)) {
+    await resetAllChannelAccountsUnused(channelId)
+    accounts = await getAvailableChannelAccounts(channelId)
+  }
+
   if (accounts.length === 0) {
     return null
   }
