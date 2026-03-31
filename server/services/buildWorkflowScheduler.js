@@ -422,6 +422,7 @@ function getBuildConfig() {
   return {
     secretKey: buildConfig.secretKey,
     useNewMicroAppAssetFlow,
+    clearExistingProjectsBeforeBuild: Boolean(buildConfig.clearExistingProjectsBeforeBuild),
     ccId: buildConfig.ccId,
     microAppName: buildConfig.microAppName,
     microAppId: buildConfig.microAppId,
@@ -1587,6 +1588,7 @@ async function buildBatchForDouyin(drama, config, initData, dramaName, accountId
 async function executeSetup(drama, initData) {
   const dramaName = drama.fields['剧名']?.[0]?.text
   const accountId = drama.fields['账户']?.[0]?.text
+  const buildConfig = getBuildConfig()
 
   if (!dramaName || !accountId) {
     throw new Error('剧集信息不完整')
@@ -1599,11 +1601,13 @@ async function executeSetup(drama, initData) {
     throw new Error('没有配置抖音号')
   }
 
-  await clearExistingProjects({
-    accountId,
-    cookie: getJuliangCookie(),
-    logPrefix: '[后台搭建]',
-  })
+  if (buildConfig.clearExistingProjectsBeforeBuild) {
+    await clearExistingProjects({
+      accountId,
+      cookie: getJuliangCookie(),
+      logPrefix: '[后台搭建]',
+    })
+  }
 
   const buildTimestamp = formatBuildDate()
   const skippedBatches = []

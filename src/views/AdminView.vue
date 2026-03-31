@@ -1020,6 +1020,11 @@
                       placeholder="请输入巨量 Cookie"
                     />
                   </n-form-item>
+                  <n-form-item label="搭建前清理历史项目">
+                    <n-switch
+                      v-model:value="channelForm.juliang.buildConfig.clearExistingProjectsBeforeBuild"
+                    />
+                  </n-form-item>
                   <n-form-item label="Source">
                     <n-input
                       v-model:value="channelForm.juliang.buildConfig.source"
@@ -1922,6 +1927,7 @@ function createDefaultChannelForm(): ChannelFormModel {
         productPlatformId: '',
         landingUrl: '',
         useNewMicroAppAssetFlow: false,
+        clearExistingProjectsBeforeBuild: false,
         advertiserName: '',
         ebpid: '',
         microAppName: '',

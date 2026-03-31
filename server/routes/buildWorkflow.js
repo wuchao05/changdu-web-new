@@ -113,6 +113,7 @@ function getBuildConfig(input = null) {
   return {
     secretKey: buildConfig.secretKey,
     useNewMicroAppAssetFlow,
+    clearExistingProjectsBeforeBuild: Boolean(buildConfig.clearExistingProjectsBeforeBuild),
     ccId: buildConfig.ccId,
     microAppName: buildConfig.microAppName,
     microAppId: buildConfig.microAppId,
