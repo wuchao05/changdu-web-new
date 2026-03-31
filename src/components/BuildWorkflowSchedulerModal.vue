@@ -1603,6 +1603,11 @@ async function executeSetup(
     throw new Error('该剧集没有配置抖音号，请检查飞书状态表的"抖音素材"字段')
   }
 
+  record.failedStep = '清理历史项目'
+  currentBatchInfo.value = '正在清理当前账户历史项目'
+  const cleanupResult = await buildWorkflowApi.clearExistingProjects(accountId)
+  console.log('清理历史项目完成:', cleanupResult.data)
+
   const buildTimestamp = getBuildTimestamp()
   const skippedBatches: Array<{ account: string; reason: string }> = []
   let hasSuccessBatch = false

@@ -23,6 +23,7 @@ import {
   formatBuildDate,
   parseDouyinMaterialFromFeishu,
 } from '../utils/buildWorkflowUtils.js'
+import { clearExistingProjects } from '../utils/buildWorkflowProjectCleanup.js'
 import {
   canBuildDramaNow,
   getDramaPublishTime,
@@ -1597,6 +1598,12 @@ async function executeSetup(drama, initData) {
   if (douyinConfigs.length === 0) {
     throw new Error('没有配置抖音号')
   }
+
+  await clearExistingProjects({
+    accountId,
+    cookie: getJuliangCookie(),
+    logPrefix: '[后台搭建]',
+  })
 
   const buildTimestamp = formatBuildDate()
   const skippedBatches = []

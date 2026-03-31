@@ -273,6 +273,28 @@ export async function uploadProductImage(accountId: string): Promise<any> {
 }
 
 /**
+ * 清理当前账户下的历史项目
+ */
+export async function clearExistingProjects(accountId: string): Promise<any> {
+  const response = await fetch(`${ENV.BASE_URL}/build-workflow/clear-existing-projects`, {
+    method: 'POST',
+    headers: buildSessionHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ account_id: accountId }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`清理历史项目失败: ${response.statusText}`)
+  }
+
+  const result = await response.json()
+  if (result.code !== 0) {
+    throw new Error(result.msg || result.error || result.message || '清理历史项目失败')
+  }
+
+  return result
+}
+
+/**
  * 创建项目
  */
 export async function createProject(params: {

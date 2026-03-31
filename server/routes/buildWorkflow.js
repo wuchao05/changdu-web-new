@@ -16,6 +16,7 @@ import {
   parsePromotionUrl,
   extractAppIdFromParams,
 } from '../utils/buildWorkflowUtils.js'
+import { clearExistingProjects } from '../utils/buildWorkflowProjectCleanup.js'
 import { createSessionRuntimeContextMiddleware } from '../utils/runtimeContextMiddleware.js'
 import { buildRuntimeInstanceKey } from '../utils/runtimeInstance.js'
 
@@ -979,6 +980,37 @@ router.post('/upload-product-image', async ctx => {
     console.error('上传主图失败:', error)
     ctx.status = 500
     ctx.body = { error: error.message || '上传主图失败' }
+  }
+})
+
+/**
+ * 清理当前账户下的历史项目
+ */
+router.post('/clear-existing-projects', async ctx => {
+  try {
+    const { account_id } = ctx.request.body
+
+    if (!account_id) {
+      ctx.status = 400
+      ctx.body = { error: '缺少必要参数: account_id' }
+      return
+    }
+
+    const cleanupResult = await clearExistingProjects({
+      accountId: account_id,
+      cookie: getJuliangCookie(ctx),
+      logPrefix: '[前台搭建]',
+    })
+
+    ctx.body = {
+      code: 0,
+      message: 'success',
+      data: cleanupResult,
+    }
+  } catch (error) {
+    console.error('清理历史项目失败:', error)
+    ctx.status = 500
+    ctx.body = { error: error.message || '清理历史项目失败' }
   }
 })
 
