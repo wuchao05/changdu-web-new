@@ -36,6 +36,7 @@ import {
   resolveChannelRuntimeById,
 } from '../utils/channelRuntime.js'
 import { buildRuntimeInstanceKey, normalizeRuntimeInstanceKey } from '../utils/runtimeInstance.js'
+import { buildServiceLogPrefix, createScopedConsole } from '../utils/serviceLogger.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -78,6 +79,22 @@ function createDefaultSchedulerState() {
 
 const schedulerInstances = Object.create(null)
 const schedulerContext = new AsyncLocalStorage()
+
+function getBuildWorkflowLogProfile() {
+  try {
+    const state = getActiveSchedulerState()
+    return {
+      runtimeUserName: state.runtimeUserName,
+      userId: state.userId,
+      channelName: state.channelName,
+      channelId: state.channelId,
+    }
+  } catch {
+    return {}
+  }
+}
+
+const buildConsole = createScopedConsole('后台搭建', getBuildWorkflowLogProfile)
 
 function getStateFilePath(instanceKey) {
   return path.join(
@@ -390,11 +407,11 @@ async function getDouyinConfigs(drama) {
     douyinMaterialText = rawField.text || rawField.value || ''
   }
 
-  console.log(`[后台搭建] 抖音素材原始字段:`, JSON.stringify(rawField))
-  console.log(`[后台搭建] 抖音素材解析后文本:`, douyinMaterialText)
+  buildConsole.log(`[后台搭建] 抖音素材原始字段:`, JSON.stringify(rawField))
+  buildConsole.log(`[后台搭建] 抖音素材解析后文本:`, douyinMaterialText)
 
   const configs = parseDouyinMaterialFromFeishu(douyinMaterialText)
-  console.log(`[后台搭建] 从飞书状态表解析到 ${configs.length} 个抖音号配置:`, configs)
+  buildConsole.log(`[后台搭建] 从飞书状态表解析到 ${configs.length} 个抖音号配置:`, configs)
   return configs
 }
 
@@ -579,13 +596,13 @@ async function queryMicroApp(accountId) {
   // ✅ 检查是否有 status === 1 的小程序
   const hasValidMicroApp = applets.some(applet => applet.status === 1)
 
-  console.log('[查询小程序] 查询结果:')
-  console.log('  - 小程序总��:', applets.length)
-  console.log('  - status === 1 的数量:', applets.filter(a => a.status === 1).length)
-  console.log('  - 是否有有效小程序:', hasValidMicroApp)
+  buildConsole.log('[查询小程序] 查询结果:')
+  buildConsole.log('  - 小程序总��:', applets.length)
+  buildConsole.log('  - status === 1 的数量:', applets.filter(a => a.status === 1).length)
+  buildConsole.log('  - 是否有有效小程序:', hasValidMicroApp)
 
   if (applets.length > 0 && !hasValidMicroApp) {
-    console.log(
+    buildConsole.log(
       '[查询小程序] ⚠️ 小程序存在但 status 都不等于 1:',
       applets.map(a => ({ instance_id: a.instance_id, status: a.status }))
     )
@@ -620,7 +637,7 @@ async function queryApprovedMicroApp(accountId) {
   url.searchParams.set('operator', buildConfig.ccId)
   url.searchParams.set('operation_type', '1')
 
-  console.log('[查询被共享的小程序] 开始查询 (search_type=2)...')
+  buildConsole.log('[查询被共享的小程序] 开始查询 (search_type=2)...')
 
   const response = await fetch(url.toString(), {
     method: 'GET',
@@ -639,12 +656,12 @@ async function queryApprovedMicroApp(accountId) {
       applet => String(applet.app_id || '').trim() === buildConfig.microAppId && applet.status === 1
     ) || applets.find(applet => applet.status === 1)
 
-  console.log('[查询被共享的小程序] 查询结果:')
-  console.log('  - 小程序总数:', applets.length)
-  console.log('  - 找到已审核通过的小程序:', approvedApplet ? '是' : '否')
+  buildConsole.log('[查询被共享的小程序] 查询结果:')
+  buildConsole.log('  - 小程序总数:', applets.length)
+  buildConsole.log('  - 找到已审核通过的小程序:', approvedApplet ? '是' : '否')
 
   if (approvedApplet) {
-    console.log(
+    buildConsole.log(
       '[查询被共享的小程序] ✓ 找到被共享的已审核通过的小程序:',
       approvedApplet.instance_id
     )
@@ -657,7 +674,7 @@ async function queryApprovedMicroApp(accountId) {
     }
   }
 
-  console.log('[查询被共享的小程序] 未找到被共享的已审核通过的小程序')
+  buildConsole.log('[查询被共享的小程序] 未找到被共享的已审核通过的小程序')
   return {
     found: false,
     microApp: null,
@@ -1229,10 +1246,10 @@ async function executeAssetization(drama) {
     throw new Error('剧集信息不完整')
   }
 
-  console.log(`[后台搭建] 开始资产化: ${dramaName}`)
+  buildConsole.log(`[后台搭建] 开始资产化: ${dramaName}`)
 
   // 步骤1: 上传账户头像
-  console.log('[后台搭建] 步骤1: 上传账户头像')
+  buildConsole.log('[后台搭建] 步骤1: 上传账户头像')
   const avatarUploadResult = await uploadAvatarImage(accountId)
   await saveAvatar({
     account_id: accountId,
@@ -1242,7 +1259,7 @@ async function executeAssetization(drama) {
   })
 
   // 步骤2: 创建推广链接（用于小程序资产）
-  console.log('[后台搭建] 步骤2: 创建推广链接')
+  buildConsole.log('[后台搭建] 步骤2: 创建推广链接')
   const primaryDouyinConfig = await getDouyinConfigs(drama)
   if (primaryDouyinConfig.length === 0) {
     throw new Error('没有配置抖音号')
@@ -1264,37 +1281,37 @@ async function executeAssetization(drama) {
   let assetMicroApp = null
 
   if (buildConfig.useNewMicroAppAssetFlow) {
-    console.log('[后台搭建] 步骤3: 新版流程跳过查询/创建小程序，直接使用配置里的小程序实例')
+    buildConsole.log('[后台搭建] 步骤3: 新版流程跳过查询/创建小程序，直接使用配置里的小程序实例')
     microApp = {
       micro_app_instance_id: buildConfig.microAppInstanceId,
       app_id: buildConfig.microAppId,
       start_page: '',
     }
   } else {
-    console.log('[后台搭建] 步骤3: 查询/创建小程序')
+    buildConsole.log('[后台搭建] 步骤3: 查询/创建小程序')
 
     // 1. 首先查询账户自己的已审核通过的小程序（search_type=1）
     const microAppResult = await queryMicroApp(accountId)
     if (microAppResult.hasValidMicroApp) {
       // 找到账户自己的已审核通过的小程序，直接使用
       microApp = microAppResult.result.data.micro_app[0]
-      console.log('[后台搭建] ✓ 使用账户自己的已审核通过的小程序:', microApp.micro_app_instance_id)
+      buildConsole.log('[后台搭建] ✓ 使用账户自己的已审核通过的小程序:', microApp.micro_app_instance_id)
     } else {
       // 2. 没有找到账户自己的小程序，查询被共享的已审核通过的小程序（search_type=2）
-      console.log('[后台搭建] 未找到账户自己的已审核通过的小程序，查询被共享的小程序...')
+      buildConsole.log('[后台搭建] 未找到账户自己的已审核通过的小程序，查询被共享的小程序...')
       const approvedResult = await queryApprovedMicroApp(accountId)
       if (approvedResult.found && approvedResult.microApp) {
         // 找到被共享的已审核通过的小程序，直接使用
         microApp = approvedResult.microApp
-        console.log('[后台搭建] ✓ 使用被共享的已审核通过的小程序:', microApp.micro_app_instance_id)
+        buildConsole.log('[后台搭建] ✓ 使用被共享的已审核通过的小程序:', microApp.micro_app_instance_id)
       } else {
         // 3. 都没有找到，检查是否有未审核通过的小程序
-        console.log('[后台搭建] 未找到被共享的小程序，检查是否需要创建...')
+        buildConsole.log('[后台搭建] 未找到被共享的小程序，检查是否需要创建...')
         const applets = microAppResult.result.data?.applets || []
         if (applets.length > 0) {
           // 有小程序但 status 都不等于 1，跳过这部剧
-          console.log('[后台搭建] ⚠️ 小程序存在但未审核通过，跳过这部剧')
-          console.log(
+          buildConsole.log('[后台搭建] ⚠️ 小程序存在但未审核通过，跳过这部剧')
+          buildConsole.log(
             '[后台搭建] 小程序详情:',
             applets.map(a => ({ instance_id: a.instance_id, status: a.status }))
           )
@@ -1303,7 +1320,7 @@ async function executeAssetization(drama) {
           throw error
         }
         // applets 为空，需要创建小程序
-        console.log('[后台搭建] 小程序不存在，开始自动创建')
+        buildConsole.log('[后台搭建] 小程序不存在，开始自动创建')
       }
     }
 
@@ -1336,13 +1353,13 @@ async function executeAssetization(drama) {
         link: microAppLink,
       })
 
-      console.log('[后台搭建] 小程序创建成功，等待30秒后查询...')
+      buildConsole.log('[后台搭建] 小程序创建成功，等待30秒后查询...')
       await new Promise(resolve => setTimeout(resolve, 30000))
 
       let recheckResult = await queryMicroApp(accountId)
 
       if (!recheckResult.hasValidMicroApp) {
-        console.log('[后台搭建] 第一次未查询到有效小程序，等待10秒后重试...')
+        buildConsole.log('[后台搭建] 第一次未查询到有效小程序，等待10秒后重试...')
         await new Promise(resolve => setTimeout(resolve, 10000))
         recheckResult = await queryMicroApp(accountId)
 
@@ -1356,7 +1373,7 @@ async function executeAssetization(drama) {
   }
 
   // 步骤4: 查询/创建小程序资产
-  console.log('[后台搭建] 步骤4: 查询/创建小程序资产')
+  buildConsole.log('[后台搭建] 步骤4: 查询/创建小程序资产')
   const assetsListResult = await listMicroAppAssets(accountId)
   let assetsId
 
@@ -1364,9 +1381,9 @@ async function executeAssetization(drama) {
     assetMicroApp = findConfiguredMicroAppAsset(assetsListResult.data?.micro_app, buildConfig)
     if (assetMicroApp) {
       assetsId = assetMicroApp.assets_id
-      console.log('[后台搭建] 新版小程序资产已存在:', assetsId)
+      buildConsole.log('[后台搭建] 新版小程序资产已存在:', assetsId)
     } else {
-      console.log('[后台搭建] 新版小程序资产不存在，开始创建')
+      buildConsole.log('[后台搭建] 新版小程序资产不存在，开始创建')
       await createMicroAppAsset({
         account_id: accountId,
         micro_app_instance_id: buildConfig.microAppInstanceId,
@@ -1393,9 +1410,9 @@ async function executeAssetization(drama) {
     }
   } else if (assetsListResult.data?.micro_app && assetsListResult.data.micro_app.length > 0) {
     assetsId = assetsListResult.data.micro_app[0].assets_id
-    console.log('[后台搭建] 小程序资产已存在:', assetsId)
+    buildConsole.log('[后台搭建] 小程序资产已存在:', assetsId)
   } else {
-    console.log('[后台搭建] 小程序资产不存在，开始创建')
+    buildConsole.log('[后台搭建] 小程序资产不存在，开始创建')
     const assetResult = await createMicroAppAsset({
       account_id: accountId,
       micro_app_instance_id: microApp.micro_app_instance_id,
@@ -1404,21 +1421,21 @@ async function executeAssetization(drama) {
   }
 
   // 步骤5: 检查并添加付费事件
-  console.log('[后台搭建] 步骤5: 检查并添加付费事件')
+  buildConsole.log('[后台搭建] 步骤5: 检查并添加付费事件')
   const eventStatusResult = await checkEventStatus({
     account_id: accountId,
     assets_id: assetsId,
   })
 
   if (eventStatusResult.has_payment_event) {
-    console.log('[后台搭建] 付费事件已存在，跳过添加')
+    buildConsole.log('[后台搭建] 付费事件已存在，跳过添加')
   } else {
-    console.log('[后台搭建] 付费事件不存在，开始添加')
+    buildConsole.log('[后台搭建] 付费事件不存在，开始添加')
     await addPaymentEvent({ account_id: accountId, assets_id: assetsId })
   }
 
   // 上传主图
-  console.log('[后台搭建] 上传主图')
+  buildConsole.log('[后台搭建] 上传主图')
   const uploadResult = await uploadProductImage(accountId)
   const imageInfo = uploadResult.data
 
@@ -1435,7 +1452,7 @@ async function executeAssetization(drama) {
     product_image_uri: imageInfo.web_uri,
   }
 
-  console.log('[后台搭建] 资产化完成')
+  buildConsole.log('[后台搭建] 资产化完成')
   return initData
 }
 
@@ -1602,7 +1619,7 @@ async function buildBatchForDouyin(drama, config, initData, dramaName, accountId
       const shouldRetry = isRetryableBuildErrorMessage(errorMessage)
       if (shouldRetry && retryCount < maxRetries) {
         const delayMs = getBuildRetryDelayMs(retryCount)
-        console.warn(
+        buildConsole.warn(
           `[后台搭建] 创建广告失败，${Math.round(delayMs / 1000)} 秒后重试 ${retryCount + 1}/${maxRetries}: ${errorMessage}`
         )
         retryCount++
@@ -1632,7 +1649,7 @@ async function executeSetup(drama, initData) {
     throw new Error('剧集信息不完整')
   }
 
-  console.log(`[后台搭建] 开始搭建: ${dramaName}`)
+  buildConsole.log(`[后台搭建] 开始搭建: ${dramaName}`)
 
   const douyinConfigs = await getDouyinConfigs(drama)
   if (douyinConfigs.length === 0) {
@@ -1643,7 +1660,7 @@ async function executeSetup(drama, initData) {
     await clearExistingProjects({
       accountId,
       cookie: getJuliangCookie(),
-      logPrefix: '[后台搭建]',
+      logPrefix: buildServiceLogPrefix('后台搭建', getBuildWorkflowLogProfile()),
     })
   }
 
@@ -1653,7 +1670,7 @@ async function executeSetup(drama, initData) {
 
   for (const config of douyinConfigs) {
     try {
-      console.log(`[后台搭建] 正在搭建抖音号: ${config.douyinAccount}`)
+      buildConsole.log(`[后台搭建] 正在搭建抖音号: ${config.douyinAccount}`)
       await buildBatchForDouyin(
         drama,
         config,
@@ -1663,11 +1680,11 @@ async function executeSetup(drama, initData) {
         buildTimestamp
       )
       hasSuccessBatch = true
-      console.log(`[后台搭建] ✅ 抖音号 ${config.douyinAccount} 批次完成`)
+      buildConsole.log(`[后台搭建] ✅ 抖音号 ${config.douyinAccount} 批次完成`)
     } catch (error) {
-      console.warn(`[后台搭建] ⚠️ 抖音号 ${config.douyinAccount} 批次跳过: ${error.message}`)
+      buildConsole.warn(`[后台搭建] ⚠️ 抖音号 ${config.douyinAccount} 批次跳过: ${error.message}`)
       if (error?.stack) {
-        console.warn(`[后台搭建] ⚠️ 抖音号 ${config.douyinAccount} 错误堆栈:\n${error.stack}`)
+        buildConsole.warn(`[后台搭建] ⚠️ 抖音号 ${config.douyinAccount} 错误堆栈:\n${error.stack}`)
       }
       skippedBatches.push({ account: config.douyinAccount, reason: error.message })
     }
@@ -1678,7 +1695,7 @@ async function executeSetup(drama, initData) {
     throw new Error(`所有抖音号批次均失败: ${skippedInfo}`)
   }
 
-  console.log(
+  buildConsole.log(
     `[后台搭建] 搭建完成，成功批次: ${douyinConfigs.length - skippedBatches.length}/${douyinConfigs.length}`
   )
   return { success: true, skippedBatches }
@@ -1701,10 +1718,10 @@ async function buildSingleDrama(drama) {
     const buildTime = Date.now()
     await updateDramaStatus(drama.record_id, '已完成', buildTime, getStatusUpdateTableId(drama), '')
 
-    console.log(`[后台搭建] ✅ 剧集 ${dramaName} 完成`)
+    buildConsole.log(`[后台搭建] ✅ 剧集 ${dramaName} 完成`)
     return { success: true, dramaName }
   } catch (error) {
-    console.error(`[后台搭建] ❌ 剧集 ${dramaName} 失败:`, error.message)
+    buildConsole.error(`[后台搭建] ❌ 剧集 ${dramaName} 失败:`, error.message)
     throw error
   }
 }
@@ -1722,7 +1739,7 @@ async function saveState(instanceKey = getActiveInstanceKey()) {
     await fs.mkdir(dir, { recursive: true })
     await fs.writeFile(filePath, JSON.stringify(entry.state, null, 2), 'utf-8')
   } catch (error) {
-    console.error('[后台搭建] 保存状态失败:', error)
+    buildConsole.error('[后台搭建] 保存状态失败:', error)
   }
 }
 
@@ -1739,12 +1756,12 @@ async function loadState(instanceKey) {
 
     // 如果之前是启用状态，恢复定时器
     if (entry.state.enabled && entry.state.intervalMinutes) {
-      console.log('[后台搭建] 恢复定时任务...', entry.state.instanceKey)
+      buildConsole.log('[后台搭建] 恢复定时任务...', entry.state.instanceKey)
       scheduleNextPolling(instanceKey)
     }
   } catch (error) {
     if (error.code !== 'ENOENT') {
-      console.error('[后台搭建] 加载状态失败:', error)
+      buildConsole.error('[后台搭建] 加载状态失败:', error)
     }
   }
 }
@@ -1762,13 +1779,13 @@ async function executePollingCycle() {
 
   // 防止并发执行：如果有任务正在执行，跳过本次轮询
   if (state.currentTask) {
-    console.log('[后台搭建] 检测到任务正在执行，跳过本次轮询:', state.currentTask.dramaName)
+    buildConsole.log('[后台搭建] 检测到任务正在执行，跳过本次轮询:', state.currentTask.dramaName)
     // 仍然安排下次轮询
     scheduleNextPolling(state.instanceKey)
     return
   }
 
-  console.log('[后台搭建] ========== 开始轮询周期 ==========')
+  buildConsole.log('[后台搭建] ========== 开始轮询周期 ==========')
 
   // 在轮询开始时立即计算下次运行时间（固定间隔，从现在开始计算）
   const intervalMs = state.intervalMinutes * 60 * 1000
@@ -1780,12 +1797,12 @@ async function executePollingCycle() {
   try {
     // 1. 查询待搭建剧集
     let dramas = await getPendingSetupDramas()
-    console.log('[后台搭建] 查询到 ' + dramas.length + ' 部待搭建剧集')
+    buildConsole.log('[后台搭建] 查询到 ' + dramas.length + ' 部待搭建剧集')
 
     // 2. 循环处理，��到成功或没有剧集
     let dramaIndex = 0
     while (dramas.length > 0) {
-      console.log(
+      buildConsole.log(
         `[后台搭建] ====== 第 ${dramaIndex + 1} 次尝试，队列中还有 ${dramas.length} 部剧集 ======`
       )
       const selectedDrama = selectHighestPriorityDrama(dramas, {
@@ -1793,14 +1810,14 @@ async function executePollingCycle() {
         buildConfig: getBuildRuleConfig(),
         onSkip: (drama, context) => {
           const dramaName = drama.fields['剧名']?.[0]?.text || '未知'
-          console.log(
+          buildConsole.log(
             `[优先级选择] 跳过 "${dramaName}"：上架时间 ${context.publishTime.format('YYYY-MM-DD HH:mm')}，最早可搭建时间 ${context.earliestBuildTime?.format('YYYY-MM-DD HH:mm') || '-'}（提前 ${context.advanceHours} 小时）`
           )
         },
       })
 
       if (!selectedDrama) {
-        console.log('[后台搭建] 未找到符合条件的剧集，等待下次轮询')
+        buildConsole.log('[后台搭建] 未找到符合条件的剧集，等待下次轮询')
         break
       }
 
@@ -1822,7 +1839,7 @@ async function executePollingCycle() {
       const rating = getRatingValue(selectedDrama)
       const date = selectedDrama.fields['日期'] || null
       const publishTime = selectedDrama.fields['上架时间']?.value?.[0] || null
-      console.log('[后台搭建] 选中剧集: ' + dramaName + ' (剩余 ' + (dramas.length - 1) + ' 部)')
+      buildConsole.log('[后台搭建] 选中剧集: ' + dramaName + ' (剩余 ' + (dramas.length - 1) + ' 部)')
       state.currentTask = {
         status: 'building',
         dramaName,
@@ -1850,7 +1867,7 @@ async function executePollingCycle() {
           state.taskHistory = state.taskHistory.slice(0, 20)
         }
 
-        console.log('[后台搭建] ✅ 剧集 ' + dramaName + ' 完成，结束本次轮询')
+        buildConsole.log('[后台搭建] ✅ 剧集 ' + dramaName + ' 完成，结束本次轮询')
 
         // 成功后结束本次轮询，等待下一个周期
         state.currentTask = null
@@ -1862,7 +1879,7 @@ async function executePollingCycle() {
         const isSkip = error.code === 'MICROAPP_NOT_APPROVED'
         const action = isSkip ? '跳过' : '失败'
 
-        console.log('[后台搭建] ⚠️ 剧集 ' + dramaName + ' ' + action + ': ' + error.message)
+        buildConsole.log('[后台搭建] ⚠️ 剧集 ' + dramaName + ' ' + action + ': ' + error.message)
 
         if (!isSkip) {
           state.stats.failCount++
@@ -1870,7 +1887,7 @@ async function executePollingCycle() {
 
         // 更新飞书状态为失败/跳过，并记录原因到备注
         try {
-          console.log('[后台搭建] 准备更新飞书状态...')
+          buildConsole.log('[后台搭建] 准备更新飞书状态...')
           await updateDramaStatus(
             selectedDrama.record_id,
             isSkip ? '跳过搭建' : '搭建失败',
@@ -1878,12 +1895,12 @@ async function executePollingCycle() {
             getStatusUpdateTableId(selectedDrama),
             error.message
           )
-          console.log('[后台搭建] ✅ 已更新飞书状态为: ' + (isSkip ? '跳过搭建' : '搭建失败'))
+          buildConsole.log('[后台搭建] ✅ 已更新飞书状态为: ' + (isSkip ? '跳过搭建' : '搭建失败'))
         } catch (feishuError) {
-          console.error('[后台搭建] ❌ 更新飞书状态失败:', feishuError.message)
+          buildConsole.error('[后台搭建] ❌ 更新飞书状态失败:', feishuError.message)
         }
 
-        console.log('[后台搭建] 准备更新任务历史...')
+        buildConsole.log('[后台搭建] 准备更新任务历史...')
         try {
           state.taskHistory.unshift({
             dramaName,
@@ -1897,22 +1914,22 @@ async function executePollingCycle() {
           if (state.taskHistory.length > 20) {
             state.taskHistory = state.taskHistory.slice(0, 20)
           }
-          console.log('[后台搭建] ✅ 任务历史已更新')
+          buildConsole.log('[后台搭建] ✅ 任务历史已更新')
         } catch (historyError) {
-          console.error('[后台搭建] ❌ 更新任务历史失败:', historyError.message)
+          buildConsole.error('[后台搭建] ❌ 更新任务历史失败:', historyError.message)
         }
 
         // 从待处理列表中移除，继续下一部
-        console.log('[后台搭建] 准备从列表移除失败剧集...')
+        buildConsole.log('[后台搭建] 准备从列表移除失败剧集...')
         const beforeFilterCount = dramas.length
         const selectedRecordId = selectedDrama.record_id
-        console.log(`[后台搭建] 待移除的剧集 record_id: ${selectedRecordId}`)
+        buildConsole.log(`[后台搭建] 待移除的剧集 record_id: ${selectedRecordId}`)
         dramas = dramas.filter(d => d.record_id !== selectedRecordId)
         const afterFilterCount = dramas.length
-        console.log(
+        buildConsole.log(
           `[后台搭建] 已从列表移除 ${dramaName}，移除前: ${beforeFilterCount} 部，移除后: ${afterFilterCount} 部`
         )
-        console.log('[后台搭建] 继续尝试下一部剧集')
+        buildConsole.log('[后台搭建] 继续尝试下一部剧集')
         await saveState(state.instanceKey) // 保存状态，确保 progress 不会丢失
         dramaIndex++ // 增加尝试计数
       }
@@ -1924,7 +1941,7 @@ async function executePollingCycle() {
     // 所有剧集都跳过/失败，安排下次轮询
     scheduleNextPolling(state.instanceKey)
   } catch (error) {
-    console.error('[后台搭建] 轮询周期异常:', error.message)
+    buildConsole.error('[后台搭建] 轮询周期异常:', error.message)
 
     state.currentTask = null
     await saveState(state.instanceKey)
@@ -1971,7 +1988,7 @@ export async function startScheduler(intervalMinutes, tableId = null, channelRun
     const state = entry.state
     const runtime = await ensureSchedulerRuntime(channelRuntime, instanceKey)
 
-    console.log(
+    buildConsole.log(
       `[后台搭建] 启动调度器，实例: ${instanceKey}，渠道: ${getChannelLabel(runtime)}，轮询间隔: ${intervalMinutes} 分钟，状态更新表格: ${tableId || '默认'}`
     )
 
@@ -1993,7 +2010,7 @@ export async function startScheduler(intervalMinutes, tableId = null, channelRun
 export async function stopScheduler(channelRuntime = null) {
   const instanceKey = buildRuntimeInstanceKey(channelRuntime || {})
   const entry = ensureSchedulerEntry(instanceKey)
-  console.log('[后台搭建] 停止调度器', instanceKey)
+  buildConsole.log('[后台搭建] 停止调度器', instanceKey)
 
   entry.state.enabled = false
 
@@ -2033,7 +2050,7 @@ export function getSchedulerStatus(instanceKey) {
  * 初始化调度器（服务启动时调用）
  */
 export async function initScheduler() {
-  console.log('[后台搭建] 初始化调度器...')
+  buildConsole.log('[后台搭建] 初始化调度器...')
   const instanceKeys = await listPersistedInstanceKeys()
 
   for (const instanceKey of instanceKeys) {
@@ -2041,13 +2058,13 @@ export async function initScheduler() {
     const state = ensureSchedulerEntry(instanceKey).state
 
     if (state.currentTask) {
-      console.log('[后台搭建] 检测到遗留任务:', instanceKey, state.currentTask.dramaName)
-      console.log('[后台搭建] 清除遗留任务状态，等待下次轮询重新处理')
+      buildConsole.log('[后台搭建] 检测到遗留任务:', instanceKey, state.currentTask.dramaName)
+      buildConsole.log('[后台搭建] 清除遗留任务状态，等待下次轮询重新处理')
       state.currentTask = null
       await saveState(instanceKey)
     }
 
-    console.log('[后台搭建] 调度器状态:', instanceKey, state.enabled ? '运行中' : '已停止')
+    buildConsole.log('[后台搭建] 调度器状态:', instanceKey, state.enabled ? '运行中' : '已停止')
   }
 }
 
@@ -2065,7 +2082,7 @@ export async function triggerSchedulerBuild(
     const entry = ensureSchedulerEntry(instanceKey)
     const state = entry.state
     const runtime = await ensureSchedulerRuntime(channelRuntime, instanceKey)
-    console.log(
+    buildConsole.log(
       '[后台搭建] 手动触发搭建任务',
       `实例: ${instanceKey}`,
       `渠道: ${getChannelLabel(runtime)}`,
@@ -2102,13 +2119,13 @@ export async function triggerSchedulerBuild(
  */
 async function buildSpecificDrama(dramaId) {
   const state = getActiveSchedulerState()
-  console.log(`[后台搭建] 开始搭建指定剧集: ${dramaId}`)
+  buildConsole.log(`[后台搭建] 开始搭建指定剧集: ${dramaId}`)
   state.lastRunTime = new Date().toISOString()
 
   try {
     // 1. 查询待搭建剧集
     const dramas = await getPendingSetupDramas()
-    console.log(`[后台搭建] 查询到 ${dramas.length} 部待搭建剧集`)
+    buildConsole.log(`[后台搭建] 查询到 ${dramas.length} 部待搭建剧集`)
 
     // 2. 找到指定的剧集
     const targetDrama = dramas.find(d => d.record_id === dramaId)
@@ -2134,7 +2151,7 @@ async function buildSpecificDrama(dramaId) {
       )
     }
 
-    console.log(`[后台搭建] 找到指定剧集: ${dramaName}`)
+    buildConsole.log(`[后台搭建] 找到指定剧集: ${dramaName}`)
     state.currentTask = {
       status: 'building',
       dramaName,
@@ -2162,7 +2179,7 @@ async function buildSpecificDrama(dramaId) {
     state.currentTask = null
     await saveState(state.instanceKey)
   } catch (error) {
-    console.error('[后台搭建] 指定剧集搭建失败:', error.message)
+    buildConsole.error('[后台搭建] 指定剧集搭建失败:', error.message)
     state.stats.failCount++
 
     const dramaName = state.currentTask?.dramaName || '未知'

@@ -6,6 +6,7 @@ import { readUser, resolveRuntimeContext } from '../utils/studioData.js'
 import { resolveChannelRuntimeById } from '../utils/channelRuntime.js'
 import { buildRuntimeInstanceKey, normalizeRuntimeInstanceKey } from '../utils/runtimeInstance.js'
 import { FEISHU_CONFIG } from '../config/feishu.js'
+import { buildServiceLogPrefix } from '../utils/serviceLogger.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -102,6 +103,15 @@ function normalizeState(state = {}) {
   }
 }
 
+function getMaterialPreviewLogPrefix(source = {}) {
+  return buildServiceLogPrefix('素材预览', {
+    runtimeUserName: source.runtimeUserName,
+    userId: source.userId,
+    channelName: source.channelName,
+    channelId: source.channelId,
+  })
+}
+
 class MaterialPreviewManager {
   constructor() {
     this.previewService = new MaterialPreviewService()
@@ -155,7 +165,7 @@ class MaterialPreviewManager {
     await this.saveStates()
 
     console.log(
-      '[素材预览] 已启动:',
+      `${getMaterialPreviewLogPrefix(state)} 已启动:`,
       JSON.stringify(
         {
           instanceKey,
@@ -174,7 +184,7 @@ class MaterialPreviewManager {
 
     setTimeout(() => {
       this.executePreview(instanceKey).catch(error => {
-        console.error('[素材预览] 首次执行失败:', instanceKey, error)
+        console.error(`${getMaterialPreviewLogPrefix(state)} 首次执行失败:`, instanceKey, error)
       })
     }, 1000)
 
@@ -332,7 +342,7 @@ class MaterialPreviewManager {
     this.clearTimer(instanceKey)
     const timerId = setInterval(() => {
       this.executePreview(instanceKey).catch(error => {
-        console.error('[素材预览] 定时执行失败:', instanceKey, error)
+        console.error(`${getMaterialPreviewLogPrefix(state)} 定时执行失败:`, instanceKey, error)
       })
     }, state.intervalMinutes * 60 * 1000)
 
@@ -354,7 +364,7 @@ class MaterialPreviewManager {
       throw new Error(`素材预览不存在: ${instanceKey}`)
     }
     if (state.running) {
-      console.log('[素材预览] 上一轮仍在执行，跳过本次:', instanceKey)
+      console.log(`${getMaterialPreviewLogPrefix(state)} 上一轮仍在执行，跳过本次:`, instanceKey)
       return
     }
 
@@ -366,7 +376,7 @@ class MaterialPreviewManager {
     try {
       const executionConfig = await this.buildExecutionConfig(state)
       console.log(
-        '[素材预览] 开始执行:',
+        `${getMaterialPreviewLogPrefix(state)} 开始执行:`,
         JSON.stringify(
           {
             instanceKey,
@@ -397,6 +407,7 @@ class MaterialPreviewManager {
         previewDelayMs: 400,
         cookie: executionConfig.cookie,
         dryRun: false,
+        logPrefix: getMaterialPreviewLogPrefix(state),
       })
 
       state.lastStatus = result.failed > 0 ? 'failed' : 'success'
@@ -410,7 +421,7 @@ class MaterialPreviewManager {
       }
 
       console.log(
-        '[素材预览] 执行完成:',
+        `${getMaterialPreviewLogPrefix(state)} 执行完成:`,
         JSON.stringify(
           {
             instanceKey,
@@ -434,7 +445,7 @@ class MaterialPreviewManager {
     } catch (error) {
       state.lastStatus = 'failed'
       state.lastError = error?.message || String(error)
-      console.error('[素材预览] 执行失败:', instanceKey, error)
+      console.error(`${getMaterialPreviewLogPrefix(state)} 执行失败:`, instanceKey, error)
     } finally {
       state.running = false
       if (state.enabled) {

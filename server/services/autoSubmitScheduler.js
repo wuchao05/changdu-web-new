@@ -6,6 +6,7 @@
 import fs from 'fs/promises'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { AsyncLocalStorage } from 'async_hooks'
 import { FEISHU_CONFIG } from '../config/feishu.js'
 import { AUTO_SUBMIT_CONFIG } from '../config/autoSubmit.js'
 import { buildChangduGetHeaders } from '../utils/changduSign.js'
@@ -17,9 +18,72 @@ import {
 } from '../utils/channelRuntime.js'
 import { normalizeRuntimeInstanceKey } from '../utils/runtimeInstance.js'
 import { resolveDownloadCenterRequestHeaders } from '../utils/downloadCenterHeaders.js'
+import { createScopedConsole } from '../utils/serviceLogger.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
+const autoSubmitLogContext = new AsyncLocalStorage()
+
+function runWithAutoSubmitLogContext(context, runner) {
+  return autoSubmitLogContext.run(context || {}, runner)
+}
+
+function buildAutoSubmitLogContext(instanceKey = '', runtimeContext = null) {
+  return {
+    instanceKey: String(instanceKey || runtimeContext?.channelRuntime?.channelId || '').trim(),
+    runtimeUserName: String(runtimeContext?.runtimeUser?.nickname || '').trim(),
+    userId: String(runtimeContext?.runtimeUser?.id || '').trim(),
+    channelName: String(runtimeContext?.channelRuntime?.channelName || '').trim(),
+    channelId: String(runtimeContext?.channelRuntime?.channelId || '').trim(),
+  }
+}
+
+function parseInstanceKeyFromLogArgs(args = []) {
+  const firstArg = args[0]
+  if (typeof firstArg !== 'string') {
+    return ''
+  }
+
+  const match = firstArg.match(/^\[(?:自动提交|批量提交)-([^\]]+)\]/)
+  return String(match?.[1] || '').trim()
+}
+
+function resolveLogProfileFromContext(args = []) {
+  const context = autoSubmitLogContext.getStore() || {}
+  const instanceKey = String(context.instanceKey || parseInstanceKeyFromLogArgs(args) || '').trim()
+  let profile = {}
+
+  if (instanceKey) {
+    const schedulerProfile = getSchedulerProfile(instanceKey)
+    profile = {
+      runtimeUserName: schedulerProfile.runtimeUserName,
+      userId: schedulerProfile.userId,
+      channelName: schedulerProfile.channelName,
+      channelId: schedulerProfile.channelId,
+    }
+  }
+
+  return {
+    runtimeUserName: profile.runtimeUserName || context.runtimeUserName || '',
+    userId: profile.userId || context.userId || '',
+    channelName: profile.channelName || context.channelName || '',
+    channelId: profile.channelId || context.channelId || '',
+  }
+}
+
+function resolveLogScope(args = []) {
+  const firstArg = args[0]
+  if (typeof firstArg === 'string' && firstArg.startsWith('[批量提交')) {
+    return '批量提交'
+  }
+  return '自动提交'
+}
+
+const serviceConsole = createScopedConsole(
+  '自动提交',
+  args => resolveLogProfileFromContext(args),
+  args => resolveLogScope(args)
+)
 
 /**
  * 将 ISO 时间字符串转换为北京时间格式
@@ -49,13 +113,13 @@ async function safeJsonParse(response, context = '') {
   const status = response.status
   const text = await response.text()
   if (!text || text.trim() === '') {
-    console.error(`[自动提交] ${context} 响应为空, HTTP状态: ${status}, URL: ${response.url}`)
+    serviceConsole.error(`[自动提交] ${context} 响应为空, HTTP状态: ${status}, URL: ${response.url}`)
     throw new Error(`${context ? context + ': ' : ''}响应为空 (HTTP ${status})`)
   }
   try {
     return JSON.parse(text)
   } catch (e) {
-    console.error(
+    serviceConsole.error(
       `[自动提交] JSON解析失败 ${context}, HTTP状态: ${status}:`,
       text.substring(0, 500)
     )
@@ -354,7 +418,7 @@ async function saveState(channelId) {
     await fs.mkdir(dir, { recursive: true })
     await fs.writeFile(stateFilePath, JSON.stringify(entry.state, null, 2))
   } catch (error) {
-    console.error(`[自动提交-${channelId}] 保存状态失败:`, error.message)
+    serviceConsole.error(`[自动提交-${channelId}] 保存状态失败:`, error.message)
   }
 }
 
@@ -368,9 +432,9 @@ async function loadState(channelId) {
     const data = await fs.readFile(stateFilePath, 'utf-8')
     const savedState = JSON.parse(data)
     entry.state = { ...entry.state, ...savedState }
-    console.log(`[自动提交-${channelId}] 已加载保存的状态`)
+    serviceConsole.log(`[自动提交-${channelId}] 已加载保存的状态`)
   } catch {
-    console.log(`[自动提交-${channelId}] 未找到状态文件，使用默认状态`)
+    serviceConsole.log(`[自动提交-${channelId}] 未找到状态文件，使用默认状态`)
   }
 }
 
@@ -382,13 +446,15 @@ async function migrateOldState() {
     const data = await fs.readFile(OLD_STATE_FILE_PATH, 'utf-8')
     const oldState = JSON.parse(data)
     const channelId = String(oldState.channelId || 'default').trim() || 'default'
-    const entry = ensureSchedulerEntry(channelId)
-    entry.state = { ...entry.state, ...oldState, channelId }
-    await saveState(channelId)
-    console.log(`[自动提交] 已迁移旧状态文件到渠道 ${channelId}`)
+    await runWithAutoSubmitLogContext(buildAutoSubmitLogContext(channelId), async () => {
+      const entry = ensureSchedulerEntry(channelId)
+      entry.state = { ...entry.state, ...oldState, channelId }
+      await saveState(channelId)
+      serviceConsole.log(`[自动提交-${channelId}] 已迁移旧状态文件到渠道 ${channelId}`)
 
-    await fs.unlink(OLD_STATE_FILE_PATH)
-    console.log('[自动提交] 已删除旧状态文件')
+      await fs.unlink(OLD_STATE_FILE_PATH)
+      serviceConsole.log(`[自动提交-${channelId}] 已删除旧状态文件`)
+    })
   } catch {
     // 旧文件不存在或读取失败，忽略
   }
@@ -607,7 +673,7 @@ async function resetAllChannelAccountsUnused(channelId) {
     }
   }
 
-  console.log(`[自动提交-${channelId}] 账户池已回收，共重置 ${records.length} 个账户`)
+  serviceConsole.log(`[自动提交-${channelId}] 账户池已回收，共重置 ${records.length} 个账户`)
   return { resetCount: records.length }
 }
 
@@ -725,8 +791,8 @@ async function createDramaStatusRecord(channelId, params) {
 
   const result = await safeJsonParse(response, '创建剧集状态记录')
   if (result.code !== 0) {
-    console.error(`[自动提交-${channelId}] 创建剧集状态记录失败，请求字段:`, JSON.stringify(fields))
-    console.error(`[自动提交-${channelId}] 飞书返回:`, JSON.stringify(result))
+    serviceConsole.error(`[自动提交-${channelId}] 创建剧集状态记录失败，请求字段:`, JSON.stringify(fields))
+    serviceConsole.error(`[自动提交-${channelId}] 飞书返回:`, JSON.stringify(result))
     throw new Error(`创建剧集状态记录失败: ${result.msg}`)
   }
   return result
@@ -836,7 +902,7 @@ async function getNewDramaList(params = {}) {
   // 检查 HTTP 状态码
   if (!response.ok) {
     const text = await response.text()
-    console.error(`[自动提交] 获取新剧列表 HTTP ${response.status}:`, text.substring(0, 200))
+    serviceConsole.error(`[自动提交] 获取新剧列表 HTTP ${response.status}:`, text.substring(0, 200))
     throw new Error(`获取新剧列表: HTTP ${response.status} - ${response.statusText}`)
   }
 
@@ -901,7 +967,7 @@ async function getNewDramaListWithRetry(
       (result.message?.includes('访问速度过快') || result.message?.includes('rate limit'))
 
     if (isRateLimited && retries > 0) {
-      console.log(`[自动提交] 请求被限速，${AUTO_SUBMIT_CONFIG.pagination.retryDelay}ms后重试...`)
+      serviceConsole.log(`[自动提交] 请求被限速，${AUTO_SUBMIT_CONFIG.pagination.retryDelay}ms后重试...`)
       await wait(AUTO_SUBMIT_CONFIG.pagination.retryDelay)
       return getNewDramaListWithRetry(params, retries - 1)
     }
@@ -910,7 +976,7 @@ async function getNewDramaListWithRetry(
   } catch (error) {
     // 网络错误等异常情况下的重试
     if (retries > 0) {
-      console.log(
+      serviceConsole.log(
         `[自动提交] 请求失败: ${error.message}，${AUTO_SUBMIT_CONFIG.pagination.retryDelay}ms后重试...`
       )
       await wait(AUTO_SUBMIT_CONFIG.pagination.retryDelay)
@@ -936,7 +1002,7 @@ async function getDownloadTaskList(channelId, startTime, endTime) {
 
   const headerConfig = await getDownloadCenterTaskListHeaders(channelId)
 
-  console.log(`[自动提交-${channelId}] task_list 请求头:`, {
+  serviceConsole.log(`[自动提交-${channelId}] task_list 请求头:`, {
     Distributorid: headerConfig.distributorid,
     Appid: headerConfig.appid,
     Aduserid: headerConfig.Aduserid,
@@ -988,10 +1054,10 @@ async function fetchAutoSubmitDramas(channelId) {
   await ensureSchedulerRuntime(channelId)
   const dateRanges = getDateRanges()
 
-  console.log(`[自动提交-${channelId}] ========== 获取剧集 ==========`)
-  console.log(`[自动提交-${channelId}] 今天:`, formatDate(dateRanges.today))
-  console.log(`[自动提交-${channelId}] 明天:`, formatDate(dateRanges.tomorrow))
-  console.log(`[自动提交-${channelId}] 后天:`, formatDate(dateRanges.dayAfterTomorrow))
+  serviceConsole.log(`[自动提交-${channelId}] ========== 获取剧集 ==========`)
+  serviceConsole.log(`[自动提交-${channelId}] 今天:`, formatDate(dateRanges.today))
+  serviceConsole.log(`[自动提交-${channelId}] 明天:`, formatDate(dateRanges.tomorrow))
+  serviceConsole.log(`[自动提交-${channelId}] 后天:`, formatDate(dateRanges.dayAfterTomorrow))
 
   const dramaListTableId = getSchedulerProfile(channelId).dramaListTableId
   const { batchSize, batchDelay, totalPages } = AUTO_SUBMIT_CONFIG.pagination
@@ -1003,7 +1069,7 @@ async function fetchAutoSubmitDramas(channelId) {
     dateRanges.endTime
   )
   const downloadList = downloadResult.data || []
-  console.log(`[自动提交-${channelId}] 下载任务列表:`, downloadList.length, '条')
+  serviceConsole.log(`[自动提交-${channelId}] 下载任务列表:`, downloadList.length, '条')
 
   // 分批获取剧集列表
   const dramaResults = []
@@ -1034,7 +1100,7 @@ async function fetchAutoSubmitDramas(channelId) {
     return acc
   }, [])
 
-  console.log(`[自动提交-${channelId}] 去重后的剧集总数:`, uniqueDramas.length)
+  serviceConsole.log(`[自动提交-${channelId}] 去重后的剧集总数:`, uniqueDramas.length)
 
   // 过滤剧集
   const filteredDramas = uniqueDramas.filter(drama => {
@@ -1044,7 +1110,7 @@ async function fetchAutoSubmitDramas(channelId) {
     return true
   })
 
-  console.log(`[自动提交-${channelId}] 过滤后的剧集总数:`, filteredDramas.length)
+  serviceConsole.log(`[自动提交-${channelId}] 过滤后的剧集总数:`, filteredDramas.length)
 
   // 按日期分组
   const todayDramas = []
@@ -1065,9 +1131,9 @@ async function fetchAutoSubmitDramas(channelId) {
     }
   }
 
-  console.log(`[自动提交-${channelId}] 今天的剧集数:`, todayDramas.length)
-  console.log(`[自动提交-${channelId}] 明天的剧集数:`, tomorrowDramas.length)
-  console.log(`[自动提交-${channelId}] 后天的剧集数:`, dayAfterTomorrowDramas.length)
+  serviceConsole.log(`[自动提交-${channelId}] 今天的剧集数:`, todayDramas.length)
+  serviceConsole.log(`[自动提交-${channelId}] 明天的剧集数:`, tomorrowDramas.length)
+  serviceConsole.log(`[自动提交-${channelId}] 后天的剧集数:`, dayAfterTomorrowDramas.length)
 
   const newDramaSet = new Set()
 
@@ -1164,7 +1230,7 @@ async function processDrama(channelId, drama, downloadList, newDramaSet, options
     // 1. 检查可用账户
     const availableAccount = await getFirstAvailableAccount(channelId)
     if (!availableAccount) {
-      console.log(`[自动提交-${channelId}] 无可用账户，跳过: ${dramaName}`)
+      serviceConsole.log(`[自动提交-${channelId}] 无可用账户，跳过: ${dramaName}`)
       return { success: false, reason: 'no_account' }
     }
 
@@ -1177,7 +1243,7 @@ async function processDrama(channelId, drama, downloadList, newDramaSet, options
       })
 
       if (existingDrama) {
-        console.log(`[自动提交-${channelId}] 剧集已存在，跳过: ${dramaName}`)
+        serviceConsole.log(`[自动提交-${channelId}] 剧集已存在，跳过: ${dramaName}`)
         return { success: false, reason: 'already_exists' }
       }
     }
@@ -1187,7 +1253,7 @@ async function processDrama(channelId, drama, downloadList, newDramaSet, options
 
     // 4. 创建飞书剧集清单记录
     await createDramaRecord(channelId, dramaName, drama.publish_time, drama.book_id, rating)
-    console.log(`[自动提交-${channelId}] 创建剧集清单记录成功: ${dramaName}`)
+    serviceConsole.log(`[自动提交-${channelId}] 创建剧集清单记录成功: ${dramaName}`)
 
     // 5. 根据下载状态确定飞书状态
     const downloadData = getDownloadDataForDrama(downloadList, drama)
@@ -1208,7 +1274,7 @@ async function processDrama(channelId, drama, downloadList, newDramaSet, options
       douyinMaterial: douyinMaterial || undefined, // 如果为空字符串则传 undefined
       rating, // 传递评级参数
     })
-    console.log(
+    serviceConsole.log(
       `[自动提交-${channelId}] 创建剧集状态记录成功，分配账户: ${availableAccount.account}`
     )
 
@@ -1220,15 +1286,15 @@ async function processDrama(channelId, drama, downloadList, newDramaSet, options
       try {
         const remark = `${getSchedulerBrandName(channelId)}-${dramaName}`
         await editJuliangAccountRemark(channelId, availableAccount.account, remark)
-        console.log(`[自动提交-${channelId}] 更新巨量账户备注成功: ${availableAccount.account}`)
+        serviceConsole.log(`[自动提交-${channelId}] 更新巨量账户备注成功: ${availableAccount.account}`)
       } catch (juliangError) {
-        console.error(`[自动提交-${channelId}] 更新巨量账户备注失败:`, juliangError.message)
+        serviceConsole.error(`[自动提交-${channelId}] 更新巨量账户备注失败:`, juliangError.message)
       }
     }
 
     return { success: true }
   } catch (error) {
-    console.error(`[自动提交-${channelId}] 处理失败: ${dramaName}`, error.message)
+    serviceConsole.error(`[自动提交-${channelId}] 处理失败: ${dramaName}`, error.message)
     return { success: false, reason: 'error', error: error.message }
   }
 }
@@ -1242,7 +1308,7 @@ async function runAutoSubmitCycle(channelId) {
 
   if (!state.enabled) return
   if (state.running) {
-    console.log(`[自动提交-${channelId}] 上一轮仍在运行，跳过本次`)
+    serviceConsole.log(`[自动提交-${channelId}] 上一轮仍在运行，跳过本次`)
     return
   }
 
@@ -1254,7 +1320,7 @@ async function runAutoSubmitCycle(channelId) {
   await saveState(channelId)
 
   try {
-    console.log(`[自动提交-${channelId}] ========== 开始自动提交流程 ==========`)
+    serviceConsole.log(`[自动提交-${channelId}] ========== 开始自动提交流程 ==========`)
 
     // 1. 获取并过滤剧集
     const { today, tomorrow, dayAfterTomorrow, downloadList, newDramaSet } =
@@ -1274,7 +1340,7 @@ async function runAutoSubmitCycle(channelId) {
 
     for (const dateGroup of dateGroups) {
       if (!state.enabled) {
-        console.log(`[自动提交-${channelId}] 已停止`)
+        serviceConsole.log(`[自动提交-${channelId}] 已停止`)
         break
       }
 
@@ -1295,7 +1361,7 @@ async function runAutoSubmitCycle(channelId) {
       })
 
       if (eligibleDramas.length === 0) {
-        console.log(`[自动提交-${channelId}] ${dateGroup.date}没有需要处理的剧集`)
+        serviceConsole.log(`[自动提交-${channelId}] ${dateGroup.date}没有需要处理的剧集`)
         continue
       }
 
@@ -1303,7 +1369,7 @@ async function runAutoSubmitCycle(channelId) {
       const sortedDramas = sortDramasByPriority(eligibleDramas, downloadList, newDramaSet)
 
       const filterMode = state.onlyRedFlag ? '仅红标剧' : '所有剧'
-      console.log(
+      serviceConsole.log(
         `[自动提交-${channelId}] 开始处理${dateGroup.date}的剧集，共 ${sortedDramas.length} 部（筛选模式：${filterMode}）`
       )
 
@@ -1311,7 +1377,7 @@ async function runAutoSubmitCycle(channelId) {
       state.progress.total = sortedDramas.length
       for (let i = 0; i < sortedDramas.length; i++) {
         if (!state.enabled) {
-          console.log(`[自动提交-${channelId}] 已停止`)
+          serviceConsole.log(`[自动提交-${channelId}] 已停止`)
           break
         }
 
@@ -1321,7 +1387,7 @@ async function runAutoSubmitCycle(channelId) {
         await saveState(channelId)
 
         const redFlagLabel = newDramaSet.has(drama.book_id) ? ' [红标]' : ''
-        console.log(
+        serviceConsole.log(
           `[自动提交-${channelId}] 处理第 ${i + 1}/${sortedDramas.length} 部：${drama.series_name}${redFlagLabel}`
         )
 
@@ -1330,12 +1396,12 @@ async function runAutoSubmitCycle(channelId) {
 
         if (result.success) {
           successCount++
-          console.log(`[自动提交-${channelId}] ✓ ${drama.series_name} 处理成功`)
+          serviceConsole.log(`[自动提交-${channelId}] ✓ ${drama.series_name} 处理成功`)
         } else if (result.reason === 'already_exists' || result.reason === 'no_account') {
           skipCount++
         } else {
           failCount++
-          console.log(
+          serviceConsole.log(
             `[自动提交-${channelId}] ✗ ${drama.series_name} 处理失败: ${result.error || result.reason}`
           )
         }
@@ -1344,7 +1410,7 @@ async function runAutoSubmitCycle(channelId) {
         await wait(1000)
       }
 
-      console.log(`[自动提交-${channelId}] ${dateGroup.date}的剧集处理完成`)
+      serviceConsole.log(`[自动提交-${channelId}] ${dateGroup.date}的剧集处理完成`)
     }
 
     // 更新统计
@@ -1362,12 +1428,12 @@ async function runAutoSubmitCycle(channelId) {
       skip: skipCount,
     })
 
-    console.log(`[自动提交-${channelId}] ========== 自动提交流程完成 ==========`)
-    console.log(
+    serviceConsole.log(`[自动提交-${channelId}] ========== 自动提交流程完成 ==========`)
+    serviceConsole.log(
       `[自动提交-${channelId}] 本轮统计: 处理 ${processedCount}, 成功 ${successCount}, 失败 ${failCount}, 跳过 ${skipCount}`
     )
   } catch (error) {
-    console.error(`[自动提交-${channelId}] 执行失败:`, error.message)
+    serviceConsole.error(`[自动提交-${channelId}] 执行失败:`, error.message)
     addTaskHistory(channelId, {
       status: 'error',
       error: error.message,
@@ -1396,14 +1462,14 @@ function scheduleNextRun(channelId) {
   const intervalMs = state.intervalMinutes * 60 * 1000
   state.nextRunTime = new Date(Date.now() + intervalMs).toISOString()
 
-  console.log(`[自动提交-${channelId}] 下次运行时间: ${state.nextRunTime}`)
+  serviceConsole.log(`[自动提交-${channelId}] 下次运行时间: ${state.nextRunTime}`)
 
   if (entry.timer) {
     clearTimeout(entry.timer)
   }
 
   entry.timer = setTimeout(() => {
-    runAutoSubmitCycle(channelId)
+    runWithAutoSubmitLogContext({ instanceKey: channelId }, () => runAutoSubmitCycle(channelId))
   }, intervalMs)
 }
 
@@ -1413,57 +1479,61 @@ function scheduleNextRun(channelId) {
  * 启动调度器
  */
 export async function startScheduler(channelId, options = {}, runtimeContext = null) {
-  const { intervalMinutes = 5, onlyRedFlag = false } = options
+  return runWithAutoSubmitLogContext(buildAutoSubmitLogContext(channelId, runtimeContext), async () => {
+    const { intervalMinutes = 5, onlyRedFlag = false } = options
 
-  const entry = ensureSchedulerEntry(channelId)
-  const state = entry.state
-  const runtime = await ensureSchedulerRuntime(channelId, runtimeContext)
+    const entry = ensureSchedulerEntry(channelId)
+    const state = entry.state
+    const runtime = await ensureSchedulerRuntime(channelId, runtimeContext)
 
-  if (state.enabled) {
-    console.log(`[自动提交-${channelId}] 调度器已经在运行`)
-    return { success: false, message: '调度器已经在运行' }
-  }
+    if (state.enabled) {
+      serviceConsole.log(`[自动提交-${channelId}] 调度器已经在运行`)
+      return { success: false, message: '调度器已经在运行' }
+    }
 
-  state.enabled = true
-  state.intervalMinutes = intervalMinutes
-  state.onlyRedFlag = onlyRedFlag
+    state.enabled = true
+    state.intervalMinutes = intervalMinutes
+    state.onlyRedFlag = onlyRedFlag
 
-  console.log(
-    `[自动提交-${channelId}] 启动调度器，渠道: ${getChannelLabel(runtime)}，轮询间隔: ${intervalMinutes} 分钟`
-  )
-  console.log(`[自动提交-${channelId}] 仅红标: ${onlyRedFlag}`)
+    serviceConsole.log(
+      `[自动提交-${channelId}] 启动调度器，渠道: ${getChannelLabel(runtime)}，轮询间隔: ${intervalMinutes} 分钟`
+    )
+    serviceConsole.log(`[自动提交-${channelId}] 仅红标: ${onlyRedFlag}`)
 
-  await saveState(channelId)
+    await saveState(channelId)
 
-  // 立即执行一次
-  runAutoSubmitCycle(channelId)
+    // 立即执行一次
+    await runAutoSubmitCycle(channelId)
 
-  return { success: true, message: '调度器已启动' }
+    return { success: true, message: '调度器已启动' }
+  })
 }
 
 /**
  * 停止调度器
  */
 export async function stopScheduler(channelId) {
-  console.log(`[自动提交-${channelId}] 停止调度器`)
+  return runWithAutoSubmitLogContext(buildAutoSubmitLogContext(channelId), async () => {
+    serviceConsole.log(`[自动提交-${channelId}] 停止调度器`)
 
-  const entry = ensureSchedulerEntry(channelId)
-  const state = entry.state
+    const entry = ensureSchedulerEntry(channelId)
+    const state = entry.state
 
-  state.enabled = false
-  state.running = false
-  state.nextRunTime = null
-  state.currentTask = null
-  state.progress = { current: 0, total: 0, currentDate: '', currentDrama: '' }
+    state.enabled = false
+    state.running = false
+    state.nextRunTime = null
+    state.currentTask = null
+    state.progress = { current: 0, total: 0, currentDate: '', currentDrama: '' }
 
-  if (entry.timer) {
-    clearTimeout(entry.timer)
-    entry.timer = null
-  }
+    if (entry.timer) {
+      clearTimeout(entry.timer)
+      entry.timer = null
+    }
 
-  await saveState(channelId)
+    await saveState(channelId)
 
-  return { success: true, message: '调度器已停止' }
+    return { success: true, message: '调度器已停止' }
+  })
 }
 
 /**
@@ -1496,32 +1566,34 @@ export function getSchedulerStatus(channelId) {
  * 手动触发一次执行
  */
 export async function triggerManualRun(channelId, runtimeContext = null) {
-  const runtime = await ensureSchedulerRuntime(channelId, runtimeContext)
-  const entry = ensureSchedulerEntry(channelId)
-  const state = entry.state
+  return runWithAutoSubmitLogContext(buildAutoSubmitLogContext(channelId, runtimeContext), async () => {
+    const runtime = await ensureSchedulerRuntime(channelId, runtimeContext)
+    const entry = ensureSchedulerEntry(channelId)
+    const state = entry.state
 
-  if (state.running) {
-    return { success: false, message: '当前正在运行中' }
-  }
-
-  console.log(`[自动提交-${channelId}] 手动触发执行，渠道: ${getChannelLabel(runtime)}`)
-
-  // 临时启用以执行一次
-  const wasEnabled = state.enabled
-  state.enabled = true
-
-  await runAutoSubmitCycle(channelId)
-
-  // 如果之前未启用，恢复状态
-  if (!wasEnabled) {
-    state.enabled = false
-    if (entry.timer) {
-      clearTimeout(entry.timer)
-      entry.timer = null
+    if (state.running) {
+      return { success: false, message: '当前正在运行中' }
     }
-  }
 
-  return { success: true, message: '手动执行完成' }
+    serviceConsole.log(`[自动提交-${channelId}] 手动触发执行，渠道: ${getChannelLabel(runtime)}`)
+
+    // 临时启用以执行一次
+    const wasEnabled = state.enabled
+    state.enabled = true
+
+    await runAutoSubmitCycle(channelId)
+
+    // 如果之前未启用，恢复状态
+    if (!wasEnabled) {
+      state.enabled = false
+      if (entry.timer) {
+        clearTimeout(entry.timer)
+        entry.timer = null
+      }
+    }
+
+    return { success: true, message: '手动执行完成' }
+  })
 }
 
 /**
@@ -1551,15 +1623,17 @@ export async function initScheduler() {
   await Promise.all(keys.map(instanceKey => loadState(instanceKey)))
 
   for (const instanceKey of Object.keys(schedulers)) {
-    const entry = ensureSchedulerEntry(instanceKey)
-    await ensureSchedulerRuntime(instanceKey)
-    entry.state.running = false
-    entry.state.progress = { current: 0, total: 0, currentDate: '', currentDrama: '' }
+    await runWithAutoSubmitLogContext({ instanceKey }, async () => {
+      const entry = ensureSchedulerEntry(instanceKey)
+      await ensureSchedulerRuntime(instanceKey)
+      entry.state.running = false
+      entry.state.progress = { current: 0, total: 0, currentDate: '', currentDrama: '' }
 
-    if (entry.state.enabled) {
-      console.log(`[自动提交-${instanceKey}] 恢复之前的调度状态`)
-      scheduleNextRun(instanceKey)
-    }
+      if (entry.state.enabled) {
+        serviceConsole.log(`[自动提交-${instanceKey}] 恢复之前的调度状态`)
+        scheduleNextRun(instanceKey)
+      }
+    })
   }
 }
 
@@ -1568,7 +1642,7 @@ export async function initScheduler() {
  * @param {Array} items - 剧集列表
  */
 async function executeBatchSubmit(items, runtimeContext = null) {
-  console.log(`[批量提交] 开始处理 ${items.length} 部剧集`)
+  serviceConsole.log(`[批量提交] 开始处理 ${items.length} 部剧集`)
 
   const results = []
   let successCount = 0
@@ -1584,7 +1658,7 @@ async function executeBatchSubmit(items, runtimeContext = null) {
     const dramaName = item.series_name
 
     try {
-      console.log(`[批量提交] 处理第 ${i + 1}/${items.length} 部：${dramaName}`)
+      serviceConsole.log(`[批量提交] 处理第 ${i + 1}/${items.length} 部：${dramaName}`)
 
       await ensureSchedulerRuntime(channelId, runtimeContext)
 
@@ -1619,7 +1693,7 @@ async function executeBatchSubmit(items, runtimeContext = null) {
           series_name: item.series_name,
           success: true,
         })
-        console.log(`[批量提交] ✓ ${dramaName} 提交成功`)
+        serviceConsole.log(`[批量提交] ✓ ${dramaName} 提交成功`)
       } else {
         failedCount++
         results.push({
@@ -1628,7 +1702,7 @@ async function executeBatchSubmit(items, runtimeContext = null) {
           success: false,
           error: result.reason || result.error || '提交失败',
         })
-        console.log(`[批量提交] ✗ ${dramaName} 提交失败: ${result.reason || result.error}`)
+        serviceConsole.log(`[批量提交] ✗ ${dramaName} 提交失败: ${result.reason || result.error}`)
       }
 
       // 每个剧集之间等待 1 秒
@@ -1643,11 +1717,11 @@ async function executeBatchSubmit(items, runtimeContext = null) {
         success: false,
         error: error.message,
       })
-      console.error(`[批量提交] ✗ ${dramaName} 处理异常:`, error.message)
+      serviceConsole.error(`[批量提交] ✗ ${dramaName} 处理异常:`, error.message)
     }
   }
 
-  console.log(
+  serviceConsole.log(
     `[批量提交] 完成！总计 ${items.length} 部，成功 ${successCount} 部，失败 ${failedCount} 部`
   )
 
@@ -1666,17 +1740,23 @@ async function executeBatchSubmit(items, runtimeContext = null) {
  */
 export function batchSubmitDramas(items, runtimeContext = null) {
   const taskId = `batch-${Date.now()}`
+  const channelId = runtimeContext?.channelRuntime?.channelId || 'default'
+  const logContext = buildAutoSubmitLogContext(channelId, runtimeContext)
 
-  console.log(`[批量提交] 创建任务 ${taskId}，共 ${items.length} 部剧集`)
+  runWithAutoSubmitLogContext(logContext, () => {
+    serviceConsole.log(`[批量提交] 创建任务 ${taskId}，共 ${items.length} 部剧集`)
+  })
 
   // 异步执行，不等待结果
-  executeBatchSubmit(items, runtimeContext)
-    .then(result => {
-      console.log(`[批量提交] 任务 ${taskId} 完成:`, result)
-    })
-    .catch(error => {
-      console.error(`[批量提交] 任务 ${taskId} 失败:`, error)
-    })
+  runWithAutoSubmitLogContext(logContext, () =>
+    executeBatchSubmit(items, runtimeContext)
+      .then(result => {
+        serviceConsole.log(`[批量提交] 任务 ${taskId} 完成:`, result)
+      })
+      .catch(error => {
+        serviceConsole.error(`[批量提交] 任务 ${taskId} 失败:`, error)
+      })
+  )
 
   // 立即返回任务信息
   return {

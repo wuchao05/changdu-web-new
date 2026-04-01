@@ -9,8 +9,13 @@ const FEISHU_TOKEN_API_URL = `${FEISHU_CONFIG.api_base_url}${FEISHU_CONFIG.token
 const DEFAULT_FEISHU_BASE_URL = 'https://open.feishu.cn/open-apis/bitable/v1'
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+const DEFAULT_LOG_PREFIX = '[素材预览-未知用户-默认渠道]'
 
-async function withRetry(runner, label, retries = 3, delayMs = 600) {
+function resolveLogPrefix(logPrefix = '') {
+  return String(logPrefix || '').trim() || DEFAULT_LOG_PREFIX
+}
+
+async function withRetry(runner, label, retries = 3, delayMs = 600, logPrefix = '') {
   let lastError
 
   for (let index = 0; index < retries; index += 1) {
@@ -19,7 +24,7 @@ async function withRetry(runner, label, retries = 3, delayMs = 600) {
     } catch (error) {
       lastError = error
       console.warn(
-        `[素材预览] ${label} 失败重试 ${index + 1}/${retries}:`,
+        `${resolveLogPrefix(logPrefix)} ${label} 失败重试 ${index + 1}/${retries}:`,
         error?.response?.status || error?.message || error
       )
       await sleep(delayMs * (index + 1))
@@ -45,7 +50,7 @@ function createClient(cookie) {
   })
 }
 
-async function fetchAllAds(client, aadvid) {
+async function fetchAllAds(client, aadvid, logPrefix = '') {
   const all = []
   let page = 1
 
@@ -67,7 +72,10 @@ async function fetchAllAds(client, aadvid) {
             params: { aadvid },
           }
         ),
-      `fetchAds(page=${page})`
+      `fetchAds(page=${page})`,
+      3,
+      600,
+      logPrefix
     )
 
     if (response.data.code !== 0) {
@@ -148,7 +156,7 @@ async function runConcurrent(items, limit, runner) {
   }
 }
 
-async function fetchMaterialsByPromotions(client, aadvid, promotionIds, concurrency = 3) {
+async function fetchMaterialsByPromotions(client, aadvid, promotionIds, concurrency = 3, logPrefix = '') {
   const results = []
   const groups = chunk(promotionIds, 50)
 
@@ -191,7 +199,10 @@ async function fetchMaterialsByPromotions(client, aadvid, promotionIds, concurre
               params: { aadvid },
             }
           ),
-        `fetchMaterials(chunk=${chunkIndex}, page=${page})`
+        `fetchMaterials(chunk=${chunkIndex}, page=${page})`,
+        3,
+        600,
+        logPrefix
       )
 
       if (response.data.code !== 0) {
@@ -305,7 +316,7 @@ function promotionsToDeleteByType(materials) {
   return promotionIds
 }
 
-async function previewOne(client, aadvid, materialId, promotionId) {
+async function previewOne(client, aadvid, materialId, promotionId, logPrefix = '') {
   const response = await withRetry(
     () =>
       client.get('/ad/api/agw/ad/preview_url', {
@@ -317,7 +328,10 @@ async function previewOne(client, aadvid, materialId, promotionId) {
         },
         headers: { 'Accept-Encoding': 'gzip, deflate, br' },
       }),
-    `preview(material=${materialId})`
+    `preview(material=${materialId})`,
+    3,
+    600,
+    logPrefix
   )
 
   if ((response.data?.code ?? 0) !== 0) {
@@ -327,7 +341,7 @@ async function previewOne(client, aadvid, materialId, promotionId) {
   return response.data
 }
 
-async function deleteMaterialsBatch(client, aadvid, promotionId, cdpIds) {
+async function deleteMaterialsBatch(client, aadvid, promotionId, cdpIds, logPrefix = '') {
   const response = await withRetry(
     () =>
       client.post(
@@ -337,7 +351,10 @@ async function deleteMaterialsBatch(client, aadvid, promotionId, cdpIds) {
           params: { aadvid },
         }
       ),
-    `deleteMaterials(promotion=${promotionId}, count=${cdpIds.length})`
+    `deleteMaterials(promotion=${promotionId}, count=${cdpIds.length})`,
+    3,
+    600,
+    logPrefix
   )
 
   if ((response.data?.code ?? 0) !== 0) {
@@ -347,7 +364,7 @@ async function deleteMaterialsBatch(client, aadvid, promotionId, cdpIds) {
   return response.data
 }
 
-async function deletePromotion(client, aadvid, promotionId) {
+async function deletePromotion(client, aadvid, promotionId, logPrefix = '') {
   const response = await withRetry(
     () =>
       client.post(
@@ -357,7 +374,10 @@ async function deletePromotion(client, aadvid, promotionId) {
           params: { aadvid },
         }
       ),
-    `deletePromotion(${promotionId})`
+    `deletePromotion(${promotionId})`,
+    3,
+    600,
+    logPrefix
   )
 
   if ((response.data?.code ?? 0) !== 0) {
@@ -534,7 +554,7 @@ function resolveAccountCookie(account, fallbackCookie = '') {
 export class MaterialPreviewService {
   async analyzeAccount(config) {
     const client = createClient(config.cookie)
-    const adsAll = await fetchAllAds(client, config.aadvid)
+    const adsAll = await fetchAllAds(client, config.aadvid, config.logPrefix)
     const adsFiltered = filterAndDedupAds(adsAll, config.drama_name, config.aweme_white_list)
 
     if (!adsFiltered.length) {
@@ -548,7 +568,13 @@ export class MaterialPreviewService {
     }
 
     const promotionIds = adsFiltered.map(ad => ad.promotion_id)
-    const materials = await fetchMaterialsByPromotions(client, config.aadvid, promotionIds, 3)
+    const materials = await fetchMaterialsByPromotions(
+      client,
+      config.aadvid,
+      promotionIds,
+      3,
+      config.logPrefix
+    )
     const classified = classifyMaterialsByType(materials)
     const canDeletePromotions = promotionsToDeleteByType(materials)
     const canDeletePromotionSet = new Set(canDeletePromotions)
@@ -573,12 +599,18 @@ export class MaterialPreviewService {
 
     for (const material of materials) {
       try {
-        await previewOne(client, config.aadvid, material.material_id, material.promotion_id)
+        await previewOne(
+          client,
+          config.aadvid,
+          material.material_id,
+          material.promotion_id,
+          config.logPrefix
+        )
         success += 1
       } catch (error) {
         failed += 1
         console.error(
-          `[素材预览] 预览失败 material=${material.material_id} promotion=${material.promotion_id}:`,
+          `${resolveLogPrefix(config.logPrefix)} 预览失败 material=${material.material_id} promotion=${material.promotion_id}:`,
           error?.response?.status || error?.message || error
         )
       }
@@ -604,12 +636,12 @@ export class MaterialPreviewService {
       }
 
       try {
-        await deleteMaterialsBatch(client, config.aadvid, promotionId, materialIds)
+        await deleteMaterialsBatch(client, config.aadvid, promotionId, materialIds, config.logPrefix)
         success += 1
       } catch (error) {
         failed += 1
         console.error(
-          `[素材预览] 删除素材失败 promotion=${promotionId}:`,
+          `${resolveLogPrefix(config.logPrefix)} 删除素材失败 promotion=${promotionId}:`,
           error?.response?.status || error?.message || error
         )
       }
@@ -626,12 +658,12 @@ export class MaterialPreviewService {
 
     for (const promotionId of promotionIds) {
       try {
-        await deletePromotion(client, config.aadvid, promotionId)
+        await deletePromotion(client, config.aadvid, promotionId, config.logPrefix)
         success += 1
       } catch (error) {
         failed += 1
         console.error(
-          `[素材预览] 删除广告失败 promotion=${promotionId}:`,
+          `${resolveLogPrefix(config.logPrefix)} 删除广告失败 promotion=${promotionId}:`,
           error?.response?.status || error?.message || error
         )
       }
@@ -647,7 +679,7 @@ export class MaterialPreviewService {
     let failed = 0
 
     console.log(
-      `[素材预览] 开始处理账户批次，共 ${batchConfig.accounts.length} 个账户，dryRun=${Boolean(batchConfig.dryRun)}`
+      `${resolveLogPrefix(batchConfig.logPrefix)} 开始处理账户批次，共 ${batchConfig.accounts.length} 个账户，dryRun=${Boolean(batchConfig.dryRun)}`
     )
 
     for (const account of batchConfig.accounts) {
@@ -656,11 +688,12 @@ export class MaterialPreviewService {
         const config = {
           ...account,
           cookie,
+          logPrefix: batchConfig.logPrefix,
         }
 
         const analysis = await this.analyzeAccount(config)
         console.log(
-          `[素材预览] 账户分析结果 aadvid=${account.aadvid} drama=${account.drama_name}: filteredAds=${analysis.filteredAds}, needPreview=${analysis.needPreview.length}, needDelete=${analysis.needDelete.length}, canDeletePromotions=${analysis.canDeletePromotions.length}`
+          `${resolveLogPrefix(batchConfig.logPrefix)} 账户分析结果 aadvid=${account.aadvid} drama=${account.drama_name}: filteredAds=${analysis.filteredAds}, needPreview=${analysis.needPreview.length}, needDelete=${analysis.needDelete.length}, canDeletePromotions=${analysis.canDeletePromotions.length}`
         )
         if (analysis.filteredAds === 0) {
           results.push({
@@ -672,7 +705,7 @@ export class MaterialPreviewService {
             canDeletePromotionsCount: 0,
           })
           console.log(
-            `[素材预览] 跳过账户 aadvid=${account.aadvid} drama=${account.drama_name}: 没有命中过滤后的广告`
+            `${resolveLogPrefix(batchConfig.logPrefix)} 跳过账户 aadvid=${account.aadvid} drama=${account.drama_name}: 没有命中过滤后的广告`
           )
           continue
         }
@@ -712,7 +745,7 @@ export class MaterialPreviewService {
         })
         success += 1
         console.log(
-          `[素材预览] 账户处理完成 aadvid=${account.aadvid} drama=${account.drama_name}: preview=${analysis.needPreview.length}, delete=${analysis.needDelete.length}, deletePromotions=${analysis.canDeletePromotions.length}`
+          `${resolveLogPrefix(batchConfig.logPrefix)} 账户处理完成 aadvid=${account.aadvid} drama=${account.drama_name}: preview=${analysis.needPreview.length}, delete=${analysis.needDelete.length}, deletePromotions=${analysis.canDeletePromotions.length}`
         )
       } catch (error) {
         results.push({
@@ -726,14 +759,14 @@ export class MaterialPreviewService {
         })
         failed += 1
         console.error(
-          `[素材预览] 账户处理失败 aadvid=${account.aadvid} drama=${account.drama_name}:`,
+          `${resolveLogPrefix(batchConfig.logPrefix)} 账户处理失败 aadvid=${account.aadvid} drama=${account.drama_name}:`,
           error?.message || error
         )
       }
     }
 
     console.log(
-      `[素材预览] 账户批次处理完成: total=${batchConfig.accounts.length}, success=${success}, failed=${failed}`
+      `${resolveLogPrefix(batchConfig.logPrefix)} 账户批次处理完成: total=${batchConfig.accounts.length}, success=${success}, failed=${failed}`
     )
 
     return {
@@ -755,11 +788,11 @@ export class MaterialPreviewService {
     )
 
     console.log(
-      `[素材预览] 飞书筛选完成: tableId=${feishuConfig.tableId}, accounts=${accounts.length}, awemeWhiteList=${Array.isArray(config.aweme_white_list) ? config.aweme_white_list.join(',') : ''}`
+      `${resolveLogPrefix(config.logPrefix)} 飞书筛选完成: tableId=${feishuConfig.tableId}, accounts=${accounts.length}, awemeWhiteList=${Array.isArray(config.aweme_white_list) ? config.aweme_white_list.join(',') : ''}`
     )
 
     if (!accounts.length) {
-      console.log('[素材预览] 本轮没有命中需要预览的账户')
+      console.log(`${resolveLogPrefix(config.logPrefix)} 本轮没有命中需要预览的账户`)
       return {
         total: 0,
         success: 0,
@@ -773,6 +806,7 @@ export class MaterialPreviewService {
       dryRun: config.dryRun,
       previewDelayMs: config.previewDelayMs || 400,
       cookie: config.cookie,
+      logPrefix: config.logPrefix,
     })
   }
 }
