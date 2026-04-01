@@ -414,8 +414,8 @@ async function getDouyinConfigs(drama) {
     douyinMaterialText = rawField.text || rawField.value || ''
   }
 
-  buildConsole.log(`[后台搭建] 抖音素材原始字段:`, JSON.stringify(rawField))
-  buildConsole.log(`[后台搭建] 抖音素材解析后文本:`, douyinMaterialText)
+  // buildConsole.log(`[后台搭建] 抖音素材原始字段:`, JSON.stringify(rawField))
+  // buildConsole.log(`[后台搭建] 抖音素材解析后文本:`, douyinMaterialText)
 
   const configs = parseDouyinMaterialFromFeishu(douyinMaterialText)
   buildConsole.log(`[后台搭建] 从飞书状态表解析到 ${configs.length} 个抖音号配置:`, configs)
@@ -1987,18 +1987,19 @@ function scheduleNextPolling(instanceKey = getActiveInstanceKey()) {
   const nowMs = Date.now()
   const savedNextRunMs = Date.parse(String(state.nextRunTime || ''))
   const hasValidSavedNextRunTime = Number.isFinite(savedNextRunMs)
-  const nextRunMs = hasValidSavedNextRunTime
-    ? Math.max(savedNextRunMs, nowMs)
-    : nowMs + intervalMs
+  const nextRunMs = hasValidSavedNextRunTime ? Math.max(savedNextRunMs, nowMs) : nowMs + intervalMs
 
   if (entry.timer) {
     clearTimeout(entry.timer)
   }
 
   state.nextRunTime = new Date(nextRunMs).toISOString()
-  entry.timer = setTimeout(() => {
-    runWithSchedulerContext(instanceKey, () => executePollingCycle())
-  }, Math.max(0, nextRunMs - nowMs))
+  entry.timer = setTimeout(
+    () => {
+      runWithSchedulerContext(instanceKey, () => executePollingCycle())
+    },
+    Math.max(0, nextRunMs - nowMs)
+  )
 
   void saveState(instanceKey)
 }
