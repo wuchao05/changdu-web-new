@@ -25,6 +25,11 @@
             <strong class="server-logs-page__metric-value">{{ entries.length }}</strong>
           </div>
 
+          <div class="server-logs-page__metric">
+            <span class="server-logs-page__metric-label">当前展示</span>
+            <strong class="server-logs-page__metric-value">{{ filteredEntries.length }}</strong>
+          </div>
+
           <div class="server-logs-page__status">
             <span class="server-logs-page__status-label">连接状态</span>
             <n-tag size="small" :type="statusTagType" round>
@@ -56,6 +61,33 @@
             清空
           </n-button>
         </div>
+
+        <div class="server-logs-page__filters">
+          <n-select
+            v-model:value="selectedScope"
+            class="server-logs-page__filter"
+            :options="scopeOptions"
+            clearable
+            filterable
+            placeholder="按前缀过滤"
+          />
+          <n-select
+            v-model:value="selectedUserName"
+            class="server-logs-page__filter"
+            :options="userNameOptions"
+            clearable
+            filterable
+            placeholder="按用户名过滤"
+          />
+          <n-select
+            v-model:value="selectedChannelName"
+            class="server-logs-page__filter"
+            :options="channelOptions"
+            clearable
+            filterable
+            placeholder="按渠道过滤"
+          />
+        </div>
       </div>
     </header>
 
@@ -76,9 +108,9 @@
         </div>
 
         <div ref="logContainerRef" class="terminal-shell__viewport">
-          <div v-if="entries.length" class="terminal-shell__content">
+          <div v-if="filteredEntries.length" class="terminal-shell__content">
             <div
-              v-for="entry in entries"
+              v-for="entry in filteredEntries"
               :key="getEntryKey(entry)"
               class="terminal-shell__line"
               :class="`terminal-shell__line--${entry.level}`"
@@ -91,8 +123,8 @@
 
           <div v-else class="terminal-shell__empty">
             <Icon icon="mdi:console-line" class="terminal-shell__empty-icon" />
-            <p class="terminal-shell__empty-title">等待服务端输出日志</p>
-            <p class="terminal-shell__empty-desc">页面打开后会自动连接日志流并持续接收最新打印内容</p>
+            <p class="terminal-shell__empty-title">{{ emptyStateTitle }}</p>
+            <p class="terminal-shell__empty-desc">{{ emptyStateDescription }}</p>
           </div>
         </div>
       </section>
@@ -104,7 +136,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
-import { NAlert, NButton, NSwitch, NTag } from 'naive-ui'
+import { NAlert, NButton, NSelect, NSwitch, NTag } from 'naive-ui'
 import { connectDebugLogStream, type DebugLogEntry } from '@/api/debug'
 
 defineOptions({
@@ -112,6 +144,15 @@ defineOptions({
 })
 
 type DebugConnectionStatus = 'idle' | 'connecting' | 'connected' | 'error'
+type SelectOption = {
+  label: string
+  value: string
+}
+type ParsedLogMeta = {
+  scope: string
+  userName: string
+  channelName: string
+}
 
 const router = useRouter()
 const autoScroll = ref(true)
@@ -119,6 +160,9 @@ const entries = ref<DebugLogEntry[]>([])
 const errorMessage = ref('')
 const connectionStatus = ref<DebugConnectionStatus>('idle')
 const logContainerRef = ref<HTMLElement | null>(null)
+const selectedScope = ref<string | null>(null)
+const selectedUserName = ref<string | null>(null)
+const selectedChannelName = ref<string | null>(null)
 const entryKeySet = new Set<string>()
 
 let disconnectStream: null | (() => void) = null
@@ -150,6 +194,113 @@ const statusTagType = computed(() => {
     default:
       return 'default'
   }
+})
+
+function parseLogMeta(message: string): ParsedLogMeta | null {
+  const normalizedMessage = String(message || '').trim()
+  const matchedPrefix = normalizedMessage.match(/^\[([^\]]+)\]/)
+  if (!matchedPrefix?.[1]) {
+    return null
+  }
+
+  const segments = matchedPrefix[1]
+    .split('-')
+    .map(segment => segment.trim())
+    .filter(Boolean)
+
+  if (segments.length < 3) {
+    return null
+  }
+
+  return {
+    scope: segments[0],
+    userName: segments[1],
+    channelName: segments.slice(2).join('-'),
+  }
+}
+
+function buildSelectOptions(values: string[]): SelectOption[] {
+  return values.map(value => ({
+    label: value,
+    value,
+  }))
+}
+
+const parsedEntries = computed(() =>
+  entries.value.map(entry => ({
+    entry,
+    meta: parseLogMeta(entry.message),
+  }))
+)
+
+const scopeOptions = computed<SelectOption[]>(() => {
+  const values = new Set<string>()
+  parsedEntries.value.forEach(({ meta }) => {
+    if (meta?.scope) {
+      values.add(meta.scope)
+    }
+  })
+  return buildSelectOptions(Array.from(values))
+})
+
+const userNameOptions = computed<SelectOption[]>(() => {
+  const values = new Set<string>()
+  parsedEntries.value.forEach(({ meta }) => {
+    if (meta?.userName) {
+      values.add(meta.userName)
+    }
+  })
+  return buildSelectOptions(Array.from(values))
+})
+
+const channelOptions = computed<SelectOption[]>(() => {
+  const values = new Set<string>()
+  parsedEntries.value.forEach(({ meta }) => {
+    if (meta?.channelName) {
+      values.add(meta.channelName)
+    }
+  })
+  return buildSelectOptions(Array.from(values))
+})
+
+const filteredEntries = computed(() =>
+  parsedEntries.value
+    .filter(({ meta }) => {
+      if (selectedScope.value && meta?.scope !== selectedScope.value) {
+        return false
+      }
+
+      if (selectedUserName.value && meta?.userName !== selectedUserName.value) {
+        return false
+      }
+
+      if (selectedChannelName.value && meta?.channelName !== selectedChannelName.value) {
+        return false
+      }
+
+      if (selectedScope.value || selectedUserName.value || selectedChannelName.value) {
+        return Boolean(meta)
+      }
+
+      return true
+    })
+    .map(({ entry }) => entry)
+)
+
+const emptyStateTitle = computed(() => {
+  if (entries.value.length === 0) {
+    return '等待服务端输出日志'
+  }
+
+  return '没有匹配的日志'
+})
+
+const emptyStateDescription = computed(() => {
+  if (entries.value.length === 0) {
+    return '页面打开后会自动连接日志流并持续接收最新打印内容'
+  }
+
+  return '试试清空部分过滤条件，或等待新的匹配日志进入'
 })
 
 function formatTimestamp(timestamp: string) {
@@ -309,7 +460,7 @@ function handleBack() {
 }
 
 watch(
-  () => entries.value.length,
+  () => filteredEntries.value.length,
   async () => {
     await nextTick()
     scrollToBottom()
@@ -421,7 +572,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  min-width: 420px;
+  min-width: 540px;
   padding: 16px 18px;
   border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 20px;
@@ -436,6 +587,7 @@ onBeforeUnmount(() => {
   align-items: stretch;
   justify-content: space-between;
   gap: 16px;
+  flex-wrap: wrap;
 }
 
 .server-logs-page__metric,
@@ -479,6 +631,32 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.server-logs-page__filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.server-logs-page__filter {
+  min-width: 0;
+}
+
+:deep(.server-logs-page__filter .n-base-selection) {
+  min-height: 42px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.78);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  box-shadow: none;
+}
+
+:deep(.server-logs-page__filter .n-base-selection-label) {
+  color: #e2e8f0;
+}
+
+:deep(.server-logs-page__filter .n-base-selection-placeholder) {
+  color: #94a3b8;
 }
 
 .server-logs-page__switch-group {
@@ -705,6 +883,10 @@ onBeforeUnmount(() => {
   .server-logs-page__actions-card {
     width: 100%;
     min-width: 0;
+  }
+
+  .server-logs-page__filters {
+    grid-template-columns: 1fr;
   }
 
   .server-logs-page__body {
