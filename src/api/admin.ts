@@ -247,15 +247,40 @@ export interface SchedulerOverviewItem {
   }
 }
 
+export interface SchedulerOverviewUserOption {
+  userId: string
+  runtimeUserName: string
+  account: string
+}
+
+export interface SchedulerOverviewUserGroup {
+  userId: string
+  runtimeUserName: string
+  account: string
+  channels: SchedulerOverviewItem[]
+  summary: {
+    channelCount: number
+    enabledCount: number
+    runningCount: number
+    abnormalCount: number
+    abnormalChannels: number
+    hasAbnormal: boolean
+    hasRunning: boolean
+  }
+}
+
 export interface SchedulerOverviewResponse {
   updatedAt: string
   summary: {
-    totalGroups: number
-    abnormalGroups: number
-    runningGroups: number
+    totalUsers: number
+    totalChannels: number
+    abnormalUsers: number
+    runningTasks: number
     enabledTasks: number
   }
-  items: SchedulerOverviewItem[]
+  users: SchedulerOverviewUserGroup[]
+  userOptions: SchedulerOverviewUserOption[]
+  selectedUserId: string | null
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -332,8 +357,17 @@ export function getAdminOverview() {
   }>('/admin/overview')
 }
 
-export function getSchedulerOverview() {
-  return request<SchedulerOverviewResponse>('/admin/scheduler-overview')
+export function getSchedulerOverview(userId?: string) {
+  const normalizedUserId = String(userId || '').trim()
+  const searchParams = new URLSearchParams()
+  if (normalizedUserId) {
+    searchParams.set('userId', normalizedUserId)
+  }
+
+  const query = searchParams.toString()
+  return request<SchedulerOverviewResponse>(
+    `/admin/scheduler-overview${query ? `?${query}` : ''}`
+  )
 }
 
 export function listUsers() {

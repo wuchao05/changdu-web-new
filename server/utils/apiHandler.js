@@ -234,16 +234,16 @@ export function createDownloadCenterHandler(apiName, targetPath) {
         ...(cookieFromParams ? { Cookie: cookieFromParams } : {}),
       })
 
-      if (targetPath.includes('/download_center/task_list')) {
-        console.log('\n========== 【新剧抢跑-剧集状态】 ==========')
-        console.log('⏰ 时间:', new Date().toLocaleString('zh-CN'))
-        console.log('📝 API名称:', apiName)
-        console.log('🌐 请求方法:', ctx.method)
-        console.log('🎯 目标URL:', targetUrl)
-        console.log('📋 请求参数:', params)
-        console.log('📦 请求真实服务端请求头:', resolvedHeaders)
-        console.log('=========================================\n')
-      }
+      // if (targetPath.includes('/download_center/task_list')) {
+      //   console.log('\n========== 【新剧抢跑-剧集状态】 ==========')
+      //   console.log('⏰ 时间:', new Date().toLocaleString('zh-CN'))
+      //   console.log('📝 API名称:', apiName)
+      //   console.log('🌐 请求方法:', ctx.method)
+      //   console.log('🎯 目标URL:', targetUrl)
+      //   console.log('📋 请求参数:', params)
+      //   console.log('📦 请求真实服务端请求头:', resolvedHeaders)
+      //   console.log('=========================================\n')
+      // }
 
       // if (logRequest) {
       //   console.log('cookiehahahah', cookieFromParams)

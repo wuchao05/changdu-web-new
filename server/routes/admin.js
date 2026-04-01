@@ -298,6 +298,18 @@ function createSchedulerOverviewItem({ userId, runtimeUserName, account, channel
   }
 }
 
+function buildSchedulerUserSummary(channels) {
+  return {
+    channelCount: channels.length,
+    enabledCount: channels.reduce((sum, item) => sum + item.summary.enabledCount, 0),
+    runningCount: channels.reduce((sum, item) => sum + item.summary.runningCount, 0),
+    abnormalCount: channels.reduce((sum, item) => sum + item.summary.abnormalCount, 0),
+    abnormalChannels: channels.filter(item => item.summary.hasAbnormal).length,
+    hasAbnormal: channels.some(item => item.summary.hasAbnormal),
+    hasRunning: channels.some(item => item.summary.runningCount > 0),
+  }
+}
+
 router.get('/users', async ctx => {
   const users = await listUsers()
   const channels = await readChannels()
@@ -311,6 +323,7 @@ router.get('/users', async ctx => {
 })
 
 router.get('/scheduler-overview', async ctx => {
+  const requestedUserId = String(ctx.query.userId || '').trim()
   const [users, { channels }, autoSubmitStatuses, buildWorkflowStatuses] = await Promise.all([
     listUsers(),
     readChannels(),
@@ -322,8 +335,20 @@ router.get('/scheduler-overview', async ctx => {
   const nowMs = Date.now()
   const itemMap = new Map()
   const channelMap = new Map(channels.map(channel => [channel.id, channel]))
+  const filterUserSet = requestedUserId ? new Set([requestedUserId]) : null
+  const userOptions = users
+    .map(user => ({
+      userId: user.id,
+      runtimeUserName: user.nickname,
+      account: user.account,
+    }))
+    .sort((first, second) => first.runtimeUserName.localeCompare(second.runtimeUserName, 'zh-CN'))
 
   for (const user of users) {
+    if (filterUserSet && !filterUserSet.has(user.id)) {
+      continue
+    }
+
     const channelIds = Array.isArray(user.channelIds)
       ? user.channelIds
       : user.channelId
@@ -354,6 +379,9 @@ router.get('/scheduler-overview', async ctx => {
     const userId = String(status?.userId || '').trim()
     const channelId = String(status?.channelId || '').trim()
     if (!userId || !channelId) {
+      return null
+    }
+    if (filterUserSet && !filterUserSet.has(userId)) {
       return null
     }
 
@@ -413,18 +441,63 @@ router.get('/scheduler-overview', async ctx => {
       return first.channelName.localeCompare(second.channelName, 'zh-CN')
     })
 
+  const userMap = new Map()
+  for (const item of items) {
+    if (!userMap.has(item.userId)) {
+      userMap.set(item.userId, {
+        userId: item.userId,
+        runtimeUserName: item.runtimeUserName,
+        account: item.account,
+        channels: [],
+      })
+    }
+
+    const userGroup = userMap.get(item.userId)
+    if (!userGroup.account && item.account) {
+      userGroup.account = item.account
+    }
+    userGroup.channels.push(item)
+  }
+
+  const groupedUsers = [...userMap.values()]
+    .map(userGroup => ({
+      ...userGroup,
+      summary: buildSchedulerUserSummary(userGroup.channels),
+      channels: [...userGroup.channels].sort((first, second) => {
+        if (first.summary.hasAbnormal !== second.summary.hasAbnormal) {
+          return first.summary.hasAbnormal ? -1 : 1
+        }
+        if (first.summary.runningCount !== second.summary.runningCount) {
+          return second.summary.runningCount - first.summary.runningCount
+        }
+        return first.channelName.localeCompare(second.channelName, 'zh-CN')
+      }),
+    }))
+    .sort((first, second) => {
+      if (first.summary.hasAbnormal !== second.summary.hasAbnormal) {
+        return first.summary.hasAbnormal ? -1 : 1
+      }
+      if (first.summary.runningCount !== second.summary.runningCount) {
+        return second.summary.runningCount - first.summary.runningCount
+      }
+      return first.runtimeUserName.localeCompare(second.runtimeUserName, 'zh-CN')
+    })
+
   ctx.body = {
     code: 0,
     message: 'success',
     data: {
       updatedAt: new Date().toISOString(),
       summary: {
-        totalGroups: items.length,
-        abnormalGroups: items.filter(item => item.summary.hasAbnormal).length,
-        runningGroups: items.filter(item => item.summary.runningCount > 0).length,
+        totalUsers: groupedUsers.length,
+        totalChannels: items.length,
+        abnormalUsers: groupedUsers.filter(user => user.summary.hasAbnormal).length,
+        runningTasks: items.reduce((sum, item) => sum + item.summary.runningCount, 0),
         enabledTasks: items.reduce((sum, item) => sum + item.summary.enabledCount, 0),
       },
-      items,
+      users: groupedUsers,
+      userOptions,
+      selectedUserId: requestedUserId || null,
     },
   }
 })

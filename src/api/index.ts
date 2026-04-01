@@ -87,7 +87,6 @@ export function getDistributors(): Promise<DistributorData> {
     .then(res => res.data)
 }
 
-
 /**
  * 新剧抢跑 - 获取新剧列表（服务端转发常读内部接口）
  */
@@ -137,7 +136,7 @@ export function getDownloadTaskList(
     page_size: 1000,
     ...params,
   }
-  console.log('download_center/task_list 请求参数:', requestParams)
+  // console.log('download_center/task_list 请求参数:', requestParams)
   return httpInstance
     .get('/node/api/platform/distributor/download_center/task_list', {
       params: requestParams,

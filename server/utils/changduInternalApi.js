@@ -299,13 +299,13 @@ export async function requestChangduInternalApi({
   // console.log('[常读内部接口] 发起请求:', logPayload)
 
   if (isNewDramaListPath(pathname)) {
-    console.log('[新剧抢跑-列表] 请求真实服务端请求头:', requestHeaders)
-    console.log('[新剧抢跑-列表] 请求真实服务端参数:', {
-      method: normalizedMethod,
-      pathname,
-      query: sanitizeRecord(query),
-      body: body ?? null,
-    })
+    // console.log('[新剧抢跑-列表] 请求真实服务端请求头:', requestHeaders)
+    // console.log('[新剧抢跑-列表] 请求真实服务端参数:', {
+    //   method: normalizedMethod,
+    //   pathname,
+    //   query: sanitizeRecord(query),
+    //   body: body ?? null,
+    // })
   }
 
   let response
