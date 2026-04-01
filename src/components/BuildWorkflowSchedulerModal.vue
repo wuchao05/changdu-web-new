@@ -913,6 +913,24 @@ function formatBackgroundTime(timeStr: string | null): string {
   return dayjs(timeStr).format('MM-DD HH:mm:ss')
 }
 
+function formatBackgroundNextRunTime(
+  status: buildWorkflowApi.BackgroundSchedulerStatus | null
+): string {
+  const timeStr = status?.nextRunTime || null
+  if (!timeStr) return '-'
+
+  const targetTime = dayjs(timeStr)
+  if (!targetTime.isValid()) {
+    return '-'
+  }
+
+  if (status?.enabled && !status.currentTask && targetTime.isBefore(dayjs())) {
+    return '已过点，正在补跑...'
+  }
+
+  return targetTime.format('MM-DD HH:mm:ss')
+}
+
 /**
  * 格式化任务历史中的日期（飞书时间戳）
  */
@@ -2075,7 +2093,7 @@ onBeforeUnmount(() => {
               <div class="polling-item-inline">
                 <span class="label">下次运行:</span>
                 <span class="value countdown">{{
-                  formatBackgroundTime(backgroundSchedulerStatus.nextRunTime)
+                  formatBackgroundNextRunTime(backgroundSchedulerStatus)
                 }}</span>
               </div>
               <div class="polling-item-inline">

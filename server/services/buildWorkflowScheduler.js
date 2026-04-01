@@ -206,7 +206,9 @@ async function ensureSchedulerRuntime(channelRuntime = null, instanceKey = getAc
         ).trim(),
       },
       brandName: String(
-        channelRuntime.runtimeUser?.brandName || channelRuntime.runtimeUserConfig?.brandName || '小红'
+        channelRuntime.runtimeUser?.brandName ||
+          channelRuntime.runtimeUserConfig?.brandName ||
+          '小红'
       ).trim(),
     }
     return normalizedRuntime
@@ -480,7 +482,9 @@ function getBuildConfig() {
     landingUrl: buildConfig.landingUrl,
     rechargeTemplateId: toRechargeTemplateIdNumber(buildConfig.rechargeTemplateId),
     adCallbackConfigId:
-      typeof buildConfig.adCallbackConfigId === 'string' ? buildConfig.adCallbackConfigId.trim() : '',
+      typeof buildConfig.adCallbackConfigId === 'string'
+        ? buildConfig.adCallbackConfigId.trim()
+        : '',
   }
 }
 
@@ -502,9 +506,7 @@ function findConfiguredMicroAppAsset(assets = [], buildConfig = {}) {
   const targetMicroAppId = String(buildConfig.microAppId || '').trim()
 
   return (
-    microApps.find(
-      item => String(item?.micro_app_instance_id || '').trim() === targetInstanceId
-    ) ||
+    microApps.find(item => String(item?.micro_app_instance_id || '').trim() === targetInstanceId) ||
     microApps.find(item => String(item?.micro_app_id || '').trim() === targetMicroAppId) ||
     null
   )
@@ -532,7 +534,8 @@ function getChangduDistributorIdNumber() {
  */
 async function createPromotionLink(params) {
   const { book_id, drama_name, promotion_name } = params
-  const finalPromotionName = promotion_name || generatePromotionName(drama_name, getRuntimeBrandName())
+  const finalPromotionName =
+    promotion_name || generatePromotionName(drama_name, getRuntimeBrandName())
   const buildConfig = getBuildConfig()
 
   const requestBody = {
@@ -545,7 +548,9 @@ async function createPromotionLink(params) {
     price: BUILD_WORKFLOW_CONFIG.promotion.price,
     start_chapter: BUILD_WORKFLOW_CONFIG.promotion.startChapter,
     ...(buildConfig.adCallbackConfigId
-      ? { ad_callback_config_id: toOptionalAdCallbackConfigIdNumber(buildConfig.adCallbackConfigId) }
+      ? {
+          ad_callback_config_id: toOptionalAdCallbackConfigIdNumber(buildConfig.adCallbackConfigId),
+        }
       : {}),
   }
 
@@ -1300,7 +1305,10 @@ async function executeAssetization(drama) {
     if (microAppResult.hasValidMicroApp) {
       // 找到账户自己的已审核通过的小程序，直接使用
       microApp = microAppResult.result.data.micro_app[0]
-      buildConsole.log('[后台搭建] ✓ 使用账户自己的已审核通过的小程序:', microApp.micro_app_instance_id)
+      buildConsole.log(
+        '[后台搭建] ✓ 使用账户自己的已审核通过的小程序:',
+        microApp.micro_app_instance_id
+      )
     } else {
       // 2. 没有找到账户自己的小程序，查询被共享的已审核通过的小程序（search_type=2）
       buildConsole.log('[后台搭建] 未找到账户自己的已审核通过的小程序，查询被共享的小程序...')
@@ -1308,7 +1316,10 @@ async function executeAssetization(drama) {
       if (approvedResult.found && approvedResult.microApp) {
         // 找到被共享的已审核通过的小程序，直接使用
         microApp = approvedResult.microApp
-        buildConsole.log('[后台搭建] ✓ 使用被共享的已审核通过的小程序:', microApp.micro_app_instance_id)
+        buildConsole.log(
+          '[后台搭建] ✓ 使用被共享的已审核通过的小程序:',
+          microApp.micro_app_instance_id
+        )
       } else {
         // 3. 都没有找到，检查是否有未审核通过的小程序
         buildConsole.log('[后台搭建] 未找到被共享的小程序，检查是否需要创建...')
@@ -1395,20 +1406,25 @@ async function executeAssetization(drama) {
       })
 
       const createdAssetsListResult = await listMicroAppAssets(accountId)
-      assetMicroApp = findConfiguredMicroAppAsset(createdAssetsListResult.data?.micro_app, buildConfig)
+      assetMicroApp = findConfiguredMicroAppAsset(
+        createdAssetsListResult.data?.micro_app,
+        buildConfig
+      )
       if (!assetMicroApp) {
         throw new Error('新版小程序资产创建成功后，未查询到对应资产')
       }
       assetsId = assetMicroApp.assets_id
       microApp = {
-        micro_app_instance_id: assetMicroApp.micro_app_instance_id || buildConfig.microAppInstanceId,
+        micro_app_instance_id:
+          assetMicroApp.micro_app_instance_id || buildConfig.microAppInstanceId,
         app_id: assetMicroApp.micro_app_id || buildConfig.microAppId,
         start_page: '',
       }
     }
     if (assetMicroApp) {
       microApp = {
-        micro_app_instance_id: assetMicroApp.micro_app_instance_id || buildConfig.microAppInstanceId,
+        micro_app_instance_id:
+          assetMicroApp.micro_app_instance_id || buildConfig.microAppInstanceId,
         app_id: assetMicroApp.micro_app_id || buildConfig.microAppId,
         start_page: '',
       }
@@ -1759,12 +1775,6 @@ async function loadState(instanceKey) {
     entry.state = { ...entry.state, ...savedState }
     await runWithSchedulerContext(instanceKey, async () => {
       await ensureSchedulerRuntime(null, instanceKey)
-
-      // 如果之前是启用状态，恢复定时器
-      if (entry.state.enabled && entry.state.intervalMinutes) {
-        buildConsole.log('[后台搭建] 恢复定时任务...', entry.state.instanceKey)
-        scheduleNextPolling(instanceKey)
-      }
     })
   } catch (error) {
     if (error.code !== 'ENOENT') {
@@ -1785,10 +1795,13 @@ async function executePollingCycle() {
 
   if (!state.enabled) return
   await ensureSchedulerRuntime(null, state.instanceKey)
+  const intervalMs = state.intervalMinutes * 60 * 1000
 
   // 防止并发执行：如果有任务正在执行，跳过本次轮询
   if (state.currentTask) {
     buildConsole.log('[后台搭建] 检测到任务正在执行，跳过本次轮询:', state.currentTask.dramaName)
+    state.nextRunTime = new Date(Date.now() + intervalMs).toISOString()
+    await saveState(state.instanceKey)
     // 仍然安排下次轮询
     scheduleNextPolling(state.instanceKey)
     return
@@ -1797,7 +1810,6 @@ async function executePollingCycle() {
   buildConsole.log('[后台搭建] ========== 开始轮询周期 ==========')
 
   // 在轮询开始时立即计算下次运行时间（固定间隔，从现在开始计算）
-  const intervalMs = state.intervalMinutes * 60 * 1000
   const now = new Date()
   state.lastRunTime = now.toISOString()
   state.nextRunTime = new Date(now.getTime() + intervalMs).toISOString()
@@ -1848,7 +1860,9 @@ async function executePollingCycle() {
       const rating = getRatingValue(selectedDrama)
       const date = selectedDrama.fields['日期'] || null
       const publishTime = selectedDrama.fields['上架时间']?.value?.[0] || null
-      buildConsole.log('[后台搭建] 选中剧集: ' + dramaName + ' (剩余 ' + (dramas.length - 1) + ' 部)')
+      buildConsole.log(
+        '[后台搭建] 选中剧集: ' + dramaName + ' (剩余 ' + (dramas.length - 1) + ' 部)'
+      )
       state.currentTask = {
         status: 'building',
         dramaName,
@@ -1962,8 +1976,7 @@ async function executePollingCycle() {
 
 /**
  * 安排下次轮询
- * 注意：nextRunTime 在 executePollingCycle 开头就已经预先计算好了
- * 这里只负责设置定时器
+ * 优先复用 state.nextRunTime，确保展示时间与真实触发时间一致
  */
 function scheduleNextPolling(instanceKey = getActiveInstanceKey()) {
   const entry = ensureSchedulerEntry(instanceKey)
@@ -1971,16 +1984,23 @@ function scheduleNextPolling(instanceKey = getActiveInstanceKey()) {
   if (!state.intervalMinutes || !state.enabled) return
 
   const intervalMs = state.intervalMinutes * 60 * 1000
+  const nowMs = Date.now()
+  const savedNextRunMs = Date.parse(String(state.nextRunTime || ''))
+  const hasValidSavedNextRunTime = Number.isFinite(savedNextRunMs)
+  const nextRunMs = hasValidSavedNextRunTime
+    ? Math.max(savedNextRunMs, nowMs)
+    : nowMs + intervalMs
 
   if (entry.timer) {
     clearTimeout(entry.timer)
   }
 
+  state.nextRunTime = new Date(nextRunMs).toISOString()
   entry.timer = setTimeout(() => {
     runWithSchedulerContext(instanceKey, () => executePollingCycle())
-  }, intervalMs)
+  }, Math.max(0, nextRunMs - nowMs))
 
-  saveState(instanceKey)
+  void saveState(instanceKey)
 }
 
 /**
@@ -2023,6 +2043,7 @@ export async function stopScheduler(channelRuntime = null) {
     buildConsole.log('[后台搭建] 停止调度器', instanceKey)
 
     entry.state.enabled = false
+    entry.state.nextRunTime = null
 
     if (entry.timer) {
       clearTimeout(entry.timer)
@@ -2074,6 +2095,16 @@ export async function initScheduler() {
         buildConsole.log('[后台搭建] 清除遗留任务状态，等待下次轮询重新处理')
         state.currentTask = null
         await saveState(instanceKey)
+      }
+
+      if (state.enabled && state.intervalMinutes) {
+        const savedNextRunMs = Date.parse(String(state.nextRunTime || ''))
+        if (Number.isFinite(savedNextRunMs) && savedNextRunMs <= Date.now()) {
+          buildConsole.log('[后台搭建] 检测到已过点的轮询任务，立即补跑:', instanceKey)
+        } else {
+          buildConsole.log('[后台搭建] 恢复定时任务...', instanceKey, state.nextRunTime || '')
+        }
+        scheduleNextPolling(instanceKey)
       }
 
       buildConsole.log('[后台搭建] 调度器状态:', instanceKey, state.enabled ? '运行中' : '已停止')
