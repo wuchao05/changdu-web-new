@@ -118,6 +118,7 @@ class MaterialPreviewManager {
     this.states = new Map()
     this.timers = new Map()
     this.initialized = false
+    this.saveStatesQueue = Promise.resolve()
   }
 
   async init() {
@@ -497,20 +498,32 @@ class MaterialPreviewManager {
   }
 
   async saveStates() {
-    const dirPath = path.dirname(STATE_FILE_PATH)
-    await fs.mkdir(dirPath, { recursive: true })
+    const saveTask = async () => {
+      const dirPath = path.dirname(STATE_FILE_PATH)
+      await fs.mkdir(dirPath, { recursive: true })
 
-    const payload = {}
-    for (const [instanceKey, state] of this.states.entries()) {
-      payload[instanceKey] = {
-        ...state,
-        running: false,
+      const payload = {}
+      for (const [instanceKey, state] of this.states.entries()) {
+        payload[instanceKey] = {
+          ...state,
+          running: false,
+        }
+      }
+
+      // 保存操作可能被定时任务和手动操作同时触发，这里串行化并使用唯一临时文件，避免并发 rename 互相覆盖。
+      const tempPath = `${STATE_FILE_PATH}.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`
+      try {
+        await fs.writeFile(tempPath, JSON.stringify(payload, null, 2), 'utf-8')
+        await fs.rename(tempPath, STATE_FILE_PATH)
+      } catch (error) {
+        await fs.unlink(tempPath).catch(() => {})
+        throw error
       }
     }
 
-    const tempPath = `${STATE_FILE_PATH}.tmp`
-    await fs.writeFile(tempPath, JSON.stringify(payload, null, 2), 'utf-8')
-    await fs.rename(tempPath, STATE_FILE_PATH)
+    const run = this.saveStatesQueue.then(saveTask)
+    this.saveStatesQueue = run.catch(() => {})
+    return run
   }
 
   async restoreTimers() {
