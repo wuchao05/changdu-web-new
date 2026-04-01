@@ -719,6 +719,11 @@ const accountMenuOptions = computed<DropdownOption[]>(() => {
       icon: () => h(Icon, { icon: 'mdi:shield-crown-outline', class: 'h-4 w-4' }),
     })
     options.push({
+      key: 'scheduler-overview',
+      label: '轮询任务总览',
+      icon: () => h(Icon, { icon: 'mdi:chart-timeline-variant', class: 'h-4 w-4' }),
+    })
+    options.push({
       key: 'view-logs',
       label: '查看日志',
       icon: () => h(Icon, { icon: 'mdi:console', class: 'h-4 w-4' }),
@@ -1419,6 +1424,11 @@ async function handleAccountMenuSelect(key: string) {
 
   if (key === 'change-password') {
     openChangePasswordModal()
+    return
+  }
+
+  if (key === 'scheduler-overview') {
+    await router.push('/admin/schedulers')
     return
   }
 

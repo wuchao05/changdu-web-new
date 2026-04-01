@@ -1678,6 +1678,7 @@ export function getSchedulerStatus(channelId) {
     onlyRedFlag: state.onlyRedFlag,
     nextRunTime: toBeijingTime(state.nextRunTime),
     lastRunTime: toBeijingTime(state.lastRunTime),
+    currentTask: state.currentTask ? { ...state.currentTask } : null,
     stats: state.stats,
     progress: state.progress,
     taskHistory: state.taskHistory.slice(0, 10).map(task => ({
@@ -1685,6 +1686,19 @@ export function getSchedulerStatus(channelId) {
       timestamp: toBeijingTime(task.timestamp),
     })),
   }
+}
+
+export async function listSchedulerStatuses() {
+  const persistedKeys = await listPersistedInstanceKeys()
+  const instanceKeys = Array.from(new Set([...Object.keys(schedulers), ...persistedKeys]))
+
+  for (const instanceKey of instanceKeys) {
+    if (!schedulers[instanceKey]) {
+      await loadState(instanceKey)
+    }
+  }
+
+  return instanceKeys.map(instanceKey => getSchedulerStatus(instanceKey))
 }
 
 /**

@@ -146,6 +146,118 @@ export interface ChannelConfig {
   updatedAt: string
 }
 
+export interface SchedulerOverviewTaskBase {
+  key: 'autoSubmit' | 'buildWorkflow' | 'materialPreview'
+  title: string
+  enabled: boolean
+  running: boolean
+  isAbnormal: boolean
+  abnormalReasons: string[]
+  nextRunTime: string | null
+  nextRunTimeText: string | null
+  lastRunTime: string | null
+  lastRunTimeText: string | null
+  currentTask: {
+    status: string
+    startTime: string | null
+    dramaName?: string
+  } | null
+}
+
+export interface SchedulerOverviewAutoSubmitTask extends SchedulerOverviewTaskBase {
+  key: 'autoSubmit'
+  intervalMinutes: number
+  onlyRedFlag: boolean
+  progress: {
+    current: number
+    total: number
+    currentDate: string
+    currentDrama: string
+  }
+  stats: {
+    totalProcessed: number
+    successCount: number
+    failCount: number
+    skipCount: number
+  }
+  taskHistory: Array<{
+    timestamp: string
+    status: 'completed' | 'error'
+    processed?: number
+    success?: number
+    fail?: number
+    skip?: number
+    error?: string
+  }>
+}
+
+export interface SchedulerOverviewBuildWorkflowTask extends SchedulerOverviewTaskBase {
+  key: 'buildWorkflow'
+  intervalMinutes: number
+  tableId: string | null
+  stats: {
+    totalBuilt: number
+    successCount: number
+    failCount: number
+  }
+  taskHistory: Array<{
+    dramaName: string
+    status: 'success' | 'failed' | 'skipped'
+    rating?: string | null
+    date?: number | null
+    publishTime?: number | null
+    error?: string
+    completedAt: string
+  }>
+}
+
+export interface SchedulerOverviewMaterialPreviewTask extends SchedulerOverviewTaskBase {
+  key: 'materialPreview'
+  intervalMinutes: number
+  buildTimeWindowStart: number
+  buildTimeWindowEnd: number
+  lastStatus: 'success' | 'failed' | null
+  lastError: string
+  stats: {
+    totalProcessed: number
+    totalPreviewed: number
+    totalDeleted: number
+    successCount: number
+    failCount: number
+  }
+}
+
+export interface SchedulerOverviewItem {
+  userId: string
+  runtimeUserName: string
+  account: string
+  channelId: string
+  channelName: string
+  tasks: {
+    autoSubmit: SchedulerOverviewAutoSubmitTask
+    buildWorkflow: SchedulerOverviewBuildWorkflowTask
+    materialPreview: SchedulerOverviewMaterialPreviewTask
+  }
+  summary: {
+    total: number
+    enabledCount: number
+    runningCount: number
+    abnormalCount: number
+    hasAbnormal: boolean
+  }
+}
+
+export interface SchedulerOverviewResponse {
+  updatedAt: string
+  summary: {
+    totalGroups: number
+    abnormalGroups: number
+    runningGroups: number
+    enabledTasks: number
+  }
+  items: SchedulerOverviewItem[]
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${ENV.BASE_URL}${path}`, {
     ...init,
@@ -218,6 +330,10 @@ export function getAdminOverview() {
     adminCount: number
     normalCount: number
   }>('/admin/overview')
+}
+
+export function getSchedulerOverview() {
+  return request<SchedulerOverviewResponse>('/admin/scheduler-overview')
 }
 
 export function listUsers() {

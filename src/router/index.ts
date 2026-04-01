@@ -42,6 +42,12 @@ const router = createRouter({
       meta: { requiresAuth: true, requiresAdmin: true, hideFooter: true, hideDebugDrawer: true },
     },
     {
+      path: '/admin/schedulers',
+      name: 'admin-schedulers',
+      component: () => import('../views/SchedulerOverviewView.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true, hideFooter: true, hideDebugDrawer: true },
+    },
+    {
       path: '/new-drama-preview',
       redirect: '/clip',
     },

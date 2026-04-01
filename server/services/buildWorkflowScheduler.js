@@ -2079,6 +2079,19 @@ export function getSchedulerStatus(instanceKey) {
   }
 }
 
+export async function listSchedulerStatuses() {
+  const persistedKeys = await listPersistedInstanceKeys()
+  const instanceKeys = Array.from(new Set([...Object.keys(schedulerInstances), ...persistedKeys]))
+
+  for (const instanceKey of instanceKeys) {
+    if (!schedulerInstances[instanceKey]) {
+      await loadState(instanceKey)
+    }
+  }
+
+  return instanceKeys.map(instanceKey => getSchedulerStatus(instanceKey))
+}
+
 /**
  * 初始化调度器（服务启动时调用）
  */
