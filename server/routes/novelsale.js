@@ -91,7 +91,9 @@ function matchPromotionDouyinAccount(promotionName, douyinAccounts = []) {
     return ''
   }
 
-  const matchedAccounts = douyinAccounts.filter(account => normalizedPromotionName.includes(account))
+  const matchedAccounts = douyinAccounts.filter(account =>
+    normalizedPromotionName.includes(account)
+  )
   if (matchedAccounts.length === 0) {
     return ''
   }
@@ -205,9 +207,9 @@ async function fetchAllOrdersByRange(ctx, timeRange) {
   let rangeLimitHit = false
 
   while (hasMoreData) {
-    console.log(
-      `🔄 [订单统计] 时间段 ${timeRange.begin_time}-${timeRange.end_time} 第 ${currentFetchIndex + 1} 次请求，已有 ${rangeOrders.length} 条`
-    )
+    // console.log(
+    //   `🔄 [订单统计] 时间段 ${timeRange.begin_time}-${timeRange.end_time} 第 ${currentFetchIndex + 1} 次请求，已有 ${rangeOrders.length} 条`
+    // )
 
     const modifiedQuery = buildPromotionDetailQuery(ctx.query, {
       begin_time: String(timeRange.begin_time),
@@ -224,7 +226,9 @@ async function fetchAllOrdersByRange(ctx, timeRange) {
     ctx.query = originalQuery
 
     if (!ctx.body || !Array.isArray(ctx.body.data)) {
-      console.log(`⚠️ [订单统计] 时间段 ${timeRange.begin_time}-${timeRange.end_time} 响应格式错误，停止`)
+      // console.log(
+      //   `⚠️ [订单统计] 时间段 ${timeRange.begin_time}-${timeRange.end_time} 响应格式错误，停止`
+      // )
       break
     }
 
@@ -232,15 +236,15 @@ async function fetchAllOrdersByRange(ctx, timeRange) {
     const batchTotal = ctx.body.total || 0
 
     if (batchOrders.length === 0) {
-      console.log(`✅ [订单统计] 时间段 ${timeRange.begin_time}-${timeRange.end_time} 已到末尾`)
+      // console.log(`✅ [订单统计] 时间段 ${timeRange.begin_time}-${timeRange.end_time} 已到末尾`)
       break
     }
 
     rangeOrders.push(...batchOrders)
 
-    console.log(
-      `  📦 时间段 ${timeRange.begin_time}-${timeRange.end_time}: 本批 ${batchOrders.length} 条，总计 ${batchTotal} 条，累计 ${rangeOrders.length} 条`
-    )
+    // console.log(
+    //   `  📦 时间段 ${timeRange.begin_time}-${timeRange.end_time}: 本批 ${batchOrders.length} 条，总计 ${batchTotal} 条，累计 ${rangeOrders.length} 条`
+    // )
 
     const fetchedCount = (currentFetchIndex + 1) * fetchPageSize
     if (fetchedCount >= batchTotal) {
@@ -248,9 +252,9 @@ async function fetchAllOrdersByRange(ctx, timeRange) {
     }
 
     if (rangeOrders.length >= MAX_ORDER_FETCH_COUNT) {
-      console.log(
-        `⚠️ [订单统计] 时间段 ${timeRange.begin_time}-${timeRange.end_time} 已触达常读平台最近 ${MAX_ORDER_FETCH_COUNT} 条订单范围`
-      )
+      // console.log(
+      //   `⚠️ [订单统计] 时间段 ${timeRange.begin_time}-${timeRange.end_time} 已触达常读平台最近 ${MAX_ORDER_FETCH_COUNT} 条订单范围`
+      // )
       rangeLimitHit = true
       hasMoreData = false
     }
@@ -347,7 +351,9 @@ router.get('/distributor/promotion/detail/v2', async ctx => {
   const selectedPromotionUserName = String(ctx.query.promotion_user_name || '').trim()
   const orderUserStatsConfig = await resolveOrderUserStatsRuntime(ctx)
   const independentOrderStatsConfig = await resolveIndependentOrderStatsRuntime(ctx)
-  const configuredPromotionUsernames = orderUserStatsConfig.enabled ? orderUserStatsConfig.usernames : []
+  const configuredPromotionUsernames = orderUserStatsConfig.enabled
+    ? orderUserStatsConfig.usernames
+    : []
   const shouldUseIndependentOrderStats = independentOrderStatsConfig.enabled
   const shouldBuildPromotionUserStats =
     !shouldUseIndependentOrderStats && configuredPromotionUsernames.length > 0
@@ -357,13 +363,13 @@ router.get('/distributor/promotion/detail/v2', async ctx => {
     return
   }
 
-  console.log('🔍 [订单统计] 开始拉取全量数据用于本地统计', {
-    channelDouyinAccounts: channelDouyinAccounts || '',
-    independentOrderStatsEnabled: shouldUseIndependentOrderStats,
-    independentDouyinAccounts: independentOrderStatsConfig.douyinAccounts,
-    promotionUsers: configuredPromotionUsernames,
-    selectedPromotionUserName,
-  })
+  // console.log('🔍 [订单统计] 开始拉取全量数据用于本地统计', {
+  //   channelDouyinAccounts: channelDouyinAccounts || '',
+  //   independentOrderStatsEnabled: shouldUseIndependentOrderStats,
+  //   independentDouyinAccounts: independentOrderStatsConfig.douyinAccounts,
+  //   promotionUsers: configuredPromotionUsernames,
+  //   selectedPromotionUserName,
+  // })
 
   const timeRanges = splitOrderTimeRange(ctx.query.begin_time, ctx.query.end_time)
   const queryRanges =
@@ -376,9 +382,9 @@ router.get('/distributor/promotion/detail/v2', async ctx => {
           },
         ]
 
-  console.log(
-    `🧩 [订单统计] 当前查询将拆分为 ${queryRanges.length} 个时间段，按最多 ${MAX_ORDER_RANGE_DAYS} 天一段拉取`
-  )
+  // console.log(
+  //   `🧩 [订单统计] 当前查询将拆分为 ${queryRanges.length} 个时间段，按最多 ${MAX_ORDER_RANGE_DAYS} 天一段拉取`
+  // )
 
   const allOrders = []
   let orderFetchLimitHit = false
@@ -414,9 +420,9 @@ router.get('/distributor/promotion/detail/v2', async ctx => {
   const totalAmount = calculateRechargeAmount(activeOrders)
   const allTotalAmount = calculateRechargeAmount(douyinFilteredOrders)
 
-  console.log(
-    `✅ [订单统计] 完成: 共拉取 ${allOrders.length} 条数据，筛选后 ${activeOrders.length} 条，当前总充值: ${totalAmount / 100} 元`
-  )
+  // console.log(
+  //   `✅ [订单统计] 完成: 共拉取 ${allOrders.length} 条数据，筛选后 ${activeOrders.length} 条，当前总充值: ${totalAmount / 100} 元`
+  // )
 
   // 返回所有数据给前端
   ctx.body = {

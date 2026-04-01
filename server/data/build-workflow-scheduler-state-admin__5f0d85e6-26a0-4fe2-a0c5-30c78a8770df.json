@@ -2,7 +2,7 @@
   "instanceKey": "admin__5f0d85e6-26a0-4fe2-a0c5-30c78a8770df",
   "userId": "admin",
   "runtimeUserName": "管理员",
-  "enabled": true,
+  "enabled": false,
   "intervalMinutes": 20,
   "tableId": null,
   "channelId": "5f0d85e6-26a0-4fe2-a0c5-30c78a8770df",

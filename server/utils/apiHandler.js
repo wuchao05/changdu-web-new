@@ -81,14 +81,14 @@ export default async function apiHandler(ctx, config) {
     const headers = buildHeaders(ctx)
 
     if (isReportApi) {
-      console.log('🌐 最终目标URL:', targetUrl)
-      console.log('📦 转发请求头:', {
-        appid: headers.appid,
-        apptype: headers.apptype,
-        distributorid: headers.distributorid,
-        cookieLength: headers.Cookie?.length || 0,
-      })
-      console.log('=========================================\n')
+      // console.log('🌐 最终目标URL:', targetUrl)
+      // console.log('📦 转发请求头:', {
+      //   appid: headers.appid,
+      //   apptype: headers.apptype,
+      //   distributorid: headers.distributorid,
+      //   cookieLength: headers.Cookie?.length || 0,
+      // })
+      // console.log('=========================================\n')
     }
 
     // 发起请求
