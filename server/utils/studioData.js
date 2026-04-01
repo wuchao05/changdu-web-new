@@ -455,7 +455,7 @@ function getReadonlyChannelRuntimeConfig() {
 function getRuntimeUserChannelConfig(user = {}, channelId = '') {
   const channelConfig = getUserChannelConfig(user, channelId)
 
-  if (user?.userType === 'admin' || channelConfig.enabled) {
+  if (channelConfig.enabled) {
     return channelConfig
   }
 
@@ -466,38 +466,16 @@ export function buildRuntimeUser(user = {}, channelId = '') {
   const normalizedUser = normalizeUser(user)
   const sourceChannelConfig = getUserChannelConfig(normalizedUser, channelId)
   const channelConfig = getRuntimeUserChannelConfig(normalizedUser, channelId)
-  const normalizedPermissions = {
-    ...channelConfig.permissions,
-    webMenus:
-      normalizedUser.userType === 'admin'
-        ? {
-            overview: true,
-            report: true,
-          }
-        : channelConfig.permissions.webMenus,
-    desktopMenus:
-      normalizedUser.userType === 'admin'
-        ? {
-            download: true,
-            materialClip: true,
-            upload: true,
-            juliangUpload: true,
-            uploadBuild: true,
-            juliangBuild: true,
-          }
-        : channelConfig.permissions.desktopMenus,
-  }
 
   return {
     ...normalizedUser,
     feishu: channelConfig.feishu,
     materialPreview: channelConfig.materialPreview,
-    permissions: normalizedPermissions,
+    permissions: channelConfig.permissions,
     orderUserStats: channelConfig.orderUserStats,
     independentOrderStats: channelConfig.independentOrderStats,
     douyinMaterialMatches: channelConfig.douyinMaterialMatches,
-    channelConfigEnabled:
-      normalizedUser.userType === 'admin' ? true : Boolean(sourceChannelConfig.enabled),
+    channelConfigEnabled: Boolean(sourceChannelConfig.enabled),
   }
 }
 

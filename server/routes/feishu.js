@@ -904,16 +904,19 @@ router.put('/bitable/channel-accounts/reset-unused', async ctx => {
       )
     )
 
-    const tokenResponse = await fetch(`${FEISHU_CONFIG.api_base_url}${FEISHU_CONFIG.token_endpoint}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        app_id: FEISHU_CONFIG.app_id,
-        app_secret: FEISHU_CONFIG.app_secret,
-      }),
-    })
+    const tokenResponse = await fetch(
+      `${FEISHU_CONFIG.api_base_url}${FEISHU_CONFIG.token_endpoint}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          app_id: FEISHU_CONFIG.app_id,
+          app_secret: FEISHU_CONFIG.app_secret,
+        }),
+      }
+    )
 
     const tokenData = await tokenResponse.text()
     let tokenJson
@@ -1577,33 +1580,31 @@ router.post('/bitable/drama-status/pending-upload', async ctx => {
 router.post('/bitable/drama-status/pending-build', async ctx => {
   try {
     const { field_names, page_size, filter, table_id } = ctx.request.body
-    const requestedChannelId = String(ctx.get('x-studio-channel-id') || '').trim()
 
-    console.log('========== 待搭建剧集查询参数 ==========')
-    console.log(
-      JSON.stringify(
-        {
-          channelId: requestedChannelId || '',
-          table_id: table_id || '',
-          page_size: page_size || 100,
-          field_names: field_names || ['剧名', '当前状态'],
-          filter:
-            filter || {
-              conjunction: 'and',
-              conditions: [
-                {
-                  field_name: '当前状态',
-                  operator: 'is',
-                  value: ['待搭建'],
-                },
-              ],
-            },
-        },
-        null,
-        2
-      )
-    )
-    console.log('======================================')
+    // console.log('========== 待搭建剧集查询参数 ==========')
+    // console.log(
+    //   JSON.stringify(
+    //     {
+    //       channelId: requestedChannelId || '',
+    //       table_id: table_id || '',
+    //       page_size: page_size || 100,
+    //       field_names: field_names || ['剧名', '当前状态'],
+    //       filter: filter || {
+    //         conjunction: 'and',
+    //         conditions: [
+    //           {
+    //             field_name: '当前状态',
+    //             operator: 'is',
+    //             value: ['待搭建'],
+    //           },
+    //         ],
+    //       },
+    //     },
+    //     null,
+    //     2
+    //   )
+    // )
+    // console.log('======================================')
 
     const tokenResponse = await fetch(
       `${FEISHU_CONFIG.api_base_url}${FEISHU_CONFIG.token_endpoint}`,
@@ -1685,10 +1686,10 @@ router.post('/bitable/drama-status/pending-build', async ctx => {
 
     // 打印返回的数据样例（用于调试评级字段）
     if (resultData.data?.items?.length > 0) {
-      console.log('========== 飞书返回数据样例 ==========')
-      console.log('第一条记录的字段:', JSON.stringify(resultData.data.items[0].fields, null, 2))
-      console.log('评级字段值:', resultData.data.items[0].fields['评级'])
-      console.log('=====================================')
+      // console.log('========== 飞书返回数据样例 ==========')
+      // console.log('第一条记录的字段:', JSON.stringify(resultData.data.items[0].fields, null, 2))
+      // console.log('评级字段值:', resultData.data.items[0].fields['评级'])
+      // console.log('=====================================')
     }
 
     ctx.status = response.status
@@ -2000,16 +2001,8 @@ router.post('/bitable/drama-status/all', async ctx => {
 // 飞书剧集状态表创建剪辑记录接口
 router.post('/bitable/drama-status/clip', async ctx => {
   try {
-    const {
-      dramaName,
-      timestamp,
-      account,
-      publishTime,
-      table_id,
-      douyinMaterial,
-      rating,
-      status,
-    } = ctx.request.body
+    const { dramaName, timestamp, account, publishTime, table_id, douyinMaterial, rating, status } =
+      ctx.request.body
     console.log('调用飞书创建剪辑记录 API', JSON.stringify(ctx.request.body))
 
     if (!dramaName || !timestamp) {
