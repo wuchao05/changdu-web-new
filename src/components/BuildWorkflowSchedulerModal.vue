@@ -47,6 +47,8 @@ dayjs.extend(utc)
 dayjs.extend(timezone)
 
 const message = useMessage()
+const BUILD_RETRY_BASE_DELAY_MS = 2000
+const BUILD_RETRY_MAX_DELAY_MS = 10000
 
 // 辅助函数：获取错误消息
 function getErrorMessage(error: unknown): string {
@@ -54,6 +56,29 @@ function getErrorMessage(error: unknown): string {
     return error.message
   }
   return String(error)
+}
+
+function isRetryableBuildErrorMessage(messageText: string): boolean {
+  const normalizedMessage = String(messageText || '').toLowerCase()
+  return (
+    normalizedMessage.includes('服务器连接超时') ||
+    normalizedMessage.includes('连接超时') ||
+    normalizedMessage.includes('请求超时') ||
+    normalizedMessage.includes('timeout') ||
+    normalizedMessage.includes('timed out') ||
+    normalizedMessage.includes('econnreset') ||
+    normalizedMessage.includes('econnaborted') ||
+    normalizedMessage.includes('socket hang up') ||
+    normalizedMessage.includes('network error') ||
+    normalizedMessage.includes('fetch failed') ||
+    normalizedMessage.includes('502') ||
+    normalizedMessage.includes('503') ||
+    normalizedMessage.includes('504')
+  )
+}
+
+function getBuildRetryDelayMs(retryCount: number) {
+  return Math.min(BUILD_RETRY_BASE_DELAY_MS * 2 ** retryCount, BUILD_RETRY_MAX_DELAY_MS)
 }
 
 function reportWorkflowLog(
@@ -1806,13 +1831,13 @@ async function buildBatchForDouyin(
     throw new Error(`素材不足：没有找到符合条件的素材（日期=${dateString || '不限'}）`)
   }
 
-  // 5. 创建广告（最多重试1次）
+  // 5. 创建广告（服务器超时等错误使用退避重试）
   record.failedStep = '创建广告'
   const adName = `${currentBrandName.value}-${config.douyinAccount}-${dramaName}-${buildTimestamp}`
 
   let promotionId: string | undefined
   let retryCount = 0
-  const maxRetries = 1
+  const maxRetries = 3
 
   while (retryCount <= maxRetries) {
     try {
@@ -1851,11 +1876,14 @@ async function buildBatchForDouyin(
         throw new Error(`项目名称重复：${projectName}`)
       }
 
-      // 其他错误，尝试重试
-      if (retryCount < maxRetries) {
-        console.warn(`广告创建失败，重试 ${retryCount + 1}/${maxRetries}...`)
+      const shouldRetry = isRetryableBuildErrorMessage(errorMsg)
+      if (shouldRetry && retryCount < maxRetries) {
+        const delayMs = getBuildRetryDelayMs(retryCount)
+        console.warn(
+          `广告创建失败，${Math.round(delayMs / 1000)} 秒后重试 ${retryCount + 1}/${maxRetries}...`
+        )
         retryCount++
-        await new Promise(resolve => setTimeout(resolve, 2000))
+        await new Promise(resolve => setTimeout(resolve, delayMs))
       } else {
         throw error
       }

@@ -39,6 +39,8 @@ import { buildRuntimeInstanceKey, normalizeRuntimeInstanceKey } from '../utils/r
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
+const BUILD_RETRY_BASE_DELAY_MS = 2000
+const BUILD_RETRY_MAX_DELAY_MS = 10000
 
 // 状态文件路径
 const isProduction = process.env.NODE_ENV === 'production'
@@ -117,6 +119,29 @@ function getActiveSchedulerState() {
 
 function runWithSchedulerContext(instanceKey, fn) {
   return schedulerContext.run({ instanceKey: normalizeRuntimeInstanceKey(instanceKey) }, fn)
+}
+
+function isRetryableBuildErrorMessage(messageText = '') {
+  const normalizedMessage = String(messageText || '').toLowerCase()
+  return (
+    normalizedMessage.includes('服务器连接超时') ||
+    normalizedMessage.includes('连接超时') ||
+    normalizedMessage.includes('请求超时') ||
+    normalizedMessage.includes('timeout') ||
+    normalizedMessage.includes('timed out') ||
+    normalizedMessage.includes('econnreset') ||
+    normalizedMessage.includes('econnaborted') ||
+    normalizedMessage.includes('socket hang up') ||
+    normalizedMessage.includes('network error') ||
+    normalizedMessage.includes('fetch failed') ||
+    normalizedMessage.includes('502') ||
+    normalizedMessage.includes('503') ||
+    normalizedMessage.includes('504')
+  )
+}
+
+function getBuildRetryDelayMs(retryCount) {
+  return Math.min(BUILD_RETRY_BASE_DELAY_MS * 2 ** retryCount, BUILD_RETRY_MAX_DELAY_MS)
 }
 
 async function listPersistedInstanceKeys() {
@@ -1547,28 +1572,45 @@ async function buildBatchForDouyin(drama, config, initData, dramaName, accountId
     throw new Error(`素材不足：没有找到符合条件的素材（日期=${dateString || '不限'}）`)
   }
 
-  // 5. 创建广告
+  // 5. 创建广告（服务器超时等错误使用退避重试）
   const adName = `${getRuntimeBrandName()}-${config.douyinAccount}-${dramaName}-${buildTimestamp}`
   let promotionCreateResult
-  try {
-    promotionCreateResult = await createPromotion({
-      account_id: accountId,
-      project_id: projectId,
-      ad_name: adName,
-      drama_name: dramaName,
-      ies_core_user_id: iesCoreUserId,
-      materials: sortedMaterials,
-      app_id: initData.app_id,
-      start_page: initData.start_page,
-      app_type: initData.app_type,
-      start_params: initData.start_params,
-      link: initData.link,
-      product_image_uri: initData.product_image_uri,
-      product_image_width: initData.product_image_width,
-      product_image_height: initData.product_image_height,
-    })
-  } catch (error) {
-    throw new Error(`[创建广告] ${error.message}`)
+  let retryCount = 0
+  const maxRetries = 3
+
+  while (retryCount <= maxRetries) {
+    try {
+      promotionCreateResult = await createPromotion({
+        account_id: accountId,
+        project_id: projectId,
+        ad_name: adName,
+        drama_name: dramaName,
+        ies_core_user_id: iesCoreUserId,
+        materials: sortedMaterials,
+        app_id: initData.app_id,
+        start_page: initData.start_page,
+        app_type: initData.app_type,
+        start_params: initData.start_params,
+        link: initData.link,
+        product_image_uri: initData.product_image_uri,
+        product_image_width: initData.product_image_width,
+        product_image_height: initData.product_image_height,
+      })
+      break
+    } catch (error) {
+      const errorMessage = String(error?.message || '')
+      const shouldRetry = isRetryableBuildErrorMessage(errorMessage)
+      if (shouldRetry && retryCount < maxRetries) {
+        const delayMs = getBuildRetryDelayMs(retryCount)
+        console.warn(
+          `[后台搭建] 创建广告失败，${Math.round(delayMs / 1000)} 秒后重试 ${retryCount + 1}/${maxRetries}: ${errorMessage}`
+        )
+        retryCount++
+        await new Promise(resolve => setTimeout(resolve, delayMs))
+        continue
+      }
+      throw new Error(`[创建广告] ${errorMessage}`)
+    }
   }
 
   if (promotionCreateResult.code !== 0) {
