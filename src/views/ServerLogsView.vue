@@ -646,9 +646,25 @@ onBeforeUnmount(() => {
 :deep(.server-logs-page__filter .n-base-selection) {
   min-height: 42px;
   border-radius: 14px;
-  background: rgba(15, 23, 42, 0.78);
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  box-shadow: none;
+  background: rgba(15, 23, 42, 0.88) !important;
+  border: none !important;
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.16) !important;
+}
+
+:deep(.server-logs-page__filter .n-base-selection__border),
+:deep(.server-logs-page__filter .n-base-selection__state-border) {
+  display: none !important;
+}
+
+:deep(.server-logs-page__filter .n-base-selection-label) {
+  background: transparent !important;
+}
+
+:deep(.server-logs-page__filter .n-base-selection-placeholder),
+:deep(.server-logs-page__filter .n-base-selection-input),
+:deep(.server-logs-page__filter .n-base-selection__input),
+:deep(.server-logs-page__filter .n-base-selection__placeholder) {
+  background: transparent !important;
 }
 
 :deep(.server-logs-page__filter .n-base-selection-label) {
