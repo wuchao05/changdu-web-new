@@ -460,6 +460,37 @@ function normalizeFieldText(fieldValue) {
   return ''
 }
 
+function formatBeijingDateTime(timestamp) {
+  const date = new Date(Number(timestamp))
+  if (Number.isNaN(date.getTime())) {
+    return String(timestamp || '')
+  }
+
+  const beijingDate = new Date(date.getTime() + 8 * 60 * 60 * 1000)
+  const year = beijingDate.getUTCFullYear()
+  const month = String(beijingDate.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(beijingDate.getUTCDate()).padStart(2, '0')
+  const hours = String(beijingDate.getUTCHours()).padStart(2, '0')
+  const minutes = String(beijingDate.getUTCMinutes()).padStart(2, '0')
+  const seconds = String(beijingDate.getUTCSeconds()).padStart(2, '0')
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+}
+
+function resolveBuildTimeWindow(timeWindowStartMinutes, timeWindowEndMinutes) {
+  const now = Date.now()
+  const timeWindowStart = now - timeWindowStartMinutes * 60 * 1000
+  const timeWindowEnd = now - timeWindowEndMinutes * 60 * 1000
+
+  return {
+    startMinutes: timeWindowStartMinutes,
+    endMinutes: timeWindowEndMinutes,
+    startTimestamp: timeWindowStart,
+    endTimestamp: timeWindowEnd,
+    startText: formatBeijingDateTime(timeWindowStart),
+    endText: formatBeijingDateTime(timeWindowEnd),
+  }
+}
+
 async function fetchAccountsFromFeishu(feishuConfig, timeWindowStartMinutes, timeWindowEndMinutes, awemeWhiteList, cookie) {
   const apiUrl = `${feishuConfig.baseUrl}/apps/${feishuConfig.appToken}/tables/${feishuConfig.tableId}/records/search`
   const accessToken = await fetchFeishuToken(feishuConfig.appId, feishuConfig.appSecret)
@@ -510,9 +541,7 @@ async function fetchAccountsFromFeishu(feishuConfig, timeWindowStartMinutes, tim
     }),
   ])
 
-  const now = Date.now()
-  const timeWindowStart = now - timeWindowStartMinutes * 60 * 1000
-  const timeWindowEnd = now - timeWindowEndMinutes * 60 * 1000
+  const buildTimeWindow = resolveBuildTimeWindow(timeWindowStartMinutes, timeWindowEndMinutes)
   const accountMap = new Map()
 
   for (const record of [...todayRecords, ...yesterdayRecords]) {
@@ -520,7 +549,11 @@ async function fetchAccountsFromFeishu(feishuConfig, timeWindowStartMinutes, tim
     const accountId = normalizeFieldText(record.fields?.账户)
     const buildTime = record.fields?.搭建时间
 
-    if (!buildTime || buildTime < timeWindowStart || buildTime > timeWindowEnd) {
+    if (
+      !buildTime ||
+      buildTime < buildTimeWindow.startTimestamp ||
+      buildTime > buildTimeWindow.endTimestamp
+    ) {
       continue
     }
 
@@ -534,7 +567,10 @@ async function fetchAccountsFromFeishu(feishuConfig, timeWindowStartMinutes, tim
     }
   }
 
-  return [...accountMap.values()]
+  return {
+    accounts: [...accountMap.values()],
+    buildTimeWindow,
+  }
 }
 
 function resolveAccountCookie(account, fallbackCookie = '') {
@@ -779,7 +815,7 @@ export class MaterialPreviewService {
 
   async batchProcessFromFeishu(config) {
     const feishuConfig = buildFeishuConfig(config.feishu)
-    const accounts = await fetchAccountsFromFeishu(
+    const { accounts, buildTimeWindow } = await fetchAccountsFromFeishu(
       feishuConfig,
       config.buildTimeFilterWindowStartMinutes || 90,
       config.buildTimeFilterWindowEndMinutes || 20,
@@ -788,7 +824,11 @@ export class MaterialPreviewService {
     )
 
     console.log(
-      `${resolveLogPrefix(config.logPrefix)} 飞书筛选完成: tableId=${feishuConfig.tableId}, accounts=${accounts.length}, awemeWhiteList=${Array.isArray(config.aweme_white_list) ? config.aweme_white_list.join(',') : ''}`
+      `${resolveLogPrefix(config.logPrefix)} 飞书筛选范围: 当前状态=已完成, 搭建时间=${buildTimeWindow.startText} ~ ${buildTimeWindow.endText}（${buildTimeWindow.startMinutes}-${buildTimeWindow.endMinutes} 分钟前）`
+    )
+
+    console.log(
+      `${resolveLogPrefix(config.logPrefix)} 飞书筛选完成: tableId=${feishuConfig.tableId}, accounts=${accounts.length}, buildTimeRange=${buildTimeWindow.startText} ~ ${buildTimeWindow.endText}, awemeWhiteList=${Array.isArray(config.aweme_white_list) ? config.aweme_white_list.join(',') : ''}`
     )
 
     if (!accounts.length) {
