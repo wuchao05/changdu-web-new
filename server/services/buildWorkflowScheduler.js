@@ -414,7 +414,7 @@ async function getDouyinConfigs(drama) {
     douyinMaterialText = rawField.text || rawField.value || ''
   }
 
-  // buildConsole.log(`[后台搭建] 抖音素材原始字段:`, JSON.stringify(rawField))
+  buildConsole.log(`[后台搭建] 抖音素材原始字段:`, JSON.stringify(rawField))
   // buildConsole.log(`[后台搭建] 抖音素材解析后文本:`, douyinMaterialText)
 
   const configs = parseDouyinMaterialFromFeishu(douyinMaterialText)
