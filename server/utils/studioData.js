@@ -739,10 +739,7 @@ export async function resolveRuntimeContext(sessionUser, requestedChannelId = ''
     : sessionUser.channelId
       ? [sessionUser.channelId]
       : []
-  const availableChannels =
-    sessionUser.userType === 'admin'
-      ? channels
-      : channels.filter(item => accessibleChannelIds.includes(item.id))
+  const availableChannels = channels.filter(item => accessibleChannelIds.includes(item.id))
   const channel =
     availableChannels.find(item => item.id === requestedChannelId) ||
     availableChannels.find(item => item.id === sessionUser.defaultChannelId) ||
