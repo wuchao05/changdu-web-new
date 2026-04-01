@@ -10,10 +10,10 @@ const router = new Router({
 function resolveLimit(rawLimit) {
   const parsedLimit = Number.parseInt(String(rawLimit || ''), 10)
   if (!Number.isFinite(parsedLimit)) {
-    return 200
+    return 500
   }
 
-  return Math.min(Math.max(parsedLimit, 20), 500)
+  return Math.min(Math.max(parsedLimit, 20), 5000)
 }
 
 router.get('/logs/stream', requireAdmin, async ctx => {

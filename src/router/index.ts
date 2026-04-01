@@ -36,6 +36,12 @@ const router = createRouter({
       meta: { requiresAuth: true, requiresAdmin: true },
     },
     {
+      path: '/admin/logs',
+      name: 'admin-logs',
+      component: () => import('../views/ServerLogsView.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true, hideFooter: true, hideDebugDrawer: true },
+    },
+    {
       path: '/new-drama-preview',
       redirect: '/clip',
     },

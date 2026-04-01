@@ -718,6 +718,11 @@ const accountMenuOptions = computed<DropdownOption[]>(() => {
       label: '管理员后台',
       icon: () => h(Icon, { icon: 'mdi:shield-crown-outline', class: 'h-4 w-4' }),
     })
+    options.push({
+      key: 'view-logs',
+      label: '查看日志',
+      icon: () => h(Icon, { icon: 'mdi:console', class: 'h-4 w-4' }),
+    })
   }
 
   options.push(
@@ -1414,6 +1419,11 @@ async function handleAccountMenuSelect(key: string) {
 
   if (key === 'change-password') {
     openChangePasswordModal()
+    return
+  }
+
+  if (key === 'view-logs') {
+    await router.push('/admin/logs')
     return
   }
 

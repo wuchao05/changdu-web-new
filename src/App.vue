@@ -15,7 +15,10 @@ import AppFooter from '@/components/AppFooter.vue'
 import DebugConsoleDrawer from '@/components/DebugConsoleDrawer.vue'
 
 const route = useRoute()
-const showFooter = computed(() => route.name !== 'login')
+const showFooter = computed(() => route.name !== 'login' && route.meta.hideFooter !== true)
+const showDebugDrawer = computed(
+  () => route.name !== 'login' && route.meta.hideDebugDrawer !== true
+)
 </script>
 
 <template>
@@ -31,7 +34,7 @@ const showFooter = computed(() => route.name !== 'login')
               </RouterView>
             </div>
             <AppFooter v-if="showFooter" />
-            <DebugConsoleDrawer />
+            <DebugConsoleDrawer v-if="showDebugDrawer" />
           </div>
         </n-notification-provider>
       </n-dialog-provider>
