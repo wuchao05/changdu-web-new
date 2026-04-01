@@ -2,33 +2,59 @@
   <div class="server-logs-page">
     <header class="server-logs-page__header">
       <div class="server-logs-page__title-wrap">
-        <n-button text class="server-logs-page__back" @click="handleBack">
-          <template #icon>
-            <Icon icon="mdi:arrow-left" />
-          </template>
-          返回
-        </n-button>
+        <div class="server-logs-page__title-top">
+          <n-button text class="server-logs-page__back" @click="handleBack">
+            <template #icon>
+              <Icon icon="mdi:arrow-left" />
+            </template>
+            返回
+          </n-button>
+          <span class="server-logs-page__eyebrow">管理员工具</span>
+        </div>
 
-        <div>
-          <p class="server-logs-page__eyebrow">管理员工具</p>
+        <div class="server-logs-page__title-block">
           <h1 class="server-logs-page__title">服务端日志</h1>
           <p class="server-logs-page__subtitle">实时展示当前服务进程输出的全部可用日志</p>
         </div>
       </div>
 
-      <div class="server-logs-page__actions">
-        <div class="server-logs-page__status">
-          <span>日志 {{ entries.length }} 条</span>
-          <n-tag size="small" :type="statusTagType">
-            {{ statusText }}
-          </n-tag>
+      <div class="server-logs-page__actions-card">
+        <div class="server-logs-page__status-row">
+          <div class="server-logs-page__metric">
+            <span class="server-logs-page__metric-label">日志总数</span>
+            <strong class="server-logs-page__metric-value">{{ entries.length }}</strong>
+          </div>
+
+          <div class="server-logs-page__status">
+            <span class="server-logs-page__status-label">连接状态</span>
+            <n-tag size="small" :type="statusTagType" round>
+              {{ statusText }}
+            </n-tag>
+          </div>
         </div>
 
         <div class="server-logs-page__toolbar">
-          <span class="server-logs-page__switch-label">自动滚动</span>
-          <n-switch v-model:value="autoScroll" size="small" />
-          <n-button secondary @click="restartStream">重新连接</n-button>
-          <n-button quaternary @click="clearEntries">清空</n-button>
+          <div class="server-logs-page__switch-group">
+            <span class="server-logs-page__switch-label">自动滚动</span>
+            <n-switch v-model:value="autoScroll" size="small" />
+          </div>
+
+          <n-button class="server-logs-page__action-button" @click="restartStream">
+            <template #icon>
+              <Icon icon="mdi:refresh" />
+            </template>
+            重新连接
+          </n-button>
+
+          <n-button
+            class="server-logs-page__action-button server-logs-page__action-button--subtle"
+            @click="clearEntries"
+          >
+            <template #icon>
+              <Icon icon="mdi:delete-outline" />
+            </template>
+            清空
+          </n-button>
         </div>
       </div>
     </header>
@@ -317,7 +343,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   background:
-    radial-gradient(circle at top, rgba(56, 189, 248, 0.14), transparent 28%),
+    radial-gradient(circle at top, rgba(14, 165, 233, 0.14), transparent 28%),
     radial-gradient(circle at bottom right, rgba(34, 197, 94, 0.12), transparent 22%),
     linear-gradient(180deg, #020617 0%, #0f172a 42%, #020617 100%);
   color: #e2e8f0;
@@ -327,29 +353,51 @@ onBeforeUnmount(() => {
   position: sticky;
   top: 0;
   z-index: 10;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
   gap: 20px;
-  padding: 24px 28px 18px;
+  padding: 22px 28px 16px;
   border-bottom: 1px solid rgba(148, 163, 184, 0.14);
-  background: rgba(2, 6, 23, 0.78);
+  background:
+    linear-gradient(180deg, rgba(3, 7, 18, 0.96), rgba(6, 13, 28, 0.88)),
+    radial-gradient(circle at top left, rgba(56, 189, 248, 0.12), transparent 28%);
   backdrop-filter: blur(18px);
 }
 
 .server-logs-page__title-wrap {
   display: flex;
-  align-items: flex-start;
-  gap: 16px;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.server-logs-page__title-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.server-logs-page__title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .server-logs-page__back {
-  color: #cbd5e1;
+  padding: 0;
+  color: #86efac;
 }
 
 .server-logs-page__eyebrow {
-  margin: 0 0 6px;
-  color: #38bdf8;
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 28px;
+  padding: 0 12px;
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  border-radius: 999px;
+  background: rgba(8, 47, 73, 0.28);
+  color: #67e8f9;
   font-size: 12px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -358,28 +406,69 @@ onBeforeUnmount(() => {
 .server-logs-page__title {
   margin: 0;
   color: #f8fafc;
-  font-size: 28px;
+  font-size: 40px;
   font-weight: 700;
+  line-height: 1.05;
 }
 
 .server-logs-page__subtitle {
-  margin: 8px 0 0;
-  color: #94a3b8;
-  font-size: 14px;
+  margin: 0;
+  color: #a5b4fc;
+  font-size: 15px;
 }
 
-.server-logs-page__actions {
+.server-logs-page__actions-card {
   display: flex;
-  align-items: flex-end;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 420px;
+  padding: 16px 18px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.82)),
+    radial-gradient(circle at top right, rgba(34, 197, 94, 0.09), transparent 34%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.server-logs-page__status-row {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
   gap: 16px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+}
+
+.server-logs-page__metric,
+.server-logs-page__status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(30, 41, 59, 0.76);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.server-logs-page__metric {
+  min-width: 130px;
+}
+
+.server-logs-page__metric-label,
+.server-logs-page__status-label {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.server-logs-page__metric-value {
+  color: #f8fafc;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .server-logs-page__status {
-  display: flex;
-  align-items: center;
-  gap: 10px;
   color: #cbd5e1;
   font-size: 13px;
 }
@@ -387,13 +476,56 @@ onBeforeUnmount(() => {
 .server-logs-page__toolbar {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
+.server-logs-page__switch-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.78);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+}
+
 .server-logs-page__switch-label {
-  color: #94a3b8;
-  font-size: 12px;
+  color: #cbd5e1;
+  font-size: 13px;
+}
+
+.server-logs-page__action-button {
+  min-width: 128px;
+  border-radius: 14px;
+  border: 1px solid rgba(34, 197, 94, 0.28);
+  background: linear-gradient(180deg, rgba(22, 101, 52, 0.32), rgba(20, 83, 45, 0.22));
+  color: #dcfce7;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.server-logs-page__action-button:hover {
+  border-color: rgba(74, 222, 128, 0.42);
+  background: linear-gradient(180deg, rgba(22, 101, 52, 0.42), rgba(21, 94, 51, 0.28));
+  color: #f0fdf4;
+}
+
+.server-logs-page__action-button--subtle {
+  border-color: rgba(148, 163, 184, 0.22);
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.88), rgba(15, 23, 42, 0.82));
+  color: #e2e8f0;
+}
+
+.server-logs-page__action-button--subtle:hover {
+  border-color: rgba(148, 163, 184, 0.38);
+  background: linear-gradient(180deg, rgba(51, 65, 85, 0.9), rgba(30, 41, 59, 0.88));
+  color: #f8fafc;
+}
+
+:deep(.server-logs-page__action-button .n-button__content) {
+  font-weight: 600;
 }
 
 .server-logs-page__body {
@@ -402,7 +534,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 20px 28px 28px;
+  padding: 16px 28px 28px;
 }
 
 .server-logs-page__alert {
@@ -414,15 +546,15 @@ onBeforeUnmount(() => {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  border: 1px solid rgba(96, 165, 250, 0.16);
   border-radius: 22px;
   overflow: hidden;
   background:
-    linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(2, 6, 23, 0.98)),
-    linear-gradient(90deg, rgba(34, 197, 94, 0.06), rgba(56, 189, 248, 0.05));
+    radial-gradient(circle at top right, rgba(59, 130, 246, 0.1), transparent 24%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(2, 6, 23, 0.98));
   box-shadow:
     0 28px 80px rgba(2, 6, 23, 0.5),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03);
 }
 
 .terminal-shell__meta {
@@ -432,7 +564,9 @@ onBeforeUnmount(() => {
   gap: 12px;
   padding: 14px 18px;
   border-bottom: 1px solid rgba(148, 163, 184, 0.14);
-  background: rgba(15, 23, 42, 0.92);
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(15, 23, 42, 0.9)),
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.1), transparent 28%);
   color: #94a3b8;
   font-size: 12px;
 }
@@ -560,19 +694,17 @@ onBeforeUnmount(() => {
 
 @media (max-width: 960px) {
   .server-logs-page__header {
+    grid-template-columns: 1fr;
     padding: 18px 16px 14px;
-    flex-direction: column;
   }
 
-  .server-logs-page__title-wrap {
-    width: 100%;
-    flex-direction: column;
-    gap: 12px;
+  .server-logs-page__title {
+    font-size: 32px;
   }
 
-  .server-logs-page__actions {
+  .server-logs-page__actions-card {
     width: 100%;
-    justify-content: space-between;
+    min-width: 0;
   }
 
   .server-logs-page__body {
@@ -585,8 +717,16 @@ onBeforeUnmount(() => {
     font-size: 24px;
   }
 
-  .server-logs-page__actions {
-    align-items: flex-start;
+  .server-logs-page__title-top,
+  .server-logs-page__status-row,
+  .server-logs-page__toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .server-logs-page__switch-group,
+  .server-logs-page__action-button {
+    width: 100%;
   }
 
   .terminal-shell__line {
