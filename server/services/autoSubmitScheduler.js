@@ -17,11 +17,14 @@ import {
   resolveChannelRuntimeById,
 } from '../utils/channelRuntime.js'
 import {
+  buildRuntimeInstanceKey,
   normalizeRuntimeInstanceKey,
+  parseRuntimeInstanceKey,
   patchRuntimeIdentityFromInstanceKey,
 } from '../utils/runtimeInstance.js'
 import { resolveDownloadCenterRequestHeaders } from '../utils/downloadCenterHeaders.js'
 import { createScopedConsole } from '../utils/serviceLogger.js'
+import { findUsersByChannelId } from '../utils/studioData.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -426,21 +429,121 @@ async function saveState(channelId) {
   }
 }
 
+async function removeStateFile(instanceKey) {
+  try {
+    await fs.unlink(getStateFilePath(instanceKey))
+  } catch (error) {
+    if (error?.code !== 'ENOENT') {
+      throw error
+    }
+  }
+}
+
+async function stateFileExists(instanceKey) {
+  try {
+    await fs.access(getStateFilePath(instanceKey))
+    return true
+  } catch {
+    return false
+  }
+}
+
+function selectLegacyStateOwner(users = [], channelId = '') {
+  const normalizedChannelId = String(channelId || '').trim()
+  const defaultChannelUsers = users.filter(
+    user => String(user.defaultChannelId || '').trim() === normalizedChannelId
+  )
+  const nonAdminDefaultUsers = defaultChannelUsers.filter(user => user.userType !== 'admin')
+  if (nonAdminDefaultUsers.length === 1) {
+    return nonAdminDefaultUsers[0]
+  }
+  if (defaultChannelUsers.length === 1) {
+    return defaultChannelUsers[0]
+  }
+
+  const nonAdminUsers = users.filter(user => user.userType !== 'admin')
+  if (nonAdminUsers.length === 1) {
+    return nonAdminUsers[0]
+  }
+  if (users.length === 1) {
+    return users[0]
+  }
+
+  return null
+}
+
+async function resolvePersistedInstanceKey(instanceKey, savedState = {}) {
+  const normalizedInstanceKey = normalizeRuntimeInstanceKey(instanceKey)
+  const parsedIdentity = parseRuntimeInstanceKey(normalizedInstanceKey)
+  const stateUserId = String(savedState.userId || '').trim()
+  const stateChannelId = String(savedState.channelId || parsedIdentity.channelId || '').trim()
+
+  if (parsedIdentity.userId && parsedIdentity.userId !== 'anonymous' && stateChannelId) {
+    return normalizedInstanceKey
+  }
+
+  if (stateUserId && stateChannelId) {
+    return buildRuntimeInstanceKey({
+      userId: stateUserId,
+      channelId: stateChannelId,
+    })
+  }
+
+  if (!stateChannelId) {
+    return normalizedInstanceKey
+  }
+
+  const matchedUsers = await findUsersByChannelId(stateChannelId)
+  const owner = selectLegacyStateOwner(matchedUsers, stateChannelId)
+  if (!owner) {
+    return normalizedInstanceKey
+  }
+
+  return buildRuntimeInstanceKey({
+    userId: owner.id,
+    channelId: stateChannelId,
+  })
+}
+
 /**
  * 加载状态
  */
-async function loadState(channelId) {
-  return runWithAutoSubmitLogContext({ instanceKey: channelId }, async () => {
+async function loadState(instanceKey) {
+  return runWithAutoSubmitLogContext({ instanceKey }, async () => {
     try {
-      const entry = ensureSchedulerEntry(channelId)
-      const stateFilePath = getStateFilePath(channelId)
+      const stateFilePath = getStateFilePath(instanceKey)
       const data = await fs.readFile(stateFilePath, 'utf-8')
       const savedState = JSON.parse(data)
-      entry.state = { ...entry.state, ...savedState }
-      await ensureSchedulerRuntime(channelId)
-      serviceConsole.log(`[自动提交-${channelId}] 已加载保存的状态`)
+      const resolvedInstanceKey = await resolvePersistedInstanceKey(instanceKey, savedState)
+
+      if (resolvedInstanceKey !== normalizeRuntimeInstanceKey(instanceKey)) {
+        const resolvedStateExists = await stateFileExists(resolvedInstanceKey)
+        if (resolvedStateExists) {
+          await removeStateFile(instanceKey)
+          return loadState(resolvedInstanceKey)
+        }
+      }
+
+      const entry = ensureSchedulerEntry(resolvedInstanceKey)
+      entry.state = {
+        ...entry.state,
+        ...savedState,
+        instanceKey: normalizeRuntimeInstanceKey(resolvedInstanceKey),
+      }
+      patchRuntimeIdentityFromInstanceKey(entry.state, resolvedInstanceKey)
+      await ensureSchedulerRuntime(resolvedInstanceKey)
+
+      if (resolvedInstanceKey !== normalizeRuntimeInstanceKey(instanceKey)) {
+        await saveState(resolvedInstanceKey)
+        await removeStateFile(instanceKey)
+        serviceConsole.log(
+          `[自动提交-${resolvedInstanceKey}] 已迁移旧实例状态: ${instanceKey} -> ${resolvedInstanceKey}`
+        )
+      }
+
+      serviceConsole.log(`[自动提交-${resolvedInstanceKey}] 已加载保存的状态`)
     } catch {
-      serviceConsole.log(`[自动提交-${channelId}] 未找到状态文件，使用默认状态`)
+      serviceConsole.log(`[自动提交-${instanceKey}] 未找到状态文件，使用默认状态`)
     }
   })
 }
@@ -1627,7 +1730,9 @@ export async function initScheduler() {
   // 尝试迁移旧状态文件
   await migrateOldState()
   const keys = await listPersistedInstanceKeys()
-  await Promise.all(keys.map(instanceKey => loadState(instanceKey)))
+  for (const instanceKey of keys) {
+    await loadState(instanceKey)
+  }
 
   for (const instanceKey of Object.keys(schedulers)) {
     await runWithAutoSubmitLogContext({ instanceKey }, async () => {
