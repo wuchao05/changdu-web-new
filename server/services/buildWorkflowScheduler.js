@@ -2093,8 +2093,9 @@ export async function initScheduler() {
 
       if (state.currentTask) {
         buildConsole.log('[后台搭建] 检测到遗留任务:', instanceKey, state.currentTask.dramaName)
-        buildConsole.log('[后台搭建] 清除遗留任务状态，等待下次轮询重新处理')
+        buildConsole.log('[后台搭建] 检测到任务可能因发版重启被中断，启动后立即补跑')
         state.currentTask = null
+        state.nextRunTime = new Date().toISOString()
         await saveState(instanceKey)
       }
 

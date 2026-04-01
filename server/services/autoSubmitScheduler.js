@@ -1426,6 +1426,9 @@ async function runAutoSubmitCycle(channelId) {
   }
 
   state.running = true
+  if (state.intervalMinutes) {
+    state.nextRunTime = new Date(Date.now() + state.intervalMinutes * 60 * 1000).toISOString()
+  }
   state.currentTask = {
     startTime: new Date().toISOString(),
     status: 'running',
@@ -1752,6 +1755,14 @@ export async function initScheduler() {
     await runWithAutoSubmitLogContext({ instanceKey }, async () => {
       const entry = ensureSchedulerEntry(instanceKey)
       await ensureSchedulerRuntime(instanceKey)
+      const hasInterruptedTask = entry.state.running || Boolean(entry.state.currentTask)
+
+      if (hasInterruptedTask) {
+        serviceConsole.log(`[自动提交-${instanceKey}] 检测到发版前被中断的轮询任务，启动后立即补跑`)
+        entry.state.nextRunTime = new Date().toISOString()
+        entry.state.currentTask = null
+      }
+
       entry.state.running = false
       entry.state.progress = { current: 0, total: 0, currentDate: '', currentDrama: '' }
 
