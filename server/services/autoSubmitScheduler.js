@@ -38,6 +38,29 @@ function buildAutoSubmitLogContext(instanceKey = '', runtimeContext = null) {
   }
 }
 
+function parseRuntimeIdentityFromInstanceKey(instanceKey = '') {
+  const normalizedInstanceKey = String(instanceKey || '').trim()
+  if (!normalizedInstanceKey) {
+    return {
+      userId: '',
+      channelId: '',
+    }
+  }
+
+  const separatorIndex = normalizedInstanceKey.indexOf('__')
+  if (separatorIndex === -1) {
+    return {
+      userId: '',
+      channelId: normalizedInstanceKey,
+    }
+  }
+
+  return {
+    userId: normalizedInstanceKey.slice(0, separatorIndex).trim(),
+    channelId: normalizedInstanceKey.slice(separatorIndex + 2).trim(),
+  }
+}
+
 function parseInstanceKeyFromLogArgs(args = []) {
   const firstArg = args[0]
   if (typeof firstArg !== 'string') {
@@ -259,6 +282,15 @@ function getSchedulerProfile(instanceKey) {
 
 async function ensureSchedulerRuntime(instanceKey, runtimeContext = null) {
   const entry = ensureSchedulerEntry(instanceKey)
+  const identity = parseRuntimeIdentityFromInstanceKey(instanceKey)
+
+  if (!entry.state.userId && identity.userId && identity.userId !== 'anonymous') {
+    entry.state.userId = identity.userId
+  }
+
+  if (!entry.state.channelId && identity.channelId && identity.channelId !== 'default') {
+    entry.state.channelId = identity.channelId
+  }
 
   if (runtimeContext?.channelRuntime) {
     const normalizedRuntime = normalizeChannelRuntime(runtimeContext.channelRuntime)
@@ -426,16 +458,19 @@ async function saveState(channelId) {
  * 加载状态
  */
 async function loadState(channelId) {
-  try {
-    const entry = ensureSchedulerEntry(channelId)
-    const stateFilePath = getStateFilePath(channelId)
-    const data = await fs.readFile(stateFilePath, 'utf-8')
-    const savedState = JSON.parse(data)
-    entry.state = { ...entry.state, ...savedState }
-    serviceConsole.log(`[自动提交-${channelId}] 已加载保存的状态`)
-  } catch {
-    serviceConsole.log(`[自动提交-${channelId}] 未找到状态文件，使用默认状态`)
-  }
+  return runWithAutoSubmitLogContext({ instanceKey: channelId }, async () => {
+    try {
+      const entry = ensureSchedulerEntry(channelId)
+      const stateFilePath = getStateFilePath(channelId)
+      const data = await fs.readFile(stateFilePath, 'utf-8')
+      const savedState = JSON.parse(data)
+      entry.state = { ...entry.state, ...savedState }
+      await ensureSchedulerRuntime(channelId)
+      serviceConsole.log(`[自动提交-${channelId}] 已加载保存的状态`)
+    } catch {
+      serviceConsole.log(`[自动提交-${channelId}] 未找到状态文件，使用默认状态`)
+    }
+  })
 }
 
 /**

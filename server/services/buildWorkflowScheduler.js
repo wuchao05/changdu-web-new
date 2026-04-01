@@ -1752,16 +1752,20 @@ async function loadState(instanceKey) {
     const data = await fs.readFile(getStateFilePath(instanceKey), 'utf-8')
     const savedState = JSON.parse(data)
     entry.state = { ...entry.state, ...savedState }
-    await runWithSchedulerContext(instanceKey, () => ensureSchedulerRuntime(null, instanceKey))
+    await runWithSchedulerContext(instanceKey, async () => {
+      await ensureSchedulerRuntime(null, instanceKey)
 
-    // 如果之前是启用状态，恢复定时器
-    if (entry.state.enabled && entry.state.intervalMinutes) {
-      buildConsole.log('[后台搭建] 恢复定时任务...', entry.state.instanceKey)
-      scheduleNextPolling(instanceKey)
-    }
+      // 如果之前是启用状态，恢复定时器
+      if (entry.state.enabled && entry.state.intervalMinutes) {
+        buildConsole.log('[后台搭建] 恢复定时任务...', entry.state.instanceKey)
+        scheduleNextPolling(instanceKey)
+      }
+    })
   } catch (error) {
     if (error.code !== 'ENOENT') {
-      buildConsole.error('[后台搭建] 加载状态失败:', error)
+      await runWithSchedulerContext(instanceKey, () => {
+        buildConsole.error('[后台搭建] 加载状态失败:', error)
+      })
     }
   }
 }
@@ -2009,19 +2013,21 @@ export async function startScheduler(intervalMinutes, tableId = null, channelRun
  */
 export async function stopScheduler(channelRuntime = null) {
   const instanceKey = buildRuntimeInstanceKey(channelRuntime || {})
-  const entry = ensureSchedulerEntry(instanceKey)
-  buildConsole.log('[后台搭建] 停止调度器', instanceKey)
+  return runWithSchedulerContext(instanceKey, async () => {
+    const entry = ensureSchedulerEntry(instanceKey)
+    buildConsole.log('[后台搭建] 停止调度器', instanceKey)
 
-  entry.state.enabled = false
+    entry.state.enabled = false
 
-  if (entry.timer) {
-    clearTimeout(entry.timer)
-    entry.timer = null
-  }
+    if (entry.timer) {
+      clearTimeout(entry.timer)
+      entry.timer = null
+    }
 
-  await saveState(instanceKey)
+    await saveState(instanceKey)
 
-  return getSchedulerStatus(instanceKey)
+    return getSchedulerStatus(instanceKey)
+  })
 }
 
 /**
@@ -2050,21 +2056,23 @@ export function getSchedulerStatus(instanceKey) {
  * 初始化调度器（服务启动时调用）
  */
 export async function initScheduler() {
-  buildConsole.log('[后台搭建] 初始化调度器...')
+  globalThis.console.log('[后台搭建] 初始化调度器...')
   const instanceKeys = await listPersistedInstanceKeys()
 
   for (const instanceKey of instanceKeys) {
-    await loadState(instanceKey)
-    const state = ensureSchedulerEntry(instanceKey).state
+    await runWithSchedulerContext(instanceKey, async () => {
+      await loadState(instanceKey)
+      const state = ensureSchedulerEntry(instanceKey).state
 
-    if (state.currentTask) {
-      buildConsole.log('[后台搭建] 检测到遗留任务:', instanceKey, state.currentTask.dramaName)
-      buildConsole.log('[后台搭建] 清除遗留任务状态，等待下次轮询重新处理')
-      state.currentTask = null
-      await saveState(instanceKey)
-    }
+      if (state.currentTask) {
+        buildConsole.log('[后台搭建] 检测到遗留任务:', instanceKey, state.currentTask.dramaName)
+        buildConsole.log('[后台搭建] 清除遗留任务状态，等待下次轮询重新处理')
+        state.currentTask = null
+        await saveState(instanceKey)
+      }
 
-    buildConsole.log('[后台搭建] 调度器状态:', instanceKey, state.enabled ? '运行中' : '已停止')
+      buildConsole.log('[后台搭建] 调度器状态:', instanceKey, state.enabled ? '运行中' : '已停止')
+    })
   }
 }
 
