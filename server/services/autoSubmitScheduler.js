@@ -1421,6 +1421,7 @@ async function runAutoSubmitCycle(channelId) {
   if (!state.enabled) return
   if (state.running) {
     serviceConsole.log(`[自动提交-${channelId}] 上一轮仍在运行，跳过本次`)
+    scheduleNextRun(channelId)
     return
   }
 
@@ -1568,11 +1569,18 @@ async function runAutoSubmitCycle(channelId) {
 /**
  * 调度下次运行
  */
-function scheduleNextRun(channelId) {
+function scheduleNextRun(channelId, options = {}) {
   const entry = ensureSchedulerEntry(channelId)
   const state = entry.state
   const intervalMs = state.intervalMinutes * 60 * 1000
-  state.nextRunTime = new Date(Date.now() + intervalMs).toISOString()
+  const nowMs = Date.now()
+  const savedNextRunMs = Date.parse(String(state.nextRunTime || ''))
+  const usePersistedTime = options.usePersistedTime === true
+  const hasValidSavedNextRunTime = Number.isFinite(savedNextRunMs)
+  const nextRunMs =
+    usePersistedTime && hasValidSavedNextRunTime ? Math.max(savedNextRunMs, nowMs) : nowMs + intervalMs
+
+  state.nextRunTime = new Date(nextRunMs).toISOString()
 
   serviceConsole.log(`[自动提交-${channelId}] 下次运行时间: ${state.nextRunTime}`)
 
@@ -1582,7 +1590,9 @@ function scheduleNextRun(channelId) {
 
   entry.timer = setTimeout(() => {
     runWithAutoSubmitLogContext({ instanceKey: channelId }, () => runAutoSubmitCycle(channelId))
-  }, intervalMs)
+  }, Math.max(0, nextRunMs - nowMs))
+
+  void saveState(channelId)
 }
 
 // ============== 导出的控制函数 ==============
@@ -1698,10 +1708,12 @@ export async function triggerManualRun(channelId, runtimeContext = null) {
     // 如果之前未启用，恢复状态
     if (!wasEnabled) {
       state.enabled = false
+      state.nextRunTime = null
       if (entry.timer) {
         clearTimeout(entry.timer)
         entry.timer = null
       }
+      await saveState(channelId)
     }
 
     return { success: true, message: '手动执行完成' }
@@ -1744,8 +1756,18 @@ export async function initScheduler() {
       entry.state.progress = { current: 0, total: 0, currentDate: '', currentDrama: '' }
 
       if (entry.state.enabled) {
-        serviceConsole.log(`[自动提交-${instanceKey}] 恢复之前的调度状态`)
-        scheduleNextRun(instanceKey)
+        const savedNextRunMs = Date.parse(String(entry.state.nextRunTime || ''))
+        if (Number.isFinite(savedNextRunMs) && savedNextRunMs <= Date.now()) {
+          serviceConsole.log(`[自动提交-${instanceKey}] 检测到已过点任务，立即补跑`)
+        } else {
+          serviceConsole.log(
+            `[自动提交-${instanceKey}] 恢复之前的调度状态，下次运行: ${entry.state.nextRunTime || ''}`
+          )
+        }
+        scheduleNextRun(instanceKey, { usePersistedTime: true })
+      } else if (entry.state.nextRunTime) {
+        entry.state.nextRunTime = null
+        await saveState(instanceKey)
       }
     })
   }

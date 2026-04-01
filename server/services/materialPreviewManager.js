@@ -127,7 +127,7 @@ class MaterialPreviewManager {
 
     this.initialized = true
     await this.loadStates()
-    this.restoreTimers()
+    await this.restoreTimers()
   }
 
   async startPreview(runtimeContext, options = {}) {
@@ -161,7 +161,7 @@ class MaterialPreviewManager {
     })
 
     this.states.set(instanceKey, state)
-    this.createTimer(instanceKey)
+    this.createTimer(instanceKey, { delayMs: 1000 })
     await this.saveStates()
 
     console.log(
@@ -181,12 +181,6 @@ class MaterialPreviewManager {
         2
       )
     )
-
-    setTimeout(() => {
-      this.executePreview(instanceKey).catch(error => {
-        console.error(`${getMaterialPreviewLogPrefix(state)} 首次执行失败:`, instanceKey, error)
-      })
-    }, 1000)
 
     return this.getStatus(instanceKey)
   }
@@ -351,19 +345,32 @@ class MaterialPreviewManager {
     }
   }
 
-  createTimer(instanceKey) {
+  createTimer(instanceKey, options = {}) {
     const state = this.states.get(instanceKey)
     if (!state) return
 
     this.clearTimer(instanceKey)
-    const timerId = setInterval(() => {
+    const intervalMs = state.intervalMinutes * 60 * 1000
+    const nowMs = Date.now()
+    const savedNextRunMs = Date.parse(String(state.nextRunTime || ''))
+    const hasValidSavedNextRunTime = Number.isFinite(savedNextRunMs)
+    const nextRunMs =
+      typeof options.delayMs === 'number'
+        ? nowMs + Math.max(0, options.delayMs)
+        : options.usePersistedTime && hasValidSavedNextRunTime
+          ? Math.max(savedNextRunMs, nowMs)
+          : nowMs + intervalMs
+
+    const timerId = setTimeout(() => {
+      this.timers.delete(instanceKey)
       this.executePreview(instanceKey).catch(error => {
         console.error(`${getMaterialPreviewLogPrefix(state)} 定时执行失败:`, instanceKey, error)
       })
-    }, state.intervalMinutes * 60 * 1000)
+    }, Math.max(0, nextRunMs - nowMs))
 
     this.timers.set(instanceKey, timerId)
-    state.nextRunTime = new Date(Date.now() + state.intervalMinutes * 60 * 1000).toISOString()
+    state.nextRunTime = new Date(nextRunMs).toISOString()
+    void this.saveStates()
   }
 
   clearTimer(instanceKey) {
@@ -381,6 +388,9 @@ class MaterialPreviewManager {
     }
     if (state.running) {
       console.log(`${getMaterialPreviewLogPrefix(state)} 上一轮仍在执行，跳过本次:`, instanceKey)
+      if (state.enabled) {
+        this.createTimer(instanceKey)
+      }
       return
     }
 
@@ -465,7 +475,7 @@ class MaterialPreviewManager {
     } finally {
       state.running = false
       if (state.enabled) {
-        state.nextRunTime = new Date(Date.now() + state.intervalMinutes * 60 * 1000).toISOString()
+        this.createTimer(instanceKey)
       } else {
         state.nextRunTime = null
       }
@@ -503,11 +513,28 @@ class MaterialPreviewManager {
     await fs.rename(tempPath, STATE_FILE_PATH)
   }
 
-  restoreTimers() {
+  async restoreTimers() {
+    let hasStateChanged = false
     for (const [instanceKey, state] of this.states.entries()) {
       if (state.enabled) {
-        this.createTimer(instanceKey)
+        const savedNextRunMs = Date.parse(String(state.nextRunTime || ''))
+        if (Number.isFinite(savedNextRunMs) && savedNextRunMs <= Date.now()) {
+          console.log(`${getMaterialPreviewLogPrefix(state)} 检测到已过点任务，立即补跑:`, instanceKey)
+        } else {
+          console.log(
+            `${getMaterialPreviewLogPrefix(state)} 恢复定时任务，下次运行:`,
+            state.nextRunTime || ''
+          )
+        }
+        this.createTimer(instanceKey, { usePersistedTime: true })
+      } else if (state.nextRunTime) {
+        state.nextRunTime = null
+        hasStateChanged = true
       }
+    }
+
+    if (hasStateChanged) {
+      await this.saveStates()
     }
   }
 }
