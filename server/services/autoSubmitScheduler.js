@@ -16,7 +16,10 @@ import {
   normalizeChannelRuntime,
   resolveChannelRuntimeById,
 } from '../utils/channelRuntime.js'
-import { normalizeRuntimeInstanceKey } from '../utils/runtimeInstance.js'
+import {
+  normalizeRuntimeInstanceKey,
+  patchRuntimeIdentityFromInstanceKey,
+} from '../utils/runtimeInstance.js'
 import { resolveDownloadCenterRequestHeaders } from '../utils/downloadCenterHeaders.js'
 import { createScopedConsole } from '../utils/serviceLogger.js'
 
@@ -35,29 +38,6 @@ function buildAutoSubmitLogContext(instanceKey = '', runtimeContext = null) {
     userId: String(runtimeContext?.runtimeUser?.id || '').trim(),
     channelName: String(runtimeContext?.channelRuntime?.channelName || '').trim(),
     channelId: String(runtimeContext?.channelRuntime?.channelId || '').trim(),
-  }
-}
-
-function parseRuntimeIdentityFromInstanceKey(instanceKey = '') {
-  const normalizedInstanceKey = String(instanceKey || '').trim()
-  if (!normalizedInstanceKey) {
-    return {
-      userId: '',
-      channelId: '',
-    }
-  }
-
-  const separatorIndex = normalizedInstanceKey.indexOf('__')
-  if (separatorIndex === -1) {
-    return {
-      userId: '',
-      channelId: normalizedInstanceKey,
-    }
-  }
-
-  return {
-    userId: normalizedInstanceKey.slice(0, separatorIndex).trim(),
-    channelId: normalizedInstanceKey.slice(separatorIndex + 2).trim(),
   }
 }
 
@@ -282,15 +262,7 @@ function getSchedulerProfile(instanceKey) {
 
 async function ensureSchedulerRuntime(instanceKey, runtimeContext = null) {
   const entry = ensureSchedulerEntry(instanceKey)
-  const identity = parseRuntimeIdentityFromInstanceKey(instanceKey)
-
-  if (!entry.state.userId && identity.userId && identity.userId !== 'anonymous') {
-    entry.state.userId = identity.userId
-  }
-
-  if (!entry.state.channelId && identity.channelId && identity.channelId !== 'default') {
-    entry.state.channelId = identity.channelId
-  }
+  patchRuntimeIdentityFromInstanceKey(entry.state, instanceKey)
 
   if (runtimeContext?.channelRuntime) {
     const normalizedRuntime = normalizeChannelRuntime(runtimeContext.channelRuntime)

@@ -35,7 +35,11 @@ import {
   normalizeChannelRuntime,
   resolveChannelRuntimeById,
 } from '../utils/channelRuntime.js'
-import { buildRuntimeInstanceKey, normalizeRuntimeInstanceKey } from '../utils/runtimeInstance.js'
+import {
+  buildRuntimeInstanceKey,
+  normalizeRuntimeInstanceKey,
+  patchRuntimeIdentityFromInstanceKey,
+} from '../utils/runtimeInstance.js'
 import { buildServiceLogPrefix, createScopedConsole } from '../utils/serviceLogger.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -179,6 +183,7 @@ function getSchedulerRuntime() {
 async function ensureSchedulerRuntime(channelRuntime = null, instanceKey = getActiveInstanceKey()) {
   const entry = ensureSchedulerEntry(instanceKey)
   const state = entry.state
+  patchRuntimeIdentityFromInstanceKey(state, instanceKey)
 
   if (channelRuntime) {
     const normalizedRuntime = normalizeChannelRuntime(
