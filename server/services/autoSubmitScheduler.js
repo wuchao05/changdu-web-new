@@ -1335,12 +1335,14 @@ function sortDramasByPriority(dramas, downloadList, newDramaSet) {
 async function processDrama(channelId, drama, downloadList, newDramaSet, options = {}) {
   await ensureSchedulerRuntime(channelId)
   const dramaName = drama.series_name
+  const logScope = options.logScope === '批量提交' ? '批量提交' : '自动提交'
+  const logPrefix = `[${logScope}-${channelId}]`
 
   try {
     // 1. 检查可用账户
     const availableAccount = await getFirstAvailableAccount(channelId)
     if (!availableAccount) {
-      serviceConsole.log(`[自动提交-${channelId}] 无可用账户，跳过: ${dramaName}`)
+      serviceConsole.log(`${logPrefix} 无可用账户，跳过: ${dramaName}`)
       return { success: false, reason: 'no_account' }
     }
 
@@ -1353,7 +1355,7 @@ async function processDrama(channelId, drama, downloadList, newDramaSet, options
       })
 
       if (existingDrama) {
-        serviceConsole.log(`[自动提交-${channelId}] 剧集已存在，跳过: ${dramaName}`)
+        serviceConsole.log(`${logPrefix} 剧集已存在，跳过: ${dramaName}`)
         return { success: false, reason: 'already_exists' }
       }
     }
@@ -1363,7 +1365,7 @@ async function processDrama(channelId, drama, downloadList, newDramaSet, options
 
     // 4. 创建飞书剧集清单记录
     await createDramaRecord(channelId, dramaName, drama.publish_time, drama.book_id, rating)
-    serviceConsole.log(`[自动提交-${channelId}] 创建剧集清单记录成功: ${dramaName}`)
+    serviceConsole.log(`${logPrefix} 创建剧集清单记录成功: ${dramaName}`)
 
     // 5. 根据下载状态确定飞书状态
     const downloadData = getDownloadDataForDrama(downloadList, drama)
@@ -1385,7 +1387,7 @@ async function processDrama(channelId, drama, downloadList, newDramaSet, options
       rating, // 传递评级参数
     })
     serviceConsole.log(
-      `[自动提交-${channelId}] 创建剧集状态记录成功，分配账户: ${availableAccount.account}`
+      `${logPrefix} 创建剧集状态记录成功，分配账户: ${availableAccount.account}`
     )
 
     // 9. 更新账户使用状态
@@ -1396,15 +1398,15 @@ async function processDrama(channelId, drama, downloadList, newDramaSet, options
       try {
         const remark = `${getSchedulerBrandName(channelId)}-${dramaName}`
         await editJuliangAccountRemark(channelId, availableAccount.account, remark)
-        serviceConsole.log(`[自动提交-${channelId}] 更新巨量账户备注成功: ${availableAccount.account}`)
+        serviceConsole.log(`${logPrefix} 更新巨量账户备注成功: ${availableAccount.account}`)
       } catch (juliangError) {
-        serviceConsole.error(`[自动提交-${channelId}] 更新巨量账户备注失败:`, juliangError.message)
+        serviceConsole.error(`${logPrefix} 更新巨量账户备注失败:`, juliangError.message)
       }
     }
 
     return { success: true }
   } catch (error) {
-    serviceConsole.error(`[自动提交-${channelId}] 处理失败: ${dramaName}`, error.message)
+    serviceConsole.error(`${logPrefix} 处理失败: ${dramaName}`, error.message)
     return { success: false, reason: 'error', error: error.message }
   }
 }
@@ -1796,6 +1798,7 @@ async function executeBatchSubmit(items, runtimeContext = null) {
       const result = await processDrama(channelId, drama, downloadList, new Set(), {
         manualRedFlag: item.manualRedFlag,
         fromSearchResult: item.fromSearchResult,
+        logScope: '批量提交',
       })
 
       if (result.success) {
