@@ -52,9 +52,7 @@ function parseSchedulerTimeMs(value) {
     return Number.NaN
   }
 
-  const beijingMatch = rawValue.match(
-    /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/
-  )
+  const beijingMatch = rawValue.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/)
   if (beijingMatch) {
     const [, year, month, day, hour, minute, second] = beijingMatch
     return Date.parse(`${year}-${month}-${day}T${hour}:${minute}:${second}+08:00`)
@@ -335,14 +333,13 @@ router.get('/scheduler-overview', async ctx => {
   const nowMs = Date.now()
   const itemMap = new Map()
   const channelMap = new Map(channels.map(channel => [channel.id, channel]))
+  const userOrderMap = new Map(users.map((user, index) => [user.id, index]))
   const filterUserSet = requestedUserId ? new Set([requestedUserId]) : null
-  const userOptions = users
-    .map(user => ({
-      userId: user.id,
-      runtimeUserName: user.nickname,
-      account: user.account,
-    }))
-    .sort((first, second) => first.runtimeUserName.localeCompare(second.runtimeUserName, 'zh-CN'))
+  const userOptions = users.map(user => ({
+    userId: user.id,
+    runtimeUserName: user.nickname,
+    account: user.account,
+  }))
 
   for (const user of users) {
     if (filterUserSet && !filterUserSet.has(user.id)) {
@@ -473,15 +470,11 @@ router.get('/scheduler-overview', async ctx => {
         return first.channelName.localeCompare(second.channelName, 'zh-CN')
       }),
     }))
-    .sort((first, second) => {
-      if (first.summary.hasAbnormal !== second.summary.hasAbnormal) {
-        return first.summary.hasAbnormal ? -1 : 1
-      }
-      if (first.summary.runningCount !== second.summary.runningCount) {
-        return second.summary.runningCount - first.summary.runningCount
-      }
-      return first.runtimeUserName.localeCompare(second.runtimeUserName, 'zh-CN')
-    })
+    .sort(
+      (first, second) =>
+        (userOrderMap.get(first.userId) ?? Number.MAX_SAFE_INTEGER) -
+        (userOrderMap.get(second.userId) ?? Number.MAX_SAFE_INTEGER)
+    )
 
   ctx.body = {
     code: 0,
@@ -623,11 +616,11 @@ router.delete('/users/:id', async ctx => {
     return
   }
 
-  if (current.userType === 'admin' && current.account === 'admin') {
+  if (current.id === 'admin') {
     ctx.status = 400
     ctx.body = {
       code: 400,
-      message: '默认管理员账号不可删除',
+      message: '默认管理员小红不可删除',
     }
     return
   }
@@ -903,7 +896,9 @@ router.put('/download-center-configs/:id', async ctx => {
   }
 
   const nextConfigs = configs.map((config, currentIndex) =>
-    currentIndex === index ? updated : { ...config, isDefault: updated.isDefault ? false : config.isDefault }
+    currentIndex === index
+      ? updated
+      : { ...config, isDefault: updated.isDefault ? false : config.isDefault }
   )
 
   await writeDownloadCenterConfigs(nextConfigs)

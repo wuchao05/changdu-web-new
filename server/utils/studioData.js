@@ -153,7 +153,7 @@ function defaultDownloadCenterConfig() {
 function defaultAdminUser() {
   return {
     id: DEFAULT_ADMIN_USER_ID,
-    nickname: '管理员',
+    nickname: '小红',
     account: 'admin',
     brandName: '小红',
     password: 'qwer1234',
@@ -205,7 +205,9 @@ function normalizeDownloadCenterConfigs(configs = []) {
 
   const normalizedConfigs = configs
     .map(normalizeDownloadCenterConfig)
-    .filter(config => config.name || config.owner || config.cookie || config.secretKey || config.appId)
+    .filter(
+      config => config.name || config.owner || config.cookie || config.secretKey || config.appId
+    )
 
   if (normalizedConfigs.length === 0) {
     return []
@@ -702,7 +704,9 @@ export async function findUserByAccount(account) {
 export async function findUserByToken(token) {
   if (!token) return null
   const users = await listUsers()
-  return users.find(user => Array.isArray(user.authTokens) && user.authTokens.includes(token)) || null
+  return (
+    users.find(user => Array.isArray(user.authTokens) && user.authTokens.includes(token)) || null
+  )
 }
 
 export async function resolveUserChannel(user) {

@@ -1,16 +1,11 @@
 {
   "id": "admin",
-  "nickname": "管理员",
+  "nickname": "小红",
   "account": "admin",
   "password": "qwer1234",
-  "authTokens": [
-    "105851f2677b59575690c66f004b7e076522f0cbad629e5f"
-  ],
+  "authTokens": ["105851f2677b59575690c66f004b7e076522f0cbad629e5f"],
   "userType": "admin",
-  "channelIds": [
-    "5f0d85e6-26a0-4fe2-a0c5-30c78a8770df",
-    "00514b91-884d-40f8-9e67-6a593a9df74f"
-  ],
+  "channelIds": ["5f0d85e6-26a0-4fe2-a0c5-30c78a8770df", "00514b91-884d-40f8-9e67-6a593a9df74f"],
   "defaultChannelId": "5f0d85e6-26a0-4fe2-a0c5-30c78a8770df",
   "channelConfigs": {
     "5f0d85e6-26a0-4fe2-a0c5-30c78a8770df": {
@@ -44,13 +39,7 @@
       "orderUserStats": {
         "enabled": true,
         "sortMode": "amount_desc",
-        "usernames": [
-          "小红",
-          "小何",
-          "虎哥",
-          "岁月",
-          "昱飞"
-        ]
+        "usernames": ["小红", "小何", "虎哥", "岁月", "昱飞"]
       },
       "independentOrderStats": {
         "enabled": false
