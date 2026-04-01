@@ -204,6 +204,22 @@ class MaterialPreviewManager {
     state.running = false
     state.nextRunTime = null
     await this.saveStates()
+
+    console.log(
+      `${getMaterialPreviewLogPrefix(state)} 已停止:`,
+      JSON.stringify(
+        {
+          instanceKey: normalizedKey,
+          userId: state.userId,
+          runtimeUserName: state.runtimeUserName,
+          channelId: state.channelId,
+          channelName: state.channelName,
+        },
+        null,
+        2
+      )
+    )
+
     return this.getStatus(normalizedKey)
   }
 

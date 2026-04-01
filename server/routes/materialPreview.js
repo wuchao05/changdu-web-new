@@ -170,6 +170,9 @@ router.post('/start', async ctx => {
 router.post('/stop', async ctx => {
   try {
     const targetContext = await resolveTargetContext(ctx)
+    await persistMaterialPreviewConfig(targetContext.user, targetContext.channel.id, {
+      enabled: false,
+    })
     const result = await materialPreviewManager.stopPreview(targetContext.instanceKey)
 
     ctx.body = {
