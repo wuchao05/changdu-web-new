@@ -658,11 +658,11 @@ router.get('/distributor/content/series/list/v1', async ctx => {
       }
     }
 
-    console.log('[新剧抢跑] 常读返回结果:', {
-      code: apiResult?.code,
-      message: apiResult?.message || '',
-      dataCount: Array.isArray(apiResult?.data?.data) ? apiResult.data.data.length : undefined,
-    })
+    // console.log('[新剧抢跑] 常读返回结果:', {
+    //   code: apiResult?.code,
+    //   message: apiResult?.message || '',
+    //   dataCount: Array.isArray(apiResult?.data?.data) ? apiResult.data.data.length : undefined,
+    // })
 
     // 转换数据格式以保持前端兼容性
     if (apiResult.code === 0) {
@@ -1030,9 +1030,9 @@ router.get('/distributor/statistic/rank/series/quality/list/v2', async ctx => {
                 const existsInFeishu = dramaExistsInFeishuMap.get(drama.book_name)
 
                 // 调试：打印每部剧的匹配情况
-                console.log(
-                  `[排行榜] 剧名: "${drama.book_name}", 飞书已下载: ${isDownloaded}, 飞书存在: ${existsInFeishu}`
-                )
+                // console.log(
+                //   `[排行榜] 剧名: "${drama.book_name}", 飞书已下载: ${isDownloaded}, 飞书存在: ${existsInFeishu}`
+                // )
 
                 // 设置是否已下载状态
                 drama.feishu_downloaded = isDownloaded === true
