@@ -11,10 +11,7 @@
             >
               <Icon icon="mdi:chart-line" class="w-6 h-6 text-white" />
             </div>
-            <div
-              v-if="isMobile && mobileUserLabels.length > 0"
-              class="min-w-0 flex items-center"
-            >
+            <div v-if="isMobile && mobileUserLabels.length > 0" class="min-w-0 flex items-center">
               <button
                 v-for="label in mobileUserLabels"
                 :key="`mobile-${label}`"
@@ -356,19 +353,27 @@
                 <div class="independent-order-summary__card">
                   <p
                     class="independent-order-summary__label"
-                    :class="{ 'order-user-tab__skeleton order-user-tab__skeleton--meta': ordersLoading }"
+                    :class="{
+                      'order-user-tab__skeleton order-user-tab__skeleton--meta': ordersLoading,
+                    }"
                   >
                     {{ ordersLoading ? '' : '当前时间范围总充值' }}
                   </p>
                   <p
                     class="independent-order-summary__value"
-                    :class="{ 'order-user-tab__skeleton order-user-tab__skeleton--amount': ordersLoading }"
+                    :class="{
+                      'order-user-tab__skeleton order-user-tab__skeleton--amount': ordersLoading,
+                    }"
                   >
-                    {{ ordersLoading ? '' : formatCurrency(independentOrderStatsSummary.totalAmount) }}
+                    {{
+                      ordersLoading ? '' : formatCurrency(independentOrderStatsSummary.totalAmount)
+                    }}
                   </p>
                   <p
                     class="independent-order-summary__meta"
-                    :class="{ 'order-user-tab__skeleton order-user-tab__skeleton--meta': ordersLoading }"
+                    :class="{
+                      'order-user-tab__skeleton order-user-tab__skeleton--meta': ordersLoading,
+                    }"
                   >
                     {{
                       ordersLoading
@@ -380,25 +385,31 @@
                 <div class="independent-order-summary__card">
                   <p
                     class="independent-order-summary__label"
-                    :class="{ 'order-user-tab__skeleton order-user-tab__skeleton--meta': ordersLoading }"
+                    :class="{
+                      'order-user-tab__skeleton order-user-tab__skeleton--meta': ordersLoading,
+                    }"
                   >
                     {{ ordersLoading ? '' : '当前时间范围总订单' }}
                   </p>
                   <p
                     class="independent-order-summary__value"
-                    :class="{ 'order-user-tab__skeleton order-user-tab__skeleton--amount': ordersLoading }"
-                  >
-                    {{ ordersLoading ? '' : formatNumberValue(independentOrderStatsSummary.totalOrders) }}
-                  </p>
-                  <p
-                    class="independent-order-summary__meta"
-                    :class="{ 'order-user-tab__skeleton order-user-tab__skeleton--meta': ordersLoading }"
+                    :class="{
+                      'order-user-tab__skeleton order-user-tab__skeleton--amount': ordersLoading,
+                    }"
                   >
                     {{
                       ordersLoading
                         ? ''
-                        : independentOrderStatsSummary.accountSummaryText
+                        : formatNumberValue(independentOrderStatsSummary.totalOrders)
                     }}
+                  </p>
+                  <p
+                    class="independent-order-summary__meta"
+                    :class="{
+                      'order-user-tab__skeleton order-user-tab__skeleton--meta': ordersLoading,
+                    }"
+                  >
+                    {{ ordersLoading ? '' : independentOrderStatsSummary.accountSummaryText }}
                   </p>
                 </div>
               </div>
@@ -423,26 +434,34 @@
                   <div class="order-user-tab__head">
                     <span
                       class="order-user-tab__label"
-                      :class="{ 'order-user-tab__skeleton order-user-tab__skeleton--label': ordersLoading }"
+                      :class="{
+                        'order-user-tab__skeleton order-user-tab__skeleton--label': ordersLoading,
+                      }"
                     >
                       {{ ordersLoading ? '' : tab.label }}
                     </span>
                     <span
                       class="order-user-tab__count"
-                      :class="{ 'order-user-tab__skeleton order-user-tab__skeleton--count': ordersLoading }"
+                      :class="{
+                        'order-user-tab__skeleton order-user-tab__skeleton--count': ordersLoading,
+                      }"
                     >
                       {{ ordersLoading ? '' : `${tab.total} 单` }}
                     </span>
                   </div>
                   <p
                     class="order-user-tab__amount"
-                    :class="{ 'order-user-tab__skeleton order-user-tab__skeleton--amount': ordersLoading }"
+                    :class="{
+                      'order-user-tab__skeleton order-user-tab__skeleton--amount': ordersLoading,
+                    }"
                   >
                     {{ ordersLoading ? '' : formatCurrency(tab.totalAmount) }}
                   </p>
                   <p
                     class="order-user-tab__meta"
-                    :class="{ 'order-user-tab__skeleton order-user-tab__skeleton--meta': ordersLoading }"
+                    :class="{
+                      'order-user-tab__skeleton order-user-tab__skeleton--meta': ordersLoading,
+                    }"
                   >
                     {{ ordersLoading ? '' : tab.meta }}
                   </p>
@@ -664,8 +683,7 @@ const autoBuildDisabledReason = computed(() => {
   return ''
 })
 const canAccessSyncAccount = computed(
-  () =>
-    hasActiveChannel.value && Boolean(sessionStore.currentRuntimeUser?.permissions?.syncAccount)
+  () => hasActiveChannel.value && Boolean(sessionStore.currentRuntimeUser?.permissions?.syncAccount)
 )
 const canAccessOverview = computed(
   () =>
@@ -674,7 +692,8 @@ const canAccessOverview = computed(
 )
 const canAccessReport = computed(
   () =>
-    hasActiveChannel.value && Boolean(sessionStore.currentRuntimeUser?.permissions?.webMenus?.report)
+    hasActiveChannel.value &&
+    Boolean(sessionStore.currentRuntimeUser?.permissions?.webMenus?.report)
 )
 const hasAccountTableId = computed(() => Boolean(apiConfigStore.config.accountTableId))
 const dashboardSubtitle = computed(() => '数据驱动，精准运营')
@@ -765,7 +784,9 @@ const changePasswordRules: FormRules = {
         if (String(value || '').trim().length < 6) {
           return new Error('新密码至少需要 6 位')
         }
-        if (String(value || '').trim() === String(changePasswordForm.currentPassword || '').trim()) {
+        if (
+          String(value || '').trim() === String(changePasswordForm.currentPassword || '').trim()
+        ) {
           return new Error('新密码不能与当前密码相同')
         }
         return true
@@ -934,9 +955,7 @@ const independentOrderStatsSummary = computed(() => {
   const paidOrderCount = allOrderRows.value.filter(order => order.pay_status === 0).length
   const accountCount = independentOrderDouyinAccounts.value.length
   const accountSummaryText =
-    accountCount > 0
-      ? `已按 ${accountCount} 个抖音号规则过滤`
-      : '当前渠道未配置抖音号名称'
+    accountCount > 0 ? `已按 ${accountCount} 个抖音号规则过滤` : '当前渠道未配置抖音号名称'
 
   return {
     totalOrders: Number(ordersData.value?.total || 0),
@@ -1512,6 +1531,9 @@ onMounted(async () => {
   reportDateRange.value = getDefaultDateRange()
   orderDateRange.value = getDefaultDateRange()
   await refreshDashboardContext()
+  adminApi.reportPageVisit('首页').catch((error: unknown) => {
+    console.warn('记录首页访问日志失败:', error)
+  })
   if (hasActiveChannel.value) {
     douyinMaterialStore.loadFromServer(true).catch(error => {
       console.error('加载抖音号匹配素材失败:', error)
@@ -1852,7 +1874,9 @@ onUnmounted(() => {
 
 .user-label-badge--clickable {
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .user-label-badge--clickable:hover {

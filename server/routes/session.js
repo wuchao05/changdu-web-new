@@ -13,10 +13,19 @@ import {
   writeUser,
 } from '../utils/studioData.js'
 import { DEFAULT_BUILD_CONFIG, normalizeBuildConfig } from '../config/buildConfig.js'
+import { buildServiceLogPrefix } from '../utils/serviceLogger.js'
 
 const router = new Router({
   prefix: '/api/session',
 })
+
+function logPageVisit(pageName, runtimeUser, channel) {
+  const prefix = buildServiceLogPrefix('页面访问', {
+    runtimeUserName: runtimeUser?.nickname || runtimeUser?.account || '',
+    channelName: channel?.name || channel?.id || '',
+  })
+  globalThis.console.log(`${prefix}-${pageName}`)
+}
 
 router.post('/login', async ctx => {
   try {
@@ -190,6 +199,30 @@ router.get('/me', async ctx => {
       message: '获取登录状态失败',
       error: error.message,
     }
+  }
+})
+
+router.post('/page-visit', requireSession, async ctx => {
+  const pageName = String(ctx.request.body?.pageName || '').trim()
+
+  if (!pageName) {
+    ctx.status = 400
+    ctx.body = {
+      code: 400,
+      message: '页面名称不能为空',
+    }
+    return
+  }
+
+  const sessionUser = ctx.state.sessionUser
+  const requestedChannelId = String(ctx.get('x-studio-channel-id') || '').trim()
+  const { channel, runtimeUser } = await resolveRuntimeContext(sessionUser, requestedChannelId)
+
+  logPageVisit(pageName, runtimeUser || sessionUser, channel)
+
+  ctx.body = {
+    code: 0,
+    message: 'success',
   }
 })
 

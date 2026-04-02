@@ -486,6 +486,8 @@ function getBuildConfig() {
     secretKey: buildConfig.secretKey,
     useNewMicroAppAssetFlow,
     clearExistingProjectsBeforeBuild: Boolean(buildConfig.clearExistingProjectsBeforeBuild),
+    advanceHoursAfterTen: buildConfig.advanceHoursAfterTen,
+    advanceHoursBeforeTen: buildConfig.advanceHoursBeforeTen,
     ccId: buildConfig.ccId,
     microAppName: buildConfig.microAppName,
     microAppId: buildConfig.microAppId,
@@ -1284,12 +1286,12 @@ async function executeAssetization(drama) {
 
   // 步骤2: 创建推广链接（用于小程序资产）
   buildConsole.log('[后台搭建] 步骤2: 创建推广链接')
-  const primaryDouyinConfig = await getDouyinConfigs(drama)
-  if (primaryDouyinConfig.length === 0) {
+  const douyinConfigs = await getDouyinConfigs(drama)
+  if (douyinConfigs.length === 0) {
     throw new Error('没有配置抖音号')
   }
   const assetPromotionName = generateSmartPromotionName(
-    primaryDouyinConfig[0].douyinAccount,
+    douyinConfigs[0].douyinAccount,
     dramaName,
     accountId,
     getRuntimeBrandName()
@@ -1488,7 +1490,10 @@ async function executeAssetization(drama) {
   }
 
   buildConsole.log('[后台搭建] 资产化完成')
-  return initData
+  return {
+    ...initData,
+    douyinConfigs,
+  }
 }
 
 /**
@@ -1700,7 +1705,7 @@ async function executeSetup(drama, initData) {
 
   buildConsole.log(`[后台搭建] 开始搭建: ${dramaName}`)
 
-  const douyinConfigs = await getDouyinConfigs(drama)
+  const douyinConfigs = Array.isArray(initData?.douyinConfigs) ? initData.douyinConfigs : []
   if (douyinConfigs.length === 0) {
     throw new Error('没有配置抖音号')
   }

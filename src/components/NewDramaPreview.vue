@@ -893,6 +893,7 @@ import {
   getDownloadUrl,
   feishuApi,
 } from '@/api'
+import { reportPageVisit } from '@/api/admin'
 import {
   startAutoSubmit as startAutoSubmitApi,
   stopAutoSubmit as stopAutoSubmitApi,
@@ -3458,6 +3459,10 @@ onMounted(async () => {
   } catch (error) {
     console.warn('同步认证配置失败，使用本地配置:', error)
   }
+
+  reportPageVisit('剧单页').catch((error: unknown) => {
+    console.warn('记录剧单页访问日志失败:', error)
+  })
 
   // 加载当前运行用户的抖音号素材配置
   douyinMaterialStore.loadFromServer(true)

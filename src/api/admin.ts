@@ -352,6 +352,13 @@ export function getCurrentSession() {
   }>('/session/me')
 }
 
+export function reportPageVisit(pageName: string) {
+  return request<void>('/session/page-visit', {
+    method: 'POST',
+    body: JSON.stringify({ pageName }),
+  })
+}
+
 export function getAdminOverview() {
   return request<{
     userCount: number
