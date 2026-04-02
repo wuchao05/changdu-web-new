@@ -92,6 +92,115 @@
         <n-card class="shadow-sm border border-gray-200">
           <template #header>
             <div class="flex items-center space-x-3">
+              <Icon icon="mdi:account-group-outline" class="w-5 h-5 text-gray-600" />
+              <div>
+                <h3 class="text-lg font-semibold text-gray-900">抖音号素材配置</h3>
+                <p class="text-sm text-gray-500">
+                  当前渠道下的抖音号素材规则，和管理员后台共用同一套数据。
+                </p>
+              </div>
+            </div>
+          </template>
+          <div class="space-y-4">
+            <div
+              class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600"
+            >
+              <div class="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                <span
+                  >当前渠道：<strong class="text-gray-900">{{ activeChannelName }}</strong></span
+                >
+                <span
+                  >共 {{ materialMatches.length }} 条规则，{{
+                    validMaterialMatchCount
+                  }}
+                  条有效</span
+                >
+              </div>
+              <p class="mt-2 text-xs text-gray-500">
+                这里展示的就是管理员后台给当前用户在当前渠道下配置的规则；你修改后，后台会同步看到同样内容。
+              </p>
+            </div>
+
+            <div v-if="materialMatches.length" class="space-y-3">
+              <div
+                v-for="match in materialMatches"
+                :key="match.id"
+                class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
+              >
+                <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <n-input v-model:value="match.douyinAccount" placeholder="请输入抖音号名称" />
+                  <n-input v-model:value="match.douyinAccountId" placeholder="请输入抖音号 ID" />
+                  <n-input
+                    v-model:value="match.materialRange"
+                    placeholder="请输入素材范围，如 01-05"
+                  />
+                </div>
+                <div class="mt-3 flex items-center justify-between text-xs text-gray-500">
+                  <span>
+                    {{
+                      isMaterialMatchValid(match)
+                        ? '已配置完整，可直接生效'
+                        : '请补全抖音号、ID 和素材范围'
+                    }}
+                  </span>
+                  <div class="flex items-center gap-2">
+                    <n-button
+                      size="small"
+                      tertiary
+                      type="primary"
+                      @click="saveMaterialMatch(match.id)"
+                    >
+                      保存
+                    </n-button>
+                    <n-button
+                      size="small"
+                      tertiary
+                      type="error"
+                      @click="removeMaterialMatch(match.id)"
+                    >
+                      删除
+                    </n-button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div
+              v-else
+              class="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-10 text-center text-sm text-gray-500"
+            >
+              当前渠道暂无抖音号素材规则，可以在下方新增。
+            </div>
+
+            <div class="rounded-xl border border-dashed border-gray-300 bg-white p-4">
+              <div class="mb-3 flex items-center justify-between">
+                <div>
+                  <h4 class="text-sm font-semibold text-gray-900">新增规则</h4>
+                  <p class="text-xs text-gray-500">填写完整后保存到当前渠道</p>
+                </div>
+                <n-button type="primary" @click="addMaterialMatch">新增规则</n-button>
+              </div>
+              <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <n-input
+                  v-model:value="newMaterialMatch.douyinAccount"
+                  placeholder="请输入抖音号名称"
+                />
+                <n-input
+                  v-model:value="newMaterialMatch.douyinAccountId"
+                  placeholder="请输入抖音号 ID"
+                />
+                <n-input
+                  v-model:value="newMaterialMatch.materialRange"
+                  placeholder="请输入素材范围，如 01-05"
+                />
+              </div>
+            </div>
+          </div>
+        </n-card>
+
+        <n-card class="shadow-sm border border-gray-200">
+          <template #header>
+            <div class="flex items-center space-x-3">
               <Icon icon="mdi:database" class="w-5 h-5 text-gray-600" />
               <div>
                 <h3 class="text-lg font-semibold text-gray-900">数据管理</h3>
@@ -143,19 +252,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import {
   useMessage,
   useDialog,
   NButton,
   NCard,
+  NInput,
   NSelect,
   NSwitch,
   NInputNumber,
 } from 'naive-ui'
 import { useSettingsStore } from '@/stores/settings'
 import { useApiConfigStore } from '@/stores/apiConfig'
+import { useSessionStore } from '@/stores/session'
+import { useDouyinMaterialStore } from '@/stores/douyinMaterial'
 
 defineOptions({
   name: 'SettingsPage',
@@ -166,6 +278,8 @@ const dialog = useDialog()
 
 const settingsStore = useSettingsStore()
 const apiConfigStore = useApiConfigStore()
+const sessionStore = useSessionStore()
+const douyinMaterialStore = useDouyinMaterialStore()
 
 const localSettings = ref({
   pageSize: 10,
@@ -191,6 +305,31 @@ const dateRangeOptions = [
   { label: '至今', value: 'all' },
 ]
 
+const materialMatches = ref(douyinMaterialStore.matches)
+const newMaterialMatch = ref({
+  douyinAccount: '',
+  douyinAccountId: '',
+  materialRange: '',
+})
+
+const activeChannelName = computed(() => {
+  const activeChannelId = sessionStore.activeChannelId
+  if (activeChannelId) {
+    const matchedChannel = sessionStore.availableChannels.find(
+      channel => channel.id === activeChannelId
+    )
+    if (matchedChannel?.name) {
+      return matchedChannel.name
+    }
+  }
+
+  return sessionStore.currentChannel?.name || '未选择渠道'
+})
+
+const validMaterialMatchCount = computed(
+  () => materialMatches.value.filter(match => isMaterialMatchValid(match)).length
+)
+
 function initLocalState() {
   const settings = settingsStore.settings
   localSettings.value = {
@@ -206,6 +345,26 @@ function initLocalState() {
 watch(
   () => settingsStore.settings,
   () => initLocalState(),
+  { immediate: true }
+)
+
+watch(
+  () => douyinMaterialStore.matches,
+  value => {
+    materialMatches.value = value.map(item => ({ ...item }))
+  },
+  { immediate: true, deep: true }
+)
+
+watch(
+  () => sessionStore.activeChannelId,
+  activeChannelId => {
+    if (!activeChannelId) {
+      materialMatches.value = []
+      return
+    }
+    void douyinMaterialStore.loadFromServer(true)
+  },
   { immediate: true }
 )
 
@@ -237,6 +396,81 @@ function clearCache() {
   localStorage.removeItem('studio_runtime_channel_config')
   localStorage.removeItem('appSettings')
   message.success('缓存数据已清除')
+}
+
+function isMaterialMatchValid(match: {
+  douyinAccount?: string
+  douyinAccountId?: string
+  materialRange?: string
+}) {
+  return Boolean(
+    String(match.douyinAccount || '').trim() &&
+      String(match.douyinAccountId || '').trim() &&
+      String(match.materialRange || '').trim()
+  )
+}
+
+async function addMaterialMatch() {
+  const payload = {
+    douyinAccount: String(newMaterialMatch.value.douyinAccount || '').trim(),
+    douyinAccountId: String(newMaterialMatch.value.douyinAccountId || '').trim(),
+    materialRange: String(newMaterialMatch.value.materialRange || '').trim(),
+  }
+
+  if (!isMaterialMatchValid(payload)) {
+    message.warning('请先填写完整的抖音号、抖音号 ID 和素材范围')
+    return
+  }
+
+  try {
+    await douyinMaterialStore.addMatch(
+      payload.douyinAccount,
+      payload.douyinAccountId,
+      payload.materialRange
+    )
+    newMaterialMatch.value = {
+      douyinAccount: '',
+      douyinAccountId: '',
+      materialRange: '',
+    }
+    message.success('规则已新增')
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '新增规则失败')
+  }
+}
+
+async function saveMaterialMatch(matchId: string) {
+  const match = materialMatches.value.find(item => item.id === matchId)
+  if (!match) {
+    return
+  }
+
+  if (!isMaterialMatchValid(match)) {
+    message.warning('请先填写完整的抖音号、抖音号 ID 和素材范围')
+    return
+  }
+
+  try {
+    await douyinMaterialStore.updateMatch(
+      match.id,
+      String(match.douyinAccount || '').trim(),
+      String(match.douyinAccountId || '').trim(),
+      String(match.materialRange || '').trim()
+    )
+    message.success('规则已保存')
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '保存规则失败')
+    await douyinMaterialStore.loadFromServer(true)
+  }
+}
+
+async function removeMaterialMatch(matchId: string) {
+  try {
+    await douyinMaterialStore.deleteMatch(matchId)
+    message.success('规则已删除')
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '删除规则失败')
+  }
 }
 
 async function resetAllSettings() {
