@@ -13,7 +13,7 @@ function resolveLimit(rawLimit) {
     return 500
   }
 
-  return Math.min(Math.max(parsedLimit, 20), 5000)
+  return Math.min(Math.max(parsedLimit, 20), 20000)
 }
 
 router.get('/logs/stream', requireAdmin, async ctx => {

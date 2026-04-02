@@ -398,7 +398,7 @@ function startStream() {
   const streamId = activeStreamId
 
   disconnectStream = connectDebugLogStream({
-    limit: 5000,
+    limit: 20000,
     onConnected: () => {
       if (streamId !== activeStreamId) {
         return

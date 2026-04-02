@@ -54,7 +54,7 @@ function resolveLimit(limit?: number) {
     return 500
   }
 
-  return Math.min(Math.max(Math.trunc(limit as number), 20), 5000)
+  return Math.min(Math.max(Math.trunc(limit as number), 20), 20000)
 }
 
 function handlePacket(packet: DebugStreamPacket, options: ConnectDebugLogStreamOptions) {

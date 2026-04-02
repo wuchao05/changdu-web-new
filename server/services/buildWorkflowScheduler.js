@@ -165,6 +165,10 @@ function getBuildRetryDelayMs(retryCount) {
   return Math.min(BUILD_RETRY_BASE_DELAY_MS * 2 ** retryCount, BUILD_RETRY_MAX_DELAY_MS)
 }
 
+function formatAdvanceHoursDebugText(buildConfig = {}) {
+  return `提前搭建配置(10点后=${String(buildConfig.advanceHoursAfterTen || '0')}, 10点前=${String(buildConfig.advanceHoursBeforeTen || '0')})`
+}
+
 async function listPersistedInstanceKeys() {
   try {
     const fileNames = await fs.readdir(STATE_FILE_DIR)
@@ -214,11 +218,19 @@ async function ensureSchedulerRuntime(channelRuntime = null, instanceKey = getAc
     return normalizedRuntime
   }
 
+  if (state.channelId) {
+    const resolvedRuntime = await resolveChannelRuntimeById(state.channelId)
+    state.channelId = resolvedRuntime.channelId
+    state.channelName = resolvedRuntime.channelName
+    state.channelRuntime = resolvedRuntime
+    return resolvedRuntime
+  }
+
   if (state.channelRuntime) {
     return normalizeChannelRuntime(state.channelRuntime)
   }
 
-  const resolvedRuntime = await resolveChannelRuntimeById(state.channelId)
+  const resolvedRuntime = await resolveChannelRuntimeById('')
   state.channelId = resolvedRuntime.channelId
   state.channelName = resolvedRuntime.channelName
   state.channelRuntime = resolvedRuntime
@@ -1634,6 +1646,24 @@ async function buildBatchForDouyin(drama, config, initData, dramaName, accountId
         product_image_width: initData.product_image_width,
         product_image_height: initData.product_image_height,
       })
+
+      if (promotionCreateResult.code !== 0) {
+        const resultMessage = String(promotionCreateResult.msg || '创建广告失败')
+        const shouldRetry = isRetryableBuildErrorMessage(resultMessage)
+
+        if (shouldRetry && retryCount < maxRetries) {
+          const delayMs = getBuildRetryDelayMs(retryCount)
+          buildConsole.warn(
+            `[后台搭建] 创建广告返回失败，${Math.round(delayMs / 1000)} 秒后重试 ${retryCount + 1}/${maxRetries}: ${resultMessage}`
+          )
+          retryCount++
+          await new Promise(resolve => setTimeout(resolve, delayMs))
+          continue
+        }
+
+        throw new Error(resultMessage)
+      }
+
       break
     } catch (error) {
       const errorMessage = String(error?.message || '')
@@ -1649,10 +1679,6 @@ async function buildBatchForDouyin(drama, config, initData, dramaName, accountId
       }
       throw new Error(`[创建广告] ${errorMessage}`)
     }
-  }
-
-  if (promotionCreateResult.code !== 0) {
-    throw new Error(promotionCreateResult.msg || '创建广告失败')
   }
 
   return promotionCreateResult
@@ -1794,7 +1820,7 @@ async function executePollingCycle() {
   const state = entry.state
 
   if (!state.enabled) return
-  await ensureSchedulerRuntime(null, state.instanceKey)
+  const runtime = await ensureSchedulerRuntime(null, state.instanceKey)
   const intervalMs = state.intervalMinutes * 60 * 1000
 
   // 防止并发执行：如果有任务正在执行，跳过本次轮询
@@ -1808,6 +1834,9 @@ async function executePollingCycle() {
   }
 
   buildConsole.log('[后台搭建] ========== 开始轮询周期 ==========')
+  buildConsole.log(
+    `[后台搭建] 当前运行时配置，渠道ID: ${runtime.channelId || '-'}，渠道: ${getChannelLabel(runtime)}，${formatAdvanceHoursDebugText(runtime.buildConfig)}`
+  )
 
   // 在轮询开始时立即计算下次运行时间（固定间隔，从现在开始计算）
   const now = new Date()
@@ -2020,6 +2049,9 @@ export async function startScheduler(intervalMinutes, tableId = null, channelRun
 
     buildConsole.log(
       `[后台搭建] 启动调度器，实例: ${instanceKey}，渠道: ${getChannelLabel(runtime)}，轮询间隔: ${intervalMinutes} 分钟，状态更新表格: ${tableId || '默认'}`
+    )
+    buildConsole.log(
+      `[后台搭建] 启动调度器配置快照，渠道ID: ${runtime.channelId || '-'}，${formatAdvanceHoursDebugText(runtime.buildConfig)}`
     )
 
     state.enabled = true
