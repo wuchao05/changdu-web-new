@@ -197,12 +197,15 @@ export interface SchedulerOverviewBuildWorkflowTask extends SchedulerOverviewTas
   key: 'buildWorkflow'
   intervalMinutes: number
   tableId: string | null
+  queueSnapshot: {
+    pendingCount: number
+    buildableCount: number
+    updatedAt: string | null
+  }
   stats: {
     totalBuilt: number
     successCount: number
     failCount: number
-    pendingCount: number
-    buildableCount: number
   }
   taskHistory: Array<{
     dramaName: string

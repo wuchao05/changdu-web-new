@@ -71,12 +71,15 @@ function createDefaultSchedulerState() {
     },
     nextRunTime: null,
     lastRunTime: null,
+    queueSnapshot: {
+      pendingCount: 0,
+      buildableCount: 0,
+      updatedAt: null,
+    },
     stats: {
       totalBuilt: 0,
       successCount: 0,
       failCount: 0,
-      pendingCount: 0,
-      buildableCount: 0,
     },
     currentTask: null,
     taskHistory: [],
@@ -97,6 +100,19 @@ function getBuildWorkflowLogProfile() {
     }
   } catch {
     return {}
+  }
+}
+
+function updateQueueSnapshot(
+  state,
+  pendingCount,
+  buildableCount,
+  updatedAt = new Date().toISOString()
+) {
+  state.queueSnapshot = {
+    pendingCount: Number(pendingCount || 0),
+    buildableCount: Number(buildableCount || 0),
+    updatedAt,
   }
 }
 
@@ -1855,11 +1871,12 @@ async function executePollingCycle() {
     // 1. 查询待搭建剧集
     let dramas = await getPendingSetupDramas()
     buildConsole.log('[后台搭建] 查询到 ' + dramas.length + ' 部待搭建剧集')
-
-    state.stats.pendingCount = dramas.length
-    state.stats.buildableCount = dramas.filter(drama =>
+    const buildableCount = dramas.filter(drama =>
       canBuildDramaNow(drama, now, getBuildRuleConfig())
     ).length
+    updateQueueSnapshot(state, dramas.length, buildableCount, now.toISOString())
+    buildConsole.log(`[后台搭建] 当前队列快照: 待搭建 ${dramas.length}，可搭建 ${buildableCount}`)
+    await saveState(state.instanceKey)
 
     // 2. 循环处理，��到成功或没有剧集
     let dramaIndex = 0
@@ -2117,12 +2134,15 @@ export function getSchedulerStatus(instanceKey) {
     tableId: state.tableId,
     nextRunTime: state.nextRunTime,
     lastRunTime: state.lastRunTime,
+    queueSnapshot: {
+      pendingCount: Number(state.queueSnapshot?.pendingCount || 0),
+      buildableCount: Number(state.queueSnapshot?.buildableCount || 0),
+      updatedAt: state.queueSnapshot?.updatedAt || null,
+    },
     stats: {
       totalBuilt: Number(state.stats?.totalBuilt || 0),
       successCount: Number(state.stats?.successCount || 0),
       failCount: Number(state.stats?.failCount || 0),
-      pendingCount: Number(state.stats?.pendingCount || 0),
-      buildableCount: Number(state.stats?.buildableCount || 0),
     },
     currentTask: state.currentTask ? { ...state.currentTask } : null,
     taskHistory: [...state.taskHistory],
@@ -2236,10 +2256,13 @@ async function buildSpecificDrama(dramaId) {
     const dramas = await getPendingSetupDramas()
     buildConsole.log(`[后台搭建] 查询到 ${dramas.length} 部待搭建剧集`)
     const buildRuleConfig = getBuildRuleConfig()
-    state.stats.pendingCount = dramas.length
-    state.stats.buildableCount = dramas.filter(drama =>
-      canBuildDramaNow(drama, new Date(), buildRuleConfig)
+    const now = new Date()
+    const buildableCount = dramas.filter(drama =>
+      canBuildDramaNow(drama, now, buildRuleConfig)
     ).length
+    updateQueueSnapshot(state, dramas.length, buildableCount, now.toISOString())
+    buildConsole.log(`[后台搭建] 当前队列快照: 待搭建 ${dramas.length}，可搭建 ${buildableCount}`)
+    await saveState(state.instanceKey)
 
     // 2. 找到指定的剧集
     const targetDrama = dramas.find(d => d.record_id === dramaId)

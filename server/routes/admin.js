@@ -220,12 +220,15 @@ function buildBuildWorkflowTask(status, nowMs) {
     currentTask,
     intervalMinutes: Number(status?.intervalMinutes || 0),
     tableId: status?.tableId || null,
+    queueSnapshot: status?.queueSnapshot || {
+      pendingCount: 0,
+      buildableCount: 0,
+      updatedAt: null,
+    },
     stats: status?.stats || {
       totalBuilt: 0,
       successCount: 0,
       failCount: 0,
-      pendingCount: 0,
-      buildableCount: 0,
     },
     taskHistory,
   }

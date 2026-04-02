@@ -427,7 +427,7 @@ function formatCurrentTask(task: SchedulerOverviewTask) {
   }
 
   if (task.key === 'buildWorkflow') {
-    return String(task.stats.pendingCount || 0)
+    return String(task.queueSnapshot?.pendingCount || 0)
   }
 
   return task.running ? '执行中' : '待机'
@@ -451,7 +451,7 @@ function formatTaskExtra(task: SchedulerOverviewTask) {
   }
 
   if (task.key === 'buildWorkflow') {
-    return String(task.stats.buildableCount || 0)
+    return String(task.queueSnapshot?.buildableCount || 0)
   }
 
   return `前 ${task.buildTimeWindowStart} 分钟到后 ${task.buildTimeWindowEnd} 分钟`
