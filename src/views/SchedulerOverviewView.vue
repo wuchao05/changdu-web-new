@@ -30,7 +30,18 @@
           <span class="scheduler-overview-page__live-dot" />
           <span>实时链路在线</span>
           <span class="scheduler-overview-page__live-divider" />
-          <span>异常用户 {{ dashboardSummary.abnormalUsers }}</span>
+          <button
+            type="button"
+            class="scheduler-overview-page__live-filter"
+            :class="{
+              'scheduler-overview-page__live-filter--active': abnormalOnly,
+              'scheduler-overview-page__live-filter--disabled': !dashboardSummary.abnormalUsers,
+            }"
+            :disabled="!dashboardSummary.abnormalUsers"
+            @click="toggleAbnormalOnly"
+          >
+            异常用户 {{ dashboardSummary.abnormalUsers }}
+          </button>
         </div>
       </div>
 
@@ -51,16 +62,18 @@
               />
             </div>
 
-            <n-button
-              class="scheduler-overview-page__action-button"
-              :loading="refreshing"
+            <button
+              type="button"
+              class="scheduler-overview-page__refresh-button"
+              :class="{ 'scheduler-overview-page__refresh-button--spinning': refreshing }"
+              :disabled="refreshing"
               @click="handleManualRefresh"
             >
-              <template #icon>
+              <span class="scheduler-overview-page__refresh-icon">
                 <Icon icon="mdi:refresh" />
-              </template>
-              立即刷新
-            </n-button>
+              </span>
+              <span>{{ refreshing ? '同步中...' : '立即刷新' }}</span>
+            </button>
           </div>
 
           <div class="scheduler-overview-page__toolbar-meta">
@@ -127,7 +140,8 @@
                 class="user-monitor-card__pulse"
                 :class="{
                   'user-monitor-card__pulse--danger': group.summary.hasAbnormal,
-                  'user-monitor-card__pulse--running': !group.summary.hasAbnormal && group.summary.hasRunning,
+                  'user-monitor-card__pulse--running':
+                    !group.summary.hasAbnormal && group.summary.hasRunning,
                 }"
               />
 
@@ -187,15 +201,21 @@
               <div class="channel-panel__summary">
                 <div class="channel-panel__summary-item">
                   <span class="channel-panel__summary-label">启用</span>
-                  <strong class="channel-panel__summary-value">{{ channel.summary.enabledCount }}</strong>
+                  <strong class="channel-panel__summary-value">{{
+                    channel.summary.enabledCount
+                  }}</strong>
                 </div>
                 <div class="channel-panel__summary-item">
                   <span class="channel-panel__summary-label">运行</span>
-                  <strong class="channel-panel__summary-value">{{ channel.summary.runningCount }}</strong>
+                  <strong class="channel-panel__summary-value">{{
+                    channel.summary.runningCount
+                  }}</strong>
                 </div>
                 <div class="channel-panel__summary-item">
                   <span class="channel-panel__summary-label">异常</span>
-                  <strong class="channel-panel__summary-value">{{ channel.summary.abnormalCount }}</strong>
+                  <strong class="channel-panel__summary-value">{{
+                    channel.summary.abnormalCount
+                  }}</strong>
                 </div>
               </div>
 
@@ -235,7 +255,10 @@
                     </div>
                   </div>
 
-                  <div v-if="task.isAbnormal && task.abnormalReasons.length" class="task-monitor__alerts">
+                  <div
+                    v-if="task.isAbnormal && task.abnormalReasons.length"
+                    class="task-monitor__alerts"
+                  >
                     <span
                       v-for="reason in task.abnormalReasons.slice(0, 2)"
                       :key="reason"
@@ -294,20 +317,25 @@ const refreshing = ref(false)
 const errorMessage = ref('')
 const overview = ref<SchedulerOverviewResponse | null>(null)
 const selectedUserId = ref<string | null>(null)
+const abnormalOnly = ref(false)
 
 let refreshTimer: number | null = null
 let requestPending = false
 
 const userGroups = computed<SchedulerOverviewUserGroup[]>(() => overview.value?.users || [])
-const displayUserGroups = computed(() =>
-  userGroups.value.map(group => ({
+const displayUserGroups = computed(() => {
+  const visibleGroups = abnormalOnly.value
+    ? userGroups.value.filter(group => group.summary.hasAbnormal)
+    : userGroups.value
+
+  return visibleGroups.map(group => ({
     ...group,
     channels: group.channels.map(channel => ({
       ...channel,
       taskList: getTaskList(channel),
     })),
   }))
-)
+})
 const updatedAtText = computed(() => formatTime(overview.value?.updatedAt || null))
 const dashboardSummary = computed(
   () =>
@@ -348,7 +376,8 @@ const selectThemeOverrides = {
       optionTextColorActive: '#f3feff',
       optionColorPending: 'rgba(34, 211, 238, 0.16)',
       optionColorActive: 'rgba(45, 212, 191, 0.14)',
-      optionColorActivePending: 'linear-gradient(90deg, rgba(103, 232, 249, 0.92), rgba(45, 212, 191, 0.92))',
+      optionColorActivePending:
+        'linear-gradient(90deg, rgba(103, 232, 249, 0.92), rgba(45, 212, 191, 0.92))',
       optionCheckColor: '#34d399',
       groupHeaderTextColor: 'rgba(193, 235, 255, 0.52)',
       dividerColor: 'rgba(56, 189, 248, 0.12)',
@@ -359,7 +388,7 @@ const selectThemeOverrides = {
 } as const
 
 function getTaskList(item: SchedulerOverviewItem): SchedulerOverviewTask[] {
-  return [item.tasks.autoSubmit, item.tasks.buildWorkflow, item.tasks.materialPreview]
+  return [item.tasks.buildWorkflow, item.tasks.materialPreview, item.tasks.autoSubmit]
 }
 
 function formatTime(value: string | null) {
@@ -433,15 +462,13 @@ function formatTaskExtra(task: SchedulerOverviewTask) {
 
 function getTaskHistory(task: SchedulerOverviewTask) {
   if (task.key === 'autoSubmit') {
-    return task.taskHistory
-      .slice(0, 2)
-      .map(record => {
-        const timeText = record.timestamp || '未知时间'
-        if (record.status === 'error') {
-          return `${timeText} 执行失败：${record.error || '未知错误'}`
-        }
-        return `${timeText} 完成 ${record.processed || 0} 部，成功 ${record.success || 0} 部`
-      })
+    return task.taskHistory.slice(0, 2).map(record => {
+      const timeText = record.timestamp || '未知时间'
+      if (record.status === 'error') {
+        return `${timeText} 执行失败：${record.error || '未知错误'}`
+      }
+      return `${timeText} 完成 ${record.processed || 0} 部，成功 ${record.success || 0} 部`
+    })
   }
 
   if (task.key === 'buildWorkflow') {
@@ -585,6 +612,14 @@ function handleManualRefresh() {
   void fetchOverview({ silent: true })
 }
 
+function toggleAbnormalOnly() {
+  if (!dashboardSummary.value.abnormalUsers) {
+    return
+  }
+
+  abnormalOnly.value = !abnormalOnly.value
+}
+
 function handleUserFilterChange(value: string | null) {
   selectedUserId.value = value ? String(value) : null
   void fetchOverview({ silent: true })
@@ -667,8 +702,12 @@ onBeforeUnmount(() => {
   top: -8%;
   width: 440px;
   height: 440px;
-  background:
-    radial-gradient(circle, rgba(45, 212, 191, 0.18), rgba(34, 211, 238, 0.12) 45%, transparent 72%);
+  background: radial-gradient(
+    circle,
+    rgba(45, 212, 191, 0.18),
+    rgba(34, 211, 238, 0.12) 45%,
+    transparent 72%
+  );
   animation: auroraFloatLeft 14s ease-in-out infinite;
 }
 
@@ -677,8 +716,12 @@ onBeforeUnmount(() => {
   top: 10%;
   width: 520px;
   height: 520px;
-  background:
-    radial-gradient(circle, rgba(96, 165, 250, 0.18), rgba(34, 211, 238, 0.1) 42%, transparent 72%);
+  background: radial-gradient(
+    circle,
+    rgba(96, 165, 250, 0.18),
+    rgba(34, 211, 238, 0.1) 42%,
+    transparent 72%
+  );
   animation: auroraFloatRight 16s ease-in-out infinite;
 }
 
@@ -821,7 +864,12 @@ onBeforeUnmount(() => {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(110deg, transparent 15%, rgba(103, 232, 249, 0.14) 50%, transparent 85%);
+  background: linear-gradient(
+    110deg,
+    transparent 15%,
+    rgba(103, 232, 249, 0.14) 50%,
+    transparent 85%
+  );
   transform: translateX(-120%);
   animation: stripShine 4.8s ease-in-out infinite;
   pointer-events: none;
@@ -840,6 +888,45 @@ onBeforeUnmount(() => {
   width: 1px;
   height: 12px;
   background: rgba(125, 211, 252, 0.22);
+}
+
+.scheduler-overview-page__live-filter {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid rgba(125, 211, 252, 0.2);
+  border-radius: 999px;
+  background: rgba(10, 26, 41, 0.7);
+  color: #dff7ff;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.scheduler-overview-page__live-filter:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(103, 232, 249, 0.48);
+  background: rgba(11, 35, 52, 0.92);
+  box-shadow: 0 0 18px rgba(34, 211, 238, 0.16);
+}
+
+.scheduler-overview-page__live-filter--active {
+  border-color: rgba(251, 113, 133, 0.42);
+  background: linear-gradient(90deg, rgba(69, 10, 10, 0.88), rgba(76, 29, 60, 0.82));
+  color: #ffe4ea;
+  box-shadow: 0 0 20px rgba(251, 113, 133, 0.18);
+}
+
+.scheduler-overview-page__live-filter--disabled {
+  opacity: 0.56;
+  cursor: not-allowed;
 }
 
 .scheduler-overview-page__actions-card {
@@ -969,27 +1056,61 @@ onBeforeUnmount(() => {
   color: #dff6ff;
 }
 
-.scheduler-overview-page__action-button {
-  align-self: flex-start;
-  color: #dff6ff;
-  border-color: rgba(103, 232, 249, 0.42);
-  background: linear-gradient(90deg, rgba(12, 31, 47, 0.92), rgba(10, 44, 60, 0.86));
+.scheduler-overview-page__refresh-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 0 18px;
+  border: 1px solid rgba(110, 231, 255, 0.24);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(7, 31, 47, 0.95), rgba(7, 53, 66, 0.9)),
+    radial-gradient(circle at top left, rgba(45, 212, 191, 0.18), transparent 34%);
   box-shadow:
-    0 0 24px rgba(34, 211, 238, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    0 18px 32px rgba(2, 8, 23, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 24px rgba(34, 211, 238, 0.08);
+  color: #f4fdff;
+  font: inherit;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    opacity 0.2s ease;
 }
 
-.scheduler-overview-page__action-button:hover {
-  border-color: rgba(103, 232, 249, 0.72);
-  background: linear-gradient(90deg, rgba(16, 43, 62, 0.96), rgba(13, 61, 82, 0.9));
+.scheduler-overview-page__refresh-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(125, 211, 252, 0.48);
   box-shadow:
-    0 0 28px rgba(34, 211, 238, 0.14),
+    0 20px 36px rgba(2, 8, 23, 0.32),
+    0 0 28px rgba(34, 211, 238, 0.16),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
-.scheduler-overview-page__action-button :deep(.n-button__content),
-.scheduler-overview-page__action-button :deep(.n-button__icon) {
-  color: #dff6ff !important;
+.scheduler-overview-page__refresh-button:disabled {
+  opacity: 0.72;
+  cursor: wait;
+}
+
+.scheduler-overview-page__refresh-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #8af5ff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.scheduler-overview-page__refresh-button--spinning .scheduler-overview-page__refresh-icon {
+  animation: refreshSpin 0.9s linear infinite;
 }
 
 .scheduler-overview-page__body {
@@ -1527,6 +1648,15 @@ onBeforeUnmount(() => {
   }
 }
 
+@keyframes refreshSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
 @media (max-width: 1080px) {
   .scheduler-overview-page__grid {
     grid-template-columns: minmax(0, 1fr);
@@ -1591,11 +1721,11 @@ onBeforeUnmount(() => {
   .scheduler-overview-page__toolbar-primary,
   .scheduler-overview-page__toolbar-meta,
   .scheduler-overview-page__filter,
-  .scheduler-overview-page__action-button {
+  .scheduler-overview-page__refresh-button {
     width: 100%;
   }
 
-  .scheduler-overview-page__action-button {
+  .scheduler-overview-page__refresh-button {
     justify-content: center;
   }
 }

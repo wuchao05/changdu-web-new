@@ -616,11 +616,11 @@ router.delete('/users/:id', async ctx => {
     return
   }
 
-  if (current.id === 'admin') {
+  if (current.account === 'xh') {
     ctx.status = 400
     ctx.body = {
       code: 400,
-      message: '默认管理员小红不可删除',
+      message: '管理员账户 xh 不可删除',
     }
     return
   }
