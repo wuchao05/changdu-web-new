@@ -75,6 +75,8 @@ function createDefaultSchedulerState() {
       totalBuilt: 0,
       successCount: 0,
       failCount: 0,
+      pendingCount: 0,
+      buildableCount: 0,
     },
     currentTask: null,
     taskHistory: [],
@@ -1849,6 +1851,11 @@ async function executePollingCycle() {
     let dramas = await getPendingSetupDramas()
     buildConsole.log('[后台搭建] 查询到 ' + dramas.length + ' 部待搭建剧集')
 
+    state.stats.pendingCount = dramas.length
+    state.stats.buildableCount = dramas.filter(drama =>
+      canBuildDramaNow(drama, now, getBuildRuleConfig())
+    ).length
+
     // 2. 循环处理，��到成功或没有剧集
     let dramaIndex = 0
     while (dramas.length > 0) {
@@ -2105,7 +2112,13 @@ export function getSchedulerStatus(instanceKey) {
     tableId: state.tableId,
     nextRunTime: state.nextRunTime,
     lastRunTime: state.lastRunTime,
-    stats: { ...state.stats },
+    stats: {
+      totalBuilt: Number(state.stats?.totalBuilt || 0),
+      successCount: Number(state.stats?.successCount || 0),
+      failCount: Number(state.stats?.failCount || 0),
+      pendingCount: Number(state.stats?.pendingCount || 0),
+      buildableCount: Number(state.stats?.buildableCount || 0),
+    },
     currentTask: state.currentTask ? { ...state.currentTask } : null,
     taskHistory: [...state.taskHistory],
   }
@@ -2217,6 +2230,11 @@ async function buildSpecificDrama(dramaId) {
     // 1. 查询待搭建剧集
     const dramas = await getPendingSetupDramas()
     buildConsole.log(`[后台搭建] 查询到 ${dramas.length} 部待搭建剧集`)
+    const buildRuleConfig = getBuildRuleConfig()
+    state.stats.pendingCount = dramas.length
+    state.stats.buildableCount = dramas.filter(drama =>
+      canBuildDramaNow(drama, new Date(), buildRuleConfig)
+    ).length
 
     // 2. 找到指定的剧集
     const targetDrama = dramas.find(d => d.record_id === dramaId)
@@ -2230,7 +2248,6 @@ async function buildSpecificDrama(dramaId) {
       throw new Error(`剧集 ${dramaName} 缺少上架时间，无法提交搭建`)
     }
 
-    const buildRuleConfig = getBuildRuleConfig()
     const earliestBuildTime = getEarliestBuildTime(targetDrama, buildRuleConfig)
     if (!earliestBuildTime) {
       throw new Error(`剧集 ${dramaName} 缺少最早可搭建时间，无法提交搭建`)

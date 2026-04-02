@@ -32,6 +32,32 @@ const RUNNING_TOO_LONG_MS = {
   materialPreview: 20 * 60 * 1000,
 }
 
+function formatDuration(value) {
+  const timestamp = parseSchedulerTimeMs(value)
+  if (!Number.isFinite(timestamp)) {
+    return '0分钟'
+  }
+
+  const durationMs = Math.max(Date.now() - timestamp, 0)
+  const totalMinutes = Math.floor(durationMs / (60 * 1000))
+  const days = Math.floor(totalMinutes / (24 * 60))
+  const hours = Math.floor((totalMinutes % (24 * 60)) / 60)
+  const minutes = totalMinutes % 60
+  const parts = []
+
+  if (days > 0) {
+    parts.push(`${days}天`)
+  }
+  if (hours > 0) {
+    parts.push(`${hours}小时`)
+  }
+  if (minutes > 0 || parts.length === 0) {
+    parts.push(`${minutes}分钟`)
+  }
+
+  return parts.join('')
+}
+
 function buildUserResponse(user, channelMap) {
   return {
     ...sanitizeUser(user),
@@ -127,6 +153,8 @@ function buildAutoSubmitTask(status, nowMs) {
     lastRunTime: status?.lastRunTime || null,
     lastRunTimeText: normalizeDisplayTime(status?.lastRunTime),
     currentTask,
+    submissionType: Boolean(status?.onlyRedFlag) ? '仅红标' : '全部',
+    runningDurationText: formatDuration(currentTask?.startTime),
     progress: status?.progress || {
       current: 0,
       total: 0,
@@ -196,6 +224,8 @@ function buildBuildWorkflowTask(status, nowMs) {
       totalBuilt: 0,
       successCount: 0,
       failCount: 0,
+      pendingCount: 0,
+      buildableCount: 0,
     },
     taskHistory,
   }

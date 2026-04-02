@@ -242,7 +242,7 @@
                       <span class="task-monitor__fact-value">{{ formatInterval(task) }}</span>
                     </div>
                     <div class="task-monitor__fact">
-                      <span class="task-monitor__fact-label">当前任务</span>
+                      <span class="task-monitor__fact-label">{{ getSecondFactLabel(task) }}</span>
                       <span class="task-monitor__fact-value">{{ formatCurrentTask(task) }}</span>
                     </div>
                     <div class="task-monitor__fact">
@@ -250,7 +250,7 @@
                       <span class="task-monitor__fact-value">{{ formatTaskStats(task) }}</span>
                     </div>
                     <div class="task-monitor__fact">
-                      <span class="task-monitor__fact-label">补充信息</span>
+                      <span class="task-monitor__fact-label">{{ getFourthFactLabel(task) }}</span>
                       <span class="task-monitor__fact-value">{{ formatTaskExtra(task) }}</span>
                     </div>
                   </div>
@@ -423,17 +423,14 @@ function formatInterval(task: SchedulerOverviewTask) {
 
 function formatCurrentTask(task: SchedulerOverviewTask) {
   if (task.key === 'autoSubmit') {
-    if (task.progress.currentDrama) {
-      return `${task.progress.currentDrama}（${task.progress.current}/${task.progress.total || 0}）`
-    }
-    return task.running ? '自动提交运行中' : '无'
+    return task.submissionType
   }
 
   if (task.key === 'buildWorkflow') {
-    return task.currentTask?.dramaName || (task.running ? '后台搭建运行中' : '无')
+    return String(task.stats.pendingCount || 0)
   }
 
-  return task.running ? `素材预览执行中（开始于 ${task.lastRunTimeText || '未知'}）` : '无'
+  return task.running ? '执行中' : '待机'
 }
 
 function formatTaskStats(task: SchedulerOverviewTask) {
@@ -445,19 +442,39 @@ function formatTaskStats(task: SchedulerOverviewTask) {
     return `累计 ${task.stats.totalBuilt}，成功 ${task.stats.successCount}，失败 ${task.stats.failCount}`
   }
 
-  return `处理 ${task.stats.totalProcessed}，预览 ${task.stats.totalPreviewed}，删除 ${task.stats.totalDeleted}`
+  return `预览 ${task.stats.totalPreviewed}，删除 ${task.stats.totalDeleted}`
 }
 
 function formatTaskExtra(task: SchedulerOverviewTask) {
   if (task.key === 'autoSubmit') {
-    return task.onlyRedFlag ? '仅红标剧模式' : '处理全部剧集'
+    return task.runningDurationText
   }
 
   if (task.key === 'buildWorkflow') {
-    return task.tableId ? `状态表：${task.tableId}` : '使用默认状态表'
+    return String(task.stats.buildableCount || 0)
   }
 
-  return `时间窗口：前 ${task.buildTimeWindowStart} 分钟到后 ${task.buildTimeWindowEnd} 分钟`
+  return `前 ${task.buildTimeWindowStart} 分钟到后 ${task.buildTimeWindowEnd} 分钟`
+}
+
+function getSecondFactLabel(task: SchedulerOverviewTask) {
+  if (task.key === 'autoSubmit') {
+    return '提交类型'
+  }
+  if (task.key === 'buildWorkflow') {
+    return '待搭建剧'
+  }
+  return '当前状态'
+}
+
+function getFourthFactLabel(task: SchedulerOverviewTask) {
+  if (task.key === 'autoSubmit') {
+    return '运行时长'
+  }
+  if (task.key === 'buildWorkflow') {
+    return '可搭建剧'
+  }
+  return '时间窗口'
 }
 
 function getTaskHistory(task: SchedulerOverviewTask) {

@@ -168,6 +168,8 @@ export interface SchedulerOverviewAutoSubmitTask extends SchedulerOverviewTaskBa
   key: 'autoSubmit'
   intervalMinutes: number
   onlyRedFlag: boolean
+  submissionType: '仅红标' | '全部'
+  runningDurationText: string
   progress: {
     current: number
     total: number
@@ -199,6 +201,8 @@ export interface SchedulerOverviewBuildWorkflowTask extends SchedulerOverviewTas
     totalBuilt: number
     successCount: number
     failCount: number
+    pendingCount: number
+    buildableCount: number
   }
   taskHistory: Array<{
     dramaName: string
@@ -365,9 +369,7 @@ export function getSchedulerOverview(userId?: string) {
   }
 
   const query = searchParams.toString()
-  return request<SchedulerOverviewResponse>(
-    `/admin/scheduler-overview${query ? `?${query}` : ''}`
-  )
+  return request<SchedulerOverviewResponse>(`/admin/scheduler-overview${query ? `?${query}` : ''}`)
 }
 
 export function listUsers() {
