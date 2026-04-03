@@ -343,6 +343,7 @@ export function getCurrentSession() {
     runtimeUser: UserProfile | null
     channel: { id: string; name: string } | null
     availableChannels: Array<{ id: string; name: string }>
+    channelBoundUsers: UserProfile[]
     feishu: {
       dramaListTableId: string
       dramaStatusTableId: string

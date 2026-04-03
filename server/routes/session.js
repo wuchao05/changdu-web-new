@@ -6,6 +6,8 @@ import {
   requireSession,
 } from '../utils/studioSession.js'
 import {
+  buildRuntimeUser,
+  findUsersByChannelId,
   getDefaultDownloadCenterConfig,
   sanitizeUser,
   resolveRuntimeContext,
@@ -142,6 +144,12 @@ router.get('/me', async ctx => {
       requestedChannelId
     )
     const defaultDownloadCenterConfig = await getDefaultDownloadCenterConfig()
+    const channelBoundUsers = channel
+      ? (await findUsersByChannelId(channel.id)).map(item =>
+          sanitizeUser(buildRuntimeUser(item, channel.id))
+        )
+      : []
+
     ctx.body = {
       code: 0,
       message: 'success',
@@ -152,6 +160,7 @@ router.get('/me', async ctx => {
         availableChannels: Array.isArray(availableChannels)
           ? availableChannels.map(item => ({ id: item.id, name: item.name }))
           : [],
+        channelBoundUsers,
         platforms: {
           changdu: {
             channel: {

@@ -468,6 +468,55 @@
                 </button>
               </div>
             </div>
+            <div v-if="shouldShowOrderBranch" class="mb-4">
+              <div class="order-branch-panel">
+                <div class="order-branch-panel__intro">
+                  <span class="order-branch-panel__badge">小红分支</span>
+                  <p class="order-branch-panel__desc">
+                    当前渠道已绑定
+                    {{ orderBranchCardItems.length }} 个子用户，先筛出命中“小红”的订单，
+                    再按子用户配置的抖音号做二次匹配，默认展开充值金额最高的用户。
+                  </p>
+                </div>
+                <div class="order-branch-panel__tree">
+                  <div class="order-branch-panel__trunk"></div>
+                  <div class="order-branch-panel__grid">
+                    <button
+                      v-for="(branchUser, branchIndex) in orderBranchCardItems"
+                      :key="branchUser.key"
+                      type="button"
+                      class="order-branch-card"
+                      :class="{ active: activeBranchUserId === branchUser.key }"
+                      :style="{ '--branch-delay': `${branchIndex * 90}ms` }"
+                      @click="handleBranchUserChange(branchUser.key)"
+                    >
+                      <div class="order-branch-card__head">
+                        <div>
+                          <p class="order-branch-card__label">{{ branchUser.label }}</p>
+                          <p class="order-branch-card__account">
+                            账号：{{ branchUser.account || '-' }}
+                          </p>
+                        </div>
+                        <span class="order-branch-card__count">{{ branchUser.total }} 单</span>
+                      </div>
+                      <p class="order-branch-card__amount">
+                        {{ formatCurrency(branchUser.totalAmount) }}
+                      </p>
+                      <p class="order-branch-card__meta">{{ branchUser.meta }}</p>
+                      <div class="order-branch-card__keywords">
+                        <span
+                          v-for="keyword in branchUser.previewKeywords"
+                          :key="keyword"
+                          class="order-branch-card__keyword"
+                        >
+                          {{ keyword }}
+                        </span>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
             <n-data-table
               :columns="orderColumns"
               :data="orderRows"
@@ -658,8 +707,10 @@ const reportCurrentPage = ref(1)
 const ordersCurrentPage = ref(1)
 const payStatus = ref(-1)
 const activePromotionUserName = ref('')
+const activeBranchUserId = ref('')
 const savingPassword = ref(false)
 const changePasswordFormRef = ref<FormInst | null>(null)
+const ORDER_BRANCH_ROOT_USERNAME = '小红'
 
 type DateRangeValue = [string, string] | null
 const reportDateRange = ref<DateRangeValue>(null)
@@ -856,11 +907,17 @@ const orderSummaryUsernames = computed(() =>
 
 const allOrderRows = computed<OrderItem[]>(() => ordersData.value?.data || [])
 
-const orderRows = computed<OrderItem[]>(() => {
-  if (isIndependentOrderStatsMode.value) {
-    return allOrderRows.value
-  }
+function getChannelUserDouyinAccounts(user: adminApi.UserProfile) {
+  const configuredAccounts = Array.isArray(user.douyinMaterialMatches)
+    ? user.douyinMaterialMatches
+        .map(item => String(item?.douyinAccount || '').trim())
+        .filter(Boolean)
+    : []
 
+  return configuredAccounts.filter((item, index, list) => list.indexOf(item) === index)
+}
+
+const rootPromotionOrders = computed(() => {
   if (!activePromotionUserName.value) {
     return allOrderRows.value
   }
@@ -870,6 +927,101 @@ const orderRows = computed<OrderItem[]>(() => {
       matchOrderPromotionUser(order.promotion_name, orderSummaryUsernames.value) ===
       activePromotionUserName.value
   )
+})
+
+function matchOrdersByDouyinAccounts(orders: OrderItem[], douyinAccounts: string[]) {
+  if (!Array.isArray(douyinAccounts) || douyinAccounts.length === 0) {
+    return []
+  }
+
+  return orders.filter(order => {
+    const promotionName = String(order.promotion_name || '').trim()
+    return douyinAccounts.some(account => promotionName.includes(account))
+  })
+}
+
+const orderBranchUsers = computed(() => {
+  const runtimeUserId = String(sessionStore.currentRuntimeUser?.id || '').trim()
+
+  return sessionStore.currentChannelUsers
+    .filter(user => {
+      const userId = String(user.id || '').trim()
+      const nickname = String(user.nickname || '').trim()
+      return Boolean(userId) && userId !== runtimeUserId && nickname !== ORDER_BRANCH_ROOT_USERNAME
+    })
+    .map(user => ({
+      ...user,
+      douyinAccounts: getChannelUserDouyinAccounts(user),
+    }))
+})
+
+const orderBranchCardItems = computed(() =>
+  orderBranchUsers.value
+    .map(user => {
+      const matchedOrders = matchOrdersByDouyinAccounts(
+        rootPromotionOrders.value,
+        user.douyinAccounts
+      )
+      const paidOrderCount = matchedOrders.filter(order => order.pay_status === 0).length
+
+      return {
+        key: user.id,
+        label: user.nickname || user.account || '未命名用户',
+        account: user.account,
+        total: matchedOrders.length,
+        totalAmount: calculateOrderRechargeAmount(matchedOrders),
+        paidOrderCount,
+        meta:
+          user.douyinAccounts.length > 0
+            ? `支付成功 ${formatNumberValue(paidOrderCount)} 单 · 命中 ${user.douyinAccounts.length} 个抖音号`
+            : '当前子用户未配置抖音号匹配规则',
+        douyinAccounts: user.douyinAccounts,
+        previewKeywords: user.douyinAccounts.slice(0, 3),
+      }
+    })
+    .sort((left, right) => {
+      const amountDiff = right.totalAmount - left.totalAmount
+      if (amountDiff !== 0) {
+        return amountDiff
+      }
+
+      const paidOrderDiff = right.paidOrderCount - left.paidOrderCount
+      if (paidOrderDiff !== 0) {
+        return paidOrderDiff
+      }
+
+      return left.label.localeCompare(right.label, 'zh-CN')
+    })
+)
+
+const activeBranchCard = computed(
+  () => orderBranchCardItems.value.find(item => item.key === activeBranchUserId.value) || null
+)
+
+const shouldShowOrderBranch = computed(
+  () =>
+    !isIndependentOrderStatsMode.value &&
+    activePromotionUserName.value === ORDER_BRANCH_ROOT_USERNAME &&
+    orderBranchCardItems.value.length > 0
+)
+
+const orderRows = computed<OrderItem[]>(() => {
+  if (isIndependentOrderStatsMode.value) {
+    return allOrderRows.value
+  }
+
+  if (shouldShowOrderBranch.value && activeBranchCard.value) {
+    return matchOrdersByDouyinAccounts(
+      rootPromotionOrders.value,
+      activeBranchCard.value?.douyinAccounts || []
+    )
+  }
+
+  if (!activePromotionUserName.value) {
+    return allOrderRows.value
+  }
+
+  return rootPromotionOrders.value
 })
 
 const orderUserTabs = computed(() => {
@@ -1521,6 +1673,19 @@ function handlePromotionUserTabChange(username: string) {
   }
 
   activePromotionUserName.value = username
+  if (username !== ORDER_BRANCH_ROOT_USERNAME) {
+    activeBranchUserId.value = ''
+  }
+  ordersCurrentPage.value = 1
+  ordersPagination.page = 1
+}
+
+function handleBranchUserChange(userId: string) {
+  if (activeBranchUserId.value === userId) {
+    return
+  }
+
+  activeBranchUserId.value = userId
   ordersCurrentPage.value = 1
   ordersPagination.page = 1
 }
@@ -1568,6 +1733,28 @@ watch(reportCurrentPage, page => {
 watch(ordersCurrentPage, page => {
   ordersPagination.page = page
 })
+
+watch(
+  [activePromotionUserName, orderBranchCardItems],
+  ([activeUsername, branchCards]) => {
+    if (activeUsername !== ORDER_BRANCH_ROOT_USERNAME || branchCards.length === 0) {
+      if (activeBranchUserId.value) {
+        activeBranchUserId.value = ''
+      }
+      return
+    }
+
+    const hasActiveBranchUser = branchCards.some(item => item.key === activeBranchUserId.value)
+    if (hasActiveBranchUser) {
+      return
+    }
+
+    activeBranchUserId.value = branchCards[0].key
+    ordersCurrentPage.value = 1
+    ordersPagination.page = 1
+  },
+  { immediate: true }
+)
 
 onUnmounted(() => {
   window.removeEventListener('resize', checkMobile)
@@ -2116,6 +2303,211 @@ onUnmounted(() => {
   border-radius: 0.5rem;
 }
 
+.order-branch-panel {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(56, 189, 248, 0.18);
+  border-radius: 1.25rem;
+  padding: 1rem 1rem 1.1rem;
+  background:
+    radial-gradient(circle at top right, rgba(34, 211, 238, 0.2), transparent 34%),
+    radial-gradient(circle at left center, rgba(251, 191, 36, 0.16), transparent 30%),
+    linear-gradient(145deg, rgba(248, 250, 252, 0.98), rgba(239, 246, 255, 0.98));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 18px 40px -30px rgba(14, 116, 144, 0.4);
+}
+
+.order-branch-panel__intro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.order-branch-panel__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  padding: 0 0.85rem;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.95), rgba(6, 182, 212, 0.92));
+  box-shadow: 0 12px 24px -18px rgba(8, 145, 178, 0.7);
+  color: white;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.order-branch-panel__desc {
+  margin: 0;
+  color: rgb(14 116 144);
+  font-size: 0.82rem;
+}
+
+.order-branch-panel__tree {
+  position: relative;
+  margin-top: 1rem;
+  padding-top: 1.2rem;
+}
+
+.order-branch-panel__trunk {
+  position: absolute;
+  top: 0;
+  left: 1.6rem;
+  width: calc(100% - 3.2rem);
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    rgba(56, 189, 248, 0.16),
+    rgba(56, 189, 248, 0.5),
+    rgba(14, 165, 233, 0.16)
+  );
+}
+
+.order-branch-panel__trunk::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -0.85rem;
+  width: 2px;
+  height: 1.25rem;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0), rgba(14, 165, 233, 0.7));
+}
+
+.order-branch-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.9rem;
+}
+
+.order-branch-card {
+  position: relative;
+  overflow: hidden;
+  min-height: 164px;
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(56, 189, 248, 0.18);
+  border-radius: 1.1rem;
+  background:
+    radial-gradient(circle at top right, rgba(125, 211, 252, 0.24), transparent 40%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(240, 249, 255, 0.98));
+  box-shadow: 0 16px 36px -28px rgba(14, 116, 144, 0.34);
+  text-align: left;
+  animation: order-branch-rise 0.5s ease both;
+  animation-delay: var(--branch-delay, 0ms);
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    border-color 0.22s ease;
+}
+
+.order-branch-card::before {
+  content: '';
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  width: 1px;
+  height: 20px;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, rgba(14, 165, 233, 0.75), rgba(14, 165, 233, 0));
+}
+
+.order-branch-card:hover {
+  transform: translateY(-3px) scale(1.01);
+  border-color: rgba(14, 165, 233, 0.35);
+  box-shadow: 0 20px 40px -26px rgba(14, 116, 144, 0.42);
+}
+
+.order-branch-card.active {
+  border-color: rgba(14, 116, 144, 0.34);
+  background:
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.28), transparent 42%),
+    linear-gradient(145deg, rgba(14, 165, 233, 0.98), rgba(8, 47, 73, 0.96));
+  box-shadow: 0 24px 48px -28px rgba(8, 47, 73, 0.64);
+}
+
+.order-branch-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.order-branch-card__label {
+  margin: 0;
+  color: rgb(12 74 110);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.order-branch-card__account {
+  margin: 0.3rem 0 0;
+  color: rgb(14 116 144);
+  font-size: 0.74rem;
+}
+
+.order-branch-card__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3.7rem;
+  min-height: 1.8rem;
+  padding: 0 0.65rem;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.78);
+  color: rgb(3 105 161);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.order-branch-card__amount {
+  margin: 0.75rem 0 0;
+  color: rgb(15 23 42);
+  font-size: 1.34rem;
+  font-weight: 800;
+}
+
+.order-branch-card__meta {
+  margin: 0.45rem 0 0;
+  color: rgb(14 116 144);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.order-branch-card__keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.8rem;
+}
+
+.order-branch-card__keyword {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.6rem;
+  padding: 0 0.55rem;
+  border-radius: 9999px;
+  background: rgba(186, 230, 253, 0.7);
+  color: rgb(12 74 110);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.order-branch-card.active .order-branch-card__label,
+.order-branch-card.active .order-branch-card__account,
+.order-branch-card.active .order-branch-card__amount,
+.order-branch-card.active .order-branch-card__meta {
+  color: white;
+}
+
+.order-branch-card.active .order-branch-card__count,
+.order-branch-card.active .order-branch-card__keyword {
+  background: rgba(255, 255, 255, 0.16);
+  color: white;
+}
+
 @keyframes refresh-breath {
   0%,
   100% {
@@ -2134,6 +2526,17 @@ onUnmounted(() => {
   }
   100% {
     background-position: -100% 50%;
+  }
+}
+
+@keyframes order-branch-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 

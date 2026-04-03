@@ -20,6 +20,7 @@ export const useSessionStore = defineStore('session', () => {
   const currentRuntimeUser = ref<adminApi.UserProfile | null>(null)
   const currentChannel = ref<{ id: string; name: string } | null>(null)
   const availableChannels = ref<Array<{ id: string; name: string }>>([])
+  const currentChannelUsers = ref<adminApi.UserProfile[]>([])
   const selectedChannelId = ref('')
   const initialized = ref(false)
 
@@ -34,6 +35,9 @@ export const useSessionStore = defineStore('session', () => {
     currentUser.value = sessionData.user
     currentRuntimeUser.value = sessionData.runtimeUser
     currentChannel.value = sessionData.channel
+    currentChannelUsers.value = Array.isArray(sessionData.channelBoundUsers)
+      ? sessionData.channelBoundUsers
+      : []
     availableChannels.value = Array.isArray((sessionData as any).availableChannels)
       ? (sessionData as any).availableChannels
       : sessionData.channel
@@ -42,7 +46,10 @@ export const useSessionStore = defineStore('session', () => {
 
     const savedChannelId = getSelectedChannelId()
     const fallbackChannelId =
-      sessionData.channel?.id || sessionData.user.defaultChannelId || availableChannels.value[0]?.id || ''
+      sessionData.channel?.id ||
+      sessionData.user.defaultChannelId ||
+      availableChannels.value[0]?.id ||
+      ''
     const nextChannelId = availableChannels.value.some(channel => channel.id === savedChannelId)
       ? savedChannelId
       : fallbackChannelId
@@ -57,6 +64,7 @@ export const useSessionStore = defineStore('session', () => {
       currentRuntimeUser.value = null
       currentChannel.value = null
       availableChannels.value = []
+      currentChannelUsers.value = []
       selectedChannelId.value = ''
       initialized.value = true
       return
@@ -79,6 +87,7 @@ export const useSessionStore = defineStore('session', () => {
         currentRuntimeUser.value = null
         currentChannel.value = null
         availableChannels.value = []
+        currentChannelUsers.value = []
         selectedChannelId.value = ''
       } else {
         console.warn('[SessionStore] 会话校验失败，保留本地登录态，等待服务恢复:', error)
@@ -114,6 +123,7 @@ export const useSessionStore = defineStore('session', () => {
       currentRuntimeUser.value = null
       currentChannel.value = null
       availableChannels.value = []
+      currentChannelUsers.value = []
       selectedChannelId.value = ''
     }
   }
@@ -123,6 +133,7 @@ export const useSessionStore = defineStore('session', () => {
     currentRuntimeUser,
     currentChannel,
     availableChannels,
+    currentChannelUsers,
     selectedChannelId,
     activeChannelId,
     initialized,
