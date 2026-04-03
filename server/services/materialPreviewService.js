@@ -7,6 +7,9 @@ dayjs.extend(customParseFormat)
 
 const FEISHU_TOKEN_API_URL = `${FEISHU_CONFIG.api_base_url}${FEISHU_CONFIG.token_endpoint}`
 const DEFAULT_FEISHU_BASE_URL = 'https://open.feishu.cn/open-apis/bitable/v1'
+const PREVIEW_RETRY_MAX_ATTEMPTS = 3
+const PREVIEW_RETRY_BASE_DELAY_MS = 1000
+const PREVIEW_RETRY_MAX_DELAY_MS = 4000
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 const DEFAULT_LOG_PREFIX = '[素材预览-未知用户-默认渠道]'
@@ -34,13 +37,42 @@ async function withRetry(runner, label, retries = 3, delayMs = 600, logPrefix = 
   throw lastError
 }
 
+function getBackoffDelayMs(attemptIndex, baseDelayMs, maxDelayMs) {
+  return Math.min(baseDelayMs * 2 ** attemptIndex, maxDelayMs)
+}
+
+async function withBackoffRetry(runner, label, options = {}) {
+  const { maxAttempts = 3, baseDelayMs = 1000, maxDelayMs = 4000, logPrefix = '' } = options
+  let lastError
+
+  for (let attemptIndex = 0; attemptIndex < maxAttempts; attemptIndex += 1) {
+    try {
+      return await runner()
+    } catch (error) {
+      lastError = error
+
+      if (attemptIndex >= maxAttempts - 1) {
+        break
+      }
+
+      const delayMs = getBackoffDelayMs(attemptIndex, baseDelayMs, maxDelayMs)
+      console.warn(
+        `${resolveLogPrefix(logPrefix)} ${label} 失败，${Math.round(delayMs / 1000)} 秒后重试 ${attemptIndex + 1}/${maxAttempts - 1}:`,
+        error?.response?.status || error?.message || error
+      )
+      await sleep(delayMs)
+    }
+  }
+
+  throw lastError
+}
+
 function createClient(cookie) {
   return axios.create({
     baseURL: 'https://ad.oceanengine.com',
     headers: {
       'Content-Type': 'application/json',
-      'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/141.0.0.0 Safari/537.36',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/141.0.0.0 Safari/537.36',
       Accept: '*/*',
       'Accept-Encoding': 'gzip, deflate, br',
       Connection: 'keep-alive',
@@ -133,7 +165,10 @@ function filterAndDedupAds(ads, dramaName, awemeWhiteList = []) {
 
     const currentTs = getCreateTs(ad)
     const previousTs = getCreateTs(previous)
-    if (currentTs > previousTs || (currentTs === previousTs && ad.promotion_id > previous.promotion_id)) {
+    if (
+      currentTs > previousTs ||
+      (currentTs === previousTs && ad.promotion_id > previous.promotion_id)
+    ) {
       bestByAweme.set(aweme, ad)
     }
   }
@@ -156,7 +191,13 @@ async function runConcurrent(items, limit, runner) {
   }
 }
 
-async function fetchMaterialsByPromotions(client, aadvid, promotionIds, concurrency = 3, logPrefix = '') {
+async function fetchMaterialsByPromotions(
+  client,
+  aadvid,
+  promotionIds,
+  concurrency = 3,
+  logPrefix = ''
+) {
   const results = []
   const groups = chunk(promotionIds, 50)
 
@@ -247,8 +288,7 @@ function isPendingPreviewMaterial(material) {
 function isPendingDeleteMaterial(material) {
   return (
     isPendingMaterial(material) &&
-    ((isOnlyBalanceInsufficient(material) &&
-      (material.material_reject_reason_type ?? 0) === 1) ||
+    ((isOnlyBalanceInsufficient(material) && (material.material_reject_reason_type ?? 0) === 1) ||
       (containsRejectStatus(material) && (material.material_reject_reason_type ?? 0) === 1))
   )
 }
@@ -317,9 +357,9 @@ function promotionsToDeleteByType(materials) {
 }
 
 async function previewOne(client, aadvid, materialId, promotionId, logPrefix = '') {
-  const response = await withRetry(
-    () =>
-      client.get('/ad/api/agw/ad/preview_url', {
+  const response = await withBackoffRetry(
+    async () => {
+      const result = await client.get('/ad/api/agw/ad/preview_url', {
         params: {
           IdType: 'ID_TYPE_MATERIAL',
           MaterialId: materialId,
@@ -327,16 +367,22 @@ async function previewOne(client, aadvid, materialId, promotionId, logPrefix = '
           aadvid,
         },
         headers: { 'Accept-Encoding': 'gzip, deflate, br' },
-      }),
-    `preview(material=${materialId})`,
-    3,
-    600,
-    logPrefix
-  )
+      })
 
-  if ((response.data?.code ?? 0) !== 0) {
-    throw new Error(`preview failed code=${response.data?.code}`)
-  }
+      if ((result.data?.code ?? 0) !== 0) {
+        throw new Error(`preview failed code=${result.data?.code}`)
+      }
+
+      return result
+    },
+    `preview(material=${materialId}, promotion=${promotionId})`,
+    {
+      maxAttempts: PREVIEW_RETRY_MAX_ATTEMPTS,
+      baseDelayMs: PREVIEW_RETRY_BASE_DELAY_MS,
+      maxDelayMs: PREVIEW_RETRY_MAX_DELAY_MS,
+      logPrefix,
+    }
+  )
 
   return response.data
 }
@@ -491,7 +537,13 @@ function resolveBuildTimeWindow(timeWindowStartMinutes, timeWindowEndMinutes) {
   }
 }
 
-async function fetchAccountsFromFeishu(feishuConfig, timeWindowStartMinutes, timeWindowEndMinutes, awemeWhiteList, cookie) {
+async function fetchAccountsFromFeishu(
+  feishuConfig,
+  timeWindowStartMinutes,
+  timeWindowEndMinutes,
+  awemeWhiteList,
+  cookie
+) {
   const apiUrl = `${feishuConfig.baseUrl}/apps/${feishuConfig.appToken}/tables/${feishuConfig.tableId}/records/search`
   const accessToken = await fetchFeishuToken(feishuConfig.appId, feishuConfig.appSecret)
 
@@ -672,7 +724,13 @@ export class MaterialPreviewService {
       }
 
       try {
-        await deleteMaterialsBatch(client, config.aadvid, promotionId, materialIds, config.logPrefix)
+        await deleteMaterialsBatch(
+          client,
+          config.aadvid,
+          promotionId,
+          materialIds,
+          config.logPrefix
+        )
         success += 1
       } catch (error) {
         failed += 1

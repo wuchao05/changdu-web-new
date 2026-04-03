@@ -26,7 +26,7 @@ export async function readAuthConfig(ctx = null) {
 
   return {
     users: {
-      admin: 'admin',
+      admin: 'xh',
     },
     platforms: {
       changdu: {
@@ -69,7 +69,7 @@ router.get('/config', async ctx => {
             }
           : null,
         users: {
-          admin: 'admin',
+          admin: 'xh',
         },
         platforms: {
           changdu: {

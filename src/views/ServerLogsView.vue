@@ -64,6 +64,13 @@
 
         <div class="server-logs-page__filters">
           <n-select
+            v-model:value="selectedLevel"
+            class="server-logs-page__filter"
+            :options="levelOptions"
+            clearable
+            placeholder="按日志类型过滤"
+          />
+          <n-select
             v-model:value="selectedScope"
             class="server-logs-page__filter"
             :options="scopeOptions"
@@ -137,7 +144,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { NAlert, NButton, NSelect, NSwitch, NTag } from 'naive-ui'
-import { connectDebugLogStream, type DebugLogEntry } from '@/api/debug'
+import { connectDebugLogStream, type DebugLogEntry, type DebugLogLevel } from '@/api/debug'
 
 defineOptions({
   name: 'ServerLogsPage',
@@ -160,6 +167,7 @@ const entries = ref<DebugLogEntry[]>([])
 const errorMessage = ref('')
 const connectionStatus = ref<DebugConnectionStatus>('idle')
 const logContainerRef = ref<HTMLElement | null>(null)
+const selectedLevel = ref<DebugLogLevel | null>(null)
 const selectedScope = ref<string | null>(null)
 const selectedUserName = ref<string | null>(null)
 const selectedChannelName = ref<string | null>(null)
@@ -226,6 +234,13 @@ function buildSelectOptions(values: string[]): SelectOption[] {
   }))
 }
 
+const levelOptions: SelectOption[] = [
+  { label: 'LOG', value: 'log' },
+  { label: 'INFO', value: 'info' },
+  { label: 'WARN', value: 'warn' },
+  { label: 'ERROR', value: 'error' },
+]
+
 const parsedEntries = computed(() =>
   entries.value.map(entry => ({
     entry,
@@ -265,7 +280,7 @@ const channelOptions = computed<SelectOption[]>(() => {
 
 const filteredEntries = computed(() =>
   parsedEntries.value
-    .filter(({ meta }) => {
+    .filter(({ entry, meta }) => {
       if (selectedScope.value && meta?.scope !== selectedScope.value) {
         return false
       }
@@ -275,6 +290,10 @@ const filteredEntries = computed(() =>
       }
 
       if (selectedChannelName.value && meta?.channelName !== selectedChannelName.value) {
+        return false
+      }
+
+      if (selectedLevel.value && entry.level !== selectedLevel.value) {
         return false
       }
 
@@ -635,7 +654,7 @@ onBeforeUnmount(() => {
 
 .server-logs-page__filters {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
 

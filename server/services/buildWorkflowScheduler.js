@@ -183,6 +183,35 @@ function getBuildRetryDelayMs(retryCount) {
   return Math.min(BUILD_RETRY_BASE_DELAY_MS * 2 ** retryCount, BUILD_RETRY_MAX_DELAY_MS)
 }
 
+function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function executeBuildStepWithRetry(stepName, runner, maxRetries = 3) {
+  let retryCount = 0
+
+  while (retryCount <= maxRetries) {
+    try {
+      return await runner()
+    } catch (error) {
+      const errorMessage = String(error?.message || `${stepName}失败`)
+      const shouldRetry = isRetryableBuildErrorMessage(errorMessage)
+
+      if (shouldRetry && retryCount < maxRetries) {
+        const delayMs = getBuildRetryDelayMs(retryCount)
+        buildConsole.warn(
+          `[后台搭建] ${stepName}失败，${Math.round(delayMs / 1000)} 秒后重试 ${retryCount + 1}/${maxRetries}: ${errorMessage}`
+        )
+        retryCount += 1
+        await wait(delayMs)
+        continue
+      }
+
+      throw error
+    }
+  }
+}
+
 function formatAdvanceHoursDebugText(buildConfig = {}) {
   return `提前搭建配置(10点后=${String(buildConfig.advanceHoursAfterTen || '0')}, 10点前=${String(buildConfig.advanceHoursBeforeTen || '0')})`
 }
@@ -368,6 +397,36 @@ async function getPendingSetupDramas() {
     item._tableId = dramaStatusTableId
   })
   return items
+}
+
+async function refreshQueueSnapshotForInstance(instanceKey, options = {}) {
+  const { save = true, logError = true } = options
+
+  return runWithSchedulerContext(instanceKey, async () => {
+    const state = getActiveSchedulerState()
+
+    try {
+      await ensureSchedulerRuntime(null, instanceKey)
+      const dramas = await getPendingSetupDramas()
+      const now = new Date()
+      const buildRuleConfig = getBuildRuleConfig()
+      const buildableCount = dramas.filter(drama =>
+        canBuildDramaNow(drama, now, buildRuleConfig)
+      ).length
+
+      updateQueueSnapshot(state, dramas.length, buildableCount, now.toISOString())
+
+      if (save) {
+        await saveState(instanceKey)
+      }
+    } catch (error) {
+      if (logError) {
+        buildConsole.warn(`[后台搭建] 刷新队列快照失败: ${error.message}`)
+      }
+    }
+
+    return getSchedulerStatus(instanceKey)
+  })
 }
 
 /**
@@ -1531,11 +1590,13 @@ async function buildBatchForDouyin(drama, config, initData, dramaName, accountId
 
   let promotionResult
   try {
-    promotionResult = await createPromotionLink({
-      book_id: bookId,
-      drama_name: dramaName,
-      promotion_name: promotionName,
-    })
+    promotionResult = await executeBuildStepWithRetry('创建推广链接', () =>
+      createPromotionLink({
+        book_id: bookId,
+        drama_name: dramaName,
+        promotion_name: promotionName,
+      })
+    )
   } catch (error) {
     throw new Error(`[创建推广链接] ${error.message}`)
   }
@@ -1567,14 +1628,16 @@ async function buildBatchForDouyin(drama, config, initData, dramaName, accountId
   const projectName = `${getRuntimeBrandName()}-${config.douyinAccount}-${dramaName}-${buildTimestamp}`
   let projectResult
   try {
-    projectResult = await createProject({
-      account_id: accountId,
-      drama_name: dramaName,
-      douyin_account_name: config.douyinAccount,
-      assets_id: initData.assets_id,
-      micro_app_instance_id: initData.micro_app_instance_id,
-      project_name: projectName,
-    })
+    projectResult = await executeBuildStepWithRetry('创建项目', () =>
+      createProject({
+        account_id: accountId,
+        drama_name: dramaName,
+        douyin_account_name: config.douyinAccount,
+        assets_id: initData.assets_id,
+        micro_app_instance_id: initData.micro_app_instance_id,
+        project_name: projectName,
+      })
+    )
   } catch (error) {
     throw new Error(`[创建项目] ${error.message}`)
   }
@@ -1584,10 +1647,12 @@ async function buildBatchForDouyin(drama, config, initData, dramaName, accountId
   // 2. 获取抖音号原始ID
   let accountInfoResult
   try {
-    accountInfoResult = await getDouyinAccountInfo({
-      account_id: accountId,
-      douyin_account_id: config.douyinAccountId,
-    })
+    accountInfoResult = await executeBuildStepWithRetry('获取抖音号信息', () =>
+      getDouyinAccountInfo({
+        account_id: accountId,
+        douyin_account_id: config.douyinAccountId,
+      })
+    )
   } catch (error) {
     throw new Error(`[获取抖音号信息] ${error.message}`)
   }
@@ -1606,11 +1671,13 @@ async function buildBatchForDouyin(drama, config, initData, dramaName, accountId
   // 3. 获取素材列表
   let materialsResult
   try {
-    materialsResult = await getMaterialList({
-      account_id: accountId,
-      aweme_id: config.douyinAccountId,
-      aweme_account: iesCoreUserId,
-    })
+    materialsResult = await executeBuildStepWithRetry('获取素材列表', () =>
+      getMaterialList({
+        account_id: accountId,
+        aweme_id: config.douyinAccountId,
+        aweme_account: iesCoreUserId,
+      })
+    )
   } catch (error) {
     throw new Error(`[获取素材列表] ${error.message}`)
   }
@@ -1648,12 +1715,9 @@ async function buildBatchForDouyin(drama, config, initData, dramaName, accountId
   // 5. 创建广告（服务器超时等错误使用退避重试）
   const adName = `${getRuntimeBrandName()}-${config.douyinAccount}-${dramaName}-${buildTimestamp}`
   let promotionCreateResult
-  let retryCount = 0
-  const maxRetries = 3
-
-  while (retryCount <= maxRetries) {
-    try {
-      promotionCreateResult = await createPromotion({
+  try {
+    promotionCreateResult = await executeBuildStepWithRetry('创建广告', async () => {
+      const result = await createPromotion({
         account_id: accountId,
         project_id: projectId,
         ad_name: adName,
@@ -1670,38 +1734,14 @@ async function buildBatchForDouyin(drama, config, initData, dramaName, accountId
         product_image_height: initData.product_image_height,
       })
 
-      if (promotionCreateResult.code !== 0) {
-        const resultMessage = String(promotionCreateResult.msg || '创建广告失败')
-        const shouldRetry = isRetryableBuildErrorMessage(resultMessage)
-
-        if (shouldRetry && retryCount < maxRetries) {
-          const delayMs = getBuildRetryDelayMs(retryCount)
-          buildConsole.warn(
-            `[后台搭建] 创建广告返回失败，${Math.round(delayMs / 1000)} 秒后重试 ${retryCount + 1}/${maxRetries}: ${resultMessage}`
-          )
-          retryCount++
-          await new Promise(resolve => setTimeout(resolve, delayMs))
-          continue
-        }
-
-        throw new Error(resultMessage)
+      if (result.code !== 0) {
+        throw new Error(result.msg || '创建广告失败')
       }
 
-      break
-    } catch (error) {
-      const errorMessage = String(error?.message || '')
-      const shouldRetry = isRetryableBuildErrorMessage(errorMessage)
-      if (shouldRetry && retryCount < maxRetries) {
-        const delayMs = getBuildRetryDelayMs(retryCount)
-        buildConsole.warn(
-          `[后台搭建] 创建广告失败，${Math.round(delayMs / 1000)} 秒后重试 ${retryCount + 1}/${maxRetries}: ${errorMessage}`
-        )
-        retryCount++
-        await new Promise(resolve => setTimeout(resolve, delayMs))
-        continue
-      }
-      throw new Error(`[创建广告] ${errorMessage}`)
-    }
+      return result
+    })
+  } catch (error) {
+    throw new Error(`[创建广告] ${String(error?.message || '创建广告失败')}`)
   }
 
   return promotionCreateResult
@@ -2149,7 +2189,8 @@ export function getSchedulerStatus(instanceKey) {
   }
 }
 
-export async function listSchedulerStatuses() {
+export async function listSchedulerStatuses(options = {}) {
+  const { refreshQueueSnapshot = false } = options
   const persistedKeys = await listPersistedInstanceKeys()
   const instanceKeys = Array.from(new Set([...Object.keys(schedulerInstances), ...persistedKeys]))
 
@@ -2159,7 +2200,23 @@ export async function listSchedulerStatuses() {
     }
   }
 
-  return instanceKeys.map(instanceKey => getSchedulerStatus(instanceKey))
+  if (!refreshQueueSnapshot) {
+    return instanceKeys.map(instanceKey => getSchedulerStatus(instanceKey))
+  }
+
+  return Promise.all(
+    instanceKeys.map(async instanceKey => {
+      const status = getSchedulerStatus(instanceKey)
+      if (!status.enabled) {
+        return status
+      }
+
+      return refreshQueueSnapshotForInstance(instanceKey, {
+        save: true,
+        logError: true,
+      })
+    })
+  )
 }
 
 /**

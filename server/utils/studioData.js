@@ -33,8 +33,6 @@ export const USERINFO_DIR = getUserinfoDir
 export const CHANNELS_FILE_PATH = getChannelsFilePath
 export const DOWNLOAD_CENTER_CONFIGS_FILE_PATH = getDownloadCenterConfigsFilePath
 
-const DEFAULT_ADMIN_USER_ID = 'admin'
-
 function nowIso() {
   return new Date().toISOString()
 }
@@ -150,15 +148,15 @@ function defaultDownloadCenterConfig() {
   }
 }
 
-function defaultAdminUser() {
+function createDefaultUserBase() {
   return {
-    id: DEFAULT_ADMIN_USER_ID,
-    nickname: '小红',
-    account: 'admin',
+    id: '',
+    nickname: '',
+    account: '',
     brandName: '小红',
-    password: 'qwer1234',
+    password: '',
     authTokens: [],
-    userType: 'admin',
+    userType: 'normal',
     channelIds: [],
     defaultChannelId: '',
     channelConfigs: {},
@@ -482,7 +480,7 @@ export function buildRuntimeUser(user = {}, channelId = '') {
 }
 
 export function normalizeUser(user = {}) {
-  const base = defaultAdminUser()
+  const base = createDefaultUserBase()
   const rawChannelIds = Array.isArray(user.channelIds)
     ? user.channelIds
     : user.channelId
@@ -597,13 +595,6 @@ export async function ensureStudioData() {
       JSON.stringify({ configs: [], updatedAt: nowIso() }, null, 2),
       'utf-8'
     )
-  }
-
-  const adminFile = path.join(getUserinfoDir(), `${DEFAULT_ADMIN_USER_ID}.json`)
-  try {
-    await fs.access(adminFile)
-  } catch {
-    await fs.writeFile(adminFile, JSON.stringify(defaultAdminUser(), null, 2), 'utf-8')
   }
 }
 

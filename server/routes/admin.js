@@ -31,6 +31,11 @@ const RUNNING_TOO_LONG_MS = {
   buildWorkflow: 30 * 60 * 1000,
   materialPreview: 20 * 60 * 1000,
 }
+const PROTECTED_ADMIN_ACCOUNT = 'xh'
+
+function isProtectedAdminAccount(user = {}) {
+  return String(user.account || '').trim() === PROTECTED_ADMIN_ACCOUNT
+}
 
 function formatDuration(value) {
   const timestamp = parseSchedulerTimeMs(value)
@@ -359,7 +364,7 @@ router.get('/scheduler-overview', async ctx => {
     listUsers(),
     readChannels(),
     listAutoSubmitSchedulerStatuses(),
-    listBuildWorkflowSchedulerStatuses(),
+    listBuildWorkflowSchedulerStatuses({ refreshQueueSnapshot: true }),
   ])
   await materialPreviewManager.init()
   const materialPreviewStatuses = materialPreviewManager.listStatus()
@@ -615,6 +620,33 @@ router.put('/users/:id', async ctx => {
   }
 
   const normalizedPayload = { ...payload }
+
+  if (
+    isProtectedAdminAccount(current) &&
+    payload.account &&
+    String(payload.account || '').trim() !== PROTECTED_ADMIN_ACCOUNT
+  ) {
+    ctx.status = 400
+    ctx.body = {
+      code: 400,
+      message: '主管理员账户 xh 不可修改账号',
+    }
+    return
+  }
+
+  if (
+    isProtectedAdminAccount(current) &&
+    typeof payload.userType !== 'undefined' &&
+    payload.userType !== 'admin'
+  ) {
+    ctx.status = 400
+    ctx.body = {
+      code: 400,
+      message: '主管理员账户 xh 必须保持管理员身份',
+    }
+    return
+  }
+
   if (typeof normalizedPayload.password === 'string' && !normalizedPayload.password.trim()) {
     delete normalizedPayload.password
   }
@@ -649,11 +681,11 @@ router.delete('/users/:id', async ctx => {
     return
   }
 
-  if (current.account === 'xh') {
+  if (isProtectedAdminAccount(current)) {
     ctx.status = 400
     ctx.body = {
       code: 400,
-      message: '管理员账户 xh 不可删除',
+      message: '主管理员账户 xh 不可删除',
     }
     return
   }
