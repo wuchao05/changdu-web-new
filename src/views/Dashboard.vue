@@ -470,47 +470,37 @@
             </div>
             <div v-if="shouldShowOrderBranch" class="mb-4">
               <div class="order-branch-panel">
-                <div class="order-branch-panel__intro">
-                  <span class="order-branch-panel__badge">小红分支</span>
-                  <p class="order-branch-panel__desc">
-                    当前渠道已绑定
-                    {{ orderBranchCardItems.length }} 个子用户，先筛出命中“小红”的订单，
-                    再按子用户配置的抖音号做二次匹配，默认展开充值金额最高的用户。
-                  </p>
-                </div>
                 <div class="order-branch-panel__tree">
                   <div class="order-branch-panel__trunk"></div>
                   <div class="order-branch-panel__grid">
                     <button
-                      v-for="(branchUser, branchIndex) in orderBranchCardItems"
+                      v-for="branchUser in orderBranchCardItems"
                       :key="branchUser.key"
                       type="button"
                       class="order-branch-card"
                       :class="{ active: activeBranchUserId === branchUser.key }"
-                      :style="{ '--branch-delay': `${branchIndex * 90}ms` }"
                       @click="handleBranchUserChange(branchUser.key)"
                     >
-                      <div class="order-branch-card__head">
-                        <div>
-                          <p class="order-branch-card__label">{{ branchUser.label }}</p>
-                          <p class="order-branch-card__account">
-                            账号：{{ branchUser.account || '-' }}
-                          </p>
-                        </div>
-                        <span class="order-branch-card__count">{{ branchUser.total }} 单</span>
-                      </div>
-                      <p class="order-branch-card__amount">
-                        {{ formatCurrency(branchUser.totalAmount) }}
-                      </p>
-                      <p class="order-branch-card__meta">{{ branchUser.meta }}</p>
-                      <div class="order-branch-card__keywords">
-                        <span
-                          v-for="keyword in branchUser.previewKeywords"
-                          :key="keyword"
-                          class="order-branch-card__keyword"
-                        >
-                          {{ keyword }}
+                      <p class="order-branch-card__label">{{ branchUser.label }}</p>
+                      <div class="order-branch-card__stat order-branch-card__stat--hero">
+                        <span class="order-branch-card__stat-label">总充值金额</span>
+                        <span class="order-branch-card__amount">
+                          {{ formatCurrency(branchUser.totalAmount) }}
                         </span>
+                      </div>
+                      <div class="order-branch-card__summary">
+                        <div class="order-branch-card__stat">
+                          <span class="order-branch-card__stat-label">总订单</span>
+                          <strong class="order-branch-card__stat-value">
+                            {{ formatNumberValue(branchUser.total) }}
+                          </strong>
+                        </div>
+                        <div class="order-branch-card__stat">
+                          <span class="order-branch-card__stat-label">充值订单</span>
+                          <strong class="order-branch-card__stat-value">
+                            {{ formatNumberValue(branchUser.paidOrderCount) }}
+                          </strong>
+                        </div>
                       </div>
                     </button>
                   </div>
@@ -940,20 +930,15 @@ function matchOrdersByDouyinAccounts(orders: OrderItem[], douyinAccounts: string
   })
 }
 
-const orderBranchUsers = computed(() => {
-  const runtimeUserId = String(sessionStore.currentRuntimeUser?.id || '').trim()
-
-  return sessionStore.currentChannelUsers
-    .filter(user => {
-      const userId = String(user.id || '').trim()
-      const nickname = String(user.nickname || '').trim()
-      return Boolean(userId) && userId !== runtimeUserId && nickname !== ORDER_BRANCH_ROOT_USERNAME
-    })
+const orderBranchUsers = computed(() =>
+  sessionStore.currentChannelUsers
+    .filter(user => Boolean(String(user.id || '').trim()))
     .map(user => ({
       ...user,
       douyinAccounts: getChannelUserDouyinAccounts(user),
     }))
-})
+    .filter(user => user.douyinAccounts.length > 0)
+)
 
 const orderBranchCardItems = computed(() =>
   orderBranchUsers.value
@@ -967,16 +952,10 @@ const orderBranchCardItems = computed(() =>
       return {
         key: user.id,
         label: user.nickname || user.account || '未命名用户',
-        account: user.account,
         total: matchedOrders.length,
         totalAmount: calculateOrderRechargeAmount(matchedOrders),
         paidOrderCount,
-        meta:
-          user.douyinAccounts.length > 0
-            ? `支付成功 ${formatNumberValue(paidOrderCount)} 单 · 命中 ${user.douyinAccounts.length} 个抖音号`
-            : '当前子用户未配置抖音号匹配规则',
         douyinAccounts: user.douyinAccounts,
-        previewKeywords: user.douyinAccounts.slice(0, 3),
       }
     })
     .sort((left, right) => {
@@ -2318,37 +2297,8 @@ onUnmounted(() => {
     0 18px 40px -30px rgba(14, 116, 144, 0.4);
 }
 
-.order-branch-panel__intro {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.order-branch-panel__badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 2rem;
-  padding: 0 0.85rem;
-  border-radius: 9999px;
-  background: linear-gradient(135deg, rgba(14, 165, 233, 0.95), rgba(6, 182, 212, 0.92));
-  box-shadow: 0 12px 24px -18px rgba(8, 145, 178, 0.7);
-  color: white;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
-
-.order-branch-panel__desc {
-  margin: 0;
-  color: rgb(14 116 144);
-  font-size: 0.82rem;
-}
-
 .order-branch-panel__tree {
   position: relative;
-  margin-top: 1rem;
   padding-top: 1.2rem;
 }
 
@@ -2386,8 +2336,8 @@ onUnmounted(() => {
 .order-branch-card {
   position: relative;
   overflow: hidden;
-  min-height: 164px;
-  padding: 0.95rem 1rem;
+  min-height: 176px;
+  padding: 1rem;
   border: 1px solid rgba(56, 189, 248, 0.18);
   border-radius: 1.1rem;
   background:
@@ -2395,8 +2345,7 @@ onUnmounted(() => {
     linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(240, 249, 255, 0.98));
   box-shadow: 0 16px 36px -28px rgba(14, 116, 144, 0.34);
   text-align: left;
-  animation: order-branch-rise 0.5s ease both;
-  animation-delay: var(--branch-delay, 0ms);
+  animation: order-branch-rise 0.45s ease both;
   transition:
     transform 0.22s ease,
     box-shadow 0.22s ease,
@@ -2428,13 +2377,6 @@ onUnmounted(() => {
   box-shadow: 0 24px 48px -28px rgba(8, 47, 73, 0.64);
 }
 
-.order-branch-card__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-
 .order-branch-card__label {
   margin: 0;
   color: rgb(12 74 110);
@@ -2442,70 +2384,59 @@ onUnmounted(() => {
   font-weight: 800;
 }
 
-.order-branch-card__account {
-  margin: 0.3rem 0 0;
-  color: rgb(14 116 144);
-  font-size: 0.74rem;
+.order-branch-card__summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+  margin-top: 1rem;
 }
 
-.order-branch-card__count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 3.7rem;
-  min-height: 1.8rem;
-  padding: 0 0.65rem;
-  border-radius: 9999px;
+.order-branch-card__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.75rem 0.8rem;
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.order-branch-card__stat--hero {
+  margin-top: 0.85rem;
   background: rgba(255, 255, 255, 0.78);
-  color: rgb(3 105 161);
-  font-size: 0.75rem;
-  font-weight: 700;
+}
+
+.order-branch-card__stat-label {
+  color: rgb(14 116 144);
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
 }
 
 .order-branch-card__amount {
-  margin: 0.75rem 0 0;
+  margin-top: 0.1rem;
   color: rgb(15 23 42);
-  font-size: 1.34rem;
+  font-size: 1.5rem;
   font-weight: 800;
 }
 
-.order-branch-card__meta {
-  margin: 0.45rem 0 0;
-  color: rgb(14 116 144);
-  font-size: 0.78rem;
-  line-height: 1.5;
-}
-
-.order-branch-card__keywords {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-  margin-top: 0.8rem;
-}
-
-.order-branch-card__keyword {
-  display: inline-flex;
-  align-items: center;
-  min-height: 1.6rem;
-  padding: 0 0.55rem;
-  border-radius: 9999px;
-  background: rgba(186, 230, 253, 0.7);
-  color: rgb(12 74 110);
-  font-size: 0.72rem;
-  font-weight: 600;
+.order-branch-card__stat-value,
+.order-branch-card__stat-number {
+  color: rgb(15 23 42);
+  font-size: 1rem;
+  font-weight: 700;
 }
 
 .order-branch-card.active .order-branch-card__label,
-.order-branch-card.active .order-branch-card__account,
 .order-branch-card.active .order-branch-card__amount,
-.order-branch-card.active .order-branch-card__meta {
+.order-branch-card.active .order-branch-card__stat-label,
+.order-branch-card.active .order-branch-card__stat-value,
+.order-branch-card.active .order-branch-card__stat-number {
   color: white;
 }
 
-.order-branch-card.active .order-branch-card__count,
-.order-branch-card.active .order-branch-card__keyword {
-  background: rgba(255, 255, 255, 0.16);
-  color: white;
+.order-branch-card.active .order-branch-card__stat {
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
 @keyframes refresh-breath {
