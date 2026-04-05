@@ -5,15 +5,17 @@ import { getSelectedChannelId } from '@/utils/sessionToken'
 
 export interface DouyinMaterialMatch {
   id: string
+  douyinAccountRefId: string
   douyinAccount: string
   douyinAccountId: string
+  cooperationCode: string
   materialRange: string
   createdAt: string
   updatedAt: string
 }
 
 const CACHE_KEY = 'douyin_material_matches_cache'
-const CACHE_VERSION = 1
+const CACHE_VERSION = 2
 const CACHE_TTL = 5 * 60 * 1000 // 5分钟缓存
 
 interface CacheData {
@@ -125,11 +127,10 @@ export const useDouyinMaterialStore = defineStore('douyinMaterial', () => {
   /**
    * 添加匹配规则
    */
-  async function addMatch(douyinAccount: string, douyinAccountId: string, materialRange: string) {
+  async function addMatch(douyinAccountRefId: string, materialRange: string) {
     try {
       const newMatch = await douyinMaterialApi.addDouyinMaterialMatch({
-        douyinAccount,
-        douyinAccountId,
+        douyinAccountRefId,
         materialRange,
       })
       matches.value.push(newMatch)
@@ -144,16 +145,10 @@ export const useDouyinMaterialStore = defineStore('douyinMaterial', () => {
   /**
    * 更新匹配规则
    */
-  async function updateMatch(
-    id: string,
-    douyinAccount: string,
-    douyinAccountId: string,
-    materialRange: string
-  ) {
+  async function updateMatch(id: string, douyinAccountRefId: string, materialRange: string) {
     try {
       const updatedMatch = await douyinMaterialApi.updateDouyinMaterialMatch(id, {
-        douyinAccount,
-        douyinAccountId,
+        douyinAccountRefId,
         materialRange,
       })
       const index = matches.value.findIndex(m => m.id === id)

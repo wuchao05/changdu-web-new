@@ -97,7 +97,9 @@
                       <div class="channel-sort-card__content">
                         <div class="channel-sort-card__title-row">
                           <span class="channel-sort-card__index">{{ index + 1 }}</span>
-                          <span class="channel-sort-card__name">{{ channel.name || '未命名渠道' }}</span>
+                          <span class="channel-sort-card__name">{{
+                            channel.name || '未命名渠道'
+                          }}</span>
                         </div>
                         <div class="channel-sort-card__meta">
                           <n-tag size="small" :bordered="false" round type="info">
@@ -105,7 +107,9 @@
                           </n-tag>
                           <n-tag size="small" :bordered="false" round>
                             {{
-                              channel.juliang.buildConfig.useNewMicroAppAssetFlow ? '新版资产流程' : '老版资产流程'
+                              channel.juliang.buildConfig.useNewMicroAppAssetFlow
+                                ? '新版资产流程'
+                                : '老版资产流程'
                             }}
                           </n-tag>
                           <n-tag
@@ -113,15 +117,23 @@
                             :bordered="false"
                             round
                             :type="
-                              formatAdvanceHoursDisplay(channel.juliang.buildConfig.advanceHoursAfterTen).allowed ||
-                              formatAdvanceHoursDisplay(channel.juliang.buildConfig.advanceHoursBeforeTen).allowed
+                              formatAdvanceHoursDisplay(
+                                channel.juliang.buildConfig.advanceHoursAfterTen
+                              ).allowed ||
+                              formatAdvanceHoursDisplay(
+                                channel.juliang.buildConfig.advanceHoursBeforeTen
+                              ).allowed
                                 ? 'success'
                                 : 'warning'
                             "
                           >
                             {{
-                              formatAdvanceHoursDisplay(channel.juliang.buildConfig.advanceHoursAfterTen).allowed ||
-                              formatAdvanceHoursDisplay(channel.juliang.buildConfig.advanceHoursBeforeTen).allowed
+                              formatAdvanceHoursDisplay(
+                                channel.juliang.buildConfig.advanceHoursAfterTen
+                              ).allowed ||
+                              formatAdvanceHoursDisplay(
+                                channel.juliang.buildConfig.advanceHoursBeforeTen
+                              ).allowed
                                 ? '允许提前搭建'
                                 : '不允许提前搭建'
                             }}
@@ -153,7 +165,173 @@
                 </template>
               </draggable>
 
-              <div v-if="sortingChannels" class="channel-sort-board__saving">正在保存渠道顺序...</div>
+              <div v-if="sortingChannels" class="channel-sort-board__saving">
+                正在保存渠道顺序...
+              </div>
+            </div>
+          </n-tab-pane>
+          <n-tab-pane name="douyin-accounts" tab="抖音号配置">
+            <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <n-input
+                v-model:value="douyinAccountKeyword"
+                clearable
+                placeholder="搜索用户、抖音号名称或合作码"
+                class="max-w-sm"
+              />
+              <div class="flex flex-wrap items-center gap-2">
+                <p class="text-sm text-slate-500">
+                  这里按用户维护抖音号名称、抖音号 ID
+                  和合作码，渠道里的抖音号匹配素材会直接复用这份列表。
+                </p>
+                <n-button
+                  size="small"
+                  tertiary
+                  @click="setAllDouyinAccountUsersExpanded(!hasExpandedDouyinAccountUsers)"
+                >
+                  {{ hasExpandedDouyinAccountUsers ? '全部收起' : '全部展开' }}
+                </n-button>
+              </div>
+            </div>
+
+            <div v-if="filteredDouyinAccountUsers.length > 0" class="space-y-4">
+              <section
+                v-for="user in filteredDouyinAccountUsers"
+                :key="user.id"
+                class="douyin-account-user-card"
+              >
+                <div
+                  class="douyin-account-user-card__head"
+                  role="button"
+                  tabindex="0"
+                  @click="toggleDouyinAccountUserExpanded(user.id)"
+                  @keydown.enter.prevent="toggleDouyinAccountUserExpanded(user.id)"
+                  @keydown.space.prevent="toggleDouyinAccountUserExpanded(user.id)"
+                >
+                  <div class="min-w-0 flex-1">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <h3 class="douyin-account-user-card__title">
+                        {{ user.nickname || user.account || '未命名用户' }}
+                      </h3>
+                      <n-tag size="small" :bordered="false" round>
+                        {{ user.account || '未配置账号' }}
+                      </n-tag>
+                      <n-tag size="small" :bordered="false" round type="info">
+                        {{ getDouyinAccountDrafts(user.id).length }} 个抖音号
+                      </n-tag>
+                    </div>
+                    <div class="douyin-account-user-card__preview-list" @click.stop>
+                      <template v-if="getDouyinAccountDrafts(user.id).length > 0">
+                        <button
+                          type="button"
+                          class="douyin-account-user-card__preview-chip"
+                          :class="{
+                            'douyin-account-user-card__preview-chip--active':
+                              !getSelectedDouyinAccountId(user.id),
+                          }"
+                          @click="selectDouyinAccountPreview(user.id)"
+                        >
+                          全部
+                        </button>
+                        <span
+                          v-for="accountItem in getDouyinAccountDrafts(user.id)"
+                          :key="accountItem.id"
+                          class="douyin-account-user-card__preview-chip"
+                          :class="{
+                            'douyin-account-user-card__preview-chip--active':
+                              getSelectedDouyinAccountId(user.id) === accountItem.id,
+                          }"
+                          role="button"
+                          tabindex="0"
+                          @click="selectDouyinAccountPreview(user.id, accountItem.id)"
+                          @keydown.enter.prevent="
+                            selectDouyinAccountPreview(user.id, accountItem.id)
+                          "
+                          @keydown.space.prevent="
+                            selectDouyinAccountPreview(user.id, accountItem.id)
+                          "
+                        >
+                          {{ accountItem.douyinAccount || '未命名抖音号' }}
+                        </span>
+                      </template>
+                      <span v-else class="douyin-account-user-card__preview-empty">暂无抖音号</span>
+                    </div>
+                  </div>
+                  <div class="flex flex-wrap items-center gap-2" @click.stop>
+                    <n-button
+                      size="small"
+                      tertiary
+                      @click="toggleDouyinAccountUserExpanded(user.id)"
+                    >
+                      {{ isDouyinAccountUserExpanded(user.id) ? '收起' : '展开' }}
+                    </n-button>
+                    <n-button tertiary type="primary" @click="addDouyinAccountDraft(user.id)">
+                      新增抖音号
+                    </n-button>
+                    <n-button
+                      type="primary"
+                      :loading="savingDouyinAccountUserId === user.id"
+                      @click="saveDouyinAccounts(user)"
+                    >
+                      保存
+                    </n-button>
+                  </div>
+                </div>
+
+                <div
+                  v-if="
+                    isDouyinAccountUserExpanded(user.id) &&
+                    getFilteredDouyinAccountDrafts(user.id).length > 0
+                  "
+                  class="douyin-account-user-card__list"
+                >
+                  <div
+                    v-for="accountItem in getFilteredDouyinAccountDrafts(user.id)"
+                    :key="accountItem.id"
+                    class="douyin-account-row"
+                  >
+                    <n-input
+                      v-model:value="accountItem.douyinAccount"
+                      placeholder="请输入抖音号名称"
+                    />
+                    <n-input
+                      v-model:value="accountItem.douyinAccountId"
+                      placeholder="请输入抖音号 ID"
+                    />
+                    <n-input
+                      v-model:value="accountItem.cooperationCode"
+                      placeholder="请输入合作码"
+                    />
+                    <n-button
+                      tertiary
+                      type="error"
+                      @click="
+                        removeDouyinAccountDraft(
+                          user.id,
+                          getDouyinAccountDrafts(user.id).findIndex(
+                            item => item.id === accountItem.id
+                          )
+                        )
+                      "
+                    >
+                      删除
+                    </n-button>
+                  </div>
+                </div>
+
+                <div
+                  v-else-if="isDouyinAccountUserExpanded(user.id)"
+                  class="douyin-account-user-card__empty"
+                >
+                  当前用户还没有配置抖音号，点击右上角“新增抖音号”开始维护。
+                </div>
+              </section>
+            </div>
+
+            <div
+              v-else
+              class="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-500"
+            >
+              没有匹配到搜索结果，换个关键词试试。
             </div>
           </n-tab-pane>
           <n-tab-pane name="download-center" tab="下载中心配置">
@@ -707,7 +885,8 @@
                         <div>
                           <p class="text-sm font-semibold text-violet-600">抖音号匹配素材</p>
                           <p class="mt-1 text-sm text-slate-500">
-                            为当前渠道单独维护抖音号、抖音号 ID 和素材范围。
+                            当前渠道只维护素材序号，抖音号名称、抖音号 ID
+                            和合作码统一复用该用户绑定的抖音号列表。
                           </p>
                         </div>
                         <div class="flex flex-wrap items-center justify-end gap-3">
@@ -715,7 +894,7 @@
                             <div>
                               <p class="toggle-hero__title">独立订单统计</p>
                               <p class="toggle-hero__desc">
-                                打开后，订单统计只展示推广链来源命中当前抖音号名称的订单。
+                                打开后，订单统计只展示推广链来源命中当前用户已绑定抖音号名称的订单。
                               </p>
                             </div>
                             <n-switch v-model:value="item.config.independentOrderStats.enabled" />
@@ -741,7 +920,7 @@
                         <n-input
                           :value="materialMatchSearchDrafts[item.channel.id] || ''"
                           clearable
-                          placeholder="搜索抖音号、ID 或素材范围..."
+                          placeholder="搜索抖音号、ID、合作码或素材序号..."
                           class="material-match-search"
                           @update:value="updateMaterialMatchSearchDraft(item.channel.id, $event)"
                         >
@@ -761,6 +940,14 @@
                       </div>
 
                       <div
+                        v-if="userForm.douyinAccounts.length === 0"
+                        class="material-match-empty-warning"
+                      >
+                        当前用户还没有绑定抖音号，请先到顶部“抖音号配置”里维护抖音号名称、抖音号 ID
+                        和合作码。
+                      </div>
+
+                      <div
                         v-if="item.config.douyinMaterialMatches.length > 0"
                         class="material-match-list"
                       >
@@ -777,14 +964,21 @@
                               <div class="material-match-card__item">
                                 <Icon icon="mdi:account" class="h-4 w-4 text-slate-500" />
                                 <span class="material-match-card__name">
-                                  {{ match.douyinAccount || '未填写抖音号' }}
+                                  {{
+                                    getMaterialMatchAccountMeta(match).douyinAccount ||
+                                    '未选择抖音号'
+                                  }}
                                 </span>
                               </div>
                               <div
                                 class="material-match-card__item material-match-card__item--muted"
                               >
                                 <span class="material-match-card__label">ID</span>
-                                <span>{{ match.douyinAccountId || '未填写' }}</span>
+                                <span>
+                                  {{
+                                    getMaterialMatchAccountMeta(match).douyinAccountId || '未填写'
+                                  }}
+                                </span>
                               </div>
                               <Icon
                                 icon="mdi:arrow-right"
@@ -795,7 +989,7 @@
                               >
                                 <Icon icon="mdi:video-outline" class="h-4 w-4 text-slate-500" />
                                 <span class="material-match-card__range">
-                                  {{ match.materialRange || '未填写素材范围' }}
+                                  {{ match.materialRange || '未填写素材序号' }}
                                 </span>
                               </div>
                             </div>
@@ -828,18 +1022,24 @@
                             v-if="isEditingUserChannelMatch(item.channel.id, match.id)"
                             class="material-match-card__editor"
                           >
-                            <n-input
-                              v-model:value="match.douyinAccount"
-                              placeholder="请输入抖音号名称"
-                            />
-                            <n-input
-                              v-model:value="match.douyinAccountId"
-                              placeholder="请输入抖音号 ID"
+                            <n-select
+                              v-model:value="match.douyinAccountRefId"
+                              :options="getUserDouyinAccountOptions()"
+                              filterable
+                              placeholder="请选择抖音号"
                             />
                             <n-input
                               v-model:value="match.materialRange"
-                              placeholder="请输入素材范围，如 01-04"
+                              placeholder="请输入素材序号，如 01-04"
                             />
+                            <div class="material-match-card__hint">
+                              抖音号ID：{{
+                                getMaterialMatchAccountMeta(match).douyinAccountId || '未绑定'
+                              }}
+                              · 合作码：{{
+                                getMaterialMatchAccountMeta(match).cooperationCode || '未填写'
+                              }}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -848,7 +1048,7 @@
                         v-else
                         class="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500"
                       >
-                        当前渠道暂无匹配规则，点击下方“添加规则”开始配置。
+                        当前渠道暂无匹配规则，点击下方“添加规则”为已绑定抖音号补充素材序号。
                       </div>
 
                       <div
@@ -868,6 +1068,7 @@
                         <n-button
                           type="primary"
                           tertiary
+                          :disabled="userForm.douyinAccounts.length === 0"
                           @click="addUserChannelMatch(item.channel.id)"
                         >
                           <template #icon>
@@ -1052,7 +1253,9 @@
                   </n-form-item>
                   <n-form-item label="项目清理">
                     <n-switch
-                      v-model:value="channelForm.juliang.buildConfig.clearExistingProjectsBeforeBuild"
+                      v-model:value="
+                        channelForm.juliang.buildConfig.clearExistingProjectsBeforeBuild
+                      "
                     />
                   </n-form-item>
                   <n-form-item label="账户回收">
@@ -1090,7 +1293,10 @@
                       placeholder="请输入 advertiserName"
                     />
                   </n-form-item>
-                  <n-form-item v-if="channelForm.juliang.buildConfig.useNewMicroAppAssetFlow" label="ebpid">
+                  <n-form-item
+                    v-if="channelForm.juliang.buildConfig.useNewMicroAppAssetFlow"
+                    label="ebpid"
+                  >
                     <n-input
                       v-model:value="channelForm.juliang.buildConfig.ebpid"
                       placeholder="请输入 ebpid"
@@ -1117,10 +1323,7 @@
                       placeholder="请输入 microAppInstanceId"
                     />
                   </n-form-item>
-                  <n-form-item
-                    v-else
-                    label="ccId"
-                  >
+                  <n-form-item v-else label="ccId">
                     <n-input
                       v-model:value="channelForm.juliang.buildConfig.ccId"
                       placeholder="请输入 ccId"
@@ -1404,6 +1607,7 @@ const overview = ref({
 })
 const userKeyword = ref('')
 const channelKeyword = ref('')
+const douyinAccountKeyword = ref('')
 const downloadCenterKeyword = ref('')
 const showUserModal = ref(false)
 const showChannelModal = ref(false)
@@ -1414,9 +1618,13 @@ const editingDownloadCenterId = ref('')
 const savingUser = ref(false)
 const savingChannel = ref(false)
 const savingDownloadCenter = ref(false)
+const savingDouyinAccountUserId = ref('')
 const sortingChannels = ref(false)
 const viewportWidth = ref(typeof window === 'undefined' ? 1440 : window.innerWidth)
 const orderUsernameDrafts = reactive<Record<string, string>>({})
+const douyinAccountDrafts = reactive<Record<string, adminApi.DouyinAccount[]>>({})
+const douyinAccountExpandedState = reactive<Record<string, boolean>>({})
+const selectedDouyinAccountByUser = reactive<Record<string, string>>({})
 const materialMatchSearchDrafts = reactive<Record<string, string>>({})
 const editingMaterialMatchIds = reactive<Record<string, string>>({})
 const userChannelExpandedState = reactive<Record<string, boolean>>({})
@@ -1438,6 +1646,7 @@ interface UserFormModel {
   userType: 'admin' | 'normal'
   channelIds: string[]
   defaultChannelId: string
+  douyinAccounts: adminApi.DouyinAccount[]
   channelConfigs: Record<string, adminApi.UserChannelBindingConfig>
   feishu: {
     dramaListTableId: string
@@ -1624,6 +1833,30 @@ const filteredChannels = computed(() => {
   return channels.value.filter(channel => channel.name.toLowerCase().includes(keyword))
 })
 const isChannelSortingByKeyword = computed(() => Boolean(channelKeyword.value.trim()))
+const filteredDouyinAccountUsers = computed(() => {
+  const keyword = douyinAccountKeyword.value.trim().toLowerCase()
+  if (!keyword) {
+    return users.value
+  }
+
+  return users.value.filter(user => {
+    const draftAccounts = Array.isArray(douyinAccountDrafts[user.id])
+      ? douyinAccountDrafts[user.id]
+      : user.douyinAccounts
+    return (
+      user.nickname.toLowerCase().includes(keyword) ||
+      user.account.toLowerCase().includes(keyword) ||
+      draftAccounts.some(account =>
+        [account.douyinAccount, account.douyinAccountId, account.cooperationCode]
+          .filter(Boolean)
+          .some(value => String(value).toLowerCase().includes(keyword))
+      )
+    )
+  })
+})
+const hasExpandedDouyinAccountUsers = computed(() =>
+  filteredDouyinAccountUsers.value.some(user => isDouyinAccountUserExpanded(user.id))
+)
 const filteredDownloadCenterConfigs = computed(() => {
   const keyword = downloadCenterKeyword.value.trim().toLowerCase()
   if (!keyword) return downloadCenterConfigs.value
@@ -1814,6 +2047,238 @@ function formatAdvanceHoursDisplay(value: string | number | null | undefined) {
   }
 }
 
+function cloneDouyinAccounts(accounts?: adminApi.DouyinAccount[]) {
+  return Array.isArray(accounts)
+    ? accounts.map(account => ({
+        id: String(account?.id || crypto.randomUUID()),
+        douyinAccount: String(account?.douyinAccount || ''),
+        douyinAccountId: String(account?.douyinAccountId || ''),
+        cooperationCode: String(account?.cooperationCode || ''),
+        createdAt: account?.createdAt,
+        updatedAt: account?.updatedAt,
+      }))
+    : []
+}
+
+function createEmptyDouyinAccount(): adminApi.DouyinAccount {
+  return {
+    id: crypto.randomUUID(),
+    douyinAccount: '',
+    douyinAccountId: '',
+    cooperationCode: '',
+  }
+}
+
+function getDouyinAccountDrafts(userId: string) {
+  if (!Array.isArray(douyinAccountDrafts[userId])) {
+    const user = users.value.find(item => item.id === userId)
+    douyinAccountDrafts[userId] = cloneDouyinAccounts(user?.douyinAccounts)
+  }
+
+  return douyinAccountDrafts[userId]
+}
+
+function syncDouyinAccountDrafts() {
+  const userIds = new Set(users.value.map(user => user.id))
+
+  users.value.forEach(user => {
+    douyinAccountDrafts[user.id] = cloneDouyinAccounts(user.douyinAccounts)
+  })
+
+  Object.keys(douyinAccountDrafts).forEach(userId => {
+    if (!userIds.has(userId)) {
+      delete douyinAccountDrafts[userId]
+    }
+  })
+}
+
+function syncDouyinAccountExpandedState(userIds: string[]) {
+  const nextUserIdSet = new Set(userIds)
+
+  Object.keys(douyinAccountExpandedState).forEach(userId => {
+    if (!nextUserIdSet.has(userId)) {
+      delete douyinAccountExpandedState[userId]
+    }
+  })
+
+  userIds.forEach(userId => {
+    if (typeof douyinAccountExpandedState[userId] !== 'boolean') {
+      douyinAccountExpandedState[userId] = false
+    }
+  })
+}
+
+function syncSelectedDouyinAccountState(userIds: string[]) {
+  const nextUserIdSet = new Set(userIds)
+
+  Object.keys(selectedDouyinAccountByUser).forEach(userId => {
+    if (!nextUserIdSet.has(userId)) {
+      delete selectedDouyinAccountByUser[userId]
+      return
+    }
+
+    const drafts = getDouyinAccountDrafts(userId)
+    const selectedId = String(selectedDouyinAccountByUser[userId] || '').trim()
+    if (selectedId && !drafts.some(account => account.id === selectedId)) {
+      selectedDouyinAccountByUser[userId] = ''
+    }
+  })
+
+  userIds.forEach(userId => {
+    if (typeof selectedDouyinAccountByUser[userId] !== 'string') {
+      selectedDouyinAccountByUser[userId] = ''
+    }
+  })
+}
+
+function isDouyinAccountUserExpanded(userId: string) {
+  return Boolean(douyinAccountExpandedState[userId])
+}
+
+function toggleDouyinAccountUserExpanded(userId: string) {
+  douyinAccountExpandedState[userId] = !isDouyinAccountUserExpanded(userId)
+}
+
+function setAllDouyinAccountUsersExpanded(expanded: boolean) {
+  filteredDouyinAccountUsers.value.forEach(user => {
+    douyinAccountExpandedState[user.id] = expanded
+  })
+}
+
+function getSelectedDouyinAccountId(userId: string) {
+  return String(selectedDouyinAccountByUser[userId] || '').trim()
+}
+
+function selectDouyinAccountPreview(userId: string, accountId = '') {
+  const nextAccountId = String(accountId || '').trim()
+  const currentAccountId = getSelectedDouyinAccountId(userId)
+
+  selectedDouyinAccountByUser[userId] = currentAccountId === nextAccountId ? '' : nextAccountId
+  douyinAccountExpandedState[userId] = true
+}
+
+function getFilteredDouyinAccountDrafts(userId: string) {
+  const drafts = getDouyinAccountDrafts(userId)
+  const selectedId = getSelectedDouyinAccountId(userId)
+
+  if (!selectedId) {
+    return drafts
+  }
+
+  return drafts.filter(account => account.id === selectedId)
+}
+
+function addDouyinAccountDraft(userId: string) {
+  getDouyinAccountDrafts(userId).push(createEmptyDouyinAccount())
+}
+
+function removeDouyinAccountDraft(userId: string, index: number) {
+  const drafts = getDouyinAccountDrafts(userId)
+  if (index < 0 || index >= drafts.length) {
+    return
+  }
+
+  const removedAccountId = drafts[index]?.id
+  drafts.splice(index, 1)
+
+  if (removedAccountId && getSelectedDouyinAccountId(userId) === removedAccountId) {
+    selectedDouyinAccountByUser[userId] = ''
+  }
+}
+
+function getUserDouyinAccountOptions(
+  douyinAccounts: adminApi.DouyinAccount[] = userForm.douyinAccounts
+) {
+  return (Array.isArray(douyinAccounts) ? douyinAccounts : []).map(account => ({
+    label: account.douyinAccount || account.douyinAccountId || '未命名抖音号',
+    value: account.id,
+  }))
+}
+
+function getBoundDouyinAccount(
+  douyinAccountRefId: string,
+  douyinAccounts: adminApi.DouyinAccount[] = userForm.douyinAccounts
+) {
+  return (Array.isArray(douyinAccounts) ? douyinAccounts : []).find(
+    account => account.id === String(douyinAccountRefId || '').trim()
+  )
+}
+
+function getMaterialMatchAccountMeta(
+  match: adminApi.UserChannelBindingConfig['douyinMaterialMatches'][number],
+  douyinAccounts: adminApi.DouyinAccount[] = userForm.douyinAccounts
+) {
+  const boundAccount = getBoundDouyinAccount(match.douyinAccountRefId, douyinAccounts)
+
+  return {
+    douyinAccount: boundAccount?.douyinAccount || String(match.douyinAccount || '').trim(),
+    douyinAccountId: boundAccount?.douyinAccountId || String(match.douyinAccountId || '').trim(),
+    cooperationCode: boundAccount?.cooperationCode || String(match.cooperationCode || '').trim(),
+  }
+}
+
+function validateDouyinAccountDrafts(user: adminApi.UserProfile) {
+  const drafts = getDouyinAccountDrafts(user.id).map(account => ({
+    ...account,
+    douyinAccount: String(account.douyinAccount || '').trim(),
+    douyinAccountId: String(account.douyinAccountId || '').trim(),
+    cooperationCode: String(account.cooperationCode || '').trim(),
+  }))
+  const visibleDrafts = drafts.filter(
+    account => account.douyinAccount || account.douyinAccountId || account.cooperationCode
+  )
+  const accountNameSet = new Set<string>()
+  const accountIdSet = new Set<string>()
+
+  for (const account of visibleDrafts) {
+    if (!account.douyinAccount || !account.douyinAccountId || !account.cooperationCode) {
+      return '请补全抖音号名称、抖音号 ID 和合作码后再保存'
+    }
+    if (accountNameSet.has(account.douyinAccount)) {
+      return '同一个用户下的抖音号名称不能重复'
+    }
+    if (accountIdSet.has(account.douyinAccountId)) {
+      return '同一个用户下的抖音号 ID 不能重复'
+    }
+    accountNameSet.add(account.douyinAccount)
+    accountIdSet.add(account.douyinAccountId)
+  }
+
+  return null
+}
+
+async function saveDouyinAccounts(user: adminApi.UserProfile) {
+  const validationError = validateDouyinAccountDrafts(user)
+  if (validationError) {
+    message.warning(validationError)
+    return
+  }
+
+  const payload = getDouyinAccountDrafts(user.id)
+    .map(account => ({
+      ...account,
+      douyinAccount: String(account.douyinAccount || '').trim(),
+      douyinAccountId: String(account.douyinAccountId || '').trim(),
+      cooperationCode: String(account.cooperationCode || '').trim(),
+    }))
+    .filter(account => account.douyinAccount && account.douyinAccountId && account.cooperationCode)
+
+  savingDouyinAccountUserId.value = user.id
+  try {
+    await adminApi.updateUser(user.id, {
+      douyinAccounts: payload,
+    })
+    message.success(`已保存 ${user.nickname || user.account || '该用户'} 的抖音号配置`)
+    await loadData()
+    await sessionStore.loadSession()
+    await apiConfigStore.loadFromStorage()
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '保存抖音号配置失败')
+  } finally {
+    savingDouyinAccountUserId.value = ''
+  }
+}
+
 function createDefaultUserForm(): UserFormModel {
   return {
     nickname: '',
@@ -1823,6 +2288,7 @@ function createDefaultUserForm(): UserFormModel {
     userType: 'normal',
     channelIds: [],
     defaultChannelId: '',
+    douyinAccounts: [],
     channelConfigs: {},
     feishu: {
       dramaListTableId: '',
@@ -1881,13 +2347,22 @@ function normalizeUserChannelConfig(
     ? config.douyinMaterialMatches
         .map(match => ({
           id: String(match?.id || crypto.randomUUID()),
+          douyinAccountRefId: String(match?.douyinAccountRefId || ''),
           douyinAccount: String(match?.douyinAccount || ''),
           douyinAccountId: String(match?.douyinAccountId || ''),
+          cooperationCode: String(match?.cooperationCode || ''),
           materialRange: String(match?.materialRange || ''),
           createdAt: match?.createdAt,
           updatedAt: match?.updatedAt,
         }))
-        .filter(match => match.douyinAccount || match.douyinAccountId || match.materialRange)
+        .filter(
+          match =>
+            match.douyinAccountRefId ||
+            match.douyinAccount ||
+            match.douyinAccountId ||
+            match.cooperationCode ||
+            match.materialRange
+        )
     : []
 
   return {
@@ -2039,14 +2514,18 @@ function resetDownloadCenterForm() {
 }
 
 function addUserChannelMatch(channelId: string) {
+  if (!Array.isArray(userForm.douyinAccounts) || userForm.douyinAccounts.length === 0) {
+    message.warning('请先在“抖音号配置”里为该用户维护抖音号')
+    return
+  }
+
   if (!userForm.channelConfigs[channelId]) {
     userForm.channelConfigs[channelId] = createDefaultUserChannelConfig()
   }
 
   const nextMatch = {
     id: crypto.randomUUID(),
-    douyinAccount: '',
-    douyinAccountId: '',
+    douyinAccountRefId: '',
     materialRange: '',
   }
 
@@ -2062,7 +2541,8 @@ function countConfiguredMaterialMatches(
   matches: adminApi.UserChannelBindingConfig['douyinMaterialMatches']
 ) {
   return matches.filter(
-    match => match.douyinAccount && match.douyinAccountId && match.materialRange
+    match =>
+      Boolean(getBoundDouyinAccount(match.douyinAccountRefId)) && Boolean(match.materialRange)
   ).length
 }
 
@@ -2078,11 +2558,18 @@ function getFilteredMaterialMatches(
     return matches
   }
 
-  return matches.filter(match =>
-    [match.douyinAccount, match.douyinAccountId, match.materialRange]
+  return matches.filter(match => {
+    const accountMeta = getMaterialMatchAccountMeta(match)
+
+    return [
+      accountMeta.douyinAccount,
+      accountMeta.douyinAccountId,
+      accountMeta.cooperationCode,
+      match.materialRange,
+    ]
       .filter(Boolean)
       .some(value => String(value).toLowerCase().includes(keyword))
-  )
+  })
 }
 
 function startEditUserChannelMatch(channelId: string, matchId: string) {
@@ -2285,6 +2772,9 @@ async function loadData() {
   users.value = userList
   channels.value = channelList
   downloadCenterConfigs.value = downloadCenterConfigList
+  syncDouyinAccountDrafts()
+  syncDouyinAccountExpandedState(userList.map(user => user.id))
+  syncSelectedDouyinAccountState(userList.map(user => user.id))
 }
 
 async function handleChannelSortEnd(event: { oldIndex?: number; newIndex?: number }) {
@@ -2299,7 +2789,9 @@ async function handleChannelSortEnd(event: { oldIndex?: number; newIndex?: numbe
   sortingChannels.value = true
 
   try {
-    const reorderedChannels = await adminApi.reorderChannels(channels.value.map(channel => channel.id))
+    const reorderedChannels = await adminApi.reorderChannels(
+      channels.value.map(channel => channel.id)
+    )
     channels.value = reorderedChannels
     await sessionStore.loadSession()
     await apiConfigStore.loadFromStorage()
@@ -2318,6 +2810,7 @@ function openUserModal(user?: adminApi.UserProfile) {
   if (user) {
     Object.assign(userForm, JSON.parse(JSON.stringify(user)))
     delete (userForm as Record<string, unknown>).materialPreview
+    userForm.douyinAccounts = cloneDouyinAccounts(user.douyinAccounts)
     userForm.password = ''
   }
   syncUserChannelConfigs()
@@ -2366,6 +2859,40 @@ async function saveUser() {
 
     for (const channelId of userForm.channelIds) {
       const channelConfig = userForm.channelConfigs?.[channelId]
+      const configuredMatchRefIds = new Set<string>()
+
+      for (const match of channelConfig?.douyinMaterialMatches || []) {
+        const hasRef = Boolean(String(match.douyinAccountRefId || '').trim())
+        const hasRange = Boolean(String(match.materialRange || '').trim())
+
+        if (!hasRef && !hasRange) {
+          continue
+        }
+
+        if (!hasRef || !hasRange) {
+          const channelName =
+            channels.value.find(channel => channel.id === channelId)?.name || `渠道 ${channelId}`
+          message.error(`【${channelName}】请为每条抖音号匹配素材规则同时选择抖音号并填写素材序号`)
+          return
+        }
+
+        if (!getBoundDouyinAccount(match.douyinAccountRefId)) {
+          const channelName =
+            channels.value.find(channel => channel.id === channelId)?.name || `渠道 ${channelId}`
+          message.error(`【${channelName}】存在未绑定的抖音号，请先到“抖音号配置”里维护后再保存`)
+          return
+        }
+
+        if (configuredMatchRefIds.has(match.douyinAccountRefId)) {
+          const channelName =
+            channels.value.find(channel => channel.id === channelId)?.name || `渠道 ${channelId}`
+          message.error(`【${channelName}】同一个抖音号只需要配置一条素材序号规则`)
+          return
+        }
+
+        configuredMatchRefIds.add(match.douyinAccountRefId)
+      }
+
       if (!channelConfig?.independentOrderStats?.enabled) {
         continue
       }
@@ -2377,7 +2904,9 @@ async function saveUser() {
 
       const channelName =
         channels.value.find(channel => channel.id === channelId)?.name || `渠道 ${channelId}`
-      message.error(`【${channelName}】开启独立订单统计前，至少需要配置 1 条有效的抖音号匹配素材规则`)
+      message.error(
+        `【${channelName}】开启独立订单统计前，至少需要配置 1 条有效的抖音号匹配素材规则`
+      )
       return
     }
 
@@ -2559,6 +3088,18 @@ watch(
   () => userForm.channelIds,
   () => syncUserChannelConfigs(),
   { deep: true }
+)
+
+watch(
+  () => filteredDouyinAccountUsers.value.map(user => user.id).join(','),
+  () => {
+    syncDouyinAccountExpandedState(users.value.map(user => user.id))
+    syncSelectedDouyinAccountState(users.value.map(user => user.id))
+    if (douyinAccountKeyword.value.trim()) {
+      setAllDouyinAccountUsersExpanded(true)
+    }
+  },
+  { immediate: true }
 )
 </script>
 
@@ -3285,6 +3826,108 @@ watch(
   color: #64748b;
 }
 
+.douyin-account-user-card {
+  padding: 1rem 1.1rem;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 1.2rem;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.92), #ffffff);
+  box-shadow: 0 16px 36px -30px rgba(15, 23, 42, 0.18);
+}
+
+.douyin-account-user-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  cursor: pointer;
+}
+
+.douyin-account-user-card__title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.douyin-account-user-card__preview-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.7rem;
+}
+
+.douyin-account-user-card__preview-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: 0.28rem 0.8rem;
+  appearance: none;
+  border: 1px solid rgba(191, 219, 254, 0.95);
+  border-radius: 9999px;
+  background: linear-gradient(135deg, rgba(239, 246, 255, 0.98), rgba(248, 250, 252, 0.98));
+  color: #1d4ed8;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.2;
+  box-shadow: 0 10px 24px -20px rgba(37, 99, 235, 0.45);
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease,
+    color 0.18s ease;
+}
+
+.douyin-account-user-card__preview-chip:hover {
+  transform: translateY(-1px);
+  border-color: rgba(96, 165, 250, 0.98);
+  box-shadow: 0 14px 28px -20px rgba(37, 99, 235, 0.35);
+}
+
+.douyin-account-user-card__preview-chip--active {
+  border-color: rgba(29, 78, 216, 0.98);
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.98), rgba(59, 130, 246, 0.96));
+  color: #eff6ff;
+  box-shadow: 0 16px 32px -20px rgba(37, 99, 235, 0.55);
+}
+
+.douyin-account-user-card__preview-empty {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: 0.28rem 0.8rem;
+  border: 1px dashed rgba(203, 213, 225, 0.95);
+  border-radius: 9999px;
+  background: rgba(248, 250, 252, 0.88);
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+.douyin-account-user-card__list {
+  display: grid;
+  gap: 0.85rem;
+  margin-top: 1rem;
+}
+
+.douyin-account-row {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.95rem;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 1rem;
+  background: #ffffff;
+}
+
+.douyin-account-user-card__empty {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px dashed #cbd5e1;
+  border-radius: 1rem;
+  background: rgba(248, 250, 252, 0.7);
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
 .material-match-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -3302,6 +3945,16 @@ watch(
   font-size: 0.8rem;
   font-weight: 600;
   color: #7c3aed;
+}
+
+.material-match-empty-warning {
+  margin-bottom: 0.9rem;
+  padding: 0.8rem 0.95rem;
+  border: 1px dashed rgba(251, 191, 36, 0.9);
+  border-radius: 0.95rem;
+  background: rgba(255, 251, 235, 0.92);
+  color: #b45309;
+  font-size: 0.82rem;
 }
 
 .material-match-list {
@@ -3393,6 +4046,12 @@ watch(
   margin-top: 0.9rem;
   padding-top: 0.9rem;
   border-top: 1px dashed rgba(221, 214, 254, 0.9);
+}
+
+.material-match-card__hint {
+  grid-column: 1 / -1;
+  font-size: 0.78rem;
+  color: #64748b;
 }
 
 .order-usernames-list {
@@ -3490,6 +4149,7 @@ watch(
   .panel-head,
   .advance-config-block__header,
   .channel-config-card__head,
+  .douyin-account-user-card__head,
   .config-subpanel__head--split,
   .material-match-card__summary {
     flex-direction: column;
@@ -3558,12 +4218,16 @@ watch(
 }
 
 @media (min-width: 768px) {
+  .douyin-account-row {
+    grid-template-columns: 1.15fr 1fr 1fr auto;
+  }
+
   .permission-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .material-match-card__editor {
-    grid-template-columns: 1.15fr 1fr 0.9fr;
+    grid-template-columns: 1.15fr 1fr;
   }
 }
 </style>

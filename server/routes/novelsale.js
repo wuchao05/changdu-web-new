@@ -293,8 +293,8 @@ async function resolveIndependentOrderStatsRuntime(ctx) {
   const independentOrderStats = normalizeIndependentOrderStatsConfig(
     runtimeContext.runtimeUser?.independentOrderStats
   )
-  const douyinAccounts = Array.isArray(runtimeContext.runtimeUser?.douyinMaterialMatches)
-    ? runtimeContext.runtimeUser.douyinMaterialMatches
+  const douyinAccounts = Array.isArray(runtimeContext.runtimeUser?.douyinAccounts)
+    ? runtimeContext.runtimeUser.douyinAccounts
         .map(item => String(item?.douyinAccount || '').trim())
         .filter(Boolean)
         .filter((item, index, list) => list.indexOf(item) === index)

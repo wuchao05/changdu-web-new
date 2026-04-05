@@ -7,6 +7,15 @@ interface RequestError extends Error {
   code?: number
 }
 
+export interface DouyinAccount {
+  id: string
+  douyinAccount: string
+  douyinAccountId: string
+  cooperationCode: string
+  createdAt?: string
+  updatedAt?: string
+}
+
 export interface UserChannelBindingConfig {
   enabled: boolean
   feishu: {
@@ -45,8 +54,10 @@ export interface UserChannelBindingConfig {
   }
   douyinMaterialMatches: Array<{
     id: string
-    douyinAccount: string
-    douyinAccountId: string
+    douyinAccountRefId: string
+    douyinAccount?: string
+    douyinAccountId?: string
+    cooperationCode?: string
     materialRange: string
     createdAt?: string
     updatedAt?: string
@@ -76,6 +87,7 @@ export interface UserProfile {
   userType: 'admin' | 'normal'
   channelIds: string[]
   defaultChannelId: string
+  douyinAccounts: DouyinAccount[]
   channelConfigs?: Record<string, UserChannelBindingConfig>
   feishu: {
     dramaListTableId: string
@@ -113,8 +125,10 @@ export interface UserProfile {
   }
   douyinMaterialMatches?: Array<{
     id: string
-    douyinAccount: string
-    douyinAccountId: string
+    douyinAccountRefId: string
+    douyinAccount?: string
+    douyinAccountId?: string
+    cooperationCode?: string
     materialRange: string
   }>
   createdAt: string

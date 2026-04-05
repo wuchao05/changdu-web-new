@@ -81,6 +81,17 @@ function defaultIndependentOrderStats() {
   }
 }
 
+function defaultDouyinAccount() {
+  return {
+    id: crypto.randomUUID(),
+    douyinAccount: '',
+    douyinAccountId: '',
+    cooperationCode: '',
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  }
+}
+
 function defaultUserChannelConfig() {
   return {
     enabled: false,
@@ -160,6 +171,7 @@ function createDefaultUserBase() {
     channelIds: [],
     defaultChannelId: '',
     channelConfigs: {},
+    douyinAccounts: [],
     feishu: defaultFeishuConfig(),
     materialPreview: defaultMaterialPreview(),
     createdAt: nowIso(),
@@ -167,15 +179,179 @@ function createDefaultUserBase() {
   }
 }
 
-export function normalizeDouyinMaterialMatch(match = {}) {
+function buildDouyinAccountIdentity(account = {}) {
+  return `${String(account.douyinAccount || '').trim()}::${String(account.douyinAccountId || '').trim()}`
+}
+
+export function normalizeDouyinAccount(account = {}) {
+  const base = defaultDouyinAccount()
+
+  return {
+    id: String(account.id || base.id),
+    douyinAccount: String(account.douyinAccount || '').trim(),
+    douyinAccountId: String(account.douyinAccountId || '').trim(),
+    cooperationCode: String(account.cooperationCode || '').trim(),
+    createdAt: account.createdAt || base.createdAt,
+    updatedAt: account.updatedAt || nowIso(),
+  }
+}
+
+function collectLegacyDouyinAccounts(user = {}) {
+  const collected = []
+  const pushMatchAsAccount = match => {
+    if (!match || typeof match !== 'object') {
+      return
+    }
+
+    const douyinAccount = String(match.douyinAccount || '').trim()
+    const douyinAccountId = String(match.douyinAccountId || '').trim()
+    const cooperationCode = String(match.cooperationCode || '').trim()
+
+    if (!douyinAccount && !douyinAccountId && !cooperationCode) {
+      return
+    }
+
+    collected.push({
+      douyinAccount,
+      douyinAccountId,
+      cooperationCode,
+    })
+  }
+
+  const rawChannelConfigs =
+    user.channelConfigs && typeof user.channelConfigs === 'object' ? user.channelConfigs : {}
+
+  Object.values(rawChannelConfigs).forEach(channelConfig => {
+    if (Array.isArray(channelConfig?.douyinMaterialMatches)) {
+      channelConfig.douyinMaterialMatches.forEach(pushMatchAsAccount)
+    }
+  })
+
+  if (Array.isArray(user.douyinMaterialMatches)) {
+    user.douyinMaterialMatches.forEach(pushMatchAsAccount)
+  }
+
+  return collected
+}
+
+function normalizeDouyinAccounts(accounts = []) {
+  if (!Array.isArray(accounts)) {
+    return []
+  }
+
+  const normalizedAccounts = []
+  const identityMap = new Map()
+
+  accounts.forEach(account => {
+    const normalizedAccount = normalizeDouyinAccount(account)
+    if (
+      !normalizedAccount.douyinAccount &&
+      !normalizedAccount.douyinAccountId &&
+      !normalizedAccount.cooperationCode
+    ) {
+      return
+    }
+
+    const identity = buildDouyinAccountIdentity(normalizedAccount)
+    if (identity && identity !== '::' && identityMap.has(identity)) {
+      const existingAccount = identityMap.get(identity)
+      existingAccount.douyinAccount =
+        existingAccount.douyinAccount || normalizedAccount.douyinAccount
+      existingAccount.douyinAccountId =
+        existingAccount.douyinAccountId || normalizedAccount.douyinAccountId
+      existingAccount.cooperationCode =
+        existingAccount.cooperationCode || normalizedAccount.cooperationCode
+      existingAccount.updatedAt = normalizedAccount.updatedAt || existingAccount.updatedAt
+      return
+    }
+
+    const nextAccount = { ...normalizedAccount }
+    normalizedAccounts.push(nextAccount)
+    if (identity && identity !== '::') {
+      identityMap.set(identity, nextAccount)
+    }
+  })
+
+  return normalizedAccounts
+}
+
+function getNormalizedUserDouyinAccounts(user = {}) {
+  return normalizeDouyinAccounts([
+    ...(Array.isArray(user.douyinAccounts) ? user.douyinAccounts : []),
+    ...collectLegacyDouyinAccounts(user),
+  ])
+}
+
+function findMatchingDouyinAccount(match = {}, douyinAccounts = []) {
+  const normalizedDouyinAccount = String(match.douyinAccount || '').trim()
+  const normalizedDouyinAccountId = String(match.douyinAccountId || '').trim()
+
+  if (normalizedDouyinAccount && normalizedDouyinAccountId) {
+    const exactMatchedAccount = douyinAccounts.find(
+      account =>
+        account.douyinAccount === normalizedDouyinAccount &&
+        account.douyinAccountId === normalizedDouyinAccountId
+    )
+    if (exactMatchedAccount) {
+      return exactMatchedAccount
+    }
+  }
+
+  if (normalizedDouyinAccountId) {
+    const matchedById = douyinAccounts.find(
+      account => account.douyinAccountId === normalizedDouyinAccountId
+    )
+    if (matchedById) {
+      return matchedById
+    }
+  }
+
+  if (normalizedDouyinAccount) {
+    return douyinAccounts.find(account => account.douyinAccount === normalizedDouyinAccount) || null
+  }
+
+  return null
+}
+
+function resolveDouyinAccountRefId(match = {}, douyinAccounts = []) {
+  const douyinAccountRefId = String(match.douyinAccountRefId || '').trim()
+
+  if (douyinAccountRefId && douyinAccounts.some(account => account.id === douyinAccountRefId)) {
+    return douyinAccountRefId
+  }
+
+  return findMatchingDouyinAccount(match, douyinAccounts)?.id || ''
+}
+
+export function normalizeDouyinMaterialMatch(match = {}, douyinAccounts = []) {
   return {
     id: String(match.id || crypto.randomUUID()),
-    douyinAccount: String(match.douyinAccount || '').trim(),
-    douyinAccountId: String(match.douyinAccountId || '').trim(),
+    douyinAccountRefId: resolveDouyinAccountRefId(match, douyinAccounts),
     materialRange: String(match.materialRange || '').trim(),
     createdAt: match.createdAt || nowIso(),
     updatedAt: match.updatedAt || nowIso(),
   }
+}
+
+export function resolveDouyinMaterialMatches(matches = [], douyinAccounts = []) {
+  const normalizedDouyinAccounts = normalizeDouyinAccounts(douyinAccounts)
+  const douyinAccountMap = new Map(normalizedDouyinAccounts.map(account => [account.id, account]))
+
+  return normalizeDouyinMaterialMatches(matches, normalizedDouyinAccounts)
+    .map(match => {
+      const relatedDouyinAccount = douyinAccountMap.get(match.douyinAccountRefId)
+      if (!relatedDouyinAccount) {
+        return null
+      }
+
+      return {
+        ...match,
+        douyinAccount: relatedDouyinAccount.douyinAccount,
+        douyinAccountId: relatedDouyinAccount.douyinAccountId,
+        cooperationCode: relatedDouyinAccount.cooperationCode,
+      }
+    })
+    .filter(match => match && match.douyinAccount && match.douyinAccountId && match.materialRange)
 }
 
 export function normalizeDownloadCenterConfig(config = {}) {
@@ -220,14 +396,14 @@ function normalizeDownloadCenterConfigs(configs = []) {
   }))
 }
 
-function normalizeDouyinMaterialMatches(matches = []) {
+function normalizeDouyinMaterialMatches(matches = [], douyinAccounts = []) {
   if (!Array.isArray(matches)) {
     return []
   }
 
   return matches
-    .map(normalizeDouyinMaterialMatch)
-    .filter(match => match.douyinAccount || match.douyinAccountId || match.materialRange)
+    .map(match => normalizeDouyinMaterialMatch(match, douyinAccounts))
+    .filter(match => match.douyinAccountRefId && match.materialRange)
 }
 
 function normalizeOrderUserStats(config = {}) {
@@ -253,9 +429,11 @@ function normalizeFeishuConfig(feishu = {}) {
   }
 }
 
-function normalizeUserChannelConfig(config = {}) {
+function normalizeUserChannelConfig(config = {}, douyinAccounts = []) {
   const resolvedEnabled =
-    typeof config.enabled === 'boolean' ? config.enabled : hasCustomUserChannelConfig(config)
+    typeof config.enabled === 'boolean'
+      ? config.enabled
+      : hasCustomUserChannelConfig(config, douyinAccounts)
   const defaultConfig = defaultUserChannelConfig()
 
   return {
@@ -296,11 +474,14 @@ function normalizeUserChannelConfig(config = {}) {
       ...(config.independentOrderStats || {}),
       enabled: Boolean(config.independentOrderStats?.enabled),
     },
-    douyinMaterialMatches: normalizeDouyinMaterialMatches(config.douyinMaterialMatches),
+    douyinMaterialMatches: normalizeDouyinMaterialMatches(
+      config.douyinMaterialMatches,
+      douyinAccounts
+    ),
   }
 }
 
-function hasCustomUserChannelConfig(config = {}) {
+function hasCustomUserChannelConfig(config = {}, douyinAccounts = []) {
   if (!config || typeof config !== 'object') {
     return false
   }
@@ -327,7 +508,7 @@ function hasCustomUserChannelConfig(config = {}) {
     hasPermissionConfig ||
     hasOrderUserStats ||
     hasIndependentOrderStats ||
-    normalizeDouyinMaterialMatches(config.douyinMaterialMatches).length > 0
+    normalizeDouyinMaterialMatches(config.douyinMaterialMatches, douyinAccounts).length > 0
   )
 }
 
@@ -335,13 +516,21 @@ function hasFeishuConfig(feishu = {}) {
   return Boolean(feishu.dramaListTableId || feishu.dramaStatusTableId || feishu.accountTableId)
 }
 
-function normalizeUserChannelConfigs(user = {}, channelIds = [], defaultChannelId = '') {
+function normalizeUserChannelConfigs(
+  user = {},
+  channelIds = [],
+  defaultChannelId = '',
+  douyinAccounts = []
+) {
   const rawChannelConfigs =
     user.channelConfigs && typeof user.channelConfigs === 'object' ? user.channelConfigs : {}
   const normalizedConfigs = {}
 
   channelIds.forEach(channelId => {
-    normalizedConfigs[channelId] = normalizeUserChannelConfig(rawChannelConfigs[channelId] || {})
+    normalizedConfigs[channelId] = normalizeUserChannelConfig(
+      rawChannelConfigs[channelId] || {},
+      douyinAccounts
+    )
   })
 
   const legacyFeishuConfig = normalizeFeishuConfig(user.feishu || {})
@@ -350,7 +539,10 @@ function normalizeUserChannelConfigs(user = {}, channelIds = [], defaultChannelI
     ...(user.materialPreview || {}),
     enabled: Boolean(user.materialPreview?.enabled),
   }
-  const legacyDouyinMaterialMatches = normalizeDouyinMaterialMatches(user.douyinMaterialMatches)
+  const legacyDouyinMaterialMatches = normalizeDouyinMaterialMatches(
+    user.douyinMaterialMatches,
+    douyinAccounts
+  )
   const legacyChannelId = defaultChannelId || channelIds[0] || ''
   if (legacyChannelId && hasFeishuConfig(legacyFeishuConfig)) {
     normalizedConfigs[legacyChannelId] = {
@@ -406,7 +598,13 @@ export function getUserChannelConfig(user = {}, channelId = '') {
       : []
   const channelIds = rawChannelIds.map(item => String(item || '').trim()).filter(Boolean)
   const defaultChannelId = String(user.defaultChannelId || user.channelId || '').trim()
-  const normalizedConfigs = normalizeUserChannelConfigs(user, channelIds, defaultChannelId)
+  const douyinAccounts = getNormalizedUserDouyinAccounts(user)
+  const normalizedConfigs = normalizeUserChannelConfigs(
+    user,
+    channelIds,
+    defaultChannelId,
+    douyinAccounts
+  )
   const targetChannelId = normalizedChannelId || defaultChannelId || channelIds[0] || ''
 
   if (targetChannelId && normalizedConfigs[targetChannelId]) {
@@ -426,8 +624,10 @@ export function ensureUserChannelConfig(user = {}, channelId = '') {
     user.channelConfigs = {}
   }
 
+  const douyinAccounts = getNormalizedUserDouyinAccounts(user)
   user.channelConfigs[normalizedChannelId] = normalizeUserChannelConfig(
-    user.channelConfigs[normalizedChannelId] || {}
+    user.channelConfigs[normalizedChannelId] || {},
+    douyinAccounts
   )
 
   return user.channelConfigs[normalizedChannelId]
@@ -466,6 +666,10 @@ export function buildRuntimeUser(user = {}, channelId = '') {
   const normalizedUser = normalizeUser(user)
   const sourceChannelConfig = getUserChannelConfig(normalizedUser, channelId)
   const channelConfig = getRuntimeUserChannelConfig(normalizedUser, channelId)
+  const douyinMaterialMatches = resolveDouyinMaterialMatches(
+    channelConfig.douyinMaterialMatches,
+    normalizedUser.douyinAccounts
+  )
 
   return {
     ...normalizedUser,
@@ -474,7 +678,7 @@ export function buildRuntimeUser(user = {}, channelId = '') {
     permissions: channelConfig.permissions,
     orderUserStats: channelConfig.orderUserStats,
     independentOrderStats: channelConfig.independentOrderStats,
-    douyinMaterialMatches: channelConfig.douyinMaterialMatches,
+    douyinMaterialMatches,
     channelConfigEnabled: Boolean(sourceChannelConfig.enabled),
   }
 }
@@ -491,13 +695,31 @@ export function normalizeUser(user = {}) {
   const resolvedDefaultChannelId = channelIds.includes(defaultChannelId)
     ? defaultChannelId
     : channelIds[0] || ''
-  const channelConfigs = normalizeUserChannelConfigs(user, channelIds, resolvedDefaultChannelId)
+  const douyinAccounts = getNormalizedUserDouyinAccounts(user)
+  const channelConfigs = normalizeUserChannelConfigs(
+    user,
+    channelIds,
+    resolvedDefaultChannelId,
+    douyinAccounts
+  )
   const defaultRuntimeFeishu = getDefaultRuntimeFeishu(
-    { ...user, channelIds, defaultChannelId: resolvedDefaultChannelId, channelConfigs },
+    {
+      ...user,
+      channelIds,
+      defaultChannelId: resolvedDefaultChannelId,
+      channelConfigs,
+      douyinAccounts,
+    },
     resolvedDefaultChannelId
   )
   const defaultRuntimeMaterialPreview = getDefaultRuntimeMaterialPreview(
-    { ...user, channelIds, defaultChannelId: resolvedDefaultChannelId, channelConfigs },
+    {
+      ...user,
+      channelIds,
+      defaultChannelId: resolvedDefaultChannelId,
+      channelConfigs,
+      douyinAccounts,
+    },
     resolvedDefaultChannelId
   )
 
@@ -512,6 +734,7 @@ export function normalizeUser(user = {}) {
     channelIds,
     defaultChannelId: resolvedDefaultChannelId,
     channelConfigs,
+    douyinAccounts,
     feishu: defaultRuntimeFeishu,
     materialPreview: defaultRuntimeMaterialPreview,
     createdAt: user.createdAt || base.createdAt,

@@ -96,7 +96,8 @@
               <div>
                 <h3 class="text-lg font-semibold text-gray-900">抖音号素材配置</h3>
                 <p class="text-sm text-gray-500">
-                  当前渠道下的抖音号素材规则，和管理员后台共用同一套数据。
+                  当前渠道只维护素材序号，抖音号名称、ID
+                  和合作码统一来自管理员后台绑定到当前用户的抖音号列表。
                 </p>
               </div>
             </div>
@@ -121,28 +122,48 @@
               </p>
             </div>
 
+            <div
+              v-if="!hasAvailableDouyinAccounts"
+              class="rounded-lg border border-dashed border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-700"
+            >
+              当前用户还没有绑定抖音号，请先到管理员后台的“抖音号配置”里维护抖音号名称、抖音号 ID
+              和合作码。
+            </div>
+
             <div v-if="materialMatches.length" class="space-y-3">
               <div
                 v-for="match in materialMatches"
                 :key="match.id"
                 class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
               >
-                <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
-                  <n-input v-model:value="match.douyinAccount" placeholder="请输入抖音号名称" />
-                  <n-input v-model:value="match.douyinAccountId" placeholder="请输入抖音号 ID" />
+                <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+                  <n-select
+                    v-model:value="match.douyinAccountRefId"
+                    :options="douyinAccountOptions"
+                    filterable
+                    placeholder="请选择抖音号"
+                  />
                   <n-input
                     v-model:value="match.materialRange"
-                    placeholder="请输入素材范围，如 01-05"
+                    placeholder="请输入素材序号，如 01-05"
                   />
                 </div>
                 <div class="mt-3 flex items-center justify-between text-xs text-gray-500">
-                  <span>
-                    {{
-                      isMaterialMatchValid(match)
-                        ? '已配置完整，可直接生效'
-                        : '请补全抖音号、ID 和素材范围'
-                    }}
-                  </span>
+                  <div class="space-y-1">
+                    <p>
+                      {{
+                        isMaterialMatchValid(match)
+                          ? '已配置完整，可直接生效'
+                          : '请先选择抖音号并填写素材序号'
+                      }}
+                    </p>
+                    <p>
+                      抖音号ID：{{
+                        getMaterialMatchAccountMeta(match).douyinAccountId || '未绑定'
+                      }}
+                      · 合作码：{{ getMaterialMatchAccountMeta(match).cooperationCode || '未填写' }}
+                    </p>
+                  </div>
                   <div class="flex items-center gap-2">
                     <n-button
                       size="small"
@@ -169,31 +190,44 @@
               v-else
               class="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-10 text-center text-sm text-gray-500"
             >
-              当前渠道暂无抖音号素材规则，可以在下方新增。
+              当前渠道暂无抖音号素材规则，可以在下方为已绑定抖音号补充素材序号。
             </div>
 
             <div class="rounded-xl border border-dashed border-gray-300 bg-white p-4">
               <div class="mb-3 flex items-center justify-between">
                 <div>
                   <h4 class="text-sm font-semibold text-gray-900">新增规则</h4>
-                  <p class="text-xs text-gray-500">填写完整后保存到当前渠道</p>
+                  <p class="text-xs text-gray-500">
+                    从当前用户已绑定的抖音号中选择后，再填写素材序号
+                  </p>
                 </div>
-                <n-button type="primary" @click="addMaterialMatch">新增规则</n-button>
+                <n-button
+                  type="primary"
+                  :disabled="!hasAvailableDouyinAccounts"
+                  @click="addMaterialMatch"
+                >
+                  新增规则
+                </n-button>
               </div>
-              <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
-                <n-input
-                  v-model:value="newMaterialMatch.douyinAccount"
-                  placeholder="请输入抖音号名称"
-                />
-                <n-input
-                  v-model:value="newMaterialMatch.douyinAccountId"
-                  placeholder="请输入抖音号 ID"
+              <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+                <n-select
+                  v-model:value="newMaterialMatch.douyinAccountRefId"
+                  :options="douyinAccountOptions"
+                  filterable
+                  placeholder="请选择抖音号"
+                  :disabled="!hasAvailableDouyinAccounts"
                 />
                 <n-input
                   v-model:value="newMaterialMatch.materialRange"
-                  placeholder="请输入素材范围，如 01-05"
+                  placeholder="请输入素材序号，如 01-05"
+                  :disabled="!hasAvailableDouyinAccounts"
                 />
               </div>
+              <p class="mt-3 text-xs text-gray-500">
+                抖音号ID：{{ getSelectedNewMaterialAccountMeta().douyinAccountId || '未选择' }} ·
+                合作码：
+                {{ getSelectedNewMaterialAccountMeta().cooperationCode || '未填写' }}
+              </p>
             </div>
           </div>
         </n-card>
@@ -307,10 +341,29 @@ const dateRangeOptions = [
 
 const materialMatches = ref(douyinMaterialStore.matches)
 const newMaterialMatch = ref({
-  douyinAccount: '',
-  douyinAccountId: '',
+  douyinAccountRefId: '',
   materialRange: '',
 })
+
+const availableDouyinAccounts = computed(() => {
+  const runtimeAccounts = Array.isArray(sessionStore.currentRuntimeUser?.douyinAccounts)
+    ? sessionStore.currentRuntimeUser?.douyinAccounts
+    : []
+  const currentAccounts = Array.isArray(sessionStore.currentUser?.douyinAccounts)
+    ? sessionStore.currentUser?.douyinAccounts
+    : []
+
+  return runtimeAccounts.length > 0 ? runtimeAccounts : currentAccounts
+})
+
+const hasAvailableDouyinAccounts = computed(() => availableDouyinAccounts.value.length > 0)
+
+const douyinAccountOptions = computed(() =>
+  availableDouyinAccounts.value.map(account => ({
+    label: account.douyinAccount || account.douyinAccountId || '未命名抖音号',
+    value: account.id,
+  }))
+)
 
 const activeChannelName = computed(() => {
   const activeChannelId = sessionStore.activeChannelId
@@ -398,39 +451,50 @@ function clearCache() {
   message.success('缓存数据已清除')
 }
 
-function isMaterialMatchValid(match: {
+function isMaterialMatchValid(match: { douyinAccountRefId?: string; materialRange?: string }) {
+  return Boolean(
+    String(match.douyinAccountRefId || '').trim() && String(match.materialRange || '').trim()
+  )
+}
+
+function getMaterialMatchAccountMeta(match: {
+  douyinAccountRefId?: string
   douyinAccount?: string
   douyinAccountId?: string
-  materialRange?: string
+  cooperationCode?: string
 }) {
-  return Boolean(
-    String(match.douyinAccount || '').trim() &&
-      String(match.douyinAccountId || '').trim() &&
-      String(match.materialRange || '').trim()
+  const matchedAccount = availableDouyinAccounts.value.find(
+    account => account.id === String(match.douyinAccountRefId || '').trim()
   )
+
+  return {
+    douyinAccount: matchedAccount?.douyinAccount || String(match.douyinAccount || '').trim(),
+    douyinAccountId: matchedAccount?.douyinAccountId || String(match.douyinAccountId || '').trim(),
+    cooperationCode: matchedAccount?.cooperationCode || String(match.cooperationCode || '').trim(),
+  }
+}
+
+function getSelectedNewMaterialAccountMeta() {
+  return getMaterialMatchAccountMeta({
+    douyinAccountRefId: newMaterialMatch.value.douyinAccountRefId,
+  })
 }
 
 async function addMaterialMatch() {
   const payload = {
-    douyinAccount: String(newMaterialMatch.value.douyinAccount || '').trim(),
-    douyinAccountId: String(newMaterialMatch.value.douyinAccountId || '').trim(),
+    douyinAccountRefId: String(newMaterialMatch.value.douyinAccountRefId || '').trim(),
     materialRange: String(newMaterialMatch.value.materialRange || '').trim(),
   }
 
   if (!isMaterialMatchValid(payload)) {
-    message.warning('请先填写完整的抖音号、抖音号 ID 和素材范围')
+    message.warning('请先选择抖音号并填写素材序号')
     return
   }
 
   try {
-    await douyinMaterialStore.addMatch(
-      payload.douyinAccount,
-      payload.douyinAccountId,
-      payload.materialRange
-    )
+    await douyinMaterialStore.addMatch(payload.douyinAccountRefId, payload.materialRange)
     newMaterialMatch.value = {
-      douyinAccount: '',
-      douyinAccountId: '',
+      douyinAccountRefId: '',
       materialRange: '',
     }
     message.success('规则已新增')
@@ -446,15 +510,14 @@ async function saveMaterialMatch(matchId: string) {
   }
 
   if (!isMaterialMatchValid(match)) {
-    message.warning('请先填写完整的抖音号、抖音号 ID 和素材范围')
+    message.warning('请先选择抖音号并填写素材序号')
     return
   }
 
   try {
     await douyinMaterialStore.updateMatch(
       match.id,
-      String(match.douyinAccount || '').trim(),
-      String(match.douyinAccountId || '').trim(),
+      String(match.douyinAccountRefId || '').trim(),
       String(match.materialRange || '').trim()
     )
     message.success('规则已保存')

@@ -857,13 +857,13 @@ const configuredOrderUsernames = computed(() => {
   return Array.isArray(usernames) ? usernames.filter(Boolean) : []
 })
 const independentOrderDouyinAccounts = computed(() => {
-  const matches = sessionStore.currentRuntimeUser?.douyinMaterialMatches
-  if (!Array.isArray(matches)) {
+  const douyinAccounts = sessionStore.currentRuntimeUser?.douyinAccounts
+  if (!Array.isArray(douyinAccounts)) {
     return []
   }
 
-  return matches
-    .map(match => String(match?.douyinAccount || '').trim())
+  return douyinAccounts
+    .map(account => String(account?.douyinAccount || '').trim())
     .filter(Boolean)
     .filter((item, index, list) => list.indexOf(item) === index)
 })
@@ -898,10 +898,8 @@ const orderSummaryUsernames = computed(() =>
 const allOrderRows = computed<OrderItem[]>(() => ordersData.value?.data || [])
 
 function getChannelUserDouyinAccounts(user: adminApi.UserProfile) {
-  const configuredAccounts = Array.isArray(user.douyinMaterialMatches)
-    ? user.douyinMaterialMatches
-        .map(item => String(item?.douyinAccount || '').trim())
-        .filter(Boolean)
+  const configuredAccounts = Array.isArray(user.douyinAccounts)
+    ? user.douyinAccounts.map(item => String(item?.douyinAccount || '').trim()).filter(Boolean)
     : []
 
   return configuredAccounts.filter((item, index, list) => list.indexOf(item) === index)

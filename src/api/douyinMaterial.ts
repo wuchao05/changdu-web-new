@@ -2,8 +2,10 @@ import httpInstance from './http'
 
 export interface DouyinMaterialMatch {
   id: string
+  douyinAccountRefId: string
   douyinAccount: string
   douyinAccountId: string
+  cooperationCode: string
   materialRange: string
   createdAt: string
   updatedAt: string
@@ -20,8 +22,7 @@ export function getDouyinMaterialConfig(): Promise<DouyinMaterialMatch[]> {
  * 添加抖音号素材匹配规则
  */
 export function addDouyinMaterialMatch(match: {
-  douyinAccount: string
-  douyinAccountId: string
+  douyinAccountRefId: string
   materialRange: string
 }): Promise<DouyinMaterialMatch> {
   return httpInstance.post('/douyin-material/config', match).then(res => res.data.data)
@@ -40,6 +41,6 @@ export function updateDouyinMaterialMatch(
 /**
  * 删除抖音号素材匹配规则
  */
-export function deleteDouyinMaterialMatch(id: string): Promise<DouyinMaterialMatch> {
-  return httpInstance.delete(`/douyin-material/config/${id}`).then(res => res.data.data)
+export function deleteDouyinMaterialMatch(id: string): Promise<void> {
+  return httpInstance.delete(`/douyin-material/config/${id}`).then(() => undefined)
 }
