@@ -289,6 +289,11 @@
                     :key="accountItem.id"
                     class="douyin-account-row"
                   >
+                    <div class="douyin-account-row__head">
+                      <span class="douyin-account-row__title">
+                        {{ accountItem.douyinAccount || '新抖音号' }}
+                      </span>
+                    </div>
                     <n-input
                       v-model:value="accountItem.douyinAccount"
                       placeholder="请输入抖音号名称"
@@ -301,20 +306,22 @@
                       v-model:value="accountItem.cooperationCode"
                       placeholder="请输入合作码"
                     />
-                    <n-button
-                      tertiary
-                      type="error"
-                      @click="
-                        removeDouyinAccountDraft(
-                          user.id,
-                          getDouyinAccountDrafts(user.id).findIndex(
-                            item => item.id === accountItem.id
+                    <div class="douyin-account-row__actions">
+                      <n-button
+                        tertiary
+                        type="error"
+                        @click="
+                          removeDouyinAccountDraft(
+                            user.id,
+                            getDouyinAccountDrafts(user.id).findIndex(
+                              item => item.id === accountItem.id
+                            )
                           )
-                        )
-                      "
-                    >
-                      删除
-                    </n-button>
+                        "
+                      >
+                        删除
+                      </n-button>
+                    </div>
                   </div>
                 </div>
 
@@ -2169,7 +2176,10 @@ function getFilteredDouyinAccountDrafts(userId: string) {
 }
 
 function addDouyinAccountDraft(userId: string) {
-  getDouyinAccountDrafts(userId).push(createEmptyDouyinAccount())
+  const nextAccount = createEmptyDouyinAccount()
+  getDouyinAccountDrafts(userId).push(nextAccount)
+  selectedDouyinAccountByUser[userId] = nextAccount.id
+  douyinAccountExpandedState[userId] = true
 }
 
 function removeDouyinAccountDraft(userId: string, index: number) {
@@ -3915,7 +3925,27 @@ watch(
   padding: 0.95rem;
   border: 1px solid rgba(226, 232, 240, 0.9);
   border-radius: 1rem;
-  background: #ffffff;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.95));
+  box-shadow: 0 18px 30px -26px rgba(15, 23, 42, 0.18);
+}
+
+.douyin-account-row__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.douyin-account-row__title {
+  min-width: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.douyin-account-row__actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .douyin-account-user-card__empty {
@@ -4218,8 +4248,8 @@ watch(
 }
 
 @media (min-width: 768px) {
-  .douyin-account-row {
-    grid-template-columns: 1.15fr 1fr 1fr auto;
+  .douyin-account-user-card__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .permission-grid {
