@@ -293,6 +293,24 @@
                       <span class="douyin-account-row__title">
                         {{ accountItem.douyinAccount || '新抖音号' }}
                       </span>
+                      <n-button
+                        quaternary
+                        circle
+                        size="small"
+                        type="error"
+                        @click="
+                          removeDouyinAccountDraft(
+                            user.id,
+                            getDouyinAccountDrafts(user.id).findIndex(
+                              item => item.id === accountItem.id
+                            )
+                          )
+                        "
+                      >
+                        <template #icon>
+                          <Icon icon="mdi:close" />
+                        </template>
+                      </n-button>
                     </div>
                     <n-input
                       v-model:value="accountItem.douyinAccount"
@@ -306,22 +324,6 @@
                       v-model:value="accountItem.cooperationCode"
                       placeholder="请输入合作码"
                     />
-                    <div class="douyin-account-row__actions">
-                      <n-button
-                        tertiary
-                        type="error"
-                        @click="
-                          removeDouyinAccountDraft(
-                            user.id,
-                            getDouyinAccountDrafts(user.id).findIndex(
-                              item => item.id === accountItem.id
-                            )
-                          )
-                        "
-                      >
-                        删除
-                      </n-button>
-                    </div>
                   </div>
                 </div>
 
@@ -3941,11 +3943,6 @@ watch(
   font-size: 0.85rem;
   font-weight: 700;
   color: #0f172a;
-}
-
-.douyin-account-row__actions {
-  display: flex;
-  justify-content: flex-end;
 }
 
 .douyin-account-user-card__empty {
