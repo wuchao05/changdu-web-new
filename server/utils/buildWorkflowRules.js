@@ -184,6 +184,63 @@ export function canBuildDramaNow(drama, currentTime, buildConfig = {}) {
   return now.isAfter(earliestBuildTime) || now.isSame(earliestBuildTime)
 }
 
+function sortRedDramas(dramas) {
+  return [...dramas].sort((a, b) => {
+    const aPublishTime = getDramaPublishTime(a)
+    const bPublishTime = getDramaPublishTime(b)
+    if (aPublishTime && bPublishTime && aPublishTime.valueOf() !== bPublishTime.valueOf()) {
+      return bPublishTime.valueOf() - aPublishTime.valueOf()
+    }
+
+    const aDateValue = getDramaDateValue(a)
+    const bDateValue = getDramaDateValue(b)
+    if (aDateValue !== bDateValue) {
+      return aDateValue - bDateValue
+    }
+
+    return 0
+  })
+}
+
+function sortNonRedDramas(dramas) {
+  const ratingPriority = { 绿标: 0, 黄标: 1 }
+
+  return [...dramas].sort((a, b) => {
+    const aDateValue = getDramaDateValue(a)
+    const bDateValue = getDramaDateValue(b)
+    if (aDateValue !== bDateValue) {
+      return aDateValue - bDateValue
+    }
+
+    const aPriority = ratingPriority[getDramaRating(a)] ?? 2
+    const bPriority = ratingPriority[getDramaRating(b)] ?? 2
+    if (aPriority !== bPriority) {
+      return aPriority - bPriority
+    }
+
+    const aPublishTime = getDramaPublishTime(a)
+    const bPublishTime = getDramaPublishTime(b)
+    if (!aPublishTime || !bPublishTime) {
+      return 0
+    }
+
+    return bPublishTime.valueOf() - aPublishTime.valueOf()
+  })
+}
+
+function selectDramaWithinPriorityGroup(dramas) {
+  if (dramas.length === 0) {
+    return null
+  }
+
+  const redDramas = dramas.filter(drama => getDramaRating(drama) === '红标')
+  if (redDramas.length > 0) {
+    return sortRedDramas(redDramas)[0]
+  }
+
+  return sortNonRedDramas(dramas)[0] || null
+}
+
 /**
  * 选择最高优先级剧集
  * @param {Array<{ fields?: Record<string, any> }>} dramas 飞书剧集记录数组
@@ -220,51 +277,16 @@ export function selectHighestPriorityDrama(dramas, options = {}) {
     return null
   }
 
-  const redDramas = buildableDramas.filter(drama => getDramaRating(drama) === '红标')
-  if (redDramas.length > 0) {
-    redDramas.sort((a, b) => {
-      const aPublishTime = getDramaPublishTime(a)
-      const bPublishTime = getDramaPublishTime(b)
-      if (aPublishTime && bPublishTime && aPublishTime.valueOf() !== bPublishTime.valueOf()) {
-        return bPublishTime.valueOf() - aPublishTime.valueOf()
-      }
-
-      const aDateValue = getDramaDateValue(a)
-      const bDateValue = getDramaDateValue(b)
-      if (aDateValue !== bDateValue) {
-        return aDateValue - bDateValue
-      }
-
-      return 0
-    })
-
-    return redDramas[0]
-  }
-
-  const ratingPriority = { 绿标: 0, 黄标: 1 }
-  const nonRedDramas = buildableDramas.filter(drama => getDramaRating(drama) !== '红标')
-
-  nonRedDramas.sort((a, b) => {
-    const aDateValue = getDramaDateValue(a)
-    const bDateValue = getDramaDateValue(b)
-    if (aDateValue !== bDateValue) {
-      return aDateValue - bDateValue
-    }
-
-    const aPriority = ratingPriority[getDramaRating(a)] ?? 2
-    const bPriority = ratingPriority[getDramaRating(b)] ?? 2
-    if (aPriority !== bPriority) {
-      return aPriority - bPriority
-    }
-
-    const aPublishTime = getDramaPublishTime(a)
-    const bPublishTime = getDramaPublishTime(b)
-    if (!aPublishTime || !bPublishTime) {
-      return 0
-    }
-
-    return bPublishTime.valueOf() - aPublishTime.valueOf()
+  const urgentForbiddenWindowDramas = buildableDramas.filter(drama => {
+    const publishTime = getDramaPublishTime(drama)
+    return publishTime
+      ? isPublishTimeInForbiddenAdvanceWindow(publishTime, options.buildConfig)
+      : false
   })
 
-  return nonRedDramas[0] || null
+  if (urgentForbiddenWindowDramas.length > 0) {
+    return selectDramaWithinPriorityGroup(urgentForbiddenWindowDramas)
+  }
+
+  return selectDramaWithinPriorityGroup(buildableDramas)
 }

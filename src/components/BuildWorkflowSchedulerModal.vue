@@ -1931,22 +1931,24 @@ onBeforeUnmount(() => {
                 <div class="rules-grid">
                   <div class="rule-row">
                     <span class="priority-num p1">1</span>
-                    <span class="rule-text">到达可搭建时间后，红标剧优先全部搭建</span>
+                    <span class="rule-text"
+                      >命中禁提前时段的剧一旦到达可搭建时间，会插队优先搭建</span
+                    >
                   </div>
                   <div class="rule-row">
                     <span class="priority-num p2">2</span>
                     <span class="rule-text"
-                      >多个红标剧时：先按上架时间从晚到早，再按日期从早到晚</span
+                      >上述剧之间仍按红标优先、上架时间和日期规则继续排序</span
                     >
                   </div>
                   <div class="rule-row">
                     <span class="priority-num p3">3</span>
-                    <span class="rule-text">红标剧搭完后：按日期从早到晚排序</span>
+                    <span class="rule-text">其余剧集再按红标优先全部搭建</span>
                   </div>
                   <div class="rule-row">
                     <span class="priority-num p4">4</span>
                     <span class="rule-text"
-                      >同日期按评级：绿标 > 黄标；同评级按上架时间从晚到早</span
+                      >多个红标剧按上架时间从晚到早，再按日期从早到晚；其余剧按日期、评级和上架时间排序</span
                     >
                   </div>
                 </div>
@@ -1959,7 +1961,7 @@ onBeforeUnmount(() => {
           </n-tooltip>
         </div>
         <div class="build-rules-desc">
-          启动后会先筛掉未到可搭建时间的剧集，再按红标优先、日期、评级和上架时间规则自动选择
+          启动后会先筛掉未到可搭建时间的剧集；命中禁提前时段且已到上架时间的剧会优先处理，其余剧再按红标、日期、评级和上架时间规则自动选择
         </div>
       </n-alert>
 
@@ -2114,22 +2116,24 @@ onBeforeUnmount(() => {
                     </div>
                     <div class="rule-item">
                       <span class="priority-badge priority-1">优先级1</span>
-                      <span class="rule-desc">到达可搭建时间后，红标剧优先全部搭建</span>
+                      <span class="rule-desc"
+                        >命中禁提前时段的剧一旦到达可搭建时间，会插队优先搭建</span
+                      >
                     </div>
                     <div class="rule-item">
                       <span class="priority-badge priority-2">优先级2</span>
                       <span class="rule-desc"
-                        >多个红标剧时：先按上架时间从晚到早，再按日期从早到晚</span
+                        >上述剧之间仍按红标优先、上架时间和日期规则继续排序</span
                       >
                     </div>
                     <div class="rule-item">
                       <span class="priority-badge priority-3">优先级3</span>
-                      <span class="rule-desc">红标剧搭完后：按日期从早到晚排序</span>
+                      <span class="rule-desc">其余剧集再按红标优先全部搭建</span>
                     </div>
                     <div class="rule-item">
                       <span class="priority-badge priority-4">优先级4</span>
                       <span class="rule-desc"
-                        >同日期按评级：绿标 > 黄标；同评级按上架时间从晚到早</span
+                        >多个红标剧按上架时间从晚到早，再按日期从早到晚；其余剧按日期、评级和上架时间排序</span
                       >
                     </div>
                     <div class="rule-note">
