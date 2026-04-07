@@ -1323,16 +1323,16 @@
                       placeholder="请输入 microAppId"
                     />
                   </n-form-item>
-                  <n-form-item
-                    v-if="channelForm.juliang.buildConfig.useNewMicroAppAssetFlow"
-                    label="microAppInstanceId"
-                  >
+                  <n-form-item label="microAppInstanceId">
                     <n-input
                       v-model:value="channelForm.juliang.buildConfig.microAppInstanceId"
                       placeholder="请输入 microAppInstanceId"
                     />
                   </n-form-item>
-                  <n-form-item v-else label="ccId">
+                  <n-form-item
+                    v-if="!channelForm.juliang.buildConfig.useNewMicroAppAssetFlow"
+                    label="ccId"
+                  >
                     <n-input
                       v-model:value="channelForm.juliang.buildConfig.ccId"
                       placeholder="请输入 ccId"

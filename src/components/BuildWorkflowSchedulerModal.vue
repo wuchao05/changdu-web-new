@@ -86,13 +86,15 @@ function reportWorkflowLog(
   level: 'log' | 'info' | 'warn' | 'error' = 'log',
   context: Record<string, unknown> = {}
 ) {
-  void buildWorkflowApi.reportClientWorkflowLog({
-    level,
-    message: messageText,
-    context,
-  }).catch(error => {
-    console.error('上报搭建流程服务端日志失败:', error)
-  })
+  void buildWorkflowApi
+    .reportClientWorkflowLog({
+      level,
+      message: messageText,
+      context,
+    })
+    .catch(error => {
+      console.error('上报搭建流程服务端日志失败:', error)
+    })
 }
 
 // 清理剧名中的特殊标点符号
@@ -137,7 +139,7 @@ interface InitializationData {
 // 自动搭建记录类型
 interface AutoBuildRecord extends BuildDramaRecord {
   currentPhase: '资产化' | '搭建' | '完成'
-  assetizationStep?: number // 资产化步骤 1-6
+  assetizationStep?: number // 资产化步骤 1-4
   failedPhase?: '资产化' | '搭建'
   douyinConfigs?: DouyinMaterialConfig[] // 该剧集的抖音配置
 }
@@ -162,7 +164,6 @@ const buildError = ref<string | null>(null)
 const currentDramaIndex = ref(0)
 const currentPhase = ref<'资产化' | '搭建' | '完成'>('资产化')
 const currentAssetizationStep = ref(0)
-const isCreatingMicroApp = ref(false)
 const waitingCountdown = ref(0)
 const currentBatchInfo = ref<string>('') // 当前搭建批次信息
 
@@ -251,11 +252,34 @@ function findConfiguredMicroAppAsset(
   const targetInstanceId = String(buildConfig?.microAppInstanceId || '').trim()
   const targetMicroAppId = String(buildConfig?.microAppId || '').trim()
 
-  return (
-    microApps.find(item => String(item?.micro_app_instance_id || '').trim() === targetInstanceId) ||
-    microApps.find(item => String(item?.micro_app_id || '').trim() === targetMicroAppId) ||
-    null
-  )
+  if (targetInstanceId) {
+    return (
+      microApps.find(
+        item => String(item?.micro_app_instance_id || '').trim() === targetInstanceId
+      ) || null
+    )
+  }
+
+  return targetMicroAppId
+    ? microApps.find(item => String(item?.micro_app_id || '').trim() === targetMicroAppId) || null
+    : null
+}
+
+function getConfiguredMicroApp(
+  buildConfig: adminApi.ChannelConfig['juliang']['buildConfig'] | null
+) {
+  const microAppInstanceId = String(buildConfig?.microAppInstanceId || '').trim()
+  const microAppId = String(buildConfig?.microAppId || '').trim()
+
+  if (!microAppInstanceId) {
+    throw new Error('当前渠道未配置 microAppInstanceId')
+  }
+
+  return {
+    micro_app_instance_id: microAppInstanceId,
+    app_id: microAppId,
+    start_page: '',
+  }
 }
 
 // 剧集列表表格列定义
@@ -374,17 +398,9 @@ const assetizationSteps = computed(() => [
     key: 1,
     title: '上传账户头像',
   },
-  { key: 2, title: '创建推广链接' },
-  {
-    key: 3,
-    title: currentBuildConfig.value?.useNewMicroAppAssetFlow
-      ? '跳过小程序'
-      : isCreatingMicroApp.value
-        ? '创建小程序'
-        : '查询小程序',
-  },
-  { key: 4, title: '创建小程序资产' },
-  { key: 5, title: '添加付费事件' },
+  { key: 2, title: '使用指定小程序' },
+  { key: 3, title: '创建小程序资产' },
+  { key: 4, title: '添加付费事件' },
 ])
 
 // 获取步骤状态
@@ -417,8 +433,8 @@ const showMaterialPreviewSwitch = computed(
     Boolean(materialPreviewStatus.value?.enabled) ||
     Boolean(materialPreviewStatus.value?.running)
 )
-const isMaterialPreviewEnabled = computed(
-  () => Boolean(materialPreviewStatus.value?.enabled || materialPreviewStatus.value?.running)
+const isMaterialPreviewEnabled = computed(() =>
+  Boolean(materialPreviewStatus.value?.enabled || materialPreviewStatus.value?.running)
 )
 
 // 监听显示状态变化
@@ -461,7 +477,8 @@ async function loadMaterialPreviewConfig() {
   const sessionData = await adminApi.getCurrentSession()
   currentBuildConfig.value = sessionData.buildConfig
   currentBrandName.value =
-    String(sessionData?.runtimeUser?.brandName || sessionData?.user?.brandName || '小红').trim() || '小红'
+    String(sessionData?.runtimeUser?.brandName || sessionData?.user?.brandName || '小红').trim() ||
+    '小红'
   materialPreviewConfig.value = sessionData.materialPreview || {
     enabled: false,
     intervalMinutes: 20,
@@ -973,7 +990,6 @@ function resetState() {
   currentDramaIndex.value = 0
   currentPhase.value = '资产化'
   currentAssetizationStep.value = 0
-  isCreatingMicroApp.value = false
   waitingCountdown.value = 0
 
   // 清理轮询相关状态
@@ -1396,194 +1412,52 @@ async function executeAssetization(
     height: 300,
   })
 
-  // 步骤2: 创建推广链接（用于小程序资产）
+  // 步骤2: 使用指定小程序
   currentAssetizationStep.value = 2
   record.assetizationStep = 2
-  console.log('步骤2: 创建推广链接（用于小程序资产）')
-  const primaryDouyinConfig = record.douyinConfigs?.[0]
-  if (!primaryDouyinConfig) {
-    throw new Error('该剧集没有配置抖音号，请检查飞书状态表的"抖音素材"字段')
-  }
-  const assetPromotionName = generateSmartPromotionName(
-    primaryDouyinConfig.douyinAccount,
-    dramaName,
-    accountId,
-    currentBrandName.value
-  )
-  const promotionResult = await buildWorkflowApi.createPromotionLink({
-    book_id: bookId,
-    drama_name: dramaName,
-    promotion_name: assetPromotionName,
-  })
-
-  // 步骤3: 查询/创建小程序
-  currentAssetizationStep.value = 3
-  record.assetizationStep = 3
-  let microApp
+  console.log('步骤2: 使用渠道配置里的小程序实例')
+  let microApp = getConfiguredMicroApp(buildConfig)
   let assetMicroApp: Record<string, any> | null = null
 
-  if (buildConfig?.useNewMicroAppAssetFlow) {
-    console.log('步骤3: 新版流程跳过查询/创建小程序，直接使用配置里的小程序实例')
-    microApp = {
-      micro_app_instance_id: buildConfig.microAppInstanceId,
-      app_id: buildConfig.microAppId,
-      start_page: '',
-    }
-  } else {
-    console.log('步骤3: 查询/创建小程序')
-
-    // 1. 首先查询账户自己的已审核通过的小程序（search_type=1）
-    console.log('查询账户自己的小程序 (search_type=1)...')
-    const microAppResult = await buildWorkflowApi.queryMicroApp(accountId)
-
-    if (microAppResult.data?.micro_app && microAppResult.data.micro_app.length > 0) {
-      // 检查是否有已审核通过的小程序
-      const approvedMicroApp = microAppResult.data.micro_app.find(
-        (app: { status: number }) => app.status === 1
-      )
-      if (approvedMicroApp) {
-        microApp = approvedMicroApp
-        console.log('✓ 找到账户自己的已审核通过的小程序:', microApp.micro_app_instance_id)
-      }
-    }
-
-    // 2. 如果没有找到账户自己的已审核通过的小程序，查询被共享的小程序（search_type=2）
-    if (!microApp) {
-      console.log('未找到账户自己的已审核通过的小程序，查询被共享的小程序 (search_type=2)...')
-      const approvedResult = await buildWorkflowApi.queryApprovedMicroApp(accountId)
-
-      if (approvedResult.data?.found && approvedResult.data.micro_app) {
-        microApp = approvedResult.data.micro_app
-        console.log('✓ 找到被共享的已审核通过的小程序:', microApp.micro_app_instance_id)
-      }
-    }
-
-    // 3. 如果都没有找到，检查是否需要创建
-    if (!microApp) {
-      console.log('未找到任何已审核通过的小程序，检查是否需要创建...')
-
-      // 检查是否有未审核通过的小程序
-      if (microAppResult.data?.micro_app && microAppResult.data.micro_app.length > 0) {
-        // 有小程序但都未审核通过，跳过搭建
-        const firstMicroApp = microAppResult.data.micro_app[0]
-        console.log('小程序存在但未审核通过，状态:', firstMicroApp.status)
-        const error = new Error('小程序未审核通过，跳过此剧集的搭建') as any
-        error.code = 'MICROAPP_NOT_APPROVED'
-        throw error
-      }
-
-      // 小程序不存在，自动创建
-      console.log('小程序不存在，开始自动创建')
-      isCreatingMicroApp.value = true
-
-      const parsed = parsePromotionUrl(promotionResult.promotion_url)
-      const appId = extractAppIdFromParams(parsed.launchParams)
-
-      if (!appId) {
-        throw new Error('无法从推广链接参数中提取 app_id')
-      }
-
-      const cleanedParams = parsed.launchParams
-        .split('&')
-        .filter(param => !param.startsWith('app_id='))
-        .join('&')
-
-      const microAppLink = generateMicroAppLink({
-        appId,
-        startPage: parsed.launchPage,
-        startParams: cleanedParams,
-      })
-
-      // 调用创建 API
-      await buildWorkflowApi.createMicroApp({
-        account_id: accountId,
-        app_id: appId,
-        path: parsed.launchPage,
-        query: parsed.launchParams,
-        remark: promotionResult.promotion_name,
-        link: microAppLink,
-      })
-
-      console.log('小程序创建成功，等待30秒后查询...')
-      waitingCountdown.value = 30
-      for (let i = 30; i > 0; i--) {
-        waitingCountdown.value = i
-        await new Promise(resolve => setTimeout(resolve, 1000))
-      }
-      waitingCountdown.value = 0
-
-      // 第一次重新查询
-      let recheckResult = await buildWorkflowApi.queryMicroApp(accountId)
-
-      if (!recheckResult.data?.micro_app || recheckResult.data.micro_app.length === 0) {
-        console.log('第一次未查询到小程序，等待10秒后重试...')
-        waitingCountdown.value = 10
-        for (let i = 10; i > 0; i--) {
-          waitingCountdown.value = i
-          await new Promise(resolve => setTimeout(resolve, 1000))
-        }
-        waitingCountdown.value = 0
-
-        recheckResult = await buildWorkflowApi.queryMicroApp(accountId)
-
-        if (!recheckResult.data?.micro_app || recheckResult.data.micro_app.length === 0) {
-          isCreatingMicroApp.value = false
-          throw new Error('小程序创建后查询失败（已重试2次）')
-        }
-      }
-
-      microApp = recheckResult.data.micro_app[0]
-      isCreatingMicroApp.value = false
-    }
-  }
-
-  // 步骤4: 查询/创建小程序资产
-  currentAssetizationStep.value = 4
-  record.assetizationStep = 4
-  console.log('步骤4: 查询/创建小程序资产')
+  // 步骤3: 查询/创建小程序资产
+  currentAssetizationStep.value = 3
+  record.assetizationStep = 3
+  console.log('步骤3: 查询/创建小程序资产')
   const assetsListResult = await buildWorkflowApi.listMicroAppAssets(accountId)
 
   let assetsId: string | number
 
-  if (buildConfig?.useNewMicroAppAssetFlow) {
-    assetMicroApp = findConfiguredMicroAppAsset(assetsListResult.data?.micro_app, buildConfig)
-    if (assetMicroApp) {
-      assetsId = assetMicroApp.assets_id
-      console.log('新版小程序资产已存在，assets_id:', assetsId)
-    } else {
-      console.log('新版小程序资产不存在，开始创建')
-      await buildWorkflowApi.createMicroAppAsset({
-        account_id: accountId,
-        micro_app_instance_id: buildConfig.microAppInstanceId,
-      })
-      const createdAssetsListResult = await buildWorkflowApi.listMicroAppAssets(accountId)
-      assetMicroApp = findConfiguredMicroAppAsset(createdAssetsListResult.data?.micro_app, buildConfig)
-      if (!assetMicroApp) {
-        throw new Error('新版小程序资产创建成功后，未查询到对应资产')
-      }
-      assetsId = assetMicroApp.assets_id
-    }
-    microApp = {
-      micro_app_instance_id: assetMicroApp.micro_app_instance_id || buildConfig.microAppInstanceId,
-      app_id: assetMicroApp.micro_app_id || buildConfig.microAppId,
-      start_page: '',
-    }
-  } else if (assetsListResult.data?.micro_app && assetsListResult.data.micro_app.length > 0) {
-    assetsId = assetsListResult.data.micro_app[0].assets_id
-    console.log('小程序资产已存在，assets_id:', assetsId)
+  assetMicroApp = findConfiguredMicroAppAsset(assetsListResult.data?.micro_app, buildConfig)
+  if (assetMicroApp) {
+    assetsId = assetMicroApp.assets_id
+    console.log('已找到指定小程序资产，assets_id:', assetsId)
   } else {
-    console.log('小程序资产不存在，开始创建')
-    const assetResult = await buildWorkflowApi.createMicroAppAsset({
+    console.log('指定小程序资产不存在，开始创建')
+    await buildWorkflowApi.createMicroAppAsset({
       account_id: accountId,
       micro_app_instance_id: microApp.micro_app_instance_id,
     })
-    assetsId = assetResult.assets_id
+    const createdAssetsListResult = await buildWorkflowApi.listMicroAppAssets(accountId)
+    assetMicroApp = findConfiguredMicroAppAsset(
+      createdAssetsListResult.data?.micro_app,
+      buildConfig
+    )
+    if (!assetMicroApp) {
+      throw new Error('小程序资产创建成功后，未查询到指定实例对应的资产')
+    }
+    assetsId = assetMicroApp.assets_id
+  }
+  microApp = {
+    micro_app_instance_id:
+      String(assetMicroApp?.micro_app_instance_id || '').trim() || microApp.micro_app_instance_id,
+    app_id: String(assetMicroApp?.micro_app_id || '').trim() || microApp.app_id || '',
+    start_page: '',
   }
 
-  // 步骤5: 检查并添加付费事件
-  currentAssetizationStep.value = 5
-  record.assetizationStep = 5
-  console.log('步骤5: 检查并添加付费事件')
+  // 步骤4: 检查并添加付费事件
+  currentAssetizationStep.value = 4
+  record.assetizationStep = 4
+  console.log('步骤4: 检查并添加付费事件')
   const eventStatusResult = await buildWorkflowApi.checkEventStatus({
     account_id: accountId,
     assets_id: assetsId,
@@ -2383,7 +2257,7 @@ onBeforeUnmount(() => {
               >剧集 {{ currentDramaIndex }}/{{ dramas.length }} - {{ currentPhase }}</span
             >
             <span v-if="currentPhase === '资产化'" class="phase-subtitle"
-              >步骤 {{ currentAssetizationStep }}/5</span
+              >步骤 {{ currentAssetizationStep }}/4</span
             >
           </div>
 
@@ -3250,5 +3124,4 @@ onBeforeUnmount(() => {
   line-height: 1.5;
   word-break: break-all;
 }
-
 </style>

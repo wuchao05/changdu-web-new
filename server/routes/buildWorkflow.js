@@ -92,15 +92,14 @@ function getBuildConfig(input = null) {
     'secretKey',
     'microAppName',
     'microAppId',
+    'microAppInstanceId',
     'productId',
     'productPlatformId',
     'landingUrl',
     'rechargeTemplateId',
   ]
 
-  if (useNewMicroAppAssetFlow) {
-    requiredKeys.push('microAppInstanceId')
-  } else {
+  if (!useNewMicroAppAssetFlow) {
     requiredKeys.push('ccId')
   }
 
@@ -124,7 +123,9 @@ function getBuildConfig(input = null) {
     landingUrl: buildConfig.landingUrl,
     rechargeTemplateId: toRechargeTemplateIdNumber(buildConfig.rechargeTemplateId),
     adCallbackConfigId:
-      typeof buildConfig.adCallbackConfigId === 'string' ? buildConfig.adCallbackConfigId.trim() : '',
+      typeof buildConfig.adCallbackConfigId === 'string'
+        ? buildConfig.adCallbackConfigId.trim()
+        : '',
   }
 }
 
@@ -148,7 +149,9 @@ function getChangduDistributorIdNumber(input = null) {
 }
 
 function normalizeClientLogLevel(level = '') {
-  const normalizedLevel = String(level || '').trim().toLowerCase()
+  const normalizedLevel = String(level || '')
+    .trim()
+    .toLowerCase()
   if (['log', 'info', 'warn', 'error'].includes(normalizedLevel)) {
     return normalizedLevel
   }
@@ -236,7 +239,8 @@ router.post('/create-promotion-link', async ctx => {
     }
 
     // 使用传入的 promotion_name，如果没有则使用默认格式
-    const finalPromotionName = promotion_name || generatePromotionName(drama_name, getRuntimeBrandName(ctx))
+    const finalPromotionName =
+      promotion_name || generatePromotionName(drama_name, getRuntimeBrandName(ctx))
 
     console.log('========== 创建推广链接 ==========')
     console.log('book_id:', book_id)
@@ -258,7 +262,11 @@ router.post('/create-promotion-link', async ctx => {
       price: BUILD_WORKFLOW_CONFIG.promotion.price,
       start_chapter: BUILD_WORKFLOW_CONFIG.promotion.startChapter,
       ...(buildConfig.adCallbackConfigId
-        ? { ad_callback_config_id: toOptionalAdCallbackConfigIdNumber(buildConfig.adCallbackConfigId) }
+        ? {
+            ad_callback_config_id: toOptionalAdCallbackConfigIdNumber(
+              buildConfig.adCallbackConfigId
+            ),
+          }
         : {}),
     }
 
@@ -1869,7 +1877,9 @@ async function createPromotionLinkForMicroapp(drama_name, book_id, runtime, bran
     price: BUILD_WORKFLOW_CONFIG.promotion.price,
     start_chapter: BUILD_WORKFLOW_CONFIG.promotion.startChapter,
     ...(buildConfig.adCallbackConfigId
-      ? { ad_callback_config_id: toOptionalAdCallbackConfigIdNumber(buildConfig.adCallbackConfigId) }
+      ? {
+          ad_callback_config_id: toOptionalAdCallbackConfigIdNumber(buildConfig.adCallbackConfigId),
+        }
       : {}),
   }
 

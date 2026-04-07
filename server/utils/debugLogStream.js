@@ -1,6 +1,6 @@
 import { inspect } from 'node:util'
 
-const MAX_LOG_ENTRIES = 20000
+const MAX_LOG_ENTRIES = 10000
 const SUPPORTED_LEVELS = ['log', 'info', 'warn', 'error']
 const ANSI_ESCAPE_PATTERN = /\u001b\[[0-9;]*m/g
 
