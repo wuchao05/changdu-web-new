@@ -102,6 +102,7 @@ function defaultUserChannelConfig() {
       webMenus: {
         overview: true,
         report: true,
+        buildSubmit: true,
       },
       desktopMenus: {
         download: false,
@@ -455,6 +456,10 @@ function normalizeUserChannelConfig(config = {}, douyinAccounts = []) {
           typeof config.permissions?.webMenus?.report === 'boolean'
             ? config.permissions.webMenus.report
             : defaultConfig.permissions.webMenus.report,
+        buildSubmit:
+          typeof config.permissions?.webMenus?.buildSubmit === 'boolean'
+            ? config.permissions.webMenus.buildSubmit
+            : defaultConfig.permissions.webMenus.buildSubmit,
       },
       desktopMenus: {
         download: Boolean(config.permissions?.desktopMenus?.download),
@@ -492,7 +497,8 @@ function hasCustomUserChannelConfig(config = {}, douyinAccounts = []) {
     Object.keys(config.materialPreview).length > 0
   const hasExplicitWebPermissionConfig =
     typeof config.permissions?.webMenus?.overview === 'boolean' ||
-    typeof config.permissions?.webMenus?.report === 'boolean'
+    typeof config.permissions?.webMenus?.report === 'boolean' ||
+    typeof config.permissions?.webMenus?.buildSubmit === 'boolean'
   const hasPermissionConfig =
     Boolean(config.permissions?.syncAccount) ||
     Object.values(config.permissions?.desktopMenus || {}).some(Boolean)

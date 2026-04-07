@@ -34,6 +34,7 @@ export interface UserChannelBindingConfig {
     webMenus: {
       overview: boolean
       report: boolean
+      buildSubmit: boolean
     }
     desktopMenus: {
       download: boolean
@@ -105,6 +106,7 @@ export interface UserProfile {
     webMenus: {
       overview: boolean
       report: boolean
+      buildSubmit: boolean
     }
     desktopMenus: {
       download: boolean

@@ -59,7 +59,12 @@
           </div>
 
           <div class="flex items-center" :class="isMobile ? 'space-x-2' : 'space-x-3'">
-            <n-tooltip :disabled="!autoBuildDisabledReason" placement="bottom" trigger="hover">
+            <n-tooltip
+              v-if="canAccessBuildSubmit"
+              :disabled="!autoBuildDisabledReason"
+              placement="bottom"
+              trigger="hover"
+            >
               <template #trigger>
                 <span class="inline-flex">
                   <n-button
@@ -725,6 +730,11 @@ const autoBuildDisabledReason = computed(() => {
 })
 const canAccessSyncAccount = computed(
   () => hasActiveChannel.value && Boolean(sessionStore.currentRuntimeUser?.permissions?.syncAccount)
+)
+const canAccessBuildSubmit = computed(
+  () =>
+    hasActiveChannel.value &&
+    Boolean(sessionStore.currentRuntimeUser?.permissions?.webMenus?.buildSubmit)
 )
 const canAccessOverview = computed(
   () =>

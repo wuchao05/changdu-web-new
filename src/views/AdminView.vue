@@ -1723,6 +1723,11 @@ const webPermissionOptions: Array<{
     label: '数据报表',
     description: '控制首页充值日报表格是否展示。',
   },
+  {
+    key: 'buildSubmit',
+    label: '提交搭建',
+    description: '控制首页“提交搭建”按钮是否展示。',
+  },
 ]
 const desktopPermissionOptions: Array<{
   key: DesktopPermissionKey
@@ -2340,6 +2345,7 @@ function createDefaultUserChannelConfig(): adminApi.UserChannelBindingConfig {
       webMenus: {
         overview: true,
         report: true,
+        buildSubmit: true,
       },
       desktopMenus: {
         download: false,
@@ -2416,6 +2422,10 @@ function normalizeUserChannelConfig(
           typeof config?.permissions?.webMenus?.report === 'boolean'
             ? config.permissions.webMenus.report
             : defaultConfig.permissions.webMenus.report,
+        buildSubmit:
+          typeof config?.permissions?.webMenus?.buildSubmit === 'boolean'
+            ? config.permissions.webMenus.buildSubmit
+            : defaultConfig.permissions.webMenus.buildSubmit,
       },
       desktopMenus: {
         ...defaultConfig.permissions.desktopMenus,
