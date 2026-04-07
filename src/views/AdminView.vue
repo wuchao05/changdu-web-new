@@ -699,6 +699,30 @@
                                   "
                                 />
                               </div>
+                              <div class="channel-config-card__reuse" @click.stop>
+                                <div>
+                                  <p class="channel-config-card__reuse-title">复用其他渠道配置</p>
+                                  <p class="channel-config-card__reuse-desc">
+                                    从该用户下的其他渠道复制一份完整配置，复制后当前渠道可继续独立修改。
+                                  </p>
+                                </div>
+                                <div class="channel-config-card__reuse-actions">
+                                  <n-select
+                                    v-model:value="userChannelReuseSourceIds[item.channel.id]"
+                                    :options="getUserChannelReuseOptions(item.channel.id)"
+                                    clearable
+                                    placeholder="选择要复用的渠道"
+                                  />
+                                  <n-button
+                                    tertiary
+                                    type="primary"
+                                    :disabled="!userChannelReuseSourceIds[item.channel.id]"
+                                    @click="copyUserChannelConfig(item.channel.id)"
+                                  >
+                                    复制配置
+                                  </n-button>
+                                </div>
+                              </div>
                             </div>
                             <div class="permission-card permission-card--web">
                               <div class="permission-card__body">
@@ -1637,6 +1661,7 @@ const selectedDouyinAccountByUser = reactive<Record<string, string>>({})
 const materialMatchSearchDrafts = reactive<Record<string, string>>({})
 const editingMaterialMatchIds = reactive<Record<string, string>>({})
 const userChannelExpandedState = reactive<Record<string, boolean>>({})
+const userChannelReuseSourceIds = reactive<Record<string, string>>({})
 const draggedOrderUsername = reactive({
   channelId: '',
   index: -1,
@@ -2438,6 +2463,44 @@ function normalizeUserChannelConfig(
   }
 }
 
+function cloneUserChannelConfig(
+  config?: Partial<adminApi.UserChannelBindingConfig>
+): adminApi.UserChannelBindingConfig {
+  const normalizedConfig = normalizeUserChannelConfig(
+    config ? JSON.parse(JSON.stringify(config)) : createDefaultUserChannelConfig()
+  )
+
+  return {
+    ...normalizedConfig,
+    feishu: {
+      ...normalizedConfig.feishu,
+    },
+    materialPreview: {
+      ...normalizedConfig.materialPreview,
+    },
+    permissions: {
+      syncAccount: normalizedConfig.permissions.syncAccount,
+      webMenus: {
+        ...normalizedConfig.permissions.webMenus,
+      },
+      desktopMenus: {
+        ...normalizedConfig.permissions.desktopMenus,
+      },
+    },
+    orderUserStats: {
+      ...normalizedConfig.orderUserStats,
+      usernames: [...normalizedConfig.orderUserStats.usernames],
+    },
+    independentOrderStats: {
+      ...normalizedConfig.independentOrderStats,
+    },
+    douyinMaterialMatches: normalizedConfig.douyinMaterialMatches.map(match => ({
+      ...match,
+      id: crypto.randomUUID(),
+    })),
+  }
+}
+
 function createDefaultChannelForm(): ChannelFormModel {
   return {
     name: '',
@@ -2513,6 +2576,9 @@ function resetUserForm() {
   Object.keys(userChannelExpandedState).forEach(key => {
     delete userChannelExpandedState[key]
   })
+  Object.keys(userChannelReuseSourceIds).forEach(key => {
+    delete userChannelReuseSourceIds[key]
+  })
   cancelEditOrderUsername()
   resetOrderUsernameDrag()
 }
@@ -2556,6 +2622,53 @@ function countConfiguredMaterialMatches(
     match =>
       Boolean(getBoundDouyinAccount(match.douyinAccountRefId)) && Boolean(match.materialRange)
   ).length
+}
+
+function getUserChannelReuseOptions(channelId: string) {
+  return selectedUserChannels.value
+    .filter(channel => channel.id !== channelId)
+    .map(channel => {
+      const config = userForm.channelConfigs?.[channel.id]
+
+      return {
+        label: `${channel.name}${config?.enabled ? '（已启用）' : '（未启用）'}`,
+        value: channel.id,
+      }
+    })
+}
+
+function copyUserChannelConfig(channelId: string) {
+  const sourceChannelId = String(userChannelReuseSourceIds[channelId] || '').trim()
+
+  if (!sourceChannelId) {
+    message.warning('请先选择要复用的渠道')
+    return
+  }
+
+  if (sourceChannelId === channelId) {
+    message.warning('不能复用当前渠道自己的配置')
+    return
+  }
+
+  const sourceConfig = userForm.channelConfigs?.[sourceChannelId]
+  if (!sourceConfig) {
+    message.warning('未找到要复用的渠道配置')
+    return
+  }
+
+  const sourceChannelName =
+    channels.value.find(channel => channel.id === sourceChannelId)?.name ||
+    `渠道 ${sourceChannelId}`
+  const targetChannelName =
+    channels.value.find(channel => channel.id === channelId)?.name || `渠道 ${channelId}`
+
+  userForm.channelConfigs[channelId] = cloneUserChannelConfig(sourceConfig)
+  userChannelExpandedState[channelId] = true
+  editingMaterialMatchIds[channelId] = ''
+  materialMatchSearchDrafts[channelId] = ''
+  orderUsernameDrafts[channelId] = ''
+
+  message.success(`已将【${sourceChannelName}】配置复制到【${targetChannelName}】，后续可独立修改`)
 }
 
 function getFilteredMaterialMatches(
@@ -2718,6 +2831,7 @@ function syncUserChannelConfigs() {
 
   userForm.channelConfigs = nextConfigs
   syncUserChannelExpandedState(selectedChannelIds)
+  syncUserChannelReuseSourceState(selectedChannelIds)
 
   if (userForm.defaultChannelId && !selectedChannelIds.includes(userForm.defaultChannelId)) {
     userForm.defaultChannelId = ''
@@ -2735,6 +2849,28 @@ function syncUserChannelExpandedState(selectedChannelIds: string[]) {
   selectedChannelIds.forEach(channelId => {
     if (typeof userChannelExpandedState[channelId] !== 'boolean') {
       userChannelExpandedState[channelId] = false
+    }
+  })
+}
+
+function syncUserChannelReuseSourceState(selectedChannelIds: string[]) {
+  const nextSelectedSet = new Set(selectedChannelIds)
+
+  Object.keys(userChannelReuseSourceIds).forEach(channelId => {
+    if (!nextSelectedSet.has(channelId)) {
+      delete userChannelReuseSourceIds[channelId]
+    }
+  })
+
+  selectedChannelIds.forEach(channelId => {
+    const sourceChannelId = String(userChannelReuseSourceIds[channelId] || '').trim()
+
+    if (
+      !sourceChannelId ||
+      sourceChannelId === channelId ||
+      !nextSelectedSet.has(sourceChannelId)
+    ) {
+      userChannelReuseSourceIds[channelId] = ''
     }
   })
 }
@@ -3607,6 +3743,43 @@ watch(
   color: #64748b;
 }
 
+.channel-config-card__reuse {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0.2rem 0 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, rgba(236, 253, 245, 0.92), rgba(255, 255, 255, 0.96));
+  border: 1px solid rgba(167, 243, 208, 0.95);
+}
+
+.channel-config-card__reuse-title {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #065f46;
+}
+
+.channel-config-card__reuse-desc {
+  margin-top: 0.24rem;
+  font-size: 0.8rem;
+  line-height: 1.55;
+  color: #4b5563;
+}
+
+.channel-config-card__reuse-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: min(100%, 29rem);
+  flex: 1;
+}
+
+.channel-config-card__reuse-actions :deep(.n-base-selection) {
+  width: 100%;
+}
+
 .channel-config-card__pill {
   display: inline-flex;
   align-items: center;
@@ -4199,6 +4372,20 @@ watch(
   .channel-config-card__switch {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .channel-config-card__reuse {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .channel-config-card__reuse-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .channel-config-card__reuse-actions :deep(.n-button) {
+    width: 100%;
   }
 
   .toggle-hero {
