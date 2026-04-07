@@ -282,6 +282,38 @@ function getConfiguredMicroApp(
   }
 }
 
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function waitForConfiguredMicroAppAsset(
+  accountId: string,
+  buildConfig: adminApi.ChannelConfig['juliang']['buildConfig'] | null,
+  options?: {
+    attempts?: number
+    intervalMs?: number
+  }
+) {
+  const attempts = Math.max(1, Number(options?.attempts || 3))
+  const intervalMs = Math.max(0, Number(options?.intervalMs || 1500))
+
+  for (let index = 0; index < attempts; index += 1) {
+    const assetsListResult = await buildWorkflowApi.listMicroAppAssets(accountId)
+    const matchedAsset = findConfiguredMicroAppAsset(assetsListResult.data?.micro_app, buildConfig)
+
+    if (matchedAsset) {
+      return matchedAsset
+    }
+
+    if (index < attempts - 1 && intervalMs > 0) {
+      console.log(`暂未查到指定小程序资产，${intervalMs}ms 后进行第 ${index + 2} 次重试`)
+      await sleep(intervalMs)
+    }
+  }
+
+  return null
+}
+
 // 剧集列表表格列定义
 const dramasColumns: DataTableColumns<FeishuDramaRecord> = [
   {
@@ -1437,11 +1469,10 @@ async function executeAssetization(
       account_id: accountId,
       micro_app_instance_id: microApp.micro_app_instance_id,
     })
-    const createdAssetsListResult = await buildWorkflowApi.listMicroAppAssets(accountId)
-    assetMicroApp = findConfiguredMicroAppAsset(
-      createdAssetsListResult.data?.micro_app,
-      buildConfig
-    )
+    assetMicroApp = await waitForConfiguredMicroAppAsset(accountId, buildConfig, {
+      attempts: 4,
+      intervalMs: 1500,
+    })
     if (!assetMicroApp) {
       throw new Error('小程序资产创建成功后，未查询到指定实例对应的资产')
     }

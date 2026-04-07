@@ -21,6 +21,7 @@ import {
   generatePromotionName,
   generateSmartPromotionName,
   formatBuildDate,
+  parseDouyinMaterialFromFeishu,
 } from '../utils/buildWorkflowUtils.js'
 import { clearExistingProjects } from '../utils/buildWorkflowProjectCleanup.js'
 import {
@@ -604,6 +605,48 @@ function getConfiguredMicroApp(buildConfig = {}) {
     app_id: microAppId,
     start_page: '',
   }
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function waitForConfiguredMicroAppAsset(accountId, buildConfig, options = {}) {
+  const attempts = Math.max(1, Number(options.attempts || 3))
+  const intervalMs = Math.max(0, Number(options.intervalMs || 1500))
+
+  for (let index = 0; index < attempts; index += 1) {
+    const assetsListResult = await listMicroAppAssets(accountId)
+    const matchedAsset = findConfiguredMicroAppAsset(assetsListResult.data?.micro_app, buildConfig)
+
+    if (matchedAsset) {
+      return matchedAsset
+    }
+
+    if (index < attempts - 1 && intervalMs > 0) {
+      buildConsole.log(
+        `[后台搭建] 暂未查到指定小程序资产，${intervalMs}ms 后进行第 ${index + 2} 次重试`
+      )
+      await sleep(intervalMs)
+    }
+  }
+
+  return null
+}
+
+function getDramaDouyinConfigs(drama) {
+  const rawField = drama?.fields?.['抖音素材']
+  let douyinMaterialText = ''
+
+  if (typeof rawField === 'string') {
+    douyinMaterialText = rawField
+  } else if (Array.isArray(rawField) && rawField[0]?.text) {
+    douyinMaterialText = rawField[0].text
+  } else if (rawField && typeof rawField === 'object') {
+    douyinMaterialText = rawField.text || rawField.value || ''
+  }
+
+  return parseDouyinMaterialFromFeishu(douyinMaterialText)
 }
 
 function getChangduDistributorId() {
@@ -1200,9 +1243,14 @@ async function executeAssetization(drama) {
   const bookId = drama.fields['短剧ID']?.value?.[0]?.text
   const accountId = drama.fields['账户']?.[0]?.text
   const buildConfig = getBuildConfig()
+  const douyinConfigs = getDramaDouyinConfigs(drama)
 
   if (!dramaName || !bookId || !accountId) {
     throw new Error('剧集信息不完整')
+  }
+
+  if (douyinConfigs.length === 0) {
+    throw new Error('该剧集没有配置抖音号，请检查飞书状态表的"抖音素材"字段')
   }
 
   buildConsole.log(`[后台搭建] 开始资产化: ${dramaName}`)
@@ -1237,11 +1285,10 @@ async function executeAssetization(drama) {
       micro_app_instance_id: microApp.micro_app_instance_id,
     })
 
-    const createdAssetsListResult = await listMicroAppAssets(accountId)
-    assetMicroApp = findConfiguredMicroAppAsset(
-      createdAssetsListResult.data?.micro_app,
-      buildConfig
-    )
+    assetMicroApp = await waitForConfiguredMicroAppAsset(accountId, buildConfig, {
+      attempts: 4,
+      intervalMs: 1500,
+    })
     if (!assetMicroApp) {
       throw new Error('小程序资产创建成功后，未查询到指定实例对应的资产')
     }
