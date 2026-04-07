@@ -555,36 +555,22 @@
                         打开后才会展示并启用当前渠道下的飞书、素材预览、权限和抖音匹配素材配置。
                       </p>
                     </div>
-                    <n-switch
-                      :value="item.config.enabled"
-                      @update:value="
-                        (value: boolean) =>
-                          handleUserChannelEnabledChange(item.channel.id, item.config, value)
-                      "
-                    />
-                  </div>
-                  <div class="channel-config-card__reuse" @click.stop>
-                    <div>
-                      <p class="channel-config-card__reuse-title">复用其他渠道配置</p>
-                      <p class="channel-config-card__reuse-desc">
-                        从该用户下的其他渠道复制一份完整配置，复制后当前渠道可继续独立修改。
-                      </p>
-                    </div>
-                    <div class="channel-config-card__reuse-actions">
+                    <div class="channel-config-card__switch-actions">
                       <n-select
-                        v-model:value="userChannelReuseSourceIds[item.channel.id]"
+                        :value="userChannelReuseSourceIds[item.channel.id] || null"
                         :options="getUserChannelReuseOptions(item.channel.id)"
                         clearable
-                        placeholder="选择要复用的渠道"
+                        placeholder="复用渠道"
+                        class="channel-config-card__reuse-select"
+                        @update:value="handleUserChannelReuseSelect(item.channel.id, $event)"
                       />
-                      <n-button
-                        tertiary
-                        type="primary"
-                        :disabled="!userChannelReuseSourceIds[item.channel.id]"
-                        @click="copyUserChannelConfig(item.channel.id)"
-                      >
-                        复制配置
-                      </n-button>
+                      <n-switch
+                        :value="item.config.enabled"
+                        @update:value="
+                          (value: boolean) =>
+                            handleUserChannelEnabledChange(item.channel.id, item.config, value)
+                        "
+                      />
                     </div>
                   </div>
                   <div v-if="isUserChannelSectionExpanded(item.channel.id)" class="mt-1">
@@ -2671,6 +2657,17 @@ function copyUserChannelConfig(channelId: string) {
   message.success(`已将【${sourceChannelName}】配置复制到【${targetChannelName}】，后续可独立修改`)
 }
 
+function handleUserChannelReuseSelect(channelId: string, value: string | null) {
+  userChannelReuseSourceIds[channelId] = String(value || '').trim()
+
+  if (!userChannelReuseSourceIds[channelId]) {
+    return
+  }
+
+  copyUserChannelConfig(channelId)
+  userChannelReuseSourceIds[channelId] = ''
+}
+
 function getFilteredMaterialMatches(
   channelId: string,
   matches: adminApi.UserChannelBindingConfig['douyinMaterialMatches']
@@ -3743,41 +3740,15 @@ watch(
   color: #64748b;
 }
 
-.channel-config-card__reuse {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin: 0.2rem 0 1rem;
-  padding: 0.9rem 1rem;
-  border-radius: 1rem;
-  background: linear-gradient(135deg, rgba(236, 253, 245, 0.92), rgba(255, 255, 255, 0.96));
-  border: 1px solid rgba(167, 243, 208, 0.95);
-}
-
-.channel-config-card__reuse-title {
-  font-size: 0.86rem;
-  font-weight: 700;
-  color: #065f46;
-}
-
-.channel-config-card__reuse-desc {
-  margin-top: 0.24rem;
-  font-size: 0.8rem;
-  line-height: 1.55;
-  color: #4b5563;
-}
-
-.channel-config-card__reuse-actions {
+.channel-config-card__switch-actions {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  width: min(100%, 29rem);
-  flex: 1;
+  flex-shrink: 0;
 }
 
-.channel-config-card__reuse-actions :deep(.n-base-selection) {
-  width: 100%;
+.channel-config-card__reuse-select {
+  width: 9.5rem;
 }
 
 .channel-config-card__pill {
@@ -4374,17 +4345,12 @@ watch(
     align-items: flex-start;
   }
 
-  .channel-config-card__reuse {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .channel-config-card__reuse-actions {
+  .channel-config-card__switch-actions {
     width: 100%;
-    flex-direction: column;
+    justify-content: space-between;
   }
 
-  .channel-config-card__reuse-actions :deep(.n-button) {
+  .channel-config-card__reuse-select {
     width: 100%;
   }
 

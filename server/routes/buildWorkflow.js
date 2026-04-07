@@ -158,6 +158,22 @@ function normalizeClientLogLevel(level = '') {
   return 'log'
 }
 
+function logPromotionLinkFailureDetails({
+  requestBody,
+  requestHeaders,
+  responseStatus,
+  responseText,
+}) {
+  console.error('创建推广链接失败，请求头:', requestHeaders)
+  console.error('创建推广链接失败，请求体:', JSON.stringify(requestBody, null, 2))
+  if (responseStatus) {
+    console.error('创建推广链接失败，响应状态:', responseStatus)
+  }
+  if (typeof responseText === 'string') {
+    console.error('创建推广链接失败，响应内容:', responseText)
+  }
+}
+
 router.post('/client-log', async ctx => {
   try {
     const { level, message, context } = ctx.request.body || {}
@@ -229,6 +245,8 @@ router.get('/cover-image', async ctx => {
  * 创建推广链接（常读openapi）
  */
 router.post('/create-promotion-link', async ctx => {
+  let requestBody = null
+  let requestHeaders = null
   try {
     const { book_id, drama_name, promotion_name } = ctx.request.body
 
@@ -252,7 +270,7 @@ router.post('/create-promotion-link', async ctx => {
     const buildConfig = getBuildConfig(runtime)
 
     // 构建请求体
-    const requestBody = {
+    requestBody = {
       distributor_id: getChangduDistributorIdNumber(runtime),
       book_id: book_id,
       index: BUILD_WORKFLOW_CONFIG.promotion.index,
@@ -279,16 +297,17 @@ router.post('/create-promotion-link', async ctx => {
       getChangduDistributorId(runtime),
       buildConfig.secretKey
     )
+    requestHeaders = {
+      'Content-Type': 'application/json',
+      ...signHeaders,
+    }
 
     console.log('签名头部:', signHeaders)
 
     // 调用常读openapi
     const response = await fetch(`${BUILD_WORKFLOW_CONFIG.changdu.baseUrl}/promotion/create/v1`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...signHeaders,
-      },
+      headers: requestHeaders,
       body: JSON.stringify(requestBody),
     })
 
@@ -303,6 +322,12 @@ router.post('/create-promotion-link', async ctx => {
     try {
       result = JSON.parse(responseText)
     } catch (parseError) {
+      logPromotionLinkFailureDetails({
+        requestBody,
+        requestHeaders,
+        responseStatus: `${response.status} ${response.statusText}`,
+        responseText,
+      })
       console.error('解析常读API响应失败:', parseError)
       ctx.status = 500
       ctx.body = {
@@ -314,10 +339,26 @@ router.post('/create-promotion-link', async ctx => {
       return
     }
 
-    console.log('创建推广链接成功:', result)
+    if (result.code !== 200) {
+      logPromotionLinkFailureDetails({
+        requestBody,
+        requestHeaders,
+        responseStatus: `${response.status} ${response.statusText}`,
+        responseText,
+      })
+      console.error('创建推广链接失败:', result)
+    } else {
+      console.log('创建推广链接成功:', result)
+    }
     console.log('====================================')
     ctx.body = result
   } catch (error) {
+    if (requestBody || requestHeaders) {
+      logPromotionLinkFailureDetails({
+        requestBody,
+        requestHeaders,
+      })
+    }
     console.error('创建推广链接失败:', error)
     ctx.status = 500
     ctx.body = { error: error.message || '创建推广链接失败' }

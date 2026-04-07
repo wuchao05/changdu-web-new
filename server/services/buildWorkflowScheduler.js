@@ -323,6 +323,22 @@ async function parseJsonResponse(response, actionName) {
   return result
 }
 
+function logPromotionLinkFailureDetails({
+  requestBody,
+  requestHeaders,
+  responseStatus,
+  responseBody,
+}) {
+  buildConsole.error('[后台搭建] 创建推广链接失败，请求头:', requestHeaders)
+  buildConsole.error('[后台搭建] 创建推广链接失败，请求体:', JSON.stringify(requestBody, null, 2))
+  if (responseStatus) {
+    buildConsole.error('[后台搭建] 创建推广链接失败，响应状态:', responseStatus)
+  }
+  if (typeof responseBody === 'string') {
+    buildConsole.error('[后台搭建] 创建推广链接失败，响应内容:', responseBody)
+  }
+}
+
 /**
  * 获取飞书 access token
  */
@@ -638,15 +654,36 @@ async function createPromotionLink(params) {
     getChangduDistributorId(),
     buildConfig.secretKey
   )
+  const requestHeaders = {
+    'Content-Type': 'application/json',
+    ...signHeaders,
+  }
 
   const response = await fetch(`${BUILD_WORKFLOW_CONFIG.changdu.baseUrl}/promotion/create/v1`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...signHeaders },
+    headers: requestHeaders,
     body: JSON.stringify(requestBody),
   })
 
-  const result = await parseJsonResponse(response, '创建推广链接')
+  let result
+  try {
+    result = await parseJsonResponse(response, '创建推广链接')
+  } catch (error) {
+    logPromotionLinkFailureDetails({
+      requestBody,
+      requestHeaders,
+      responseStatus: `${response.status} ${response.statusText}`,
+    })
+    throw error
+  }
+
   if (result.code !== 200) {
+    logPromotionLinkFailureDetails({
+      requestBody,
+      requestHeaders,
+      responseStatus: `${response.status} ${response.statusText}`,
+      responseBody: JSON.stringify(result),
+    })
     throw new Error(result.message || '创建推广链接失败')
   }
   return result
