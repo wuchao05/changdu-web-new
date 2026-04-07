@@ -563,6 +563,30 @@
                       "
                     />
                   </div>
+                  <div class="channel-config-card__reuse" @click.stop>
+                    <div>
+                      <p class="channel-config-card__reuse-title">复用其他渠道配置</p>
+                      <p class="channel-config-card__reuse-desc">
+                        从该用户下的其他渠道复制一份完整配置，复制后当前渠道可继续独立修改。
+                      </p>
+                    </div>
+                    <div class="channel-config-card__reuse-actions">
+                      <n-select
+                        v-model:value="userChannelReuseSourceIds[item.channel.id]"
+                        :options="getUserChannelReuseOptions(item.channel.id)"
+                        clearable
+                        placeholder="选择要复用的渠道"
+                      />
+                      <n-button
+                        tertiary
+                        type="primary"
+                        :disabled="!userChannelReuseSourceIds[item.channel.id]"
+                        @click="copyUserChannelConfig(item.channel.id)"
+                      >
+                        复制配置
+                      </n-button>
+                    </div>
+                  </div>
                   <div v-if="isUserChannelSectionExpanded(item.channel.id)" class="mt-1">
                     <div class="config-subpanel">
                       <div class="config-subpanel__head">
@@ -698,30 +722,6 @@
                                       )
                                   "
                                 />
-                              </div>
-                              <div class="channel-config-card__reuse" @click.stop>
-                                <div>
-                                  <p class="channel-config-card__reuse-title">复用其他渠道配置</p>
-                                  <p class="channel-config-card__reuse-desc">
-                                    从该用户下的其他渠道复制一份完整配置，复制后当前渠道可继续独立修改。
-                                  </p>
-                                </div>
-                                <div class="channel-config-card__reuse-actions">
-                                  <n-select
-                                    v-model:value="userChannelReuseSourceIds[item.channel.id]"
-                                    :options="getUserChannelReuseOptions(item.channel.id)"
-                                    clearable
-                                    placeholder="选择要复用的渠道"
-                                  />
-                                  <n-button
-                                    tertiary
-                                    type="primary"
-                                    :disabled="!userChannelReuseSourceIds[item.channel.id]"
-                                    @click="copyUserChannelConfig(item.channel.id)"
-                                  >
-                                    复制配置
-                                  </n-button>
-                                </div>
                               </div>
                             </div>
                             <div class="permission-card permission-card--web">
