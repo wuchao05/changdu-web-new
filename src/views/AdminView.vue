@@ -116,27 +116,9 @@
                             size="small"
                             :bordered="false"
                             round
-                            :type="
-                              formatAdvanceHoursDisplay(
-                                channel.juliang.buildConfig.advanceHoursAfterTen
-                              ).allowed ||
-                              formatAdvanceHoursDisplay(
-                                channel.juliang.buildConfig.advanceHoursBeforeTen
-                              ).allowed
-                                ? 'success'
-                                : 'warning'
-                            "
+                            :type="getAdvanceRuleSummary(channel.juliang.buildConfig).tagType"
                           >
-                            {{
-                              formatAdvanceHoursDisplay(
-                                channel.juliang.buildConfig.advanceHoursAfterTen
-                              ).allowed ||
-                              formatAdvanceHoursDisplay(
-                                channel.juliang.buildConfig.advanceHoursBeforeTen
-                              ).allowed
-                                ? '允许提前搭建'
-                                : '不允许提前搭建'
-                            }}
+                            {{ getAdvanceRuleSummary(channel.juliang.buildConfig).tagLabel }}
                           </n-tag>
                         </div>
                       </div>
@@ -1180,55 +1162,88 @@
                   <div>
                     <p class="advance-config-block__title">智能搭建时机</p>
                     <p class="advance-config-block__desc">
-                      按当前渠道控制可提前搭建时间。填 0 表示不能提前，必须等上架时间后才能搭建。
+                      命中禁提前时段的剧必须等到上架时间后才能搭建；其他时段按统一提前小时数执行。
                     </p>
                   </div>
-                  <n-tag size="small" type="info" :bordered="false" round>渠道绑定</n-tag>
+                  <div class="advance-config-block__meta">
+                    <n-tag size="small" type="info" :bordered="false" round>强约束规则</n-tag>
+                    <span class="advance-config-block__summary">
+                      {{ getAdvanceRuleSummary(channelForm.juliang.buildConfig).tagLabel }}，
+                      {{ getAdvanceRuleSummary(channelForm.juliang.buildConfig).advanceLabel }}
+                    </span>
+                  </div>
                 </div>
 
                 <div class="advance-config-grid">
                   <div class="advance-config-item">
-                    <p class="advance-config-item__title">10点及之后</p>
-                    <p class="advance-config-item__desc">适用于上架时间在 10:00 及之后的剧</p>
-                    <n-input-number
-                      :value="
-                        getAdvanceHoursInputValue(
-                          channelForm.juliang.buildConfig.advanceHoursAfterTen
-                        )
-                      "
-                      :min="0"
-                      :precision="0"
-                      class="w-full"
-                      placeholder="默认 0"
-                      @update:value="
-                        (value: number | null) =>
-                          handleAdvanceHoursChange('advanceHoursAfterTen', value)
-                      "
-                    >
-                      <template #suffix>小时</template>
-                    </n-input-number>
+                    <p class="advance-config-item__title">禁提前上架时段</p>
+                    <p class="advance-config-item__desc">
+                      上架时间落在这个时段内的剧，不允许提前搭建；开始和结束填一样表示不启用。
+                    </p>
+                    <div class="advance-config-time-range">
+                      <div class="advance-config-time-field">
+                        <span class="advance-config-time-field__label">开始</span>
+                        <n-select
+                          :value="
+                            getAdvanceHourSelectValue(
+                              channelForm.juliang.buildConfig.forbiddenAdvanceStartHour
+                            )
+                          "
+                          :options="advanceHourOptions"
+                          placeholder="开始时间"
+                          @update:value="
+                            (value: string | null) =>
+                              handleAdvanceHourChange('forbiddenAdvanceStartHour', value)
+                          "
+                        />
+                      </div>
+                      <span class="advance-config-time-range__split">至</span>
+                      <div class="advance-config-time-field">
+                        <span class="advance-config-time-field__label">结束</span>
+                        <n-select
+                          :value="
+                            getAdvanceHourSelectValue(
+                              channelForm.juliang.buildConfig.forbiddenAdvanceEndHour
+                            )
+                          "
+                          :options="advanceHourEndOptions"
+                          placeholder="结束时间"
+                          @update:value="
+                            (value: string | null) =>
+                              handleAdvanceHourChange('forbiddenAdvanceEndHour', value)
+                          "
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   <div class="advance-config-item">
-                    <p class="advance-config-item__title">10点之前</p>
-                    <p class="advance-config-item__desc">适用于上架时间在 10:00 之前的剧</p>
-                    <n-input-number
-                      :value="
-                        getAdvanceHoursInputValue(
-                          channelForm.juliang.buildConfig.advanceHoursBeforeTen
-                        )
-                      "
-                      :min="0"
-                      :precision="0"
-                      class="w-full"
-                      placeholder="默认 0"
-                      @update:value="
-                        (value: number | null) =>
-                          handleAdvanceHoursChange('advanceHoursBeforeTen', value)
-                      "
-                    >
-                      <template #suffix>小时</template>
-                    </n-input-number>
+                    <p class="advance-config-item__title">其他时段提前搭建</p>
+                    <p class="advance-config-item__desc">
+                      未命中禁提前时段的剧，统一按这个时间提前提交搭建。
+                    </p>
+                    <div class="advance-config-inline">
+                      <n-input-number
+                        :value="
+                          getAdvanceHoursInputValue(
+                            channelForm.juliang.buildConfig.advanceBuildHours
+                          )
+                        "
+                        :min="0"
+                        :precision="0"
+                        class="w-full"
+                        placeholder="默认 0"
+                        @update:value="
+                          (value: number | null) =>
+                            handleAdvanceHoursChange('advanceBuildHours', value)
+                        "
+                      >
+                        <template #suffix>小时</template>
+                      </n-input-number>
+                      <div class="advance-config-inline__tip">
+                        设为 0 时，其他时段也必须等上架时间后才能搭建。
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1696,7 +1711,8 @@ interface DownloadCenterConfigFormModel {
 
 type DesktopPermissionKey = keyof adminApi.UserChannelBindingConfig['permissions']['desktopMenus']
 type WebPermissionKey = keyof adminApi.UserChannelBindingConfig['permissions']['webMenus']
-type BuildAdvanceHoursField = 'advanceHoursAfterTen' | 'advanceHoursBeforeTen'
+type BuildAdvanceHoursField = 'advanceBuildHours'
+type BuildAdvanceHourField = 'forbiddenAdvanceStartHour' | 'forbiddenAdvanceEndHour'
 
 const userForm = reactive<UserFormModel>(createDefaultUserForm())
 const channelForm = reactive<ChannelFormModel>(createDefaultChannelForm())
@@ -1708,6 +1724,11 @@ const userTypeOptions = [
   { label: '管理员', value: 'admin' },
   { label: '普通用户', value: 'normal' },
 ]
+const advanceHourOptions = Array.from({ length: 24 }, (_, hour) => ({
+  label: `${String(hour).padStart(2, '0')}:00`,
+  value: String(hour),
+}))
+const advanceHourEndOptions = [...advanceHourOptions, { label: '24:00', value: '24' }]
 const webPermissionOptions: Array<{
   key: WebPermissionKey
   label: string
@@ -1938,45 +1959,31 @@ const channelColumns: DataTableColumns<adminApi.ChannelConfig> = [
     render: row => row.juliang.buildConfig.microAppName || '-',
   },
   {
-    title: '提前搭建规则',
+    title: '搭建时机规则',
     key: 'juliang.buildConfig.advanceHours',
     render: row => {
-      const afterTen = formatAdvanceHoursDisplay(row.juliang.buildConfig.advanceHoursAfterTen)
-      const beforeTen = formatAdvanceHoursDisplay(row.juliang.buildConfig.advanceHoursBeforeTen)
-
-      if (!afterTen.allowed && !beforeTen.allowed) {
-        return h(
-          NTag,
-          {
-            size: 'small',
-            type: 'warning',
-            bordered: false,
-            round: true,
-          },
-          () => '不允许提前搭建'
-        )
-      }
+      const summary = getAdvanceRuleSummary(row.juliang.buildConfig)
 
       return h('div', { class: 'flex flex-wrap gap-2' }, [
         h(
           NTag,
           {
             size: 'small',
-            type: afterTen.allowed ? 'info' : 'warning',
+            type: summary.tagType,
             bordered: false,
             round: true,
           },
-          () => `10点后 ${afterTen.label}`
+          () => summary.tagLabel
         ),
         h(
           NTag,
           {
             size: 'small',
-            type: beforeTen.allowed ? 'success' : 'warning',
+            type: summary.advanceHours > 0 ? 'success' : 'warning',
             bordered: false,
             round: true,
           },
-          () => `10点前 ${beforeTen.label}`
+          () => summary.advanceLabel
         ),
       ])
     },
@@ -2053,22 +2060,60 @@ function getAdvanceHoursInputValue(value: string | number | null | undefined) {
   return normalizeAdvanceHoursValue(value)
 }
 
+function normalizeAdvanceHourValue(value: string | number | null | undefined) {
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue)) {
+    return 0
+  }
+
+  if (numericValue < 0) {
+    return 0
+  }
+
+  if (numericValue > 24) {
+    return 24
+  }
+
+  return Math.floor(numericValue)
+}
+
+function getAdvanceHourSelectValue(value: string | number | null | undefined) {
+  return String(normalizeAdvanceHourValue(value))
+}
+
 function handleAdvanceHoursChange(field: BuildAdvanceHoursField, value: number | null) {
   channelForm.juliang.buildConfig[field] = String(normalizeAdvanceHoursValue(value))
 }
 
-function formatAdvanceHoursDisplay(value: string | number | null | undefined) {
-  const normalizedValue = normalizeAdvanceHoursValue(value)
-  if (normalizedValue === 0) {
-    return {
-      allowed: false,
-      label: '不允许提前搭建',
-    }
-  }
+function handleAdvanceHourChange(field: BuildAdvanceHourField, value: string | null) {
+  channelForm.juliang.buildConfig[field] = String(normalizeAdvanceHourValue(value))
+}
+
+function formatAdvanceHourLabel(value: string | number | null | undefined) {
+  return `${String(normalizeAdvanceHourValue(value)).padStart(2, '0')}:00`
+}
+
+function getAdvanceRuleSummary(
+  buildConfig: adminApi.ChannelConfig['juliang']['buildConfig'] | null | undefined
+) {
+  const startHour = normalizeAdvanceHourValue(buildConfig?.forbiddenAdvanceStartHour)
+  const endHour = normalizeAdvanceHourValue(buildConfig?.forbiddenAdvanceEndHour)
+  const advanceHours = normalizeAdvanceHoursValue(buildConfig?.advanceBuildHours)
+  const hasForbiddenWindow = startHour !== endHour
 
   return {
-    allowed: true,
-    label: `提前 ${normalizedValue} 小时搭建`,
+    advanceHours,
+    hasForbiddenWindow,
+    tagType: (hasForbiddenWindow ? 'warning' : advanceHours > 0 ? 'success' : 'default') as
+      | 'warning'
+      | 'success'
+      | 'default',
+    tagLabel: hasForbiddenWindow
+      ? `禁提前 ${formatAdvanceHourLabel(startHour)}-${formatAdvanceHourLabel(endHour)}`
+      : advanceHours > 0
+        ? '全时段可提前'
+        : '全时段等上架',
+    advanceLabel: advanceHours > 0 ? `其他时段提前 ${advanceHours} 小时` : '其他时段也不提前搭建',
   }
 }
 
@@ -2519,8 +2564,9 @@ function createDefaultChannelForm(): ChannelFormModel {
         ccId: '',
         rechargeTemplateId: '',
         adCallbackConfigId: '',
-        advanceHoursAfterTen: '0',
-        advanceHoursBeforeTen: '0',
+        forbiddenAdvanceStartHour: '0',
+        forbiddenAdvanceEndHour: '0',
+        advanceBuildHours: '0',
       },
     },
     changdu: {
@@ -3622,6 +3668,21 @@ watch(
   margin-bottom: 0.95rem;
 }
 
+.advance-config-block__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.45rem;
+}
+
+.advance-config-block__summary {
+  max-width: 22rem;
+  text-align: right;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: #475569;
+}
+
 .advance-config-block__title {
   font-size: 0.96rem;
   font-weight: 700;
@@ -3658,6 +3719,47 @@ watch(
   margin-top: 0.26rem;
   margin-bottom: 0.75rem;
   font-size: 0.78rem;
+  line-height: 1.6;
+  color: #64748b;
+}
+
+.advance-config-time-range {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: end;
+  gap: 0.75rem;
+}
+
+.advance-config-time-field {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.advance-config-time-field__label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+
+.advance-config-time-range__split {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  padding-bottom: 0.7rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.advance-config-inline {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.advance-config-inline__tip {
+  font-size: 0.76rem;
   line-height: 1.6;
   color: #64748b;
 }
@@ -4338,6 +4440,24 @@ watch(
 
   .advance-config-grid {
     grid-template-columns: 1fr;
+  }
+
+  .advance-config-block__meta {
+    align-items: flex-start;
+  }
+
+  .advance-config-block__summary {
+    max-width: none;
+    text-align: left;
+  }
+
+  .advance-config-time-range {
+    grid-template-columns: 1fr;
+  }
+
+  .advance-config-time-range__split {
+    justify-content: flex-start;
+    padding-bottom: 0;
   }
 
   .drawer-hero__icon,

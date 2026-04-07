@@ -31,9 +31,9 @@ import {
 import {
   WORKFLOW_TIMEZONE,
   canBuildDramaNow,
+  getAdvanceRuleDescription,
   getDramaPublishTime,
   getEarliestBuildTime,
-  resolveAdvanceHoursConfig,
   selectHighestPriorityDrama,
 } from '@/shared/buildWorkflowRules'
 import { generateMicroAppLink, extractAppIdFromParams } from '@/utils/microAppLink'
@@ -218,19 +218,12 @@ const manuallyBuildingIds = ref<Set<string>>(new Set())
 // 抖音号配置列表（从飞书状态表的"抖音素材"字段解析）
 const douyinConfigs = ref<DouyinMaterialConfig[]>([])
 
-const advanceHoursConfig = computed(() => resolveAdvanceHoursConfig(currentBuildConfig.value || {}))
-
 function getBuildTimestamp() {
   return dayjs().tz('Asia/Shanghai').format('YYYYMMDDHHmmss')
 }
 
-function formatAdvanceRuleSegment(label: string, hours: number) {
-  return hours > 0 ? `${label}提前 ${hours} 小时可搭建` : `${label}必须等上架时间后才能搭建`
-}
-
-const advanceRuleDescription = computed(
-  () =>
-    `${formatAdvanceRuleSegment('上架时间在 10:00 及之后，', advanceHoursConfig.value.afterTen)}；${formatAdvanceRuleSegment('10:00 之前，', advanceHoursConfig.value.beforeTen)}`
+const advanceRuleDescription = computed(() =>
+  getAdvanceRuleDescription(currentBuildConfig.value || {})
 )
 
 function canBuildByCurrentRule(
@@ -678,11 +671,17 @@ async function executePollingCycle() {
       buildConfig: currentBuildConfig.value || {},
       onSkip: (
         drama: any,
-        context: { publishTime: Dayjs; earliestBuildTime: Dayjs | null; advanceHours: number }
+        context: {
+          publishTime: Dayjs
+          earliestBuildTime: Dayjs | null
+          advanceHours: number
+          blockedByForbiddenAdvanceWindow: boolean
+          ruleDescription: string
+        }
       ) => {
         const dramaName = drama.fields['剧名']?.[0]?.text || '未知'
         console.log(
-          `[优先级选择] 跳过 "${dramaName}"：上架时间 ${context.publishTime.format('YYYY-MM-DD HH:mm')}，最早可搭建时间 ${context.earliestBuildTime?.format('YYYY-MM-DD HH:mm') || '-'}（提前 ${context.advanceHours} 小时）`
+          `[优先级选择] 跳过 "${dramaName}"：上架时间 ${context.publishTime.format('YYYY-MM-DD HH:mm')}，最早可搭建时间 ${context.earliestBuildTime?.format('YYYY-MM-DD HH:mm') || '-'}，规则：${context.ruleDescription}${context.blockedByForbiddenAdvanceWindow ? '（命中禁提前时段）' : ''}`
         )
       },
     })

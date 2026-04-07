@@ -6,9 +6,9 @@ dayjs.extend(utc)
 dayjs.extend(timezone)
 
 export const WORKFLOW_TIMEZONE = 'Asia/Shanghai'
-export const TEN_OCLOCK_HOUR = 10
-export const DEFAULT_ADVANCE_HOURS_AFTER_TEN = 0
-export const DEFAULT_ADVANCE_HOURS_BEFORE_TEN = 0
+export const DEFAULT_FORBIDDEN_ADVANCE_START_HOUR = 0
+export const DEFAULT_FORBIDDEN_ADVANCE_END_HOUR = 0
+export const DEFAULT_ADVANCE_BUILD_HOURS = 0
 
 function normalizeCurrentTime(currentTime) {
   if (!currentTime) {
@@ -27,17 +27,65 @@ function normalizeAdvanceHoursValue(value, fallback = 0) {
   return normalizedValue
 }
 
+function normalizeHourValue(value, fallback = 0) {
+  const normalizedValue = Number(value)
+  if (!Number.isFinite(normalizedValue)) {
+    return fallback
+  }
+
+  const truncatedValue = Math.trunc(normalizedValue)
+  if (truncatedValue < 0) {
+    return 0
+  }
+  if (truncatedValue > 24) {
+    return 24
+  }
+  return truncatedValue
+}
+
 export function resolveAdvanceHoursConfig(buildConfig = {}) {
   return {
-    afterTen: normalizeAdvanceHoursValue(
-      buildConfig?.advanceHoursAfterTen,
-      DEFAULT_ADVANCE_HOURS_AFTER_TEN
+    forbiddenAdvanceStartHour: normalizeHourValue(
+      buildConfig?.forbiddenAdvanceStartHour,
+      DEFAULT_FORBIDDEN_ADVANCE_START_HOUR
     ),
-    beforeTen: normalizeAdvanceHoursValue(
-      buildConfig?.advanceHoursBeforeTen,
-      DEFAULT_ADVANCE_HOURS_BEFORE_TEN
+    forbiddenAdvanceEndHour: normalizeHourValue(
+      buildConfig?.forbiddenAdvanceEndHour,
+      DEFAULT_FORBIDDEN_ADVANCE_END_HOUR
+    ),
+    advanceBuildHours: normalizeAdvanceHoursValue(
+      buildConfig?.advanceBuildHours,
+      DEFAULT_ADVANCE_BUILD_HOURS
     ),
   }
+}
+
+export function hasForbiddenAdvanceWindow(buildConfig = {}) {
+  const config = resolveAdvanceHoursConfig(buildConfig)
+  return config.forbiddenAdvanceStartHour !== config.forbiddenAdvanceEndHour
+}
+
+export function formatHourLabel(hour) {
+  return `${String(normalizeHourValue(hour)).padStart(2, '0')}:00`
+}
+
+export function formatForbiddenAdvanceWindow(buildConfig = {}) {
+  const config = resolveAdvanceHoursConfig(buildConfig)
+  return `${formatHourLabel(config.forbiddenAdvanceStartHour)}-${formatHourLabel(config.forbiddenAdvanceEndHour)}`
+}
+
+export function getAdvanceRuleDescription(buildConfig = {}) {
+  const config = resolveAdvanceHoursConfig(buildConfig)
+  const advanceText =
+    config.advanceBuildHours > 0
+      ? `其余时间可提前 ${config.advanceBuildHours} 小时搭建`
+      : '其余时间也必须等上架时间后才能搭建'
+
+  if (!hasForbiddenAdvanceWindow(config)) {
+    return advanceText
+  }
+
+  return `上架时间命中 ${formatForbiddenAdvanceWindow(config)} 时禁止提前搭建，${advanceText}`
 }
 
 /**
@@ -88,9 +136,28 @@ export function getDramaRating(drama) {
  */
 export function getAdvanceHours(publishTime, buildConfig = {}) {
   const advanceHoursConfig = resolveAdvanceHoursConfig(buildConfig)
-  return publishTime.hour() >= TEN_OCLOCK_HOUR
-    ? advanceHoursConfig.afterTen
-    : advanceHoursConfig.beforeTen
+  if (isPublishTimeInForbiddenAdvanceWindow(publishTime, advanceHoursConfig)) {
+    return 0
+  }
+
+  return advanceHoursConfig.advanceBuildHours
+}
+
+export function isPublishTimeInForbiddenAdvanceWindow(publishTime, buildConfig = {}) {
+  const config = resolveAdvanceHoursConfig(buildConfig)
+  const startHour = config.forbiddenAdvanceStartHour
+  const endHour = config.forbiddenAdvanceEndHour
+
+  if (startHour === endHour) {
+    return false
+  }
+
+  const publishHour = publishTime.hour()
+  if (startHour < endHour) {
+    return publishHour >= startHour && publishHour < endHour
+  }
+
+  return publishHour >= startHour || publishHour < endHour
 }
 
 /**
@@ -120,7 +187,7 @@ export function canBuildDramaNow(drama, currentTime, buildConfig = {}) {
 /**
  * 选择最高优先级剧集
  * @param {Array<{ fields?: Record<string, any> }>} dramas 飞书剧集记录数组
- * @param {{ currentTime?: string | number | Date | import('dayjs').Dayjs, onSkip?: (drama: any, context: { publishTime: import('dayjs').Dayjs, earliestBuildTime: import('dayjs').Dayjs | null, advanceHours: number }) => void }} [options]
+ * @param {{ currentTime?: string | number | Date | import('dayjs').Dayjs, onSkip?: (drama: any, context: { publishTime: import('dayjs').Dayjs, earliestBuildTime: import('dayjs').Dayjs | null, advanceHours: number, blockedByForbiddenAdvanceWindow: boolean, ruleDescription: string }) => void }} [options]
  * @returns {any | null}
  */
 export function selectHighestPriorityDrama(dramas, options = {}) {
@@ -132,10 +199,16 @@ export function selectHighestPriorityDrama(dramas, options = {}) {
     if (!canBuildDramaNow(drama, now, options.buildConfig)) {
       const advanceHours = getAdvanceHours(publishTime, options.buildConfig)
       const earliestBuildTime = getEarliestBuildTime(drama, options.buildConfig)
+      const blockedByForbiddenAdvanceWindow = isPublishTimeInForbiddenAdvanceWindow(
+        publishTime,
+        options.buildConfig
+      )
       options.onSkip?.(drama, {
         publishTime,
         earliestBuildTime,
         advanceHours,
+        blockedByForbiddenAdvanceWindow,
+        ruleDescription: getAdvanceRuleDescription(options.buildConfig),
       })
       return false
     }

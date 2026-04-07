@@ -9,11 +9,14 @@ type SkipContext = {
   publishTime: Dayjs
   earliestBuildTime: Dayjs | null
   advanceHours: number
+  blockedByForbiddenAdvanceWindow: boolean
+  ruleDescription: string
 }
 
 export type BuildWorkflowRuleConfig = {
-  advanceHoursAfterTen?: string | number
-  advanceHoursBeforeTen?: string | number
+  forbiddenAdvanceStartHour?: string | number
+  forbiddenAdvanceEndHour?: string | number
+  advanceBuildHours?: string | number
 }
 
 // @ts-expect-error 服务端规则文件仍为 JS，这里补一层前端类型包装。
@@ -22,9 +25,11 @@ import * as workflowRules from '../../server/utils/buildWorkflowRules.js'
 const typedWorkflowRules = workflowRules as {
   WORKFLOW_TIMEZONE: string
   resolveAdvanceHoursConfig: (buildConfig?: BuildWorkflowRuleConfig) => {
-    afterTen: number
-    beforeTen: number
+    forbiddenAdvanceStartHour: number
+    forbiddenAdvanceEndHour: number
+    advanceBuildHours: number
   }
+  getAdvanceRuleDescription: (buildConfig?: BuildWorkflowRuleConfig) => string
   getDramaPublishTime: (drama: DramaRecord) => Dayjs | null
   getEarliestBuildTime: (drama: DramaRecord, buildConfig?: BuildWorkflowRuleConfig) => Dayjs | null
   canBuildDramaNow: (
@@ -44,6 +49,7 @@ const typedWorkflowRules = workflowRules as {
 
 export const WORKFLOW_TIMEZONE = typedWorkflowRules.WORKFLOW_TIMEZONE
 export const resolveAdvanceHoursConfig = typedWorkflowRules.resolveAdvanceHoursConfig
+export const getAdvanceRuleDescription = typedWorkflowRules.getAdvanceRuleDescription
 export const getDramaPublishTime = typedWorkflowRules.getDramaPublishTime
 export const getEarliestBuildTime = typedWorkflowRules.getEarliestBuildTime
 export const canBuildDramaNow = typedWorkflowRules.canBuildDramaNow

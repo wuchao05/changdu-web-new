@@ -26,6 +26,7 @@ import {
 import { clearExistingProjects } from '../utils/buildWorkflowProjectCleanup.js'
 import {
   canBuildDramaNow,
+  getAdvanceRuleDescription,
   getDramaPublishTime,
   getEarliestBuildTime,
   selectHighestPriorityDrama,
@@ -213,7 +214,7 @@ async function executeBuildStepWithRetry(stepName, runner, maxRetries = 3) {
 }
 
 function formatAdvanceHoursDebugText(buildConfig = {}) {
-  return `提前搭建配置(10点后=${String(buildConfig.advanceHoursAfterTen || '0')}, 10点前=${String(buildConfig.advanceHoursBeforeTen || '0')})`
+  return `提前搭建配置(${getAdvanceRuleDescription(buildConfig)})`
 }
 
 async function listPersistedInstanceKeys() {
@@ -544,8 +545,9 @@ function getBuildConfig() {
     secretKey: buildConfig.secretKey,
     useNewMicroAppAssetFlow,
     clearExistingProjectsBeforeBuild: Boolean(buildConfig.clearExistingProjectsBeforeBuild),
-    advanceHoursAfterTen: buildConfig.advanceHoursAfterTen,
-    advanceHoursBeforeTen: buildConfig.advanceHoursBeforeTen,
+    forbiddenAdvanceStartHour: buildConfig.forbiddenAdvanceStartHour,
+    forbiddenAdvanceEndHour: buildConfig.forbiddenAdvanceEndHour,
+    advanceBuildHours: buildConfig.advanceBuildHours,
     ccId: buildConfig.ccId,
     microAppName: buildConfig.microAppName,
     microAppId: buildConfig.microAppId,
@@ -1699,7 +1701,7 @@ async function executePollingCycle() {
         onSkip: (drama, context) => {
           const dramaName = drama.fields['剧名']?.[0]?.text || '未知'
           buildConsole.log(
-            `[优先级选择] 跳过 "${dramaName}"：上架时间 ${context.publishTime.format('YYYY-MM-DD HH:mm')}，最早可搭建时间 ${context.earliestBuildTime?.format('YYYY-MM-DD HH:mm') || '-'}（提前 ${context.advanceHours} 小时）`
+            `[优先级选择] 跳过 "${dramaName}"：上架时间 ${context.publishTime.format('YYYY-MM-DD HH:mm')}，最早可搭建时间 ${context.earliestBuildTime?.format('YYYY-MM-DD HH:mm') || '-'}，规则：${context.ruleDescription}${context.blockedByForbiddenAdvanceWindow ? '（命中禁提前时段）' : ''}`
           )
         },
       })

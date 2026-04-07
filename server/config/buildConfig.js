@@ -30,8 +30,9 @@ export const DEFAULT_BUILD_CONFIG = {
   ccId: '1849832732821859',
   rechargeTemplateId: String(BUILD_WORKFLOW_CONFIG.changdu.rechargeTemplateId),
   adCallbackConfigId: '',
-  advanceHoursAfterTen: '0',
-  advanceHoursBeforeTen: '0',
+  forbiddenAdvanceStartHour: '0',
+  forbiddenAdvanceEndHour: '0',
+  advanceBuildHours: '0',
 }
 
 function normalizeStringValue(value, fallback = '') {
@@ -84,13 +85,17 @@ export function normalizeBuildConfig(config = {}) {
       config.adCallbackConfigId,
       DEFAULT_BUILD_CONFIG.adCallbackConfigId
     ),
-    advanceHoursAfterTen: normalizeStringValue(
-      config.advanceHoursAfterTen,
-      DEFAULT_BUILD_CONFIG.advanceHoursAfterTen
+    forbiddenAdvanceStartHour: normalizeStringValue(
+      config.forbiddenAdvanceStartHour,
+      DEFAULT_BUILD_CONFIG.forbiddenAdvanceStartHour
     ),
-    advanceHoursBeforeTen: normalizeStringValue(
-      config.advanceHoursBeforeTen,
-      DEFAULT_BUILD_CONFIG.advanceHoursBeforeTen
+    forbiddenAdvanceEndHour: normalizeStringValue(
+      config.forbiddenAdvanceEndHour,
+      DEFAULT_BUILD_CONFIG.forbiddenAdvanceEndHour
+    ),
+    advanceBuildHours: normalizeStringValue(
+      config.advanceBuildHours,
+      DEFAULT_BUILD_CONFIG.advanceBuildHours
     ),
   }
 }
