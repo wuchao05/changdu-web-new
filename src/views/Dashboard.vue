@@ -2293,9 +2293,9 @@ onUnmounted(() => {
 .order-branch-panel {
   position: relative;
   overflow: hidden;
-  border: 1px solid rgba(56, 189, 248, 0.18);
-  border-radius: 1.25rem;
-  padding: 1rem 1rem 1.1rem;
+  border: 1px solid rgba(14, 165, 233, 0.14);
+  border-radius: 1rem;
+  padding: 0.82rem 0.82rem 0.9rem;
   background:
     radial-gradient(circle at top right, rgba(34, 211, 238, 0.2), transparent 34%),
     radial-gradient(circle at left center, rgba(251, 191, 36, 0.16), transparent 30%),
@@ -2307,14 +2307,14 @@ onUnmounted(() => {
 
 .order-branch-panel__tree {
   position: relative;
-  padding-top: 1.2rem;
+  padding-top: 0.95rem;
 }
 
 .order-branch-panel__trunk {
   position: absolute;
   top: 0;
-  left: 1.6rem;
-  width: calc(100% - 3.2rem);
+  left: 1.2rem;
+  width: calc(100% - 2.4rem);
   height: 1px;
   background: linear-gradient(
     90deg,
@@ -2328,30 +2328,30 @@ onUnmounted(() => {
   content: '';
   position: absolute;
   left: 50%;
-  top: -0.85rem;
+  top: -0.7rem;
   width: 2px;
-  height: 1.25rem;
+  height: 1rem;
   transform: translateX(-50%);
   background: linear-gradient(180deg, rgba(56, 189, 248, 0), rgba(14, 165, 233, 0.7));
 }
 
 .order-branch-panel__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 0.9rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.65rem;
 }
 
 .order-branch-card {
   position: relative;
   overflow: hidden;
-  min-height: 176px;
-  padding: 1rem;
-  border: 1px solid rgba(56, 189, 248, 0.18);
-  border-radius: 1.1rem;
+  min-height: 142px;
+  padding: 0.75rem 0.78rem;
+  border: 1px solid rgba(14, 165, 233, 0.16);
+  border-radius: 0.9rem;
   background:
     radial-gradient(circle at top right, rgba(125, 211, 252, 0.24), transparent 40%),
     linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(240, 249, 255, 0.98));
-  box-shadow: 0 16px 36px -28px rgba(14, 116, 144, 0.34);
+  box-shadow: 0 10px 26px -24px rgba(14, 116, 144, 0.32);
   text-align: left;
   animation: order-branch-rise 0.45s ease both;
   transition:
@@ -2372,9 +2372,9 @@ onUnmounted(() => {
 }
 
 .order-branch-card:hover {
-  transform: translateY(-3px) scale(1.01);
+  transform: translateY(-2px);
   border-color: rgba(14, 165, 233, 0.35);
-  box-shadow: 0 20px 40px -26px rgba(14, 116, 144, 0.42);
+  box-shadow: 0 14px 30px -22px rgba(14, 116, 144, 0.38);
 }
 
 .order-branch-card.active {
@@ -2382,55 +2382,56 @@ onUnmounted(() => {
   background:
     radial-gradient(circle at top right, rgba(56, 189, 248, 0.28), transparent 42%),
     linear-gradient(145deg, rgba(14, 165, 233, 0.98), rgba(8, 47, 73, 0.96));
-  box-shadow: 0 24px 48px -28px rgba(8, 47, 73, 0.64);
+  box-shadow: 0 16px 34px -24px rgba(8, 47, 73, 0.56);
 }
 
 .order-branch-card__label {
   margin: 0;
   color: rgb(12 74 110);
-  font-size: 1rem;
-  font-weight: 800;
+  font-size: 0.9rem;
+  font-weight: 700;
 }
 
 .order-branch-card__summary {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.7rem;
-  margin-top: 1rem;
+  gap: 0.45rem;
+  margin-top: 0.65rem;
 }
 
 .order-branch-card__stat {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
-  padding: 0.75rem 0.8rem;
-  border-radius: 0.9rem;
-  background: rgba(255, 255, 255, 0.62);
+  gap: 0.14rem;
+  padding: 0.5rem 0.56rem;
+  border-radius: 0.65rem;
+  background: rgba(255, 255, 255, 0.66);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 .order-branch-card__stat--hero {
-  margin-top: 0.85rem;
+  margin-top: 0.5rem;
   background: rgba(255, 255, 255, 0.78);
 }
 
 .order-branch-card__stat-label {
   color: rgb(14 116 144);
-  font-size: 0.72rem;
-  letter-spacing: 0.03em;
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
 }
 
 .order-branch-card__amount {
-  margin-top: 0.1rem;
+  margin-top: 0;
   color: rgb(15 23 42);
-  font-size: 1.5rem;
+  font-size: 1.2rem;
   font-weight: 800;
+  line-height: 1.25;
 }
 
 .order-branch-card__stat-value,
 .order-branch-card__stat-number {
   color: rgb(15 23 42);
-  font-size: 1rem;
+  font-size: 0.88rem;
   font-weight: 700;
 }
 
