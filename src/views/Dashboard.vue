@@ -431,11 +431,29 @@
                   class="order-user-tab"
                   :class="{
                     active: !ordersLoading && activePromotionUserName === tab.key,
+                    'order-user-tab--all': tab.key === '' || tab.key === '__loading_all__',
                     'order-user-tab--loading': ordersLoading,
                   }"
                   :disabled="ordersLoading"
                   @click="handlePromotionUserTabChange(tab.key)"
                 >
+                  <span
+                    class="order-user-tab__tag"
+                    :class="[
+                      {
+                        'order-user-tab__tag--all': tab.key === '' || tab.key === '__loading_all__',
+                        'order-user-tab__skeleton order-user-tab__skeleton--tag': ordersLoading,
+                      },
+                    ]"
+                  >
+                    {{
+                      ordersLoading
+                        ? ''
+                        : tab.key === '' || tab.key === '__loading_all__'
+                          ? '总览'
+                          : '子用户'
+                    }}
+                  </span>
                   <div class="order-user-tab__head">
                     <span
                       class="order-user-tab__label"
@@ -2152,21 +2170,22 @@ onUnmounted(() => {
 }
 
 .order-user-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(158px, 186px));
+  gap: 0.65rem;
+  align-items: stretch;
 }
 
 .order-user-tab {
-  min-width: 180px;
-  flex: 1 1 180px;
-  padding: 0.95rem 1rem;
-  border: 1px solid rgba(251, 191, 36, 0.22);
-  border-radius: 1rem;
+  min-width: 0;
+  width: 100%;
+  padding: 0.72rem 0.78rem 0.78rem;
+  border: 1px solid rgba(251, 191, 36, 0.18);
+  border-radius: 0.85rem;
   background:
-    radial-gradient(circle at top right, rgba(253, 224, 71, 0.28), transparent 46%),
-    linear-gradient(135deg, rgba(255, 251, 235, 0.96), rgba(255, 247, 237, 0.98));
-  box-shadow: 0 14px 34px -24px rgba(194, 65, 12, 0.35);
+    radial-gradient(circle at top right, rgba(253, 224, 71, 0.2), transparent 42%),
+    linear-gradient(180deg, rgba(255, 251, 235, 0.98), rgba(255, 247, 237, 0.98));
+  box-shadow: 0 10px 24px -22px rgba(194, 65, 12, 0.42);
   text-align: left;
   transition:
     transform 0.22s ease,
@@ -2174,10 +2193,17 @@ onUnmounted(() => {
     border-color 0.22s ease;
 }
 
+.order-user-tab--all {
+  border-color: rgba(14, 165, 233, 0.16);
+  background:
+    radial-gradient(circle at top right, rgba(125, 211, 252, 0.18), transparent 42%),
+    linear-gradient(180deg, rgba(240, 249, 255, 0.98), rgba(248, 250, 252, 0.98));
+}
+
 .order-user-tab:hover {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
   border-color: rgba(249, 115, 22, 0.28);
-  box-shadow: 0 18px 36px -24px rgba(194, 65, 12, 0.42);
+  box-shadow: 0 14px 28px -22px rgba(194, 65, 12, 0.48);
 }
 
 .order-user-tab.active {
@@ -2185,7 +2211,7 @@ onUnmounted(() => {
   background:
     radial-gradient(circle at top right, rgba(56, 189, 248, 0.24), transparent 42%),
     linear-gradient(135deg, rgba(14, 165, 233, 0.98), rgba(3, 105, 161, 0.95));
-  box-shadow: 0 24px 48px -30px rgba(3, 105, 161, 0.68);
+  box-shadow: 0 18px 34px -28px rgba(3, 105, 161, 0.72);
 }
 
 .order-user-tab--loading {
@@ -2196,44 +2222,72 @@ onUnmounted(() => {
   transform: none;
 }
 
+.order-user-tab__tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.14rem 0.48rem;
+  border-radius: 9999px;
+  background: rgba(194, 65, 12, 0.08);
+  color: rgb(154 52 18);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.04em;
+}
+
+.order-user-tab__tag--all {
+  background: rgba(14, 116, 144, 0.1);
+  color: rgb(14 116 144);
+}
+
 .order-user-tab__head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 0.45rem;
+  margin-top: 0.48rem;
 }
 
 .order-user-tab__label {
-  font-size: 0.95rem;
+  flex: 1;
+  min-width: 0;
+  font-size: 0.88rem;
   font-weight: 700;
   color: rgb(154 52 18);
+  line-height: 1.25;
+  word-break: break-all;
 }
 
 .order-user-tab__count {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.15rem 0.55rem;
+  flex-shrink: 0;
+  padding: 0.12rem 0.45rem;
   border-radius: 9999px;
   background: rgba(255, 255, 255, 0.72);
   color: rgb(194 65 12);
-  font-size: 0.75rem;
+  font-size: 0.68rem;
   font-weight: 600;
 }
 
 .order-user-tab__amount {
-  margin-top: 0.6rem;
-  font-size: 1.2rem;
+  margin-top: 0.46rem;
+  font-size: 1.02rem;
   font-weight: 800;
+  line-height: 1.2;
   color: rgb(15 23 42);
 }
 
 .order-user-tab__meta {
-  margin-top: 0.35rem;
-  font-size: 0.78rem;
-  color: rgb(148 63 18);
+  margin-top: 0.26rem;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: rgb(120 113 108);
 }
 
+.order-user-tab.active .order-user-tab__tag,
 .order-user-tab.active .order-user-tab__label,
 .order-user-tab.active .order-user-tab__amount,
 .order-user-tab.active .order-user-tab__meta {
@@ -2275,6 +2329,12 @@ onUnmounted(() => {
 .order-user-tab__skeleton--count {
   width: 3.4rem;
   min-height: 1.35rem;
+  border-radius: 9999px;
+}
+
+.order-user-tab__skeleton--tag {
+  width: 2.9rem;
+  min-height: 1.2rem;
   border-radius: 9999px;
 }
 
@@ -2483,6 +2543,18 @@ onUnmounted(() => {
 @media (min-width: 768px) {
   .independent-order-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .order-user-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 460px) {
+  .order-user-tabs {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>
