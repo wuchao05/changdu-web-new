@@ -2133,6 +2133,7 @@ onUnmounted(() => {
   position: relative;
   min-width: 0;
   width: 100%;
+  min-height: 6.6rem;
   padding: 0.72rem 0.78rem 0.78rem;
   border: 1px solid rgba(251, 191, 36, 0.18);
   border-radius: 0.85rem;
@@ -2190,6 +2191,10 @@ onUnmounted(() => {
   padding-right: 6.5rem;
 }
 
+.order-user-tab--with-branches {
+  min-height: 7.35rem;
+}
+
 .order-user-tab__head {
   display: flex;
   align-items: flex-start;
@@ -2228,8 +2233,6 @@ onUnmounted(() => {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.24rem;
   width: 6rem;
-  max-height: 3.55rem;
-  overflow-y: auto;
   align-content: start;
 }
 
