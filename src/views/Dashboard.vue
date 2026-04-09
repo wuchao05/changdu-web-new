@@ -437,23 +437,6 @@
                   :disabled="ordersLoading"
                   @click="handlePromotionUserTabChange(tab.key)"
                 >
-                  <span
-                    class="order-user-tab__tag"
-                    :class="[
-                      {
-                        'order-user-tab__tag--all': tab.key === '' || tab.key === '__loading_all__',
-                        'order-user-tab__skeleton order-user-tab__skeleton--tag': ordersLoading,
-                      },
-                    ]"
-                  >
-                    {{
-                      ordersLoading
-                        ? ''
-                        : tab.key === '' || tab.key === '__loading_all__'
-                          ? '总览'
-                          : '子用户'
-                    }}
-                  </span>
                   <div class="order-user-tab__head">
                     <span
                       class="order-user-tab__label"
@@ -504,33 +487,11 @@
                       :class="{ active: activeBranchUserId === branchUser.key }"
                       @click="handleBranchUserChange(branchUser.key)"
                     >
-                      <div class="order-branch-card__top">
-                        <span class="order-branch-card__tag">子用户</span>
-                        <span class="order-branch-card__account-chip">
-                          {{ branchUser.accountCount }} 个号
-                        </span>
-                      </div>
                       <p class="order-branch-card__label">{{ branchUser.label }}</p>
-                      <div class="order-branch-card__hero">
-                        <span class="order-branch-card__stat-label">总充值金额</span>
-                        <span class="order-branch-card__amount">
-                          {{ formatCurrency(branchUser.totalAmount) }}
-                        </span>
-                      </div>
-                      <div class="order-branch-card__summary">
-                        <div class="order-branch-card__stat">
-                          <span class="order-branch-card__stat-label">总订单</span>
-                          <strong class="order-branch-card__stat-value">
-                            {{ formatNumberValue(branchUser.total) }}
-                          </strong>
-                        </div>
-                        <div class="order-branch-card__stat">
-                          <span class="order-branch-card__stat-label">充值订单</span>
-                          <strong class="order-branch-card__stat-value">
-                            {{ formatNumberValue(branchUser.paidOrderCount) }}
-                          </strong>
-                        </div>
-                      </div>
+                      <p class="order-branch-card__amount-label">总充值金额</p>
+                      <p class="order-branch-card__amount">
+                        {{ formatCurrency(branchUser.totalAmount) }}
+                      </p>
                     </button>
                   </div>
                 </div>
@@ -987,7 +948,6 @@ const orderBranchCardItems = computed(() =>
         total: matchedOrders.length,
         totalAmount: calculateOrderRechargeAmount(matchedOrders),
         paidOrderCount,
-        accountCount: user.douyinAccounts.length,
         douyinAccounts: user.douyinAccounts,
       }
     })
@@ -2229,31 +2189,11 @@ onUnmounted(() => {
   transform: none;
 }
 
-.order-user-tab__tag {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.14rem 0.48rem;
-  border-radius: 9999px;
-  background: rgba(194, 65, 12, 0.08);
-  color: rgb(154 52 18);
-  font-size: 0.68rem;
-  font-weight: 700;
-  line-height: 1.1;
-  letter-spacing: 0.04em;
-}
-
-.order-user-tab__tag--all {
-  background: rgba(14, 116, 144, 0.1);
-  color: rgb(14 116 144);
-}
-
 .order-user-tab__head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.45rem;
-  margin-top: 0.48rem;
 }
 
 .order-user-tab__label {
@@ -2294,7 +2234,6 @@ onUnmounted(() => {
   color: rgb(120 113 108);
 }
 
-.order-user-tab.active .order-user-tab__tag,
 .order-user-tab.active .order-user-tab__label,
 .order-user-tab.active .order-user-tab__amount,
 .order-user-tab.active .order-user-tab__meta {
@@ -2336,12 +2275,6 @@ onUnmounted(() => {
 .order-user-tab__skeleton--count {
   width: 3.4rem;
   min-height: 1.35rem;
-  border-radius: 9999px;
-}
-
-.order-user-tab__skeleton--tag {
-  width: 2.9rem;
-  min-height: 1.2rem;
   border-radius: 9999px;
 }
 
@@ -2404,21 +2337,21 @@ onUnmounted(() => {
 
 .order-branch-panel__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 0.65rem;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 156px));
+  gap: 0.55rem;
 }
 
 .order-branch-card {
   position: relative;
   overflow: hidden;
-  min-height: 118px;
-  padding: 0.68rem 0.72rem 0.74rem;
-  border: 1px solid rgba(14, 165, 233, 0.16);
-  border-radius: 0.82rem;
+  min-height: 76px;
+  padding: 0.58rem 0.65rem 0.62rem;
+  border: 1px solid rgba(14, 165, 233, 0.12);
+  border-radius: 0.72rem;
   background:
-    radial-gradient(circle at top right, rgba(125, 211, 252, 0.18), transparent 38%),
+    radial-gradient(circle at top right, rgba(125, 211, 252, 0.12), transparent 36%),
     linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.98));
-  box-shadow: 0 10px 24px -24px rgba(14, 116, 144, 0.26);
+  box-shadow: 0 8px 18px -22px rgba(14, 116, 144, 0.22);
   text-align: left;
   animation: order-branch-rise 0.45s ease both;
   transition:
@@ -2440,128 +2373,49 @@ onUnmounted(() => {
 
 .order-branch-card:hover {
   transform: translateY(-1px);
-  border-color: rgba(14, 165, 233, 0.35);
-  box-shadow: 0 14px 30px -24px rgba(14, 116, 144, 0.34);
+  border-color: rgba(14, 165, 233, 0.22);
+  box-shadow: 0 10px 20px -22px rgba(14, 116, 144, 0.28);
 }
 
 .order-branch-card.active {
-  border-color: rgba(14, 116, 144, 0.32);
+  border-color: rgba(14, 116, 144, 0.24);
   background:
-    radial-gradient(circle at top right, rgba(56, 189, 248, 0.2), transparent 40%),
-    linear-gradient(145deg, rgba(239, 246, 255, 0.98), rgba(224, 242, 254, 0.98));
-  box-shadow: 0 16px 34px -28px rgba(14, 116, 144, 0.36);
-}
-
-.order-branch-card__top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.4rem;
-}
-
-.order-branch-card__tag,
-.order-branch-card__account-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 1.35rem;
-  padding: 0.08rem 0.48rem;
-  border-radius: 9999px;
-  font-size: 0.68rem;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.order-branch-card__tag {
-  background: rgba(14, 116, 144, 0.08);
-  color: rgb(14 116 144);
-}
-
-.order-branch-card__account-chip {
-  background: rgba(255, 255, 255, 0.86);
-  color: rgb(71 85 105);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.14), transparent 40%),
+    linear-gradient(145deg, rgba(239, 246, 255, 0.98), rgba(240, 249, 255, 0.98));
+  box-shadow: 0 10px 22px -24px rgba(14, 116, 144, 0.28);
 }
 
 .order-branch-card__label {
-  margin: 0.45rem 0 0;
+  margin: 0;
   color: rgb(12 74 110);
-  font-size: 0.96rem;
+  font-size: 0.84rem;
   font-weight: 700;
+  line-height: 1.25;
 }
 
-.order-branch-card__hero {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 0.6rem;
-  margin-top: 0.6rem;
-  padding: 0.48rem 0.56rem;
-  border-radius: 0.72rem;
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.84);
-}
-
-.order-branch-card__summary {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.38rem;
-  margin-top: 0.42rem;
-}
-
-.order-branch-card__stat {
-  display: flex;
-  flex-direction: column;
-  gap: 0.14rem;
-  padding: 0.42rem 0.5rem;
-  border-radius: 0.62rem;
-  background: rgba(255, 255, 255, 0.74);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
-}
-
-.order-branch-card__stat-label {
-  color: rgb(14 116 144);
-  font-size: 0.68rem;
-  letter-spacing: 0.02em;
+.order-branch-card__amount-label {
+  margin: 0.34rem 0 0;
+  color: rgb(100 116 139);
+  font-size: 0.67rem;
+  line-height: 1.2;
 }
 
 .order-branch-card__amount {
-  margin-top: 0;
+  margin: 0.16rem 0 0;
   color: rgb(15 23 42);
-  font-size: 0.98rem;
+  font-size: 1rem;
   font-weight: 800;
   line-height: 1.15;
-  white-space: nowrap;
-}
-
-.order-branch-card__stat-value,
-.order-branch-card__stat-number {
-  color: rgb(15 23 42);
-  font-size: 0.84rem;
-  font-weight: 700;
-}
-
-.order-branch-card.active .order-branch-card__tag {
-  background: rgba(14, 116, 144, 0.14);
-}
-
-.order-branch-card.active .order-branch-card__account-chip {
-  background: rgba(224, 242, 254, 0.92);
-  color: rgb(14 116 144);
+  letter-spacing: -0.01em;
 }
 
 .order-branch-card.active .order-branch-card__label,
-.order-branch-card.active .order-branch-card__amount,
-.order-branch-card.active .order-branch-card__stat-label,
-.order-branch-card.active .order-branch-card__stat-value,
-.order-branch-card.active .order-branch-card__stat-number {
+.order-branch-card.active .order-branch-card__amount {
   color: rgb(8 47 73);
 }
 
-.order-branch-card.active .order-branch-card__hero,
-.order-branch-card.active .order-branch-card__stat {
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92);
+.order-branch-card.active .order-branch-card__amount-label {
+  color: rgb(14 116 144);
 }
 
 @keyframes refresh-breath {
