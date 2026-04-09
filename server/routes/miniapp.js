@@ -1,5 +1,5 @@
 import Router from '@koa/router'
-import { MINIAPP_SHELL_ID, buildBootstrapData, buildLayoutData } from '../config/miniappShell.js'
+import { buildBootstrapData, buildLayoutData, getMiniAppShellId } from '../config/miniappShell.js'
 
 const router = new Router({
   prefix: '/miniapp',
@@ -29,7 +29,7 @@ router.get('/bootstrap', async ctx => {
   ctx.body = {
     code: 0,
     message: 'ok',
-    data: buildBootstrapData(appId),
+    data: await buildBootstrapData(appId),
   }
 })
 
@@ -47,7 +47,9 @@ router.get('/layout', async ctx => {
     return
   }
 
-  if (shellId !== MINIAPP_SHELL_ID) {
+  const currentShellId = await getMiniAppShellId()
+
+  if (shellId !== currentShellId) {
     ctx.status = 404
     ctx.body = {
       code: 404,
@@ -60,7 +62,7 @@ router.get('/layout', async ctx => {
   ctx.body = {
     code: 0,
     message: 'ok',
-    data: buildLayoutData(appId),
+    data: await buildLayoutData(appId),
   }
 })
 
