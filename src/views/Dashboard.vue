@@ -2178,10 +2178,6 @@ onUnmounted(() => {
 }
 
 .order-user-tab__body {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.56rem;
   min-height: 100%;
 }
 
@@ -2191,7 +2187,7 @@ onUnmounted(() => {
 }
 
 .order-user-tab--with-branches .order-user-tab__main {
-  max-width: calc(100% - 6rem);
+  padding-right: 6.5rem;
 }
 
 .order-user-tab__head {
@@ -2225,24 +2221,30 @@ onUnmounted(() => {
 }
 
 .order-user-tab__branch-tags {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.32rem;
-  width: 5.2rem;
-  flex-shrink: 0;
+  position: absolute;
+  top: 0.72rem;
+  right: 0.72rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.24rem;
+  width: 6rem;
+  max-height: 3.55rem;
+  overflow-y: auto;
+  align-content: start;
 }
 
 .order-branch-tag {
   display: inline-flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.22rem;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.04rem;
   min-width: 0;
   width: 100%;
-  padding: 0.18rem 0.4rem;
+  min-height: 1.7rem;
+  padding: 0.14rem 0.32rem;
   border: 1px solid rgba(255, 255, 255, 0.24);
-  border-radius: 9999px;
+  border-radius: 0.7rem;
   background: rgba(255, 255, 255, 0.16);
   color: white;
   transition:
@@ -2264,7 +2266,8 @@ onUnmounted(() => {
 .order-branch-tag__label,
 .order-branch-tag__amount {
   min-width: 0;
-  font-size: 0.67rem;
+  max-width: 100%;
+  font-size: 0.6rem;
   line-height: 1.2;
   white-space: nowrap;
 }
@@ -2352,11 +2355,11 @@ onUnmounted(() => {
   }
 
   .order-user-tab--with-branches .order-user-tab__main {
-    max-width: calc(100% - 5.4rem);
+    padding-right: 5.9rem;
   }
 
   .order-user-tab__branch-tags {
-    width: 4.6rem;
+    width: 5.35rem;
   }
 }
 
@@ -2365,25 +2368,17 @@ onUnmounted(() => {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .order-user-tab__body {
-    gap: 0.48rem;
-  }
-
   .order-user-tab--with-branches .order-user-tab__main {
-    max-width: calc(100% - 4.9rem);
+    padding-right: 5.55rem;
   }
 
   .order-user-tab__branch-tags {
-    width: 4.2rem;
-  }
-
-  .order-branch-tag {
-    padding-inline: 0.34rem;
+    width: 5rem;
   }
 
   .order-branch-tag__label,
   .order-branch-tag__amount {
-    font-size: 0.64rem;
+    font-size: 0.58rem;
   }
 }
 </style>
