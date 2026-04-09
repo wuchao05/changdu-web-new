@@ -30,6 +30,7 @@ import adxRoutes from './server/routes/adx.js'
 import buildConfigRoutes from './server/routes/buildConfig.js'
 import debugRoutes from './server/routes/debug.js'
 import materialPreviewRoutes from './server/routes/materialPreview.js'
+import miniappRoutes from './server/routes/miniapp.js'
 import { initScheduler } from './server/services/buildWorkflowScheduler.js'
 import { initScheduler as initAutoSubmitScheduler } from './server/services/autoSubmitScheduler.js'
 import { materialPreviewManager } from './server/services/materialPreviewManager.js'
@@ -37,6 +38,7 @@ import { ensureStudioData } from './server/utils/studioData.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
+const publicDir = path.join(__dirname, 'public')
 
 installDebugLogCapture()
 
@@ -106,6 +108,9 @@ app.use(async (ctx, next) => {
 
 // 日志中间件已移除
 
+// 静态资源服务
+app.use(mount('/', serve(publicDir)))
+
 // API 路由
 
 // 健康检查端点
@@ -113,6 +118,7 @@ router.get('/health', ctx => {
   ctx.body = { status: 'ok', timestamp: new Date().toISOString() }
 })
 
+router.use(miniappRoutes.routes(), miniappRoutes.allowedMethods())
 router.use('/api/feishu', feishuRoutes.routes(), feishuRoutes.allowedMethods())
 router.use('/api/novelsale', novelsaleRoutes.routes(), novelsaleRoutes.allowedMethods())
 router.use('/api/node/api', nodeRoutes.routes(), nodeRoutes.allowedMethods())
