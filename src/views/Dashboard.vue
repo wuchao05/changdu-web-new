@@ -423,59 +423,62 @@
                   :class="{
                     active: !ordersLoading && activePromotionUserName === tab.key,
                     'order-user-tab--all': tab.key === '' || tab.key === '__loading_all__',
+                    'order-user-tab--with-branches':
+                      !ordersLoading &&
+                      shouldShowOrderBranch &&
+                      activePromotionUserName === tab.key &&
+                      tab.key === ORDER_BRANCH_ROOT_USERNAME,
                     'order-user-tab--loading': ordersLoading,
                   }"
                   @click="!ordersLoading && handlePromotionUserTabChange(tab.key)"
                 >
-                  <div class="order-user-tab__head">
-                    <span
-                      class="order-user-tab__label"
-                      :class="{
-                        'order-user-tab__skeleton order-user-tab__skeleton--label': ordersLoading,
-                      }"
+                  <div class="order-user-tab__body">
+                    <div class="order-user-tab__main">
+                      <div class="order-user-tab__head">
+                        <span
+                          class="order-user-tab__label"
+                          :class="{
+                            'order-user-tab__skeleton order-user-tab__skeleton--label':
+                              ordersLoading,
+                          }"
+                        >
+                          {{ ordersLoading ? '' : tab.label }}
+                        </span>
+                      </div>
+                      <p
+                        class="order-user-tab__amount"
+                        :class="{
+                          'order-user-tab__skeleton order-user-tab__skeleton--amount':
+                            ordersLoading,
+                        }"
+                      >
+                        {{ ordersLoading ? '' : formatCurrency(tab.totalAmount) }}
+                      </p>
+                    </div>
+                    <div
+                      v-if="
+                        !ordersLoading &&
+                        shouldShowOrderBranch &&
+                        activePromotionUserName === tab.key &&
+                        tab.key === ORDER_BRANCH_ROOT_USERNAME
+                      "
+                      class="order-user-tab__branch-tags"
+                      @click.stop
                     >
-                      {{ ordersLoading ? '' : tab.label }}
-                    </span>
-                  </div>
-                  <p
-                    class="order-user-tab__amount"
-                    :class="{
-                      'order-user-tab__skeleton order-user-tab__skeleton--amount': ordersLoading,
-                    }"
-                  >
-                    {{ ordersLoading ? '' : formatCurrency(tab.totalAmount) }}
-                  </p>
-                  <p
-                    class="order-user-tab__meta"
-                    :class="{
-                      'order-user-tab__skeleton order-user-tab__skeleton--meta': ordersLoading,
-                    }"
-                  >
-                    {{ ordersLoading ? '' : tab.meta }}
-                  </p>
-                  <div
-                    v-if="
-                      !ordersLoading &&
-                      shouldShowOrderBranch &&
-                      activePromotionUserName === tab.key &&
-                      tab.key === ORDER_BRANCH_ROOT_USERNAME
-                    "
-                    class="order-user-tab__branch-tags"
-                    @click.stop
-                  >
-                    <button
-                      v-for="branchUser in orderBranchCardItems"
-                      :key="branchUser.key"
-                      type="button"
-                      class="order-branch-tag"
-                      :class="{ active: activeBranchUserId === branchUser.key }"
-                      @click.stop="handleBranchUserChange(branchUser.key)"
-                    >
-                      <span class="order-branch-tag__label">{{ branchUser.label }}</span>
-                      <span class="order-branch-tag__amount">
-                        {{ formatCurrency(branchUser.totalAmount) }}
-                      </span>
-                    </button>
+                      <button
+                        v-for="branchUser in orderBranchCardItems"
+                        :key="branchUser.key"
+                        type="button"
+                        class="order-branch-tag"
+                        :class="{ active: activeBranchUserId === branchUser.key }"
+                        @click.stop="handleBranchUserChange(branchUser.key)"
+                      >
+                        <span class="order-branch-tag__label">{{ branchUser.label }}</span>
+                        <span class="order-branch-tag__amount">
+                          {{ formatCurrency(branchUser.totalAmount) }}
+                        </span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2127,6 +2130,7 @@ onUnmounted(() => {
 }
 
 .order-user-tab {
+  position: relative;
   min-width: 0;
   width: 100%;
   padding: 0.72rem 0.78rem 0.78rem;
@@ -2173,6 +2177,23 @@ onUnmounted(() => {
   transform: none;
 }
 
+.order-user-tab__body {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.56rem;
+  min-height: 100%;
+}
+
+.order-user-tab__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.order-user-tab--with-branches .order-user-tab__main {
+  max-width: calc(100% - 6rem);
+}
+
 .order-user-tab__head {
   display: flex;
   align-items: flex-start;
@@ -2198,35 +2219,28 @@ onUnmounted(() => {
   color: rgb(15 23 42);
 }
 
-.order-user-tab__meta {
-  margin-top: 0.26rem;
-  font-size: 0.72rem;
-  line-height: 1.35;
-  color: rgb(120 113 108);
-}
-
 .order-user-tab.active .order-user-tab__label,
-.order-user-tab.active .order-user-tab__amount,
-.order-user-tab.active .order-user-tab__meta {
+.order-user-tab.active .order-user-tab__amount {
   color: white;
 }
 
 .order-user-tab__branch-tags {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.38rem;
-  margin-top: 0.62rem;
-  padding-top: 0.58rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.32rem;
+  width: 5.2rem;
+  flex-shrink: 0;
 }
 
 .order-branch-tag {
   display: inline-flex;
   align-items: center;
-  gap: 0.34rem;
+  justify-content: space-between;
+  gap: 0.22rem;
   min-width: 0;
-  max-width: 100%;
-  padding: 0.22rem 0.48rem;
+  width: 100%;
+  padding: 0.18rem 0.4rem;
   border: 1px solid rgba(255, 255, 255, 0.24);
   border-radius: 9999px;
   background: rgba(255, 255, 255, 0.16);
@@ -2250,13 +2264,15 @@ onUnmounted(() => {
 .order-branch-tag__label,
 .order-branch-tag__amount {
   min-width: 0;
-  font-size: 0.72rem;
+  font-size: 0.67rem;
   line-height: 1.2;
   white-space: nowrap;
 }
 
 .order-branch-tag__label {
   font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .order-branch-tag__amount {
@@ -2334,11 +2350,40 @@ onUnmounted(() => {
   .order-user-tabs {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .order-user-tab--with-branches .order-user-tab__main {
+    max-width: calc(100% - 5.4rem);
+  }
+
+  .order-user-tab__branch-tags {
+    width: 4.6rem;
+  }
 }
 
 @media (max-width: 460px) {
   .order-user-tabs {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .order-user-tab__body {
+    gap: 0.48rem;
+  }
+
+  .order-user-tab--with-branches .order-user-tab__main {
+    max-width: calc(100% - 4.9rem);
+  }
+
+  .order-user-tab__branch-tags {
+    width: 4.2rem;
+  }
+
+  .order-branch-tag {
+    padding-inline: 0.34rem;
+  }
+
+  .order-branch-tag__label,
+  .order-branch-tag__amount {
+    font-size: 0.64rem;
   }
 }
 </style>
