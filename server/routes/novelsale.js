@@ -9,7 +9,6 @@ import { resolveRuntimeContext } from '../utils/studioData.js'
 import { getSessionUser } from '../utils/studioSession.js'
 
 const router = new Router()
-const MAX_ORDER_FETCH_COUNT = 10000
 const SECONDS_PER_DAY = 24 * 60 * 60
 const MAX_ORDER_RANGE_DAYS = 10
 
@@ -204,7 +203,6 @@ async function fetchAllOrdersByRange(ctx, timeRange) {
   let currentFetchIndex = 0
   const fetchPageSize = 1000
   let hasMoreData = true
-  let rangeLimitHit = false
 
   while (hasMoreData) {
     // console.log(
@@ -251,20 +249,11 @@ async function fetchAllOrdersByRange(ctx, timeRange) {
       hasMoreData = false
     }
 
-    if (rangeOrders.length >= MAX_ORDER_FETCH_COUNT) {
-      // console.log(
-      //   `⚠️ [订单统计] 时间段 ${timeRange.begin_time}-${timeRange.end_time} 已触达常读平台最近 ${MAX_ORDER_FETCH_COUNT} 条订单范围`
-      // )
-      rangeLimitHit = true
-      hasMoreData = false
-    }
-
     currentFetchIndex++
   }
 
   return {
     orders: rangeOrders,
-    limitHit: rangeLimitHit,
   }
 }
 
@@ -345,7 +334,7 @@ router.get('/distributor/application_overview_list/v1', async ctx => {
   }
 })
 
-// 推广详情 - 支持抖音号过滤（前端分页）
+// 推广详情 - 统一全量拉取后返回给前端分页
 router.get('/distributor/promotion/detail/v2', async ctx => {
   const channelDouyinAccounts = ctx.query.channel_douyin_accounts
   const selectedPromotionUserName = String(ctx.query.promotion_user_name || '').trim()
@@ -357,11 +346,6 @@ router.get('/distributor/promotion/detail/v2', async ctx => {
   const shouldUseIndependentOrderStats = independentOrderStatsConfig.enabled
   const shouldBuildPromotionUserStats =
     !shouldUseIndependentOrderStats && configuredPromotionUsernames.length > 0
-
-  if (!channelDouyinAccounts && !shouldBuildPromotionUserStats && !shouldUseIndependentOrderStats) {
-    await createGetHandler('Promotion Detail', '/novelsale/distributor/promotion/detail/v2/')(ctx)
-    return
-  }
 
   // console.log('🔍 [订单统计] 开始拉取全量数据用于本地统计', {
   //   channelDouyinAccounts: channelDouyinAccounts || '',
@@ -387,12 +371,10 @@ router.get('/distributor/promotion/detail/v2', async ctx => {
   // )
 
   const allOrders = []
-  let orderFetchLimitHit = false
 
   for (const timeRange of queryRanges) {
     const rangeResult = await fetchAllOrdersByRange(ctx, timeRange)
     allOrders.push(...rangeResult.orders)
-    orderFetchLimitHit = orderFetchLimitHit || rangeResult.limitHit
   }
 
   const independentlyFilteredOrders = shouldUseIndependentOrderStats
@@ -437,7 +419,6 @@ router.get('/distributor/promotion/detail/v2', async ctx => {
     independent_order_stats_enabled: shouldUseIndependentOrderStats,
     promotion_user_stats_enabled: shouldBuildPromotionUserStats,
     promotion_user_summaries: promotionUserSummaries,
-    order_fetch_limit_hit: orderFetchLimitHit,
   }
 })
 

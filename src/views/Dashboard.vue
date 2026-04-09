@@ -345,14 +345,6 @@
             <n-alert v-if="ordersError" type="error" :show-icon="true" class="mb-4">
               {{ ordersError }}
             </n-alert>
-            <n-alert
-              v-if="ordersData?.order_fetch_limit_hit"
-              type="warning"
-              :show-icon="true"
-              class="mb-4"
-            >
-              常读平台限制，最多只能拉到最近 1w 条订单数据，当前统计结果可能不准确
-            </n-alert>
             <div v-if="isIndependentOrderStatsMode" class="mb-4">
               <div class="independent-order-summary">
                 <div class="independent-order-summary__card">

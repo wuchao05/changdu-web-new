@@ -77,14 +77,13 @@ export interface OrderData {
   code: number
   message: string
   total: number
-  total_amount?: number // 总充值金额（单位：分，仅抖音号过滤时返回）
-  all_total?: number // 全部订单数量（启用按用户统计时返回）
-  all_total_amount?: number // 全部订单总充值金额（单位：分，启用按用户统计时返回）
+  total_amount?: number // 总充值金额（单位：分）
+  all_total?: number // 全部订单数量
+  all_total_amount?: number // 全部订单总充值金额（单位：分）
   active_promotion_user_name?: string // 当前选中的推广用户名
   promotion_user_stats_enabled?: boolean // 是否启用按用户统计订单
   independent_order_stats_enabled?: boolean // 是否启用独立订单统计
   promotion_user_summaries?: PromotionUserSummary[]
-  order_fetch_limit_hit?: boolean // 是否命中常读平台 1w 条订单限制
   data: OrderItem[]
 }
 
