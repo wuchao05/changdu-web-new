@@ -423,62 +423,68 @@
                   :class="{
                     active: !ordersLoading && activePromotionUserName === tab.key,
                     'order-user-tab--all': tab.key === '' || tab.key === '__loading_all__',
-                    'order-user-tab--with-branches':
-                      !ordersLoading &&
-                      shouldShowOrderBranch &&
-                      activePromotionUserName === tab.key &&
-                      tab.key === ORDER_BRANCH_ROOT_USERNAME,
                     'order-user-tab--loading': ordersLoading,
                   }"
                   @click="!ordersLoading && handlePromotionUserTabChange(tab.key)"
                 >
                   <div class="order-user-tab__body">
-                    <div class="order-user-tab__main">
-                      <div class="order-user-tab__head">
-                        <span
-                          class="order-user-tab__label"
-                          :class="{
-                            'order-user-tab__skeleton order-user-tab__skeleton--label':
-                              ordersLoading,
-                          }"
-                        >
-                          {{ ordersLoading ? '' : tab.label }}
-                        </span>
-                      </div>
-                      <p
-                        class="order-user-tab__amount"
+                    <div class="order-user-tab__head">
+                      <span
+                        class="order-user-tab__label"
                         :class="{
-                          'order-user-tab__skeleton order-user-tab__skeleton--amount':
-                            ordersLoading,
+                          'order-user-tab__skeleton order-user-tab__skeleton--label': ordersLoading,
                         }"
                       >
-                        {{ ordersLoading ? '' : formatCurrency(tab.totalAmount) }}
-                      </p>
-                    </div>
-                    <div
-                      v-if="
-                        !ordersLoading &&
-                        shouldShowOrderBranch &&
-                        activePromotionUserName === tab.key &&
-                        tab.key === ORDER_BRANCH_ROOT_USERNAME
-                      "
-                      class="order-user-tab__branch-tags"
-                      @click.stop
-                    >
-                      <button
-                        v-for="branchUser in orderBranchCardItems"
-                        :key="branchUser.key"
-                        type="button"
-                        class="order-branch-tag"
-                        :class="{ active: activeBranchUserId === branchUser.key }"
-                        @click.stop="handleBranchUserChange(branchUser.key)"
+                        {{ ordersLoading ? '' : tab.label }}
+                      </span>
+                      <span
+                        class="order-user-tab__count"
+                        :class="{
+                          'order-user-tab__skeleton order-user-tab__skeleton--count': ordersLoading,
+                        }"
                       >
-                        <span class="order-branch-tag__label">{{ branchUser.label }}</span>
-                        <span class="order-branch-tag__amount">
-                          {{ formatCurrency(branchUser.totalAmount) }}
-                        </span>
-                      </button>
+                        {{ ordersLoading ? '' : `${tab.total} 单` }}
+                      </span>
                     </div>
+                    <p
+                      class="order-user-tab__amount"
+                      :class="{
+                        'order-user-tab__skeleton order-user-tab__skeleton--amount': ordersLoading,
+                      }"
+                    >
+                      {{ ordersLoading ? '' : formatCurrency(tab.totalAmount) }}
+                    </p>
+                    <p
+                      class="order-user-tab__meta"
+                      :class="{
+                        'order-user-tab__skeleton order-user-tab__skeleton--meta': ordersLoading,
+                      }"
+                    >
+                      {{ ordersLoading ? '' : tab.meta }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div v-if="shouldShowOrderBranch" class="mb-4">
+              <div class="order-branch-panel">
+                <div class="order-branch-panel__tree">
+                  <div class="order-branch-panel__trunk"></div>
+                  <div class="order-branch-panel__grid">
+                    <button
+                      v-for="branchUser in orderBranchCardItems"
+                      :key="branchUser.key"
+                      type="button"
+                      class="order-branch-card"
+                      :class="{ active: activeBranchUserId === branchUser.key }"
+                      @click="handleBranchUserChange(branchUser.key)"
+                    >
+                      <p class="order-branch-card__label">{{ branchUser.label }}</p>
+                      <p class="order-branch-card__amount-label">总充值金额</p>
+                      <p class="order-branch-card__amount">
+                        {{ formatCurrency(branchUser.totalAmount) }}
+                      </p>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1018,14 +1024,14 @@ const orderUserTabs = computed(() => {
         typeof ordersData.value?.all_total_amount === 'number'
           ? ordersData.value.all_total_amount
           : calculateOrderRechargeAmount(ordersData.value?.data || []),
-      meta: '当前时间段充值金额汇总',
+      meta: '当前时间段全部订单汇总',
     },
     ...sortedSummaries.map((summary: PromotionUserSummary) => ({
       key: summary.username,
       label: summary.username,
       total: Number(summary.total || 0),
       totalAmount: Number(summary.total_amount || 0),
-      meta: '当前时间段充值金额',
+      meta: `支付成功 ${formatNumberValue(summary.paid_order_count || 0)} 单`,
     })),
   ]
 })
@@ -1049,14 +1055,14 @@ const orderUserCardItems = computed(() => {
       label: '全部',
       total: 0,
       totalAmount: 0,
-      meta: '当前时间段充值金额汇总',
+      meta: '当前时间段全部订单汇总',
     },
     ...configuredOrderUsernames.value.map(username => ({
       key: `__loading_${username}`,
       label: username,
       total: 0,
       totalAmount: 0,
-      meta: '当前时间段充值金额',
+      meta: '加载中',
     })),
   ]
 })
@@ -2130,11 +2136,10 @@ onUnmounted(() => {
 }
 
 .order-user-tab {
-  position: relative;
   min-width: 0;
   width: 100%;
-  min-height: 6.6rem;
-  padding: 0.72rem 0.78rem 0.78rem;
+  min-height: 6.2rem;
+  padding: 0.72rem 0.78rem 0.76rem;
   border: 1px solid rgba(251, 191, 36, 0.18);
   border-radius: 0.85rem;
   background:
@@ -2182,19 +2187,6 @@ onUnmounted(() => {
   min-height: 100%;
 }
 
-.order-user-tab__main {
-  flex: 1;
-  min-width: 0;
-}
-
-.order-user-tab--with-branches .order-user-tab__main {
-  padding-right: 6.5rem;
-}
-
-.order-user-tab--with-branches {
-  min-height: 7.35rem;
-}
-
 .order-user-tab__head {
   display: flex;
   align-items: flex-start;
@@ -2212,6 +2204,19 @@ onUnmounted(() => {
   word-break: break-all;
 }
 
+.order-user-tab__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0.12rem 0.45rem;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: rgb(194 65 12);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
 .order-user-tab__amount {
   margin-top: 0.46rem;
   font-size: 1.02rem;
@@ -2220,70 +2225,22 @@ onUnmounted(() => {
   color: rgb(15 23 42);
 }
 
+.order-user-tab__meta {
+  margin-top: 0.26rem;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: rgb(120 113 108);
+}
+
 .order-user-tab.active .order-user-tab__label,
-.order-user-tab.active .order-user-tab__amount {
+.order-user-tab.active .order-user-tab__amount,
+.order-user-tab.active .order-user-tab__meta {
   color: white;
 }
 
-.order-user-tab__branch-tags {
-  position: absolute;
-  top: 0.72rem;
-  right: 0.72rem;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.24rem;
-  width: 6rem;
-  align-content: start;
-}
-
-.order-branch-tag {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 0.04rem;
-  min-width: 0;
-  width: 100%;
-  min-height: 1.7rem;
-  padding: 0.14rem 0.32rem;
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  border-radius: 0.7rem;
-  background: rgba(255, 255, 255, 0.16);
+.order-user-tab.active .order-user-tab__count {
+  background: rgba(255, 255, 255, 0.18);
   color: white;
-  transition:
-    background-color 0.2s ease,
-    border-color 0.2s ease,
-    transform 0.2s ease;
-}
-
-.order-branch-tag:hover {
-  transform: translateY(-1px);
-  background: rgba(255, 255, 255, 0.22);
-}
-
-.order-branch-tag.active {
-  border-color: rgba(255, 255, 255, 0.44);
-  background: rgba(255, 255, 255, 0.28);
-}
-
-.order-branch-tag__label,
-.order-branch-tag__amount {
-  min-width: 0;
-  max-width: 100%;
-  font-size: 0.6rem;
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
-.order-branch-tag__label {
-  font-weight: 700;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.order-branch-tag__amount {
-  font-weight: 600;
-  opacity: 0.92;
 }
 
 .order-user-tab__skeleton {
@@ -2313,6 +2270,12 @@ onUnmounted(() => {
   border-radius: 0.5rem;
 }
 
+.order-user-tab__skeleton--count {
+  width: 3.4rem;
+  min-height: 1.35rem;
+  border-radius: 9999px;
+}
+
 .order-user-tab__skeleton--amount {
   width: 5.2rem;
   min-height: 1.5rem;
@@ -2323,6 +2286,121 @@ onUnmounted(() => {
   width: 7.2rem;
   min-height: 1rem;
   border-radius: 0.5rem;
+}
+
+.order-branch-panel {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(14, 165, 233, 0.14);
+  border-radius: 1rem;
+  padding: 0.78rem 0.82rem 0.86rem;
+  background:
+    radial-gradient(circle at top right, rgba(34, 211, 238, 0.18), transparent 34%),
+    radial-gradient(circle at left center, rgba(251, 191, 36, 0.14), transparent 30%),
+    linear-gradient(145deg, rgba(248, 250, 252, 0.98), rgba(239, 246, 255, 0.98));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 18px 40px -30px rgba(14, 116, 144, 0.32);
+}
+
+.order-branch-panel__tree {
+  position: relative;
+  padding-top: 0.95rem;
+}
+
+.order-branch-panel__trunk {
+  position: absolute;
+  top: 0;
+  left: 1.2rem;
+  width: calc(100% - 2.4rem);
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    rgba(56, 189, 248, 0.16),
+    rgba(56, 189, 248, 0.5),
+    rgba(14, 165, 233, 0.16)
+  );
+}
+
+.order-branch-panel__trunk::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -0.7rem;
+  width: 2px;
+  height: 1rem;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0), rgba(14, 165, 233, 0.7));
+}
+
+.order-branch-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 156px));
+  gap: 0.55rem;
+  justify-content: start;
+}
+
+.order-branch-card {
+  min-width: 0;
+  min-height: 74px;
+  padding: 0.56rem 0.62rem 0.6rem;
+  border: 1px solid rgba(14, 165, 233, 0.12);
+  border-radius: 0.72rem;
+  background:
+    radial-gradient(circle at top right, rgba(125, 211, 252, 0.12), transparent 36%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.98));
+  box-shadow: 0 8px 18px -22px rgba(14, 116, 144, 0.18);
+  text-align: left;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.order-branch-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(14, 165, 233, 0.22);
+  box-shadow: 0 10px 20px -22px rgba(14, 116, 144, 0.24);
+}
+
+.order-branch-card.active {
+  border-color: rgba(14, 116, 144, 0.24);
+  background:
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.14), transparent 40%),
+    linear-gradient(145deg, rgba(239, 246, 255, 0.98), rgba(240, 249, 255, 0.98));
+  box-shadow: 0 10px 22px -24px rgba(14, 116, 144, 0.28);
+}
+
+.order-branch-card__label {
+  margin: 0;
+  color: rgb(12 74 110);
+  font-size: 0.84rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.order-branch-card__amount-label {
+  margin: 0.34rem 0 0;
+  color: rgb(100 116 139);
+  font-size: 0.67rem;
+  line-height: 1.2;
+}
+
+.order-branch-card__amount {
+  margin: 0.16rem 0 0;
+  color: rgb(15 23 42);
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.order-branch-card.active .order-branch-card__label,
+.order-branch-card.active .order-branch-card__amount {
+  color: rgb(8 47 73);
+}
+
+.order-branch-card.active .order-branch-card__amount-label {
+  color: rgb(14 116 144);
 }
 
 @keyframes refresh-breath {
@@ -2357,12 +2435,8 @@ onUnmounted(() => {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .order-user-tab--with-branches .order-user-tab__main {
-    padding-right: 5.9rem;
-  }
-
-  .order-user-tab__branch-tags {
-    width: 5.35rem;
+  .order-branch-panel__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -2371,17 +2445,8 @@ onUnmounted(() => {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .order-user-tab--with-branches .order-user-tab__main {
-    padding-right: 5.55rem;
-  }
-
-  .order-user-tab__branch-tags {
-    width: 5rem;
-  }
-
-  .order-branch-tag__label,
-  .order-branch-tag__amount {
-    font-size: 0.58rem;
+  .order-branch-panel__grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>
