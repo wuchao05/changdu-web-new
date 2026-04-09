@@ -416,18 +416,16 @@
             </div>
             <div v-if="orderUserCardItems.length > 0" class="mb-4">
               <div class="order-user-tabs">
-                <button
+                <div
                   v-for="tab in orderUserCardItems"
                   :key="tab.key"
-                  type="button"
                   class="order-user-tab"
                   :class="{
                     active: !ordersLoading && activePromotionUserName === tab.key,
                     'order-user-tab--all': tab.key === '' || tab.key === '__loading_all__',
                     'order-user-tab--loading': ordersLoading,
                   }"
-                  :disabled="ordersLoading"
-                  @click="handlePromotionUserTabChange(tab.key)"
+                  @click="!ordersLoading && handlePromotionUserTabChange(tab.key)"
                 >
                   <div class="order-user-tab__head">
                     <span
@@ -437,14 +435,6 @@
                       }"
                     >
                       {{ ordersLoading ? '' : tab.label }}
-                    </span>
-                    <span
-                      class="order-user-tab__count"
-                      :class="{
-                        'order-user-tab__skeleton order-user-tab__skeleton--count': ordersLoading,
-                      }"
-                    >
-                      {{ ordersLoading ? '' : `${tab.total} 单` }}
                     </span>
                   </div>
                   <p
@@ -463,27 +453,28 @@
                   >
                     {{ ordersLoading ? '' : tab.meta }}
                   </p>
-                </button>
-              </div>
-            </div>
-            <div v-if="shouldShowOrderBranch" class="mb-4">
-              <div class="order-branch-panel">
-                <div class="order-branch-panel__tree">
-                  <div class="order-branch-panel__trunk"></div>
-                  <div class="order-branch-panel__grid">
+                  <div
+                    v-if="
+                      !ordersLoading &&
+                      shouldShowOrderBranch &&
+                      activePromotionUserName === tab.key &&
+                      tab.key === ORDER_BRANCH_ROOT_USERNAME
+                    "
+                    class="order-user-tab__branch-tags"
+                    @click.stop
+                  >
                     <button
                       v-for="branchUser in orderBranchCardItems"
                       :key="branchUser.key"
                       type="button"
-                      class="order-branch-card"
+                      class="order-branch-tag"
                       :class="{ active: activeBranchUserId === branchUser.key }"
-                      @click="handleBranchUserChange(branchUser.key)"
+                      @click.stop="handleBranchUserChange(branchUser.key)"
                     >
-                      <p class="order-branch-card__label">{{ branchUser.label }}</p>
-                      <p class="order-branch-card__amount-label">总充值金额</p>
-                      <p class="order-branch-card__amount">
+                      <span class="order-branch-tag__label">{{ branchUser.label }}</span>
+                      <span class="order-branch-tag__amount">
                         {{ formatCurrency(branchUser.totalAmount) }}
-                      </p>
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -1024,14 +1015,14 @@ const orderUserTabs = computed(() => {
         typeof ordersData.value?.all_total_amount === 'number'
           ? ordersData.value.all_total_amount
           : calculateOrderRechargeAmount(ordersData.value?.data || []),
-      meta: '当前时间段全部订单汇总',
+      meta: '当前时间段充值金额汇总',
     },
     ...sortedSummaries.map((summary: PromotionUserSummary) => ({
       key: summary.username,
       label: summary.username,
       total: Number(summary.total || 0),
       totalAmount: Number(summary.total_amount || 0),
-      meta: `支付成功 ${formatNumberValue(summary.paid_order_count || 0)} 单`,
+      meta: '当前时间段充值金额',
     })),
   ]
 })
@@ -1055,14 +1046,14 @@ const orderUserCardItems = computed(() => {
       label: '全部',
       total: 0,
       totalAmount: 0,
-      meta: '当前时间段全部订单汇总',
+      meta: '当前时间段充值金额汇总',
     },
     ...configuredOrderUsernames.value.map(username => ({
       key: `__loading_${username}`,
       label: username,
       total: 0,
       totalAmount: 0,
-      meta: '加载中',
+      meta: '当前时间段充值金额',
     })),
   ]
 })
@@ -2146,6 +2137,7 @@ onUnmounted(() => {
     linear-gradient(180deg, rgba(255, 251, 235, 0.98), rgba(255, 247, 237, 0.98));
   box-shadow: 0 10px 24px -22px rgba(194, 65, 12, 0.42);
   text-align: left;
+  cursor: pointer;
   transition:
     transform 0.22s ease,
     box-shadow 0.22s ease,
@@ -2198,19 +2190,6 @@ onUnmounted(() => {
   word-break: break-all;
 }
 
-.order-user-tab__count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  padding: 0.12rem 0.45rem;
-  border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.72);
-  color: rgb(194 65 12);
-  font-size: 0.68rem;
-  font-weight: 600;
-}
-
 .order-user-tab__amount {
   margin-top: 0.46rem;
   font-size: 1.02rem;
@@ -2232,9 +2211,57 @@ onUnmounted(() => {
   color: white;
 }
 
-.order-user-tab.active .order-user-tab__count {
-  background: rgba(255, 255, 255, 0.18);
+.order-user-tab__branch-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.38rem;
+  margin-top: 0.62rem;
+  padding-top: 0.58rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.order-branch-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.34rem;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0.22rem 0.48rem;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.16);
   color: white;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.order-branch-tag:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.order-branch-tag.active {
+  border-color: rgba(255, 255, 255, 0.44);
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.order-branch-tag__label,
+.order-branch-tag__amount {
+  min-width: 0;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.order-branch-tag__label {
+  font-weight: 700;
+}
+
+.order-branch-tag__amount {
+  font-weight: 600;
+  opacity: 0.92;
 }
 
 .order-user-tab__skeleton {
@@ -2264,12 +2291,6 @@ onUnmounted(() => {
   border-radius: 0.5rem;
 }
 
-.order-user-tab__skeleton--count {
-  width: 3.4rem;
-  min-height: 1.35rem;
-  border-radius: 9999px;
-}
-
 .order-user-tab__skeleton--amount {
   width: 5.2rem;
   min-height: 1.5rem;
@@ -2280,134 +2301,6 @@ onUnmounted(() => {
   width: 7.2rem;
   min-height: 1rem;
   border-radius: 0.5rem;
-}
-
-.order-branch-panel {
-  position: relative;
-  overflow: hidden;
-  border: 1px solid rgba(14, 165, 233, 0.14);
-  border-radius: 1rem;
-  padding: 0.82rem 0.82rem 0.9rem;
-  background:
-    radial-gradient(circle at top right, rgba(34, 211, 238, 0.2), transparent 34%),
-    radial-gradient(circle at left center, rgba(251, 191, 36, 0.16), transparent 30%),
-    linear-gradient(145deg, rgba(248, 250, 252, 0.98), rgba(239, 246, 255, 0.98));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.8),
-    0 18px 40px -30px rgba(14, 116, 144, 0.4);
-}
-
-.order-branch-panel__tree {
-  position: relative;
-  padding-top: 0.95rem;
-}
-
-.order-branch-panel__trunk {
-  position: absolute;
-  top: 0;
-  left: 1.2rem;
-  width: calc(100% - 2.4rem);
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    rgba(56, 189, 248, 0.16),
-    rgba(56, 189, 248, 0.5),
-    rgba(14, 165, 233, 0.16)
-  );
-}
-
-.order-branch-panel__trunk::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: -0.7rem;
-  width: 2px;
-  height: 1rem;
-  transform: translateX(-50%);
-  background: linear-gradient(180deg, rgba(56, 189, 248, 0), rgba(14, 165, 233, 0.7));
-}
-
-.order-branch-panel__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(132px, 156px));
-  gap: 0.55rem;
-}
-
-.order-branch-card {
-  position: relative;
-  overflow: hidden;
-  min-height: 76px;
-  padding: 0.58rem 0.65rem 0.62rem;
-  border: 1px solid rgba(14, 165, 233, 0.12);
-  border-radius: 0.72rem;
-  background:
-    radial-gradient(circle at top right, rgba(125, 211, 252, 0.12), transparent 36%),
-    linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.98));
-  box-shadow: 0 8px 18px -22px rgba(14, 116, 144, 0.22);
-  text-align: left;
-  animation: order-branch-rise 0.45s ease both;
-  transition:
-    transform 0.22s ease,
-    box-shadow 0.22s ease,
-    border-color 0.22s ease;
-}
-
-.order-branch-card::before {
-  content: '';
-  position: absolute;
-  top: -20px;
-  left: 50%;
-  width: 1px;
-  height: 20px;
-  transform: translateX(-50%);
-  background: linear-gradient(180deg, rgba(14, 165, 233, 0.75), rgba(14, 165, 233, 0));
-}
-
-.order-branch-card:hover {
-  transform: translateY(-1px);
-  border-color: rgba(14, 165, 233, 0.22);
-  box-shadow: 0 10px 20px -22px rgba(14, 116, 144, 0.28);
-}
-
-.order-branch-card.active {
-  border-color: rgba(14, 116, 144, 0.24);
-  background:
-    radial-gradient(circle at top right, rgba(56, 189, 248, 0.14), transparent 40%),
-    linear-gradient(145deg, rgba(239, 246, 255, 0.98), rgba(240, 249, 255, 0.98));
-  box-shadow: 0 10px 22px -24px rgba(14, 116, 144, 0.28);
-}
-
-.order-branch-card__label {
-  margin: 0;
-  color: rgb(12 74 110);
-  font-size: 0.84rem;
-  font-weight: 700;
-  line-height: 1.25;
-}
-
-.order-branch-card__amount-label {
-  margin: 0.34rem 0 0;
-  color: rgb(100 116 139);
-  font-size: 0.67rem;
-  line-height: 1.2;
-}
-
-.order-branch-card__amount {
-  margin: 0.16rem 0 0;
-  color: rgb(15 23 42);
-  font-size: 1rem;
-  font-weight: 800;
-  line-height: 1.15;
-  letter-spacing: -0.01em;
-}
-
-.order-branch-card.active .order-branch-card__label,
-.order-branch-card.active .order-branch-card__amount {
-  color: rgb(8 47 73);
-}
-
-.order-branch-card.active .order-branch-card__amount-label {
-  color: rgb(14 116 144);
 }
 
 @keyframes refresh-breath {
@@ -2428,17 +2321,6 @@ onUnmounted(() => {
   }
   100% {
     background-position: -100% 50%;
-  }
-}
-
-@keyframes order-branch-rise {
-  0% {
-    opacity: 0;
-    transform: translateY(14px) scale(0.98);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
   }
 }
 
