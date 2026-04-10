@@ -2331,7 +2331,7 @@ async function saveDouyinAccounts(user: adminApi.UserProfile) {
       douyinAccountId: String(account.douyinAccountId || '').trim(),
       cooperationCode: String(account.cooperationCode || '').trim(),
     }))
-    .filter(account => account.douyinAccount && account.douyinAccountId && account.cooperationCode)
+    .filter(account => account.douyinAccount || account.douyinAccountId || account.cooperationCode)
 
   savingDouyinAccountUserId.value = user.id
   try {
