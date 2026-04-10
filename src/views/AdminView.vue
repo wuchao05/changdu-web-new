@@ -2304,10 +2304,7 @@ function validateDouyinAccountDrafts(user: adminApi.UserProfile) {
   const accountIdSet = new Set<string>()
 
   for (const account of visibleDrafts) {
-    if (!account.douyinAccount || !account.douyinAccountId || !account.cooperationCode) {
-      return '请补全抖音号名称、抖音号 ID 和合作码后再保存'
-    }
-    if (accountNameSet.has(account.douyinAccount)) {
+if (accountNameSet.has(account.douyinAccount)) {
       return '同一个用户下的抖音号名称不能重复'
     }
     if (accountIdSet.has(account.douyinAccountId)) {
