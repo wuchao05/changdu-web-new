@@ -188,8 +188,10 @@ export interface SchedulerOverviewTaskBase {
 
 export interface SchedulerOverviewAutoSubmitTask extends SchedulerOverviewTaskBase {
   key: 'autoSubmit'
-  intervalMinutes: number
+  intervalMinutes: number | null
   onlyRedFlag: boolean
+  runOnce: boolean
+  submitRangeDays: 1 | 2 | 3
   submissionType: '仅红标' | '全部'
   runningDurationText: string
   progress: {

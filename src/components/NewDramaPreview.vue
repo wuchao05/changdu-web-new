@@ -778,7 +778,7 @@
                 </div>
                 <div>
                   <h3 class="text-lg font-semibold text-gray-900">自动提交下载</h3>
-                  <p class="text-xs text-gray-500">选择轮询间隔时间</p>
+                  <p class="text-xs text-gray-500">选择执行方式和提交范围</p>
                 </div>
               </div>
               <button
@@ -793,11 +793,21 @@
           <!-- 弹窗内容 -->
           <div class="px-6 py-6">
             <div class="mb-4">
-              <label class="block text-sm font-medium text-gray-700 mb-2"> 轮询间隔时间 </label>
+              <label class="block text-sm font-medium text-gray-700 mb-2"> 执行方式 </label>
               <NSelect
                 v-model:value="autoSubmitInterval"
                 :options="autoSubmitIntervalOptions"
-                placeholder="请选择轮询间隔时间"
+                placeholder="请选择执行方式"
+                size="large"
+              />
+            </div>
+
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-700 mb-2"> 提交时间范围 </label>
+              <NSelect
+                v-model:value="autoSubmitRangeDays"
+                :options="autoSubmitRangeOptions"
+                placeholder="请选择提交时间范围"
                 size="large"
               />
             </div>
@@ -838,7 +848,9 @@
                 <div class="text-sm text-blue-800">
                   <p class="font-medium mb-1">功能说明：</p>
                   <ul class="list-disc list-inside space-y-1 text-xs">
-                    <li>自动扫描今天/明天/后天的剧集</li>
+                    <li>{{ autoSubmitRangeDescription }}</li>
+                    <li v-if="isAutoSubmitRunOnce">仅执行当前这一轮，完成后自动停止</li>
+                    <li v-else>按所选轮询间隔持续执行</li>
                     <li v-if="autoSubmitOnlyRedFlag" class="text-red-600 font-medium">
                       只处理红标剧（增剧）
                     </li>
@@ -1090,6 +1102,8 @@ const createDefaultAutoSubmitStatus = (): AutoSubmitStatus => ({
   running: false,
   intervalMinutes: 5,
   onlyRedFlag: false,
+  runOnce: false,
+  submitRangeDays: 3,
   nextRunTime: null,
   lastRunTime: null,
   stats: { totalProcessed: 0, successCount: 0, failCount: 0, skipCount: 0 },
@@ -1099,11 +1113,13 @@ const createDefaultAutoSubmitStatus = (): AutoSubmitStatus => ({
 const autoSubmitStatus = ref<AutoSubmitStatus>(createDefaultAutoSubmitStatus())
 const autoSubmitTimer = ref<number | null>(null) // 定时器ID
 const autoSubmitCountdownTimer = ref<number | null>(null) // 倒计时定时器ID
-const autoSubmitInterval = ref(5) // 轮询间隔（分钟）
+type AutoSubmitIntervalOptionValue = number | 'once'
+const autoSubmitInterval = ref<AutoSubmitIntervalOptionValue>(5) // 轮询间隔（分钟）
 const autoSubmitCountdown = ref(0) // 倒计时（秒）
 const showAutoSubmitModal = ref(false) // 是否显示时间选择弹窗
 const showAdxDrawer = ref(false)
 const autoSubmitOnlyRedFlag = ref(false) // 是否只提交红标剧，默认false（提交所有剧）
+const autoSubmitRangeDays = ref<1 | 2 | 3>(3)
 
 const ENABLE_FETCH_ALL_NEW_DRAMA = false
 const DEFAULT_NEW_DRAMA_PAGE_COUNT = 2
@@ -1114,6 +1130,19 @@ const FULL_NEW_DRAMA_PAGE_DELAY_MS = 300
 // 当前渠道调度状态
 const currentSchedulerStatus = computed(() => {
   return autoSubmitStatus.value || createDefaultAutoSubmitStatus()
+})
+
+const isAutoSubmitRunOnce = computed(() => autoSubmitInterval.value === 'once')
+
+const autoSubmitRangeDescription = computed(() => {
+  switch (autoSubmitRangeDays.value) {
+    case 1:
+      return '仅提交下载当天的剧集'
+    case 2:
+      return '提交下载今天和明天的剧集'
+    default:
+      return '提交下载今天、明天、后天的剧集'
+  }
 })
 
 // 判断当前渠道是否启用了自动提交
@@ -1155,6 +1184,7 @@ const dateOptions = computed(() => {
 
 // 自动提交下载轮询时间选项
 const autoSubmitIntervalOptions = [
+  { label: '仅执行一次', value: 'once' },
   { label: '5 分钟', value: 5 },
   { label: '15 分钟', value: 15 },
   { label: '30 分钟', value: 30 },
@@ -1166,6 +1196,12 @@ const autoSubmitIntervalOptions = [
   { label: '8 小时', value: 480 },
   { label: '10 小时', value: 600 },
   { label: '12 小时', value: 720 },
+]
+
+const autoSubmitRangeOptions = [
+  { label: '近1天', value: 1 },
+  { label: '近2天', value: 2 },
+  { label: '近3天', value: 3 },
 ]
 
 // 收入评级选项
@@ -1907,19 +1943,31 @@ async function startAutoSubmit() {
   showAutoSubmitModal.value = false
 
   try {
+    const runOnce = autoSubmitInterval.value === 'once'
+    const intervalMinutes =
+      typeof autoSubmitInterval.value === 'number' ? autoSubmitInterval.value : 0
+
     console.log(
-      `启动服务端自动提交下载，轮询间隔: ${autoSubmitInterval.value} 分钟，渠道: ${sessionStore.activeChannelId}`
+      `启动服务端自动提交下载，执行方式: ${runOnce ? '仅执行一次' : `${intervalMinutes} 分钟轮询`}，提交范围: 近${autoSubmitRangeDays.value}天，渠道: ${sessionStore.activeChannelId}`
     )
 
     const result = await startAutoSubmitApi({
-      intervalMinutes: autoSubmitInterval.value,
+      intervalMinutes,
       onlyRedFlag: autoSubmitOnlyRedFlag.value,
+      runOnce,
+      submitRangeDays: autoSubmitRangeDays.value,
     })
 
     if (result.code === 0) {
-      message.success('自动提交已启动（服务端运行）')
-      // 开始轮询状态
-      startStatusPolling()
+      message.success(runOnce ? '已完成本次自动提交' : '自动提交已启动（服务端运行）')
+      if (result.data) {
+        autoSubmitStatus.value = result.data
+      }
+      if (result.data?.enabled) {
+        startStatusPolling()
+      } else {
+        stopStatusPolling()
+      }
     } else {
       message.error(result.message || '启动失败')
     }

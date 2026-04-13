@@ -119,7 +119,9 @@ async function safeJsonParse(response, context = '') {
   const status = response.status
   const text = await response.text()
   if (!text || text.trim() === '') {
-    serviceConsole.error(`[自动提交] ${context} 响应为空, HTTP状态: ${status}, URL: ${response.url}`)
+    serviceConsole.error(
+      `[自动提交] ${context} 响应为空, HTTP状态: ${status}, URL: ${response.url}`
+    )
     throw new Error(`${context ? context + ': ' : ''}响应为空 (HTTP ${status})`)
   }
   try {
@@ -170,6 +172,8 @@ function createDefaultState() {
     lastRunTime: null,
     running: false,
     onlyRedFlag: false,
+    runOnce: false,
+    submitRangeDays: 3,
     stats: {
       totalProcessed: 0,
       successCount: 0,
@@ -367,7 +371,10 @@ function wait(ms) {
 /**
  * 获取北京时间的今天/明天/后天日期
  */
-function getDateRanges() {
+function getDateRanges(submitRangeDays = 3) {
+  const normalizedRangeDays = [1, 2, 3].includes(Number(submitRangeDays))
+    ? Number(submitRangeDays)
+    : 3
   const now = new Date()
   // 转换为北京时间 (UTC+8)
   const beijingOffset = 8 * 60 * 60 * 1000
@@ -379,15 +386,22 @@ function getDateRanges() {
   const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
   const dayAfterTomorrowStart = new Date(todayStart.getTime() + 2 * 24 * 60 * 60 * 1000)
   const dayAfterTomorrowEnd = new Date(todayStart.getTime() + 3 * 24 * 60 * 60 * 1000)
+  const rangeEnd =
+    normalizedRangeDays === 1
+      ? tomorrowStart
+      : normalizedRangeDays === 2
+        ? dayAfterTomorrowStart
+        : dayAfterTomorrowEnd
 
   return {
     today: todayStart,
     tomorrow: tomorrowStart,
     dayAfterTomorrow: dayAfterTomorrowStart,
     dayAfterTomorrowEnd: dayAfterTomorrowEnd,
+    submitRangeDays: normalizedRangeDays,
     // 用于API请求的时间戳（秒）
     startTime: Math.floor((todayStart.getTime() - 30 * 24 * 60 * 60 * 1000) / 1000),
-    endTime: Math.floor(dayAfterTomorrowEnd.getTime() / 1000),
+    endTime: Math.floor(rangeEnd.getTime() / 1000),
   }
 }
 
@@ -901,7 +915,10 @@ async function createDramaStatusRecord(channelId, params) {
 
   const result = await safeJsonParse(response, '创建剧集状态记录')
   if (result.code !== 0) {
-    serviceConsole.error(`[自动提交-${channelId}] 创建剧集状态记录失败，请求字段:`, JSON.stringify(fields))
+    serviceConsole.error(
+      `[自动提交-${channelId}] 创建剧集状态记录失败，请求字段:`,
+      JSON.stringify(fields)
+    )
     serviceConsole.error(`[自动提交-${channelId}] 飞书返回:`, JSON.stringify(result))
     throw new Error(`创建剧集状态记录失败: ${result.msg}`)
   }
@@ -1077,7 +1094,9 @@ async function getNewDramaListWithRetry(
       (result.message?.includes('访问速度过快') || result.message?.includes('rate limit'))
 
     if (isRateLimited && retries > 0) {
-      serviceConsole.log(`[自动提交] 请求被限速，${AUTO_SUBMIT_CONFIG.pagination.retryDelay}ms后重试...`)
+      serviceConsole.log(
+        `[自动提交] 请求被限速，${AUTO_SUBMIT_CONFIG.pagination.retryDelay}ms后重试...`
+      )
       await wait(AUTO_SUBMIT_CONFIG.pagination.retryDelay)
       return getNewDramaListWithRetry(params, retries - 1)
     }
@@ -1160,9 +1179,9 @@ async function editJuliangAccountRemark(channelId, accountId, remark) {
 /**
  * 获取并过滤今天/明天/后天的剧集
  */
-async function fetchAutoSubmitDramas(channelId) {
+async function fetchAutoSubmitDramas(channelId, submitRangeDays = 3) {
   await ensureSchedulerRuntime(channelId)
-  const dateRanges = getDateRanges()
+  const dateRanges = getDateRanges(submitRangeDays)
 
   serviceConsole.log(`[自动提交-${channelId}] ========== 获取剧集 ==========`)
   serviceConsole.log(`[自动提交-${channelId}] 今天:`, formatDate(dateRanges.today))
@@ -1293,7 +1312,9 @@ function getDownloadDataForDrama(downloadList, drama) {
       : String(drama.series_name || drama.book_name || '').trim()
 
   if (dramaBookId) {
-    const matchedByBookId = downloadList.filter(item => String(item.book_id || '').trim() === dramaBookId)
+    const matchedByBookId = downloadList.filter(
+      item => String(item.book_id || '').trim() === dramaBookId
+    )
     const bestByBookId = selectBestDownloadTask(matchedByBookId)
     if (bestByBookId) {
       return bestByBookId
@@ -1304,7 +1325,9 @@ function getDownloadDataForDrama(downloadList, drama) {
     return null
   }
 
-  const matchedByName = downloadList.filter(item => String(item.book_name || '').trim() === dramaName)
+  const matchedByName = downloadList.filter(
+    item => String(item.book_name || '').trim() === dramaName
+  )
   return selectBestDownloadTask(matchedByName)
 }
 
@@ -1386,9 +1409,7 @@ async function processDrama(channelId, drama, downloadList, newDramaSet, options
       douyinMaterial: douyinMaterial || undefined, // 如果为空字符串则传 undefined
       rating, // 传递评级参数
     })
-    serviceConsole.log(
-      `${logPrefix} 创建剧集状态记录成功，分配账户: ${availableAccount.account}`
-    )
+    serviceConsole.log(`${logPrefix} 创建剧集状态记录成功，分配账户: ${availableAccount.account}`)
 
     // 9. 更新账户使用状态
     await updateAccountUsedStatus(channelId, availableAccount.recordId)
@@ -1440,14 +1461,14 @@ async function runAutoSubmitCycle(channelId) {
 
     // 1. 获取并过滤剧集
     const { today, tomorrow, dayAfterTomorrow, downloadList, newDramaSet } =
-      await fetchAutoSubmitDramas(channelId)
+      await fetchAutoSubmitDramas(channelId, state.submitRangeDays)
 
     // 2. 按日期分组处理
     const dateGroups = [
       { date: '今天', dramas: today },
       { date: '明天', dramas: tomorrow },
       { date: '后天', dramas: dayAfterTomorrow },
-    ]
+    ].slice(0, state.submitRangeDays)
 
     let processedCount = 0
     let successCount = 0
@@ -1562,7 +1583,17 @@ async function runAutoSubmitCycle(channelId) {
 
     // 如果还启用，设置下次运行
     if (state.enabled) {
-      scheduleNextRun(channelId)
+      if (state.runOnce) {
+        state.enabled = false
+        state.nextRunTime = null
+        const entry = ensureSchedulerEntry(channelId)
+        if (entry.timer) {
+          clearTimeout(entry.timer)
+          entry.timer = null
+        }
+      } else {
+        scheduleNextRun(channelId)
+      }
     }
 
     await saveState(channelId)
@@ -1575,13 +1606,24 @@ async function runAutoSubmitCycle(channelId) {
 function scheduleNextRun(channelId, options = {}) {
   const entry = ensureSchedulerEntry(channelId)
   const state = entry.state
+  if (!state.enabled || state.runOnce || !state.intervalMinutes) {
+    state.nextRunTime = null
+    if (entry.timer) {
+      clearTimeout(entry.timer)
+      entry.timer = null
+    }
+    void saveState(channelId)
+    return
+  }
   const intervalMs = state.intervalMinutes * 60 * 1000
   const nowMs = Date.now()
   const savedNextRunMs = Date.parse(String(state.nextRunTime || ''))
   const usePersistedTime = options.usePersistedTime === true
   const hasValidSavedNextRunTime = Number.isFinite(savedNextRunMs)
   const nextRunMs =
-    usePersistedTime && hasValidSavedNextRunTime ? Math.max(savedNextRunMs, nowMs) : nowMs + intervalMs
+    usePersistedTime && hasValidSavedNextRunTime
+      ? Math.max(savedNextRunMs, nowMs)
+      : nowMs + intervalMs
 
   state.nextRunTime = new Date(nextRunMs).toISOString()
 
@@ -1591,9 +1633,12 @@ function scheduleNextRun(channelId, options = {}) {
     clearTimeout(entry.timer)
   }
 
-  entry.timer = setTimeout(() => {
-    runWithAutoSubmitLogContext({ instanceKey: channelId }, () => runAutoSubmitCycle(channelId))
-  }, Math.max(0, nextRunMs - nowMs))
+  entry.timer = setTimeout(
+    () => {
+      runWithAutoSubmitLogContext({ instanceKey: channelId }, () => runAutoSubmitCycle(channelId))
+    },
+    Math.max(0, nextRunMs - nowMs)
+  )
 
   void saveState(channelId)
 }
@@ -1604,34 +1649,49 @@ function scheduleNextRun(channelId, options = {}) {
  * 启动调度器
  */
 export async function startScheduler(channelId, options = {}, runtimeContext = null) {
-  return runWithAutoSubmitLogContext(buildAutoSubmitLogContext(channelId, runtimeContext), async () => {
-    const { intervalMinutes = 5, onlyRedFlag = false } = options
+  return runWithAutoSubmitLogContext(
+    buildAutoSubmitLogContext(channelId, runtimeContext),
+    async () => {
+      const {
+        intervalMinutes = 5,
+        onlyRedFlag = false,
+        runOnce = false,
+        submitRangeDays = 3,
+      } = options
+      const normalizedRangeDays = [1, 2, 3].includes(Number(submitRangeDays))
+        ? Number(submitRangeDays)
+        : 3
 
-    const entry = ensureSchedulerEntry(channelId)
-    const state = entry.state
-    const runtime = await ensureSchedulerRuntime(channelId, runtimeContext)
+      const entry = ensureSchedulerEntry(channelId)
+      const state = entry.state
+      const runtime = await ensureSchedulerRuntime(channelId, runtimeContext)
 
-    if (state.enabled) {
-      serviceConsole.log(`[自动提交-${channelId}] 调度器已经在运行`)
-      return { success: false, message: '调度器已经在运行' }
+      if (state.enabled) {
+        serviceConsole.log(`[自动提交-${channelId}] 调度器已经在运行`)
+        return { success: false, message: '调度器已经在运行' }
+      }
+
+      state.enabled = true
+      state.intervalMinutes = runOnce ? null : intervalMinutes
+      state.onlyRedFlag = onlyRedFlag
+      state.runOnce = Boolean(runOnce)
+      state.submitRangeDays = normalizedRangeDays
+      state.nextRunTime = null
+
+      serviceConsole.log(
+        `[自动提交-${channelId}] 启动调度器，渠道: ${getChannelLabel(runtime)}，执行方式: ${runOnce ? '仅执行一次' : `${intervalMinutes} 分钟轮询`}`
+      )
+      serviceConsole.log(`[自动提交-${channelId}] 仅红标: ${onlyRedFlag}`)
+      serviceConsole.log(`[自动提交-${channelId}] 提交范围: 近${normalizedRangeDays}天`)
+
+      await saveState(channelId)
+
+      // 立即执行一次
+      await runAutoSubmitCycle(channelId)
+
+      return { success: true, message: runOnce ? '单次执行已完成' : '调度器已启动' }
     }
-
-    state.enabled = true
-    state.intervalMinutes = intervalMinutes
-    state.onlyRedFlag = onlyRedFlag
-
-    serviceConsole.log(
-      `[自动提交-${channelId}] 启动调度器，渠道: ${getChannelLabel(runtime)}，轮询间隔: ${intervalMinutes} 分钟`
-    )
-    serviceConsole.log(`[自动提交-${channelId}] 仅红标: ${onlyRedFlag}`)
-
-    await saveState(channelId)
-
-    // 立即执行一次
-    await runAutoSubmitCycle(channelId)
-
-    return { success: true, message: '调度器已启动' }
-  })
+  )
 }
 
 /**
@@ -1676,6 +1736,10 @@ export function getSchedulerStatus(channelId) {
     running: state.running,
     intervalMinutes: state.intervalMinutes,
     onlyRedFlag: state.onlyRedFlag,
+    runOnce: Boolean(state.runOnce),
+    submitRangeDays: [1, 2, 3].includes(Number(state.submitRangeDays))
+      ? Number(state.submitRangeDays)
+      : 3,
     nextRunTime: toBeijingTime(state.nextRunTime),
     lastRunTime: toBeijingTime(state.lastRunTime),
     currentTask: state.currentTask ? { ...state.currentTask } : null,
@@ -1705,36 +1769,39 @@ export async function listSchedulerStatuses() {
  * 手动触发一次执行
  */
 export async function triggerManualRun(channelId, runtimeContext = null) {
-  return runWithAutoSubmitLogContext(buildAutoSubmitLogContext(channelId, runtimeContext), async () => {
-    const runtime = await ensureSchedulerRuntime(channelId, runtimeContext)
-    const entry = ensureSchedulerEntry(channelId)
-    const state = entry.state
+  return runWithAutoSubmitLogContext(
+    buildAutoSubmitLogContext(channelId, runtimeContext),
+    async () => {
+      const runtime = await ensureSchedulerRuntime(channelId, runtimeContext)
+      const entry = ensureSchedulerEntry(channelId)
+      const state = entry.state
 
-    if (state.running) {
-      return { success: false, message: '当前正在运行中' }
-    }
-
-    serviceConsole.log(`[自动提交-${channelId}] 手动触发执行，渠道: ${getChannelLabel(runtime)}`)
-
-    // 临时启用以执行一次
-    const wasEnabled = state.enabled
-    state.enabled = true
-
-    await runAutoSubmitCycle(channelId)
-
-    // 如果之前未启用，恢复状态
-    if (!wasEnabled) {
-      state.enabled = false
-      state.nextRunTime = null
-      if (entry.timer) {
-        clearTimeout(entry.timer)
-        entry.timer = null
+      if (state.running) {
+        return { success: false, message: '当前正在运行中' }
       }
-      await saveState(channelId)
-    }
 
-    return { success: true, message: '手动执行完成' }
-  })
+      serviceConsole.log(`[自动提交-${channelId}] 手动触发执行，渠道: ${getChannelLabel(runtime)}`)
+
+      // 临时启用以执行一次
+      const wasEnabled = state.enabled
+      state.enabled = true
+
+      await runAutoSubmitCycle(channelId)
+
+      // 如果之前未启用，恢复状态
+      if (!wasEnabled) {
+        state.enabled = false
+        state.nextRunTime = null
+        if (entry.timer) {
+          clearTimeout(entry.timer)
+          entry.timer = null
+        }
+        await saveState(channelId)
+      }
+
+      return { success: true, message: '手动执行完成' }
+    }
+  )
 }
 
 /**

@@ -202,8 +202,15 @@ function buildAutoSubmitTask(status, nowMs) {
       currentDate: '',
       currentDrama: '',
     },
-    intervalMinutes: Number(status?.intervalMinutes || 0),
+    intervalMinutes:
+      typeof status?.intervalMinutes === 'number' && status.intervalMinutes > 0
+        ? Number(status.intervalMinutes)
+        : null,
     onlyRedFlag: Boolean(status?.onlyRedFlag),
+    runOnce: Boolean(status?.runOnce),
+    submitRangeDays: [1, 2, 3].includes(Number(status?.submitRangeDays))
+      ? Number(status.submitRangeDays)
+      : 3,
     stats: status?.stats || {
       totalProcessed: 0,
       successCount: 0,

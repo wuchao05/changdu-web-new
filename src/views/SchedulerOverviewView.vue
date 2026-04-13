@@ -415,6 +415,9 @@ function formatTime(value: string | null) {
 }
 
 function formatInterval(task: SchedulerOverviewTask) {
+  if (task.key === 'autoSubmit' && task.runOnce) {
+    return '仅执行一次'
+  }
   if (!task.intervalMinutes) {
     return '未配置'
   }
@@ -447,7 +450,7 @@ function formatTaskStats(task: SchedulerOverviewTask) {
 
 function formatTaskExtra(task: SchedulerOverviewTask) {
   if (task.key === 'autoSubmit') {
-    return task.runningDurationText
+    return `近${task.submitRangeDays}天 · ${task.runningDurationText}`
   }
 
   if (task.key === 'buildWorkflow') {

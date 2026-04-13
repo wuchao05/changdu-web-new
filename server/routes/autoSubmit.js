@@ -22,18 +22,61 @@ router.use(createSessionRuntimeContextMiddleware('autoSubmitContext'))
 /**
  * 启动自动提交调度器
  * POST /api/auto-submit/start
- * Body: { intervalMinutes?: number, onlyRedFlag?: boolean }
+ * Body: { intervalMinutes?: number, onlyRedFlag?: boolean, runOnce?: boolean, submitRangeDays?: 1|2|3 }
  */
 router.post('/start', async ctx => {
   try {
-    const { intervalMinutes, onlyRedFlag } = ctx.request.body || {}
+    const { intervalMinutes, onlyRedFlag, runOnce, submitRangeDays } = ctx.request.body || {}
     const instanceKey = buildRuntimeInstanceKey(ctx.state.autoSubmitContext)
+
+    if (typeof runOnce !== 'undefined' && typeof runOnce !== 'boolean') {
+      ctx.status = 400
+      ctx.body = {
+        code: -1,
+        message: 'runOnce 必须是布尔值',
+      }
+      return
+    }
+
+    if (typeof onlyRedFlag !== 'undefined' && typeof onlyRedFlag !== 'boolean') {
+      ctx.status = 400
+      ctx.body = {
+        code: -1,
+        message: 'onlyRedFlag 必须是布尔值',
+      }
+      return
+    }
+
+    if (typeof submitRangeDays !== 'undefined' && ![1, 2, 3].includes(Number(submitRangeDays))) {
+      ctx.status = 400
+      ctx.body = {
+        code: -1,
+        message: 'submitRangeDays 仅支持 1、2、3',
+      }
+      return
+    }
+
+    if (!runOnce) {
+      if (
+        typeof intervalMinutes !== 'undefined' &&
+        (typeof intervalMinutes !== 'number' || intervalMinutes < 1)
+      ) {
+        ctx.status = 400
+        ctx.body = {
+          code: -1,
+          message: '轮询间隔必须是大于等于1的数字（单位：分钟）',
+        }
+        return
+      }
+    }
 
     const result = await startScheduler(
       instanceKey,
       {
-        intervalMinutes: intervalMinutes || 5,
-        onlyRedFlag: onlyRedFlag || false,
+        intervalMinutes: typeof intervalMinutes === 'number' ? intervalMinutes : 5,
+        onlyRedFlag: onlyRedFlag === true,
+        runOnce: runOnce === true,
+        submitRangeDays: [1, 2, 3].includes(Number(submitRangeDays)) ? Number(submitRangeDays) : 3,
       },
       ctx.state.autoSubmitContext
     )

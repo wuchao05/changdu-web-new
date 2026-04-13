@@ -9,8 +9,10 @@ export interface AutoSubmitStatus {
   channelName: string
   enabled: boolean
   running: boolean
-  intervalMinutes: number
+  intervalMinutes: number | null
   onlyRedFlag: boolean
+  runOnce: boolean
+  submitRangeDays: 1 | 2 | 3
   nextRunTime: string | null
   lastRunTime: string | null
   stats: {
@@ -45,6 +47,8 @@ export interface AutoSubmitResponse {
 export interface StartAutoSubmitParams {
   intervalMinutes?: number
   onlyRedFlag?: boolean
+  runOnce?: boolean
+  submitRangeDays?: 1 | 2 | 3
 }
 
 export function startAutoSubmit(params: StartAutoSubmitParams): Promise<AutoSubmitResponse> {
