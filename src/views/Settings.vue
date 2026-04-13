@@ -50,6 +50,92 @@
         <n-card class="shadow-sm border border-gray-200">
           <template #header>
             <div class="flex items-center space-x-3">
+              <Icon icon="mdi:cash-multiple" class="w-5 h-5 text-gray-600" />
+              <div>
+                <h3 class="text-lg font-semibold text-gray-900">搭建出价</h3>
+                <p class="text-sm text-gray-500">
+                  按当前渠道设置个人覆盖出价，留空时沿用渠道默认值
+                </p>
+              </div>
+            </div>
+          </template>
+          <div class="space-y-4">
+            <div
+              class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600"
+            >
+              <div class="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                <span
+                  >当前渠道：<strong class="text-gray-900">{{ activeChannelName }}</strong></span
+                >
+                <span
+                  >当前生效出价：<strong class="text-gray-900">{{
+                    effectiveBuildBidLabel
+                  }}</strong></span
+                >
+              </div>
+              <p class="mt-2 text-xs text-gray-500">
+                渠道默认出价：{{ buildBidConfig.channelDefaultBid || '未配置' }} · 生效来源：
+                {{ buildBidSourceLabel }}
+              </p>
+            </div>
+
+            <div
+              v-if="buildBidLoading"
+              class="rounded-lg border border-dashed border-gray-300 bg-white px-4 py-6 text-sm text-gray-500"
+            >
+              正在加载当前渠道的出价配置...
+            </div>
+
+            <template v-else>
+              <div
+                v-if="!buildBidConfig.channelBidEnabled"
+                class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-700"
+              >
+                当前渠道未开启自定义出价，后台搭建会保持现有默认竞价策略。
+              </div>
+
+              <div v-else class="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <div
+                  v-if="!buildBidConfig.channelDefaultBid"
+                  class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600"
+                >
+                  当前渠道缺少默认出价，请联系管理员先在渠道管理里补充。
+                </div>
+
+                <div class="space-y-2">
+                  <label class="text-sm font-medium text-gray-700">个人覆盖出价</label>
+                  <n-input-number
+                    v-model:value="buildBidInput"
+                    :min="0"
+                    :step="0.1"
+                    clearable
+                    class="w-full"
+                    placeholder="留空则使用渠道默认出价"
+                  />
+                  <p class="text-xs text-gray-500">
+                    这里只影响你自己在当前渠道的后台搭建；不填写时自动使用渠道默认出价。
+                  </p>
+                </div>
+
+                <div class="flex flex-wrap gap-3">
+                  <n-button type="primary" :loading="savingBuildBid" @click="saveBuildBid">
+                    保存出价
+                  </n-button>
+                  <n-button
+                    :disabled="savingBuildBid || !buildBidConfig.userBid"
+                    @click="resetBuildBid"
+                  >
+                    恢复渠道默认
+                  </n-button>
+                </div>
+              </div>
+            </template>
+          </div>
+        </n-card>
+
+        <n-card class="shadow-sm border border-gray-200">
+          <template #header>
+            <div class="flex items-center space-x-3">
               <Icon icon="mdi:refresh" class="w-5 h-5 text-gray-600" />
               <div>
                 <h3 class="text-lg font-semibold text-gray-900">自动刷新</h3>
@@ -298,10 +384,12 @@ import {
   NSwitch,
   NInputNumber,
 } from 'naive-ui'
+import { getBuildBidConfig, updateBuildBidConfig, type BuildBidConfig } from '@/api/buildBid'
 import { useSettingsStore } from '@/stores/settings'
 import { useApiConfigStore } from '@/stores/apiConfig'
 import { useSessionStore } from '@/stores/session'
 import { useDouyinMaterialStore } from '@/stores/douyinMaterial'
+import { formatBuildBidInputValue, parseBuildBidInputValue } from '@/utils/buildBid'
 
 defineOptions({
   name: 'SettingsPage',
@@ -340,10 +428,27 @@ const dateRangeOptions = [
 ]
 
 const materialMatches = ref(douyinMaterialStore.matches)
+const buildBidLoading = ref(false)
+const savingBuildBid = ref(false)
+const buildBidInput = ref<number | null>(null)
 const newMaterialMatch = ref({
   douyinAccountRefId: '',
   materialRange: '',
 })
+
+function createDefaultBuildBidConfig(): BuildBidConfig {
+  return {
+    channelId: '',
+    channelName: '',
+    channelBidEnabled: false,
+    channelDefaultBid: '',
+    userBid: '',
+    effectiveBid: '',
+    effectiveSource: 'disabled',
+  }
+}
+
+const buildBidConfig = ref<BuildBidConfig>(createDefaultBuildBidConfig())
 
 const availableDouyinAccounts = computed(() => {
   const runtimeAccounts = Array.isArray(sessionStore.currentRuntimeUser?.douyinAccounts)
@@ -377,6 +482,20 @@ const activeChannelName = computed(() => {
   }
 
   return sessionStore.currentChannel?.name || '未选择渠道'
+})
+
+const buildBidSourceLabel = computed(() => {
+  if (!buildBidConfig.value.channelBidEnabled) {
+    return '渠道未开启'
+  }
+  return buildBidConfig.value.effectiveSource === 'user' ? '个人覆盖' : '渠道默认'
+})
+
+const effectiveBuildBidLabel = computed(() => {
+  if (!buildBidConfig.value.channelBidEnabled) {
+    return '未启用'
+  }
+  return buildBidConfig.value.effectiveBid || '未配置'
 })
 
 const validMaterialMatchCount = computed(
@@ -414,12 +533,56 @@ watch(
   activeChannelId => {
     if (!activeChannelId) {
       materialMatches.value = []
+      buildBidConfig.value = createDefaultBuildBidConfig()
+      buildBidInput.value = null
       return
     }
     void douyinMaterialStore.loadFromServer(true)
+    void loadBuildBidConfig()
   },
   { immediate: true }
 )
+
+async function loadBuildBidConfig() {
+  if (!sessionStore.activeChannelId) {
+    buildBidConfig.value = createDefaultBuildBidConfig()
+    buildBidInput.value = null
+    return
+  }
+
+  buildBidLoading.value = true
+  try {
+    const data = await getBuildBidConfig()
+    buildBidConfig.value = data
+    buildBidInput.value = parseBuildBidInputValue(data.userBid)
+  } catch {
+    buildBidConfig.value = createDefaultBuildBidConfig()
+    buildBidInput.value = null
+  } finally {
+    buildBidLoading.value = false
+  }
+}
+
+async function persistBuildBid(bid: string) {
+  savingBuildBid.value = true
+  try {
+    const data = await updateBuildBidConfig({ bid })
+    buildBidConfig.value = data
+    buildBidInput.value = parseBuildBidInputValue(data.userBid)
+    message.success(bid ? '个人出价已保存' : '已恢复渠道默认出价')
+  } finally {
+    savingBuildBid.value = false
+  }
+}
+
+async function saveBuildBid() {
+  await persistBuildBid(formatBuildBidInputValue(buildBidInput.value))
+}
+
+async function resetBuildBid() {
+  buildBidInput.value = null
+  await persistBuildBid('')
+}
 
 function updatePageSize(value: number) {
   settingsStore.updateSettings({ pageSize: value })

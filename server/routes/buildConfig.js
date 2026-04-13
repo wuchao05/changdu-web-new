@@ -2,6 +2,7 @@ import Router from '@koa/router'
 import { DEFAULT_BUILD_CONFIG, normalizeBuildConfig } from '../config/buildConfig.js'
 import { readChannels, writeChannels } from '../utils/studioData.js'
 import { createSessionRuntimeContextMiddleware } from '../utils/runtimeContextMiddleware.js'
+import { validateCustomBidConfig } from '../utils/buildBid.js'
 
 const router = new Router()
 
@@ -40,6 +41,8 @@ router.put('/', async ctx => {
       }
       return
     }
+
+    validateCustomBidConfig(payload)
 
     const { channels } = await readChannels()
     const targetChannelId =

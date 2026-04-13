@@ -31,6 +31,7 @@ import buildConfigRoutes from './server/routes/buildConfig.js'
 import debugRoutes from './server/routes/debug.js'
 import materialPreviewRoutes from './server/routes/materialPreview.js'
 import miniappRoutes from './server/routes/miniapp.js'
+import buildBidRoutes from './server/routes/buildBid.js'
 import { initScheduler } from './server/services/buildWorkflowScheduler.js'
 import { initScheduler as initAutoSubmitScheduler } from './server/services/autoSubmitScheduler.js'
 import { materialPreviewManager } from './server/services/materialPreviewManager.js'
@@ -130,6 +131,7 @@ router.use(publicRoutes.routes(), publicRoutes.allowedMethods())
 router.use('/api/build-config', buildConfigRoutes.routes(), buildConfigRoutes.allowedMethods())
 router.use('/api/adx', adxRoutes.routes(), adxRoutes.allowedMethods())
 router.use(debugRoutes.routes(), debugRoutes.allowedMethods())
+router.use(buildBidRoutes.routes(), buildBidRoutes.allowedMethods())
 router.use(materialPreviewRoutes.routes(), materialPreviewRoutes.allowedMethods())
 router.use(
   '/api/douyin-material',

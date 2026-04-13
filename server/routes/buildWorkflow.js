@@ -19,6 +19,7 @@ import {
 import { clearExistingProjects } from '../utils/buildWorkflowProjectCleanup.js'
 import { createSessionRuntimeContextMiddleware } from '../utils/runtimeContextMiddleware.js'
 import { buildRuntimeInstanceKey } from '../utils/runtimeInstance.js'
+import { resolveEffectiveBuildBid } from '../utils/buildBid.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -85,6 +86,16 @@ function getRuntimeBrandName(input = null) {
   return '小红'
 }
 
+function getRuntimeUser(input = null) {
+  if (input?.state?.buildWorkflowContext?.runtimeUser) {
+    return input.state.buildWorkflowContext.runtimeUser
+  }
+  if (input?.runtimeUser) {
+    return input.runtimeUser
+  }
+  return null
+}
+
 function getBuildConfig(input = null) {
   const buildConfig = getRuntimeContext(input)?.buildConfig || {}
   const useNewMicroAppAssetFlow = Boolean(buildConfig.useNewMicroAppAssetFlow)
@@ -113,6 +124,8 @@ function getBuildConfig(input = null) {
     secretKey: buildConfig.secretKey,
     useNewMicroAppAssetFlow,
     clearExistingProjectsBeforeBuild: Boolean(buildConfig.clearExistingProjectsBeforeBuild),
+    enableCustomBid: Boolean(buildConfig.enableCustomBid),
+    defaultBid: typeof buildConfig.defaultBid === 'string' ? buildConfig.defaultBid.trim() : '',
     ccId: buildConfig.ccId,
     microAppName: buildConfig.microAppName,
     microAppId: buildConfig.microAppId,
@@ -1090,6 +1103,7 @@ router.post('/create-project', async ctx => {
     const cookie = getJuliangCookie(runtime)
     const projectConfig = BUILD_WORKFLOW_CONFIG.build.project
     const buildConfig = getBuildConfig(runtime)
+    const bidConfig = resolveEffectiveBuildBid(buildConfig, getRuntimeUser(ctx))
 
     console.log('========== 创建项目 ==========')
     console.log('account_id:', account_id)
@@ -1115,7 +1129,14 @@ router.post('/create-project', async ctx => {
       last_frame: [],
       effective_frame: [],
       track_url_send_type: '2',
-      smart_bid_type: projectConfig.smart_bid_type,
+      ...(bidConfig.enabled
+        ? {
+            smart_bid_type: 0,
+            bid: bidConfig.bid,
+          }
+        : {
+            smart_bid_type: projectConfig.smart_bid_type,
+          }),
       is_search_speed_phase_four: false,
       budget: projectConfig.budget,
       inventory_catalog: projectConfig.inventory_catalog,

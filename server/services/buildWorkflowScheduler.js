@@ -42,6 +42,7 @@ import {
   patchRuntimeIdentityFromInstanceKey,
 } from '../utils/runtimeInstance.js'
 import { buildServiceLogPrefix, createScopedConsole } from '../utils/serviceLogger.js'
+import { resolveEffectiveBuildBid } from '../utils/buildBid.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -65,6 +66,9 @@ function createDefaultSchedulerState() {
     channelName: '',
     channelRuntime: null,
     runtimeUserConfig: {
+      buildPreference: {
+        bid: '',
+      },
       feishu: {
         dramaStatusTableId: '',
       },
@@ -250,6 +254,13 @@ async function ensureSchedulerRuntime(channelRuntime = null, instanceKey = getAc
     state.channelName = normalizedRuntime.channelName
     state.channelRuntime = normalizedRuntime
     state.runtimeUserConfig = {
+      buildPreference: {
+        bid: String(
+          channelRuntime.runtimeUser?.buildPreference?.bid ||
+            channelRuntime.runtimeUserConfig?.buildPreference?.bid ||
+            ''
+        ).trim(),
+      },
       feishu: {
         dramaStatusTableId: String(
           channelRuntime.runtimeUser?.feishu?.dramaStatusTableId ||
@@ -545,6 +556,8 @@ function getBuildConfig() {
     secretKey: buildConfig.secretKey,
     useNewMicroAppAssetFlow,
     clearExistingProjectsBeforeBuild: Boolean(buildConfig.clearExistingProjectsBeforeBuild),
+    enableCustomBid: Boolean(buildConfig.enableCustomBid),
+    defaultBid: typeof buildConfig.defaultBid === 'string' ? buildConfig.defaultBid.trim() : '',
     forbiddenAdvanceStartHour: buildConfig.forbiddenAdvanceStartHour,
     forbiddenAdvanceEndHour: buildConfig.forbiddenAdvanceEndHour,
     advanceBuildHours: buildConfig.advanceBuildHours,
@@ -955,6 +968,10 @@ async function createProject(params) {
   } = params
   const projectConfig = BUILD_WORKFLOW_CONFIG.build.project
   const buildConfig = getBuildConfig()
+  const bidConfig = resolveEffectiveBuildBid(
+    buildConfig,
+    getActiveSchedulerState().runtimeUserConfig
+  )
 
   const finalProjectName =
     project_name ||
@@ -970,7 +987,14 @@ async function createProject(params) {
     last_frame: [],
     effective_frame: [],
     track_url_send_type: '2',
-    smart_bid_type: projectConfig.smart_bid_type,
+    ...(bidConfig.enabled
+      ? {
+          smart_bid_type: 0,
+          bid: bidConfig.bid,
+        }
+      : {
+          smart_bid_type: projectConfig.smart_bid_type,
+        }),
     is_search_speed_phase_four: false,
     budget: projectConfig.budget,
     inventory_catalog: projectConfig.inventory_catalog,

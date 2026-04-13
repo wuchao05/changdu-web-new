@@ -10,6 +10,8 @@ export interface BuildConfig {
   useNewMicroAppAssetFlow: boolean
   clearExistingProjectsBeforeBuild: boolean
   recycleAccountsWhenExhausted: boolean
+  enableCustomBid: boolean
+  defaultBid: string
   advertiserName: string
   ebpid: string
   microAppName: string
@@ -39,6 +41,8 @@ export const DEFAULT_BUILD_CONFIG: BuildConfig = {
   useNewMicroAppAssetFlow: false,
   clearExistingProjectsBeforeBuild: false,
   recycleAccountsWhenExhausted: false,
+  enableCustomBid: false,
+  defaultBid: '',
   advertiserName: '',
   ebpid: '',
   microAppName: '',
@@ -79,6 +83,8 @@ function normalizeBuildConfig(payload: unknown): BuildConfig {
       config.clearExistingProjectsBeforeBuild
     ),
     recycleAccountsWhenExhausted: normalizeBooleanValue(config.recycleAccountsWhenExhausted),
+    enableCustomBid: normalizeBooleanValue(config.enableCustomBid),
+    defaultBid: normalizeStringValue(config.defaultBid),
     advertiserName: normalizeStringValue(config.advertiserName),
     ebpid: normalizeStringValue(config.ebpid),
     microAppName: normalizeStringValue(config.microAppName),

@@ -14,6 +14,7 @@ import {
   normalizeChannel,
   normalizeUser,
 } from '../utils/studioData.js'
+import { validateCustomBidConfig } from '../utils/buildBid.js'
 import { requireAdmin } from '../utils/studioSession.js'
 import { listSchedulerStatuses as listAutoSubmitSchedulerStatuses } from '../services/autoSubmitScheduler.js'
 import { listSchedulerStatuses as listBuildWorkflowSchedulerStatuses } from '../services/buildWorkflowScheduler.js'
@@ -789,6 +790,17 @@ router.post('/channels', async ctx => {
     return
   }
 
+  try {
+    validateCustomBidConfig(payload?.juliang?.buildConfig)
+  } catch (error) {
+    ctx.status = error.status || 400
+    ctx.body = {
+      code: 400,
+      message: error.message || '渠道出价配置不合法',
+    }
+    return
+  }
+
   const channel = normalizeChannel({
     ...payload,
     id: payload.id || crypto.randomUUID(),
@@ -827,6 +839,17 @@ router.put('/channels/:id', async ctx => {
     ctx.body = {
       code: 400,
       message: '渠道名称已存在',
+    }
+    return
+  }
+
+  try {
+    validateCustomBidConfig(payload?.juliang?.buildConfig)
+  } catch (error) {
+    ctx.status = error.status || 400
+    ctx.body = {
+      code: 400,
+      message: error.message || '渠道出价配置不合法',
     }
     return
   }

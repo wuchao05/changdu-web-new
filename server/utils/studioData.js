@@ -95,6 +95,9 @@ function defaultDouyinAccount() {
 function defaultUserChannelConfig() {
   return {
     enabled: false,
+    buildPreference: {
+      bid: '',
+    },
     feishu: defaultFeishuConfig(),
     materialPreview: defaultMaterialPreview(),
     permissions: {
@@ -439,6 +442,9 @@ function normalizeUserChannelConfig(config = {}, douyinAccounts = []) {
 
   return {
     enabled: resolvedEnabled,
+    buildPreference: {
+      bid: String(config.buildPreference?.bid || '').trim(),
+    },
     feishu: normalizeFeishuConfig(config.feishu || config),
     materialPreview: {
       ...defaultMaterialPreview(),
@@ -506,8 +512,10 @@ function hasCustomUserChannelConfig(config = {}, douyinAccounts = []) {
     Boolean(config.orderUserStats?.enabled) ||
     (Array.isArray(config.orderUserStats?.usernames) && config.orderUserStats.usernames.length > 0)
   const hasIndependentOrderStats = Boolean(config.independentOrderStats?.enabled)
+  const hasBuildPreference = Boolean(String(config.buildPreference?.bid || '').trim())
 
   return (
+    hasBuildPreference ||
     hasFeishuConfig(normalizeFeishuConfig(config.feishu || config)) ||
     hasExplicitMaterialPreview ||
     hasExplicitWebPermissionConfig ||
@@ -679,6 +687,7 @@ export function buildRuntimeUser(user = {}, channelId = '') {
 
   return {
     ...normalizedUser,
+    buildPreference: channelConfig.buildPreference,
     feishu: channelConfig.feishu,
     materialPreview: channelConfig.materialPreview,
     permissions: channelConfig.permissions,

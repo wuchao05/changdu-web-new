@@ -22,6 +22,8 @@ export const DEFAULT_BUILD_CONFIG = {
   useNewMicroAppAssetFlow: false,
   clearExistingProjectsBeforeBuild: false,
   recycleAccountsWhenExhausted: false,
+  enableCustomBid: false,
+  defaultBid: '',
   advertiserName: '',
   ebpid: '',
   microAppName: BUILD_WORKFLOW_CONFIG.juliang.microAppName,
@@ -65,6 +67,11 @@ export function normalizeBuildConfig(config = {}) {
       config.recycleAccountsWhenExhausted,
       DEFAULT_BUILD_CONFIG.recycleAccountsWhenExhausted
     ),
+    enableCustomBid: normalizeBooleanValue(
+      config.enableCustomBid,
+      DEFAULT_BUILD_CONFIG.enableCustomBid
+    ),
+    defaultBid: normalizeStringValue(config.defaultBid, DEFAULT_BUILD_CONFIG.defaultBid),
     advertiserName: normalizeStringValue(
       config.advertiserName,
       DEFAULT_BUILD_CONFIG.advertiserName

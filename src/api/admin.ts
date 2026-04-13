@@ -18,6 +18,9 @@ export interface DouyinAccount {
 
 export interface UserChannelBindingConfig {
   enabled: boolean
+  buildPreference: {
+    bid: string
+  }
   feishu: {
     dramaListTableId: string
     dramaStatusTableId: string
@@ -90,6 +93,9 @@ export interface UserProfile {
   defaultChannelId: string
   douyinAccounts: DouyinAccount[]
   channelConfigs?: Record<string, UserChannelBindingConfig>
+  buildPreference?: {
+    bid: string
+  }
   feishu: {
     dramaListTableId: string
     dramaStatusTableId: string

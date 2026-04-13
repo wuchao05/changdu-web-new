@@ -1297,6 +1297,23 @@
                       v-model:value="channelForm.juliang.buildConfig.recycleAccountsWhenExhausted"
                     />
                   </n-form-item>
+                  <n-form-item label="自定义出价">
+                    <n-switch v-model:value="channelForm.juliang.buildConfig.enableCustomBid" />
+                  </n-form-item>
+                  <n-form-item
+                    v-if="channelForm.juliang.buildConfig.enableCustomBid"
+                    label="默认出价"
+                  >
+                    <n-input-number
+                      :value="getBuildBidInputValue(channelForm.juliang.buildConfig.defaultBid)"
+                      :min="0"
+                      :step="0.1"
+                      clearable
+                      class="w-full"
+                      placeholder="请输入默认出价"
+                      @update:value="handleChannelDefaultBidChange"
+                    />
+                  </n-form-item>
                   <n-form-item label="Source">
                     <n-input
                       v-model:value="channelForm.juliang.buildConfig.source"
@@ -1623,6 +1640,12 @@ import draggable from 'vuedraggable'
 import * as adminApi from '@/api/admin'
 import { useSessionStore } from '@/stores/session'
 import { useApiConfigStore } from '@/stores/apiConfig'
+import {
+  formatBuildBidInputValue,
+  isValidBuildBidValue,
+  normalizeBuildBidValue,
+  parseBuildBidInputValue,
+} from '@/utils/buildBid'
 
 const router = useRouter()
 const message = useMessage()
@@ -2089,6 +2112,14 @@ function handleAdvanceHourChange(field: BuildAdvanceHourField, value: string | n
   channelForm.juliang.buildConfig[field] = String(normalizeAdvanceHourValue(value))
 }
 
+function getBuildBidInputValue(value: string | null | undefined) {
+  return parseBuildBidInputValue(value)
+}
+
+function handleChannelDefaultBidChange(value: number | null) {
+  channelForm.juliang.buildConfig.defaultBid = formatBuildBidInputValue(value)
+}
+
 function formatAdvanceHourLabel(value: string | number | null | undefined) {
   return `${String(normalizeAdvanceHourValue(value)).padStart(2, '0')}:00`
 }
@@ -2304,7 +2335,7 @@ function validateDouyinAccountDrafts(user: adminApi.UserProfile) {
   const accountIdSet = new Set<string>()
 
   for (const account of visibleDrafts) {
-if (accountNameSet.has(account.douyinAccount)) {
+    if (accountNameSet.has(account.douyinAccount)) {
       return '同一个用户下的抖音号名称不能重复'
     }
     if (accountIdSet.has(account.douyinAccountId)) {
@@ -2371,6 +2402,9 @@ function createDefaultUserForm(): UserFormModel {
 function createDefaultUserChannelConfig(): adminApi.UserChannelBindingConfig {
   return {
     enabled: false,
+    buildPreference: {
+      bid: '',
+    },
     feishu: {
       dramaListTableId: '',
       dramaStatusTableId: '',
@@ -2440,6 +2474,9 @@ function normalizeUserChannelConfig(
     ...defaultConfig,
     ...config,
     enabled: typeof config?.enabled === 'boolean' ? config.enabled : false,
+    buildPreference: {
+      bid: String(config?.buildPreference?.bid || '').trim(),
+    },
     feishu: {
       ...defaultConfig.feishu,
       ...(config?.feishu || {}),
@@ -2510,6 +2547,9 @@ function cloneUserChannelConfig(
 
   return {
     ...normalizedConfig,
+    buildPreference: {
+      ...normalizedConfig.buildPreference,
+    },
     feishu: {
       ...normalizedConfig.feishu,
     },
@@ -2553,6 +2593,8 @@ function createDefaultChannelForm(): ChannelFormModel {
         useNewMicroAppAssetFlow: false,
         clearExistingProjectsBeforeBuild: false,
         recycleAccountsWhenExhausted: false,
+        enableCustomBid: false,
+        defaultBid: '',
         advertiserName: '',
         ebpid: '',
         microAppName: '',
@@ -3133,6 +3175,18 @@ async function saveUser() {
 async function saveChannel() {
   savingChannel.value = true
   try {
+    if (channelForm.juliang.buildConfig.enableCustomBid) {
+      const defaultBid = normalizeBuildBidValue(channelForm.juliang.buildConfig.defaultBid)
+      if (!defaultBid) {
+        message.warning('开启自定义出价后，默认出价不能为空')
+        return
+      }
+      if (!isValidBuildBidValue(defaultBid)) {
+        message.warning('默认出价必须是数字')
+        return
+      }
+      channelForm.juliang.buildConfig.defaultBid = defaultBid
+    }
     channelForm.juliang.buildConfig.secretKey = channelForm.changdu.secretKey || ''
     if (editingChannelId.value) {
       await adminApi.updateChannel(editingChannelId.value, channelForm)
