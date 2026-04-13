@@ -534,7 +534,7 @@
                     <div>
                       <p class="channel-config-card__switch-title">启用专属配置</p>
                       <p class="channel-config-card__switch-desc">
-                        打开后才会展示并启用当前渠道下的飞书、素材预览、权限和抖音匹配素材配置。
+                        打开后才会展示并启用当前渠道下的飞书、出价、素材预览、权限和抖音匹配素材配置。
                       </p>
                     </div>
                     <div class="channel-config-card__switch-actions">
@@ -556,6 +556,41 @@
                     </div>
                   </div>
                   <div v-if="isUserChannelSectionExpanded(item.channel.id)" class="mt-1">
+                    <div
+                      v-if="item.channel.juliang.buildConfig.enableCustomBid"
+                      class="config-subpanel config-subpanel--amber"
+                    >
+                      <div class="config-subpanel__head config-subpanel__head--split">
+                        <div>
+                          <p class="text-sm font-semibold text-amber-600">搭建出价</p>
+                          <p class="mt-1 text-sm text-slate-500">
+                            管理当前用户在当前渠道下的个人覆盖出价；不填写时沿用渠道默认出价。
+                          </p>
+                        </div>
+                        <span class="channel-config-card__pill channel-config-card__pill--warning">
+                          渠道默认 {{ item.channel.juliang.buildConfig.defaultBid || '未配置' }}
+                        </span>
+                      </div>
+                      <n-form label-placement="top" class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <n-form-item label="个人覆盖出价">
+                          <n-input-number
+                            :value="
+                              getUserBuildBidInputValue(
+                                item.config.buildPreference.bid,
+                                item.channel.juliang.buildConfig.defaultBid
+                              )
+                            "
+                            :min="0"
+                            :step="0.1"
+                            clearable
+                            class="w-full"
+                            placeholder="留空则使用渠道默认出价"
+                            @update:value="value => handleUserBuildBidChange(item.config, value)"
+                          />
+                        </n-form-item>
+                      </n-form>
+                    </div>
+
                     <div class="config-subpanel">
                       <div class="config-subpanel__head">
                         <div>
@@ -2120,6 +2155,22 @@ function handleChannelDefaultBidChange(value: number | null) {
   channelForm.juliang.buildConfig.defaultBid = formatBuildBidInputValue(value)
 }
 
+function getUserBuildBidInputValue(
+  userBid: string | null | undefined,
+  defaultBid: string | null | undefined
+) {
+  const userBidValue = parseBuildBidInputValue(userBid)
+  if (userBidValue !== null) {
+    return userBidValue
+  }
+
+  return parseBuildBidInputValue(defaultBid)
+}
+
+function handleUserBuildBidChange(config: adminApi.UserChannelBindingConfig, value: number | null) {
+  config.buildPreference.bid = formatBuildBidInputValue(value)
+}
+
 function formatAdvanceHourLabel(value: string | number | null | undefined) {
   return `${String(normalizeAdvanceHourValue(value)).padStart(2, '0')}:00`
 }
@@ -3099,6 +3150,20 @@ async function saveUser() {
 
     for (const channelId of userForm.channelIds) {
       const channelConfig = userForm.channelConfigs?.[channelId]
+      const channel = channels.value.find(item => item.id === channelId)
+      const channelName = channel?.name || `渠道 ${channelId}`
+      const userBid = normalizeBuildBidValue(channelConfig?.buildPreference?.bid)
+
+      if (channel?.juliang?.buildConfig?.enableCustomBid && userBid) {
+        if (!isValidBuildBidValue(userBid)) {
+          message.error(`【${channelName}】个人覆盖出价必须是数字`)
+          return
+        }
+        if (channelConfig?.buildPreference) {
+          channelConfig.buildPreference.bid = userBid
+        }
+      }
+
       const configuredMatchRefIds = new Set<string>()
 
       for (const match of channelConfig?.douyinMaterialMatches || []) {
@@ -3110,22 +3175,16 @@ async function saveUser() {
         }
 
         if (!hasRef || !hasRange) {
-          const channelName =
-            channels.value.find(channel => channel.id === channelId)?.name || `渠道 ${channelId}`
           message.error(`【${channelName}】请为每条抖音号匹配素材规则同时选择抖音号并填写素材序号`)
           return
         }
 
         if (!getBoundDouyinAccount(match.douyinAccountRefId)) {
-          const channelName =
-            channels.value.find(channel => channel.id === channelId)?.name || `渠道 ${channelId}`
           message.error(`【${channelName}】存在未绑定的抖音号，请先到“抖音号配置”里维护后再保存`)
           return
         }
 
         if (configuredMatchRefIds.has(match.douyinAccountRefId)) {
-          const channelName =
-            channels.value.find(channel => channel.id === channelId)?.name || `渠道 ${channelId}`
           message.error(`【${channelName}】同一个抖音号只需要配置一条素材序号规则`)
           return
         }
@@ -3142,8 +3201,6 @@ async function saveUser() {
         continue
       }
 
-      const channelName =
-        channels.value.find(channel => channel.id === channelId)?.name || `渠道 ${channelId}`
       message.error(
         `【${channelName}】开启独立订单统计前，至少需要配置 1 条有效的抖音号匹配素材规则`
       )

@@ -17,7 +17,7 @@
 
     <main class="px-6 py-8">
       <div class="max-w-4xl mx-auto space-y-6">
-        <n-card class="shadow-sm border border-gray-200">
+        <n-card v-if="showBuildBidCard" class="shadow-sm border border-gray-200">
           <template #header>
             <div class="flex items-center space-x-3">
               <Icon icon="mdi:cog" class="w-5 h-5 text-gray-600" />
@@ -87,14 +87,7 @@
             </div>
 
             <template v-else>
-              <div
-                v-if="!buildBidConfig.channelBidEnabled"
-                class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-700"
-              >
-                当前渠道未开启自定义出价，后台搭建会保持现有默认竞价策略。
-              </div>
-
-              <div v-else class="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <div class="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
                 <div
                   v-if="!buildBidConfig.channelDefaultBid"
                   class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600"
@@ -105,12 +98,13 @@
                 <div class="space-y-2">
                   <label class="text-sm font-medium text-gray-700">个人覆盖出价</label>
                   <n-input-number
-                    v-model:value="buildBidInput"
+                    :value="getBuildBidInputDisplayValue()"
                     :min="0"
                     :step="0.1"
                     clearable
                     class="w-full"
                     placeholder="留空则使用渠道默认出价"
+                    @update:value="handleBuildBidInputChange"
                   />
                   <p class="text-xs text-gray-500">
                     这里只影响你自己在当前渠道的后台搭建；不填写时自动使用渠道默认出价。
@@ -484,6 +478,10 @@ const activeChannelName = computed(() => {
   return sessionStore.currentChannel?.name || '未选择渠道'
 })
 
+const showBuildBidCard = computed(
+  () => buildBidLoading.value || buildBidConfig.value.channelBidEnabled
+)
+
 const buildBidSourceLabel = computed(() => {
   if (!buildBidConfig.value.channelBidEnabled) {
     return '渠道未开启'
@@ -563,6 +561,18 @@ async function loadBuildBidConfig() {
   }
 }
 
+function getBuildBidInputDisplayValue() {
+  if (buildBidInput.value !== null) {
+    return buildBidInput.value
+  }
+
+  return parseBuildBidInputValue(buildBidConfig.value.channelDefaultBid)
+}
+
+function handleBuildBidInputChange(value: number | null) {
+  buildBidInput.value = value
+}
+
 async function persistBuildBid(bid: string) {
   savingBuildBid.value = true
   try {
@@ -576,7 +586,13 @@ async function persistBuildBid(bid: string) {
 }
 
 async function saveBuildBid() {
-  await persistBuildBid(formatBuildBidInputValue(buildBidInput.value))
+  const nextBid = formatBuildBidInputValue(buildBidInput.value)
+  if (!buildBidConfig.value.userBid && nextBid === buildBidConfig.value.channelDefaultBid) {
+    await persistBuildBid('')
+    return
+  }
+
+  await persistBuildBid(nextBid)
 }
 
 async function resetBuildBid() {

@@ -14,7 +14,11 @@ import {
   normalizeChannel,
   normalizeUser,
 } from '../utils/studioData.js'
-import { validateCustomBidConfig } from '../utils/buildBid.js'
+import {
+  isValidBuildBidValue,
+  normalizeBuildBidValue,
+  validateCustomBidConfig,
+} from '../utils/buildBid.js'
 import { requireAdmin } from '../utils/studioSession.js'
 import { listSchedulerStatuses as listAutoSubmitSchedulerStatuses } from '../services/autoSubmitScheduler.js'
 import { listSchedulerStatuses as listBuildWorkflowSchedulerStatuses } from '../services/buildWorkflowScheduler.js'
@@ -72,6 +76,37 @@ function buildUserResponse(user, channelMap) {
       .filter(Boolean),
     defaultChannelName: channelMap.get(user.defaultChannelId)?.name || '',
   }
+}
+
+function validateUserBuildBidConfigs(userPayload = {}, channels = []) {
+  const channelConfigs =
+    userPayload.channelConfigs && typeof userPayload.channelConfigs === 'object'
+      ? userPayload.channelConfigs
+      : {}
+  const channelMap = new Map(channels.map(channel => [channel.id, channel]))
+
+  Object.entries(channelConfigs).forEach(([channelId, config]) => {
+    const currentChannel = channelMap.get(channelId)
+    if (!currentChannel?.juliang?.buildConfig?.enableCustomBid) {
+      return
+    }
+
+    const bid = normalizeBuildBidValue(config?.buildPreference?.bid)
+    if (!bid) {
+      return
+    }
+
+    if (!isValidBuildBidValue(bid)) {
+      const channelName = currentChannel.name || channelId
+      const error = new Error(`【${channelName}】个人覆盖出价必须是数字`)
+      error.status = 400
+      throw error
+    }
+
+    if (config?.buildPreference && typeof config.buildPreference === 'object') {
+      config.buildPreference.bid = bid
+    }
+  })
 }
 
 function buildUserChannelKey(userId, channelId) {
@@ -560,6 +595,7 @@ router.get('/users/:id', async ctx => {
 router.post('/users', async ctx => {
   const payload = ctx.request.body || {}
   const users = await listUsers()
+  const { channels } = await readChannels()
 
   if (!payload.account || !payload.password || !payload.nickname) {
     ctx.status = 400
@@ -579,6 +615,8 @@ router.post('/users', async ctx => {
     return
   }
 
+  validateUserBuildBidConfigs(payload, channels)
+
   const user = await writeUser(
     normalizeUser({
       ...payload,
@@ -597,6 +635,7 @@ router.put('/users/:id', async ctx => {
   const { id } = ctx.params
   const payload = ctx.request.body || {}
   const users = await listUsers()
+  const { channels } = await readChannels()
   const current = users.find(user => user.id === id)
 
   if (!current) {
@@ -651,6 +690,8 @@ router.put('/users/:id', async ctx => {
   if (typeof normalizedPayload.password === 'string' && !normalizedPayload.password.trim()) {
     delete normalizedPayload.password
   }
+
+  validateUserBuildBidConfigs(normalizedPayload, channels)
 
   const updated = await writeUser(
     normalizeUser({

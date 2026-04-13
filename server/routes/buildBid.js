@@ -101,9 +101,6 @@ router.put('/config', async ctx => {
       ...channelConfig.buildPreference,
       bid,
     }
-    if (bid) {
-      channelConfig.enabled = true
-    }
     user.updatedAt = new Date().toISOString()
     await writeUser(user)
 

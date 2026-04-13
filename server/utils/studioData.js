@@ -687,7 +687,7 @@ export function buildRuntimeUser(user = {}, channelId = '') {
 
   return {
     ...normalizedUser,
-    buildPreference: channelConfig.buildPreference,
+    buildPreference: sourceChannelConfig.buildPreference,
     feishu: channelConfig.feishu,
     materialPreview: channelConfig.materialPreview,
     permissions: channelConfig.permissions,
