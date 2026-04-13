@@ -98,7 +98,7 @@ function validateUserBuildBidConfigs(userPayload = {}, channels = []) {
 
     if (!isValidBuildBidValue(bid)) {
       const channelName = currentChannel.name || channelId
-      const error = new Error(`【${channelName}】个人覆盖出价必须是数字`)
+      const error = new Error(`【${channelName}】出价必须是数字`)
       error.status = 400
       throw error
     }

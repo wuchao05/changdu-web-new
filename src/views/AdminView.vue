@@ -564,7 +564,7 @@
                         <div>
                           <p class="text-sm font-semibold text-amber-600">搭建出价</p>
                           <p class="mt-1 text-sm text-slate-500">
-                            管理当前用户在当前渠道下的个人覆盖出价；不填写时沿用渠道默认出价。
+                            管理当前用户在当前渠道下的搭建出价；未填写时自动使用渠道默认值。
                           </p>
                         </div>
                         <span class="channel-config-card__pill channel-config-card__pill--warning">
@@ -572,7 +572,7 @@
                         </span>
                       </div>
                       <n-form label-placement="top" class="grid grid-cols-1 gap-3 md:grid-cols-2">
-                        <n-form-item label="个人覆盖出价">
+                        <n-form-item label="出价">
                           <n-input-number
                             :value="
                               getUserBuildBidInputValue(
@@ -584,7 +584,7 @@
                             :step="0.1"
                             clearable
                             class="w-full"
-                            placeholder="留空则使用渠道默认出价"
+                            placeholder="未填写时使用默认出价"
                             @update:value="value => handleUserBuildBidChange(item.config, value)"
                           />
                         </n-form-item>
@@ -3156,7 +3156,7 @@ async function saveUser() {
 
       if (channel?.juliang?.buildConfig?.enableCustomBid && userBid) {
         if (!isValidBuildBidValue(userBid)) {
-          message.error(`【${channelName}】个人覆盖出价必须是数字`)
+          message.error(`【${channelName}】出价必须是数字`)
           return
         }
         if (channelConfig?.buildPreference) {
