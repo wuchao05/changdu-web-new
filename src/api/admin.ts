@@ -21,6 +21,13 @@ export interface UserChannelBindingConfig {
   buildPreference: {
     bid: string
   }
+  buildAdvanceConfig: {
+    allowCustom: boolean
+    useCustom: boolean
+    forbiddenAdvanceStartHour: string
+    forbiddenAdvanceEndHour: string
+    advanceBuildHours: string
+  }
   feishu: {
     dramaListTableId: string
     dramaStatusTableId: string
@@ -95,6 +102,13 @@ export interface UserProfile {
   channelConfigs?: Record<string, UserChannelBindingConfig>
   buildPreference?: {
     bid: string
+  }
+  buildAdvanceConfig?: {
+    allowCustom: boolean
+    useCustom: boolean
+    forbiddenAdvanceStartHour: string
+    forbiddenAdvanceEndHour: string
+    advanceBuildHours: string
   }
   feishu: {
     dramaListTableId: string

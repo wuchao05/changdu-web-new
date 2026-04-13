@@ -597,6 +597,33 @@ export async function triggerBackgroundSchedulerBuild(params: {
   return result
 }
 
+export async function validateBuildWindow(drama: unknown): Promise<{
+  code: number
+  message: string
+  data: {
+    canBuild: boolean
+    earliestBuildTime: string | null
+    ruleDescription: string
+  }
+}> {
+  const response = await fetch(`${ENV.BASE_URL}/build-workflow/validate-build-window`, {
+    method: 'POST',
+    headers: buildSessionHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ drama }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`校验搭建时机失败: ${response.statusText}`)
+  }
+
+  const result = await response.json()
+  if (result.code !== 0) {
+    throw new Error(result.message || '校验搭建时机失败')
+  }
+
+  return result
+}
+
 /**
  * 验证并创建小程序（带重试机制）
  *

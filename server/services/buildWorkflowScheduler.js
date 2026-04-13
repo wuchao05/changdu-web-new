@@ -43,6 +43,12 @@ import {
 } from '../utils/runtimeInstance.js'
 import { buildServiceLogPrefix, createScopedConsole } from '../utils/serviceLogger.js'
 import { resolveEffectiveBuildBid } from '../utils/buildBid.js'
+import {
+  DEFAULT_USER_BUILD_ADVANCE_CONFIG,
+  applyUserBuildAdvanceToBuildConfig,
+  normalizeUserBuildAdvanceConfig,
+} from '../utils/buildAdvanceConfig.js'
+import { buildRuntimeUser, readUser } from '../utils/studioData.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -68,6 +74,9 @@ function createDefaultSchedulerState() {
     runtimeUserConfig: {
       buildPreference: {
         bid: '',
+      },
+      buildAdvanceConfig: {
+        ...DEFAULT_USER_BUILD_ADVANCE_CONFIG,
       },
       feishu: {
         dramaStatusTableId: '',
@@ -261,6 +270,11 @@ async function ensureSchedulerRuntime(channelRuntime = null, instanceKey = getAc
             ''
         ).trim(),
       },
+      buildAdvanceConfig: normalizeUserBuildAdvanceConfig(
+        channelRuntime.runtimeUser?.buildAdvanceConfig ||
+          channelRuntime.runtimeUserConfig?.buildAdvanceConfig ||
+          DEFAULT_USER_BUILD_ADVANCE_CONFIG
+      ),
       feishu: {
         dramaStatusTableId: String(
           channelRuntime.runtimeUser?.feishu?.dramaStatusTableId ||
@@ -279,6 +293,33 @@ async function ensureSchedulerRuntime(channelRuntime = null, instanceKey = getAc
 
   if (state.channelId) {
     const resolvedRuntime = await resolveChannelRuntimeById(state.channelId)
+    if (state.userId) {
+      try {
+        const latestUser = await readUser(state.userId)
+        const latestRuntimeUser = buildRuntimeUser(latestUser, state.channelId)
+        state.runtimeUserName = String(
+          latestRuntimeUser?.nickname || latestRuntimeUser?.account || state.runtimeUserName || ''
+        ).trim()
+        state.runtimeUserConfig = {
+          buildPreference: {
+            bid: String(latestRuntimeUser?.buildPreference?.bid || '').trim(),
+          },
+          buildAdvanceConfig: normalizeUserBuildAdvanceConfig(
+            latestRuntimeUser?.buildAdvanceConfig || DEFAULT_USER_BUILD_ADVANCE_CONFIG
+          ),
+          feishu: {
+            dramaStatusTableId: String(latestRuntimeUser?.feishu?.dramaStatusTableId || '').trim(),
+          },
+          brandName: String(latestRuntimeUser?.brandName || '小红').trim() || '小红',
+        }
+      } catch (error) {
+        buildConsole.warn(`[后台搭建] 刷新运行时用户配置失败: ${error.message}`)
+      }
+    }
+    resolvedRuntime.buildConfig = applyUserBuildAdvanceToBuildConfig(
+      resolvedRuntime.buildConfig,
+      state.runtimeUserConfig?.buildAdvanceConfig
+    )
     state.channelId = resolvedRuntime.channelId
     state.channelName = resolvedRuntime.channelName
     state.channelRuntime = resolvedRuntime
@@ -290,6 +331,10 @@ async function ensureSchedulerRuntime(channelRuntime = null, instanceKey = getAc
   }
 
   const resolvedRuntime = await resolveChannelRuntimeById('')
+  resolvedRuntime.buildConfig = applyUserBuildAdvanceToBuildConfig(
+    resolvedRuntime.buildConfig,
+    state.runtimeUserConfig?.buildAdvanceConfig
+  )
   state.channelId = resolvedRuntime.channelId
   state.channelName = resolvedRuntime.channelName
   state.channelRuntime = resolvedRuntime

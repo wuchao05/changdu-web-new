@@ -2,6 +2,7 @@ import { DEFAULT_BUILD_CONFIG, normalizeBuildConfig } from '../config/buildConfi
 import { getSessionUser } from './studioSession.js'
 import { readChannels, resolveRuntimeContext } from './studioData.js'
 import { CHANGDU_DISTRIBUTOR_ID, CHANGDU_SECRET_KEY } from '../config/changdu.js'
+import { applyUserBuildAdvanceToBuildConfig } from './buildAdvanceConfig.js'
 
 const DEFAULT_APP_TYPE = '7'
 const DEFAULT_AGW_JS_CONV = 'str'
@@ -12,8 +13,11 @@ export function extractCsrfToken(cookie = '') {
   return match?.[1] ? decodeURIComponent(match[1]) : ''
 }
 
-function buildRuntimeFromChannel(channel = null) {
-  const buildConfig = normalizeBuildConfig(channel?.juliang?.buildConfig || DEFAULT_BUILD_CONFIG)
+function buildRuntimeFromChannel(channel = null, runtimeUser = null) {
+  const buildConfig = applyUserBuildAdvanceToBuildConfig(
+    normalizeBuildConfig(channel?.juliang?.buildConfig || DEFAULT_BUILD_CONFIG),
+    runtimeUser?.buildAdvanceConfig
+  )
   const juliangCookie = String(channel?.juliang?.cookie || '').trim()
   const changduSecretKey = String(
     channel?.changdu?.secretKey || buildConfig.secretKey || CHANGDU_SECRET_KEY
@@ -67,7 +71,7 @@ export function normalizeChannelRuntime(runtime = {}) {
     }
   }
 
-  return buildRuntimeFromChannel(runtime?.channel || null)
+  return buildRuntimeFromChannel(runtime?.channel || null, runtime?.runtimeUser || null)
 }
 
 export async function resolveChannelRuntimeById(channelId = '') {
@@ -88,8 +92,8 @@ export async function resolveChannelRuntime(ctx = null) {
   const sessionUser = ctx.state?.sessionUser || (await getSessionUser(ctx))
 
   if (sessionUser) {
-    const { channel } = await resolveRuntimeContext(sessionUser, requestedChannelId)
-    return buildRuntimeFromChannel(channel)
+    const { channel, runtimeUser } = await resolveRuntimeContext(sessionUser, requestedChannelId)
+    return buildRuntimeFromChannel(channel, runtimeUser)
   }
 
   return resolveChannelRuntimeById(requestedChannelId)

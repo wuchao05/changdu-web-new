@@ -15,6 +15,7 @@ export function createSessionRuntimeContextMiddleware(contextStateKey = 'runtime
       const runtimeContext = await resolveRuntimeContext(ctx.state.sessionUser, requestedChannelId)
       const channelRuntime = normalizeChannelRuntime({
         channel: runtimeContext.channel,
+        runtimeUser: runtimeContext.runtimeUser,
       })
 
       ctx.state.channelRuntime = channelRuntime

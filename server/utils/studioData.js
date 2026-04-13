@@ -3,6 +3,10 @@ import path from 'path'
 import crypto from 'crypto'
 import { fileURLToPath } from 'url'
 import { DEFAULT_BUILD_CONFIG, normalizeBuildConfig } from '../config/buildConfig.js'
+import {
+  DEFAULT_USER_BUILD_ADVANCE_CONFIG,
+  normalizeUserBuildAdvanceConfig,
+} from './buildAdvanceConfig.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -97,6 +101,9 @@ function defaultUserChannelConfig() {
     enabled: false,
     buildPreference: {
       bid: '',
+    },
+    buildAdvanceConfig: {
+      ...DEFAULT_USER_BUILD_ADVANCE_CONFIG,
     },
     feishu: defaultFeishuConfig(),
     materialPreview: defaultMaterialPreview(),
@@ -445,6 +452,7 @@ function normalizeUserChannelConfig(config = {}, douyinAccounts = []) {
     buildPreference: {
       bid: String(config.buildPreference?.bid || '').trim(),
     },
+    buildAdvanceConfig: normalizeUserBuildAdvanceConfig(config.buildAdvanceConfig),
     feishu: normalizeFeishuConfig(config.feishu || config),
     materialPreview: {
       ...defaultMaterialPreview(),
@@ -688,6 +696,7 @@ export function buildRuntimeUser(user = {}, channelId = '') {
   return {
     ...normalizedUser,
     buildPreference: sourceChannelConfig.buildPreference,
+    buildAdvanceConfig: sourceChannelConfig.buildAdvanceConfig,
     feishu: channelConfig.feishu,
     materialPreview: channelConfig.materialPreview,
     permissions: channelConfig.permissions,

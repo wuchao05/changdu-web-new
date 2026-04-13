@@ -20,6 +20,11 @@ import { clearExistingProjects } from '../utils/buildWorkflowProjectCleanup.js'
 import { createSessionRuntimeContextMiddleware } from '../utils/runtimeContextMiddleware.js'
 import { buildRuntimeInstanceKey } from '../utils/runtimeInstance.js'
 import { resolveEffectiveBuildBid } from '../utils/buildBid.js'
+import {
+  canBuildDramaNow,
+  getAdvanceRuleDescription,
+  getEarliestBuildTime,
+} from '../utils/buildWorkflowRules.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -227,6 +232,40 @@ router.post('/client-log', async ctx => {
     ctx.body = {
       code: -1,
       message: error.message || '记录客户端搭建日志失败',
+    }
+  }
+})
+
+router.post('/validate-build-window', async ctx => {
+  try {
+    const drama = ctx.request.body?.drama
+    if (!drama || typeof drama !== 'object') {
+      ctx.status = 400
+      ctx.body = {
+        code: -1,
+        message: 'drama 不能为空',
+      }
+      return
+    }
+
+    const buildConfig = ctx.state.channelRuntime?.buildConfig || {}
+    const earliestBuildTime = getEarliestBuildTime(drama, buildConfig)
+    const canBuild = canBuildDramaNow(drama, new Date(), buildConfig)
+
+    ctx.body = {
+      code: 0,
+      message: canBuild ? '当前可搭建' : '未到可搭建时间',
+      data: {
+        canBuild,
+        earliestBuildTime: earliestBuildTime ? earliestBuildTime.format('YYYY-MM-DD HH:mm') : null,
+        ruleDescription: getAdvanceRuleDescription(buildConfig),
+      },
+    }
+  } catch (error) {
+    ctx.status = 500
+    ctx.body = {
+      code: -1,
+      message: error.message || '校验搭建时机失败',
     }
   }
 })

@@ -3,6 +3,7 @@ import { getSessionUser } from '../utils/studioSession.js'
 import { readChannels, resolveRuntimeContext, sanitizeUser } from '../utils/studioData.js'
 import { DEFAULT_BUILD_CONFIG, normalizeBuildConfig } from '../config/buildConfig.js'
 import { createSessionRuntimeContextMiddleware } from '../utils/runtimeContextMiddleware.js'
+import { applyUserBuildAdvanceToBuildConfig } from '../utils/buildAdvanceConfig.js'
 
 const router = new Router()
 
@@ -107,7 +108,10 @@ router.get('/config', async ctx => {
         douyinMaterialMatches: Array.isArray(runtimeUser?.douyinMaterialMatches)
           ? runtimeUser.douyinMaterialMatches
           : [],
-        buildConfig: normalizeBuildConfig(channel?.juliang?.buildConfig || DEFAULT_BUILD_CONFIG),
+        buildConfig: applyUserBuildAdvanceToBuildConfig(
+          normalizeBuildConfig(channel?.juliang?.buildConfig || DEFAULT_BUILD_CONFIG),
+          runtimeUser?.buildAdvanceConfig
+        ),
       },
     }
   } catch (error) {

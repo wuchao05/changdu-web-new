@@ -591,6 +591,48 @@
                       </n-form>
                     </div>
 
+                    <div class="config-subpanel config-subpanel--blue">
+                      <div class="config-subpanel__head config-subpanel__head--split">
+                        <div>
+                          <p class="text-sm font-semibold text-blue-600">智能搭建时机</p>
+                          <p class="mt-1 text-sm text-slate-500">
+                            打开后，用户可以在设置中心按当前渠道单独覆盖智能搭建时机；未单独保存时仍沿用渠道默认规则。
+                          </p>
+                        </div>
+                        <div class="toggle-hero">
+                          <div>
+                            <p class="toggle-hero__title">允许用户自定义</p>
+                            <p class="toggle-hero__desc">
+                              关闭后，设置中心不展示该入口，且不会应用用户自己的覆盖规则。
+                            </p>
+                          </div>
+                          <n-switch v-model:value="item.config.buildAdvanceConfig.allowCustom" />
+                        </div>
+                      </div>
+                      <div class="flex flex-wrap gap-3">
+                        <span class="channel-config-card__pill channel-config-card__pill--info">
+                          渠道默认：{{
+                            getAdvanceRuleSummary(item.channel.juliang.buildConfig).tagLabel
+                          }}，
+                          {{ getAdvanceRuleSummary(item.channel.juliang.buildConfig).advanceLabel }}
+                        </span>
+                        <span
+                          class="channel-config-card__pill"
+                          :class="
+                            item.config.buildAdvanceConfig.useCustom
+                              ? 'channel-config-card__pill--warning'
+                              : 'channel-config-card__pill--success'
+                          "
+                        >
+                          {{
+                            item.config.buildAdvanceConfig.useCustom
+                              ? '已保存个人覆盖规则'
+                              : '当前沿用渠道默认'
+                          }}
+                        </span>
+                      </div>
+                    </div>
+
                     <div class="config-subpanel">
                       <div class="config-subpanel__head">
                         <div>
@@ -2176,7 +2218,11 @@ function formatAdvanceHourLabel(value: string | number | null | undefined) {
 }
 
 function getAdvanceRuleSummary(
-  buildConfig: adminApi.ChannelConfig['juliang']['buildConfig'] | null | undefined
+  buildConfig:
+    | adminApi.ChannelConfig['juliang']['buildConfig']
+    | adminApi.UserChannelBindingConfig['buildAdvanceConfig']
+    | null
+    | undefined
 ) {
   const startHour = normalizeAdvanceHourValue(buildConfig?.forbiddenAdvanceStartHour)
   const endHour = normalizeAdvanceHourValue(buildConfig?.forbiddenAdvanceEndHour)
@@ -2456,6 +2502,13 @@ function createDefaultUserChannelConfig(): adminApi.UserChannelBindingConfig {
     buildPreference: {
       bid: '',
     },
+    buildAdvanceConfig: {
+      allowCustom: false,
+      useCustom: false,
+      forbiddenAdvanceStartHour: '0',
+      forbiddenAdvanceEndHour: '0',
+      advanceBuildHours: '0',
+    },
     feishu: {
       dramaListTableId: '',
       dramaStatusTableId: '',
@@ -2527,6 +2580,19 @@ function normalizeUserChannelConfig(
     enabled: typeof config?.enabled === 'boolean' ? config.enabled : false,
     buildPreference: {
       bid: String(config?.buildPreference?.bid || '').trim(),
+    },
+    buildAdvanceConfig: {
+      allowCustom: Boolean(config?.buildAdvanceConfig?.allowCustom),
+      useCustom: Boolean(config?.buildAdvanceConfig?.useCustom),
+      forbiddenAdvanceStartHour: String(
+        normalizeAdvanceHourValue(config?.buildAdvanceConfig?.forbiddenAdvanceStartHour)
+      ),
+      forbiddenAdvanceEndHour: String(
+        normalizeAdvanceHourValue(config?.buildAdvanceConfig?.forbiddenAdvanceEndHour)
+      ),
+      advanceBuildHours: String(
+        normalizeAdvanceHoursValue(config?.buildAdvanceConfig?.advanceBuildHours)
+      ),
     },
     feishu: {
       ...defaultConfig.feishu,
@@ -2600,6 +2666,9 @@ function cloneUserChannelConfig(
     ...normalizedConfig,
     buildPreference: {
       ...normalizedConfig.buildPreference,
+    },
+    buildAdvanceConfig: {
+      ...normalizedConfig.buildAdvanceConfig,
     },
     feishu: {
       ...normalizedConfig.feishu,
@@ -3989,6 +4058,12 @@ watch(
   color: #7c3aed;
 }
 
+.channel-config-card__pill--info {
+  border-color: rgba(191, 219, 254, 0.95);
+  background: rgba(239, 246, 255, 0.96);
+  color: #1d4ed8;
+}
+
 .channel-config-card__pill--success {
   border-color: rgba(187, 247, 208, 0.95);
   background: rgba(240, 253, 244, 0.96);
@@ -4026,6 +4101,11 @@ watch(
 .config-subpanel--sky {
   background: linear-gradient(180deg, rgba(240, 249, 255, 0.98), rgba(255, 255, 255, 0.98));
   border-color: rgba(186, 230, 253, 0.95);
+}
+
+.config-subpanel--blue {
+  background: linear-gradient(180deg, rgba(239, 246, 255, 0.98), rgba(255, 255, 255, 0.98));
+  border-color: rgba(191, 219, 254, 0.95);
 }
 
 .config-subpanel--violet {

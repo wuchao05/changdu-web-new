@@ -16,6 +16,7 @@ import {
 } from '../utils/studioData.js'
 import { DEFAULT_BUILD_CONFIG, normalizeBuildConfig } from '../config/buildConfig.js'
 import { buildServiceLogPrefix } from '../utils/serviceLogger.js'
+import { applyUserBuildAdvanceToBuildConfig } from '../utils/buildAdvanceConfig.js'
 
 const router = new Router({
   prefix: '/api/session',
@@ -197,7 +198,10 @@ router.get('/me', async ctx => {
         douyinMaterialMatches: Array.isArray(runtimeUser?.douyinMaterialMatches)
           ? runtimeUser.douyinMaterialMatches
           : [],
-        buildConfig: normalizeBuildConfig(channel?.juliang?.buildConfig || DEFAULT_BUILD_CONFIG),
+        buildConfig: applyUserBuildAdvanceToBuildConfig(
+          normalizeBuildConfig(channel?.juliang?.buildConfig || DEFAULT_BUILD_CONFIG),
+          runtimeUser?.buildAdvanceConfig
+        ),
         downloadCenterConfig: defaultDownloadCenterConfig,
       },
     }

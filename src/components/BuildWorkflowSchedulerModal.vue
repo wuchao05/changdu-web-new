@@ -237,6 +237,19 @@ function getCurrentEarliestBuildTime(drama: FeishuDramaRecord) {
   return getEarliestBuildTime(drama, currentBuildConfig.value || {})
 }
 
+async function assertDramaBuildWindowAllowed(drama: FeishuDramaRecord) {
+  const result = await buildWorkflowApi.validateBuildWindow(drama)
+  if (result.data.canBuild) {
+    return result.data
+  }
+
+  throw new Error(
+    result.data.earliestBuildTime
+      ? `未到可搭建时间，最早可在 ${result.data.earliestBuildTime} 提交搭建`
+      : '未到可搭建时间'
+  )
+}
+
 function findConfiguredMicroAppAsset(
   assets: Array<Record<string, any>> | undefined,
   buildConfig: adminApi.ChannelConfig['juliang']['buildConfig'] | null
@@ -1050,6 +1063,13 @@ async function handleBuildSingleDrama(drama: FeishuDramaRecord) {
     return
   }
 
+  try {
+    await assertDramaBuildWindowAllowed(drama)
+  } catch (error) {
+    message.warning(getErrorMessage(error))
+    return
+  }
+
   // 如果后台调度器正在运行，使用后台手动搭建模式
   if (backgroundSchedulerStatus.value?.enabled) {
     await handleBackgroundManualBuild(drama)
@@ -1221,6 +1241,22 @@ async function executeBuildProcess() {
       index: i + 1,
       total: dramas.value.length,
     })
+
+    try {
+      await assertDramaBuildWindowAllowed(drama)
+    } catch (error) {
+      const messageText = getErrorMessage(error)
+      record.status = 'skipped'
+      record.errorMessage = messageText
+      message.warning(`${record.dramaName}：${messageText}`)
+      reportWorkflowLog('手动搭建剧集命中时机限制', 'warn', {
+        mode: 'manual_build',
+        dramaName: record.dramaName,
+        dramaId: drama.record_id,
+        reason: messageText,
+      })
+      continue
+    }
 
     try {
       // 执行资产化
