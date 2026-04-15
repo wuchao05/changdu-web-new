@@ -299,6 +299,11 @@ async function resolveRuntimeFeishuConfig(ctx) {
   const sessionUser = await getSessionUser(ctx)
   if (!sessionUser) {
     return {
+      requestedChannelId: '',
+      channelId: '',
+      channelName: '',
+      runtimeUserId: '',
+      runtimeUserName: '',
       dramaListTableId: '',
       dramaStatusTableId: '',
       accountTableId: '',
@@ -309,6 +314,13 @@ async function resolveRuntimeFeishuConfig(ctx) {
   const runtimeContext = await resolveRuntimeContext(sessionUser, requestedChannelId)
 
   return {
+    requestedChannelId,
+    channelId: String(runtimeContext.channel?.id || '').trim(),
+    channelName: String(runtimeContext.channel?.name || '').trim(),
+    runtimeUserId: String(runtimeContext.runtimeUser?.id || '').trim(),
+    runtimeUserName: String(
+      runtimeContext.runtimeUser?.nickname || runtimeContext.runtimeUser?.account || ''
+    ).trim(),
     dramaListTableId: String(runtimeContext.runtimeUser?.feishu?.dramaListTableId || '').trim(),
     dramaStatusTableId: String(runtimeContext.runtimeUser?.feishu?.dramaStatusTableId || '').trim(),
     accountTableId: String(runtimeContext.runtimeUser?.feishu?.accountTableId || '').trim(),
@@ -579,6 +591,20 @@ router.get('/distributor/content/series/list/v1', async ctx => {
     const targetDramaListTableId = resolveDramaListTableId(
       runtimeFeishuConfig,
       ctx.query.drama_list_table_id
+    )
+    console.log(
+      '[爆剧爆剪-剧集查询] 飞书表配置:',
+      JSON.stringify({
+        requestedChannelId: runtimeFeishuConfig.requestedChannelId,
+        channelId: runtimeFeishuConfig.channelId,
+        channelName: runtimeFeishuConfig.channelName,
+        runtimeUserId: runtimeFeishuConfig.runtimeUserId,
+        runtimeUserName: runtimeFeishuConfig.runtimeUserName,
+        requestedDramaListTableId: String(ctx.query.drama_list_table_id || '').trim(),
+        resolvedDramaListTableId: targetDramaListTableId,
+        query: String(ctx.query.query || '').trim(),
+        pageIndex: String(ctx.query.page_index || '').trim(),
+      })
     )
 
     const parsedPageIndex = parseInt(ctx.query.page_index, 10)
@@ -894,6 +920,19 @@ router.get('/distributor/statistic/rank/series/quality/list/v2', async ctx => {
     const targetDramaListTableId = resolveDramaListTableId(
       runtimeFeishuConfig,
       ctx.query.drama_list_table_id
+    )
+    console.log(
+      '[爆剧爆剪-排行榜查询] 飞书表配置:',
+      JSON.stringify({
+        requestedChannelId: runtimeFeishuConfig.requestedChannelId,
+        channelId: runtimeFeishuConfig.channelId,
+        channelName: runtimeFeishuConfig.channelName,
+        runtimeUserId: runtimeFeishuConfig.runtimeUserId,
+        runtimeUserName: runtimeFeishuConfig.runtimeUserName,
+        requestedDramaListTableId: String(ctx.query.drama_list_table_id || '').trim(),
+        resolvedDramaListTableId: targetDramaListTableId,
+        pageIndex: String(ctx.query.page_index || '').trim(),
+      })
     )
 
     // 首先获取排行榜数据
