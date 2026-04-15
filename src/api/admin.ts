@@ -382,6 +382,23 @@ export function getCurrentSession() {
     channel: { id: string; name: string } | null
     availableChannels: Array<{ id: string; name: string }>
     channelBoundUsers: UserProfile[]
+    platforms: {
+      changdu?: {
+        channel?: {
+          cookie?: string
+          distributorId?: string
+          adUserId?: string
+          rootAdUserId?: string
+          appId?: string
+        }
+      }
+      juliang?: {
+        channel?: string
+      }
+      adx?: {
+        cookie?: string
+      }
+    }
     feishu: {
       dramaListTableId: string
       dramaStatusTableId: string

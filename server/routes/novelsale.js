@@ -295,6 +295,34 @@ async function resolveIndependentOrderStatsRuntime(ctx) {
   }
 }
 
+async function resolveRuntimeFeishuConfig(ctx) {
+  const sessionUser = await getSessionUser(ctx)
+  if (!sessionUser) {
+    return {
+      dramaListTableId: '',
+      dramaStatusTableId: '',
+      accountTableId: '',
+    }
+  }
+
+  const requestedChannelId = String(ctx.get('x-studio-channel-id') || '').trim()
+  const runtimeContext = await resolveRuntimeContext(sessionUser, requestedChannelId)
+
+  return {
+    dramaListTableId: String(runtimeContext.runtimeUser?.feishu?.dramaListTableId || '').trim(),
+    dramaStatusTableId: String(runtimeContext.runtimeUser?.feishu?.dramaStatusTableId || '').trim(),
+    accountTableId: String(runtimeContext.runtimeUser?.feishu?.accountTableId || '').trim(),
+  }
+}
+
+function resolveDramaListTableId(runtimeFeishuConfig, requestedTableId) {
+  return (
+    String(runtimeFeishuConfig?.dramaListTableId || '').trim() ||
+    String(requestedTableId || '').trim() ||
+    FEISHU_CONFIG.table_ids.drama_list
+  )
+}
+
 // 通过短剧名称获取 copyright_content_id，作为内部接口关键词查询失败时的兜底
 async function getDramaIdByTitle(title) {
   void title
@@ -547,12 +575,11 @@ router.post('/a-bogus', async ctx => {
 // 系列列表 - 通过服务端直连常读内部接口，同步获取飞书剧集清单数据
 router.get('/distributor/content/series/list/v1', async ctx => {
   try {
-    // console.log('[新剧抢跑] 收到前端请求:', {
-    //   query: ctx.query,
-    // })
-
-    // 接收前端传递的 drama_list_table_id，用于查询当前渠道关联的飞书表格
-    const dramaListTableId = ctx.query.drama_list_table_id
+    const runtimeFeishuConfig = await resolveRuntimeFeishuConfig(ctx)
+    const targetDramaListTableId = resolveDramaListTableId(
+      runtimeFeishuConfig,
+      ctx.query.drama_list_table_id
+    )
 
     const parsedPageIndex = parseInt(ctx.query.page_index, 10)
     const pageIndex = Number.isNaN(parsedPageIndex) ? 0 : Math.max(parsedPageIndex, 0)
@@ -563,6 +590,7 @@ router.get('/distributor/content/series/list/v1', async ctx => {
     // 构建请求参数
     const params = {
       permission_statuses: '3,4',
+      delivery_status: 1,
       aweme_user_new_version: 'false',
       page_index: pageIndex,
       page_size: parseInt(ctx.query.page_size) || 100,
@@ -709,8 +737,7 @@ router.get('/distributor/content/series/list/v1', async ctx => {
         let pageToken = undefined
         let totalRecords = 0
 
-        // 使用前端传递的 table_id，如果没有则使用默认配置
-        const targetTableId = dramaListTableId || FEISHU_CONFIG.table_ids.drama_list
+        const targetTableId = targetDramaListTableId
 
         do {
           // 构建 URL 参数，使用 GET 接口代替 search 接口
@@ -863,8 +890,11 @@ router.get(
 // 排行榜列表 - 增强版，同步获取飞书剧集清单数据
 router.get('/distributor/statistic/rank/series/quality/list/v2', async ctx => {
   try {
-    // 接收前端传递的 drama_list_table_id，用于查询当前渠道关联的飞书表格
-    const dramaListTableId = ctx.query.drama_list_table_id
+    const runtimeFeishuConfig = await resolveRuntimeFeishuConfig(ctx)
+    const targetDramaListTableId = resolveDramaListTableId(
+      runtimeFeishuConfig,
+      ctx.query.drama_list_table_id
+    )
 
     // 首先获取排行榜数据
     const rankingListHandler = createGetHandler(
@@ -912,8 +942,7 @@ router.get('/distributor/statistic/rank/series/quality/list/v2', async ctx => {
         let pageToken = undefined
         // let pageCount = 0
 
-        // 使用前端传递的 table_id，如果没有则使用默认配置
-        const targetTableId = dramaListTableId || FEISHU_CONFIG.table_ids.drama_list
+        const targetTableId = targetDramaListTableId
 
         do {
           // 构建 URL 参数，使用 GET 接口代替 search 接口

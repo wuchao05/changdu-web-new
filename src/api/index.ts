@@ -95,6 +95,7 @@ export function getNewDramaList(params: NewDramaParams = {}): Promise<NewDramaDa
     .get('/novelsale/distributor/content/series/list/v1', {
       params: {
         permission_statuses: '3,4',
+        delivery_status: 1,
         sort_type: 1,
         sort_field: 3,
         page_index: 1,
@@ -117,6 +118,7 @@ export function searchNewDramaList(params: NewDramaParams = {}): Promise<NewDram
     .get('/novelsale/distributor/content/series/list/v1', {
       params: {
         permission_statuses: '3,4',
+        delivery_status: 1,
         page_index: 0,
         page_size: 10,
         ...params,

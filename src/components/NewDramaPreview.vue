@@ -897,7 +897,6 @@ import { useRouter } from 'vue-router'
 import { useApiConfigStore } from '@/stores/apiConfig'
 import { useDouyinMaterialStore } from '@/stores/douyinMaterial'
 import { useSessionStore } from '@/stores/session'
-import { buildSessionHeaders } from '@/utils/sessionToken'
 import {
   getNewDramaList,
   searchNewDramaList,
@@ -905,7 +904,7 @@ import {
   getDownloadUrl,
   feishuApi,
 } from '@/api'
-import { reportPageVisit } from '@/api/admin'
+import { getCurrentSession, reportPageVisit } from '@/api/admin'
 import {
   startAutoSubmit as startAutoSubmitApi,
   stopAutoSubmit as stopAutoSubmitApi,
@@ -937,6 +936,52 @@ const currentBrandName = computed(
   () => sessionStore.currentRuntimeUser?.brandName || sessionStore.currentUser?.brandName || '小红'
 )
 const accountRecycleEnabled = ref(false)
+
+async function syncCurrentChannelConfig() {
+  try {
+    const sessionData = await getCurrentSession()
+    accountRecycleEnabled.value = Boolean(sessionData?.buildConfig?.recycleAccountsWhenExhausted)
+    apiConfigStore.updateFromAuthConfig({
+      platforms: sessionData?.platforms,
+      feishu: sessionData?.feishu,
+      sessionUser: sessionData?.user,
+      runtimeUser: sessionData?.runtimeUser ?? undefined,
+      activeChannel: sessionData?.channel,
+    })
+  } catch (error) {
+    console.warn('同步当前渠道配置失败，继续使用现有配置:', error)
+  }
+}
+
+function resetChannelScopedData() {
+  clearPendingDownloadState()
+  searchResults.value = []
+  searchTotal.value = 0
+  searchCurrentPage.value = 1
+  currentPage.value = 1
+  dramaList.value = []
+  rankingList.value = []
+  rankingTotal.value = 0
+  rankingPageIndex.value = 0
+  downloadList.value = []
+}
+
+async function reloadChannelScopedData() {
+  resetChannelScopedData()
+
+  const keyword = searchKeyword.value.trim()
+  if (keyword) {
+    await performSearch(keyword, 1)
+    return
+  }
+
+  if (activeTab.value === 'ranking') {
+    await fetchRankingList()
+    return
+  }
+
+  await fetchDramaList()
+}
 
 // 格式化抖音号素材配置
 function formatDouyinMaterialConfig(): string {
@@ -3484,29 +3529,7 @@ async function goToRankingPage(page: number | string) {
 
 // 组件挂载时获取数据
 onMounted(async () => {
-  // 从服务器同步最新的认证配置
-  try {
-    const response = await fetch('/api/session/me', {
-      headers: buildSessionHeaders(),
-    })
-    if (response.ok) {
-      const { data } = await response.json()
-      accountRecycleEnabled.value = Boolean(data?.buildConfig?.recycleAccountsWhenExhausted)
-      if (data && data.platforms?.changdu) {
-        apiConfigStore.updateFromAuthConfig({
-          platforms: data.platforms,
-          feishu: data.feishu,
-          sessionUser: data.user,
-          runtimeUser: data.runtimeUser,
-          activeChannel: data.channel,
-        })
-      }
-    } else {
-      console.warn('获取认证配置失败，使用本地配置')
-    }
-  } catch (error) {
-    console.warn('同步认证配置失败，使用本地配置:', error)
-  }
+  await syncCurrentChannelConfig()
 
   reportPageVisit('剧单页').catch((error: unknown) => {
     console.warn('记录剧单页访问日志失败:', error)
@@ -3553,9 +3576,19 @@ onMounted(async () => {
 
 watch(
   () => sessionStore.selectedChannelId,
-  () => {
+  async (newChannelId, oldChannelId) => {
+    if (!newChannelId || newChannelId === oldChannelId) {
+      return
+    }
+
+    await syncCurrentChannelConfig()
+
     douyinMaterialStore.loadFromServer(true).catch(error => {
       console.error('切换渠道后加载抖音号匹配素材失败:', error)
+    })
+
+    reloadChannelScopedData().catch(error => {
+      console.error('切换渠道后刷新爆剧爆剪数据失败:', error)
     })
   }
 )
