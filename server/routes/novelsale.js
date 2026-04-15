@@ -616,7 +616,6 @@ router.get('/distributor/content/series/list/v1', async ctx => {
     // 构建请求参数
     const params = {
       permission_statuses: '3,4',
-      delivery_status: 1,
       aweme_user_new_version: 'false',
       page_index: pageIndex,
       page_size: parseInt(ctx.query.page_size) || 100,
@@ -639,6 +638,7 @@ router.get('/distributor/content/series/list/v1', async ctx => {
     }
     if (rawQueryValue) {
       params.query = rawQueryValue
+      params.delivery_status = 1
     }
     if (isNumericSearchRequest) {
       params.search_type = 1
