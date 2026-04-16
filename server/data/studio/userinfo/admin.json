@@ -6,7 +6,8 @@
   "password": "qwer1234",
   "authTokens": [
     "105851f2677b59575690c66f004b7e076522f0cbad629e5f",
-    "d6459d532055a4c562ee0511151aae13bed007400f608cbb"
+    "d6459d532055a4c562ee0511151aae13bed007400f608cbb",
+    "64f460590eed6dba3f570e81e5c90505bf89f392f8d74fbd"
   ],
   "userType": "admin",
   "channelIds": [
@@ -17,6 +18,16 @@
   "channelConfigs": {
     "5f0d85e6-26a0-4fe2-a0c5-30c78a8770df": {
       "enabled": true,
+      "buildPreference": {
+        "bid": ""
+      },
+      "buildAdvanceConfig": {
+        "allowCustom": false,
+        "useCustom": false,
+        "forbiddenAdvanceStartHour": "0",
+        "forbiddenAdvanceEndHour": "0",
+        "advanceBuildHours": "0"
+      },
       "feishu": {
         "dramaListTableId": "tblvuZhBd4drW26n",
         "dramaStatusTableId": "tblDOyi2Lzs80sv0",
@@ -168,6 +179,16 @@
     },
     "00514b91-884d-40f8-9e67-6a593a9df74f": {
       "enabled": true,
+      "buildPreference": {
+        "bid": ""
+      },
+      "buildAdvanceConfig": {
+        "allowCustom": false,
+        "useCustom": false,
+        "forbiddenAdvanceStartHour": "0",
+        "forbiddenAdvanceEndHour": "0",
+        "advanceBuildHours": "0"
+      },
       "feishu": {
         "dramaListTableId": "",
         "dramaStatusTableId": "",
@@ -340,5 +361,5 @@
     "buildTimeWindowEnd": 20
   },
   "createdAt": "2026-03-26T13:32:12.621Z",
-  "updatedAt": "2026-04-07T15:44:47.226Z"
+  "updatedAt": "2026-04-15T04:35:38.473Z"
 }
