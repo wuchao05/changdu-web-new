@@ -346,7 +346,11 @@
       :width="userDrawerWidth"
       class="admin-form-drawer admin-form-drawer--streamlined"
     >
-      <n-drawer-content closable body-content-style="padding: 0">
+      <n-drawer-content
+        closable
+        body-content-style="padding: 0"
+        class="admin-form-drawer--streamlined"
+      >
         <template #header>
           <div class="drawer-hero drawer-hero--user">
             <div class="drawer-hero__icon">
@@ -1162,7 +1166,11 @@
       :width="channelDrawerWidth"
       class="admin-form-drawer admin-form-drawer--streamlined"
     >
-      <n-drawer-content closable body-content-style="padding: 0">
+      <n-drawer-content
+        closable
+        body-content-style="padding: 0"
+        class="admin-form-drawer--streamlined"
+      >
         <template #header>
           <div class="drawer-hero drawer-hero--channel">
             <div class="drawer-hero__icon">
