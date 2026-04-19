@@ -467,6 +467,7 @@ const statistics = computed(() => {
 const showProgress = computed(() => buildRecords.value.length > 0)
 const showMaterialPreviewSwitch = computed(
   () =>
+    Boolean(materialPreviewConfig.value) ||
     Boolean(materialPreviewConfig.value?.enabled) ||
     Boolean(materialPreviewStatus.value?.enabled) ||
     Boolean(materialPreviewStatus.value?.running)

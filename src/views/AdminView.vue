@@ -963,8 +963,7 @@
                         <div>
                           <p class="text-sm font-semibold text-violet-600">抖音号匹配素材</p>
                           <p class="mt-1 text-sm text-slate-500">
-                            当前渠道只维护素材序号，抖音号名称、抖音号 ID
-                            和合作码统一复用该用户绑定的抖音号列表。
+                            先选择当前渠道要使用的抖音号，再按素材总数自动平均分配素材序号。
                           </p>
                         </div>
                         <div class="flex flex-wrap items-center justify-end gap-3">
@@ -994,166 +993,133 @@
                         </div>
                       </div>
 
-                      <div class="material-match-toolbar">
-                        <n-input
-                          :value="materialMatchSearchDrafts[item.channel.id] || ''"
-                          clearable
-                          placeholder="搜索抖音号、ID、合作码或素材序号..."
-                          class="material-match-search"
-                          @update:value="updateMaterialMatchSearchDraft(item.channel.id, $event)"
-                        >
-                          <template #prefix>
-                            <Icon icon="mdi:magnify" />
-                          </template>
-                        </n-input>
-                        <p class="material-match-toolbar__meta">
-                          {{
-                            getFilteredMaterialMatches(
-                              item.channel.id,
-                              item.config.douyinMaterialMatches
-                            ).length
-                          }}
-                          / {{ item.config.douyinMaterialMatches.length }} 条可见
-                        </p>
-                      </div>
-
                       <div
                         v-if="userForm.douyinAccounts.length === 0"
                         class="material-match-empty-warning"
                       >
-                        当前用户还没有绑定抖音号，请先到顶部“抖音号配置”里维护抖音号名称、抖音号 ID
-                        和合作码。
+                        当前用户还没有绑定抖音号，请先到顶部“抖音号配置”里维护。
                       </div>
 
-                      <div
-                        v-if="item.config.douyinMaterialMatches.length > 0"
-                        class="material-match-list"
-                      >
-                        <div
-                          v-for="match in getFilteredMaterialMatches(
-                            item.channel.id,
-                            item.config.douyinMaterialMatches
-                          )"
-                          :key="match.id"
-                          class="material-match-card"
-                        >
-                          <div class="material-match-card__summary">
-                            <div class="material-match-card__items">
-                              <div class="material-match-card__item">
-                                <Icon icon="mdi:account" class="h-4 w-4 text-slate-500" />
-                                <span class="material-match-card__name">
-                                  {{
-                                    getMaterialMatchAccountMeta(match).douyinAccount ||
-                                    '未选择抖音号'
-                                  }}
-                                </span>
-                              </div>
-                              <div
-                                class="material-match-card__item material-match-card__item--muted"
-                              >
-                                <span class="material-match-card__label">ID</span>
-                                <span>
-                                  {{
-                                    getMaterialMatchAccountMeta(match).douyinAccountId || '未填写'
-                                  }}
-                                </span>
-                              </div>
-                              <Icon
-                                icon="mdi:arrow-right"
-                                class="hidden h-4 w-4 text-slate-300 md:block"
-                              />
-                              <div
-                                class="material-match-card__item material-match-card__item--range"
-                              >
-                                <Icon icon="mdi:video-outline" class="h-4 w-4 text-slate-500" />
-                                <span class="material-match-card__range">
-                                  {{ match.materialRange || '未填写素材序号' }}
-                                </span>
-                              </div>
+                      <div v-else class="material-match-builder">
+                        <div class="material-match-builder__toolbar">
+                          <div class="material-match-builder__selector">
+                            <div>
+                              <p class="material-match-builder__label">选择抖音号</p>
+                              <p class="material-match-builder__subtext">
+                                已在其他已启用渠道占用的抖音号，这里不可重复选择。
+                              </p>
                             </div>
-                            <div class="material-match-card__actions">
-                              <n-button
-                                size="small"
-                                @click="
-                                  isEditingUserChannelMatch(item.channel.id, match.id)
-                                    ? cancelEditUserChannelMatch(item.channel.id)
-                                    : startEditUserChannelMatch(item.channel.id, match.id)
+                            <n-select
+                              :value="getUserChannelSelectedMaterialAccountIds(item.channel.id)"
+                              multiple
+                              filterable
+                              clearable
+                              max-tag-count="responsive"
+                              :options="getUserChannelMaterialSelectOptions(item.channel.id)"
+                              placeholder="请选择当前渠道要使用的抖音号"
+                              @update:value="
+                                value =>
+                                  handleUserChannelMaterialSelectionChange(item.channel.id, value)
+                              "
+                            />
+                            <p
+                              v-if="getUserChannelOccupiedMaterialAccountCount(item.channel.id) > 0"
+                              class="material-match-builder__hint"
+                            >
+                              当前有
+                              {{ getUserChannelOccupiedMaterialAccountCount(item.channel.id) }}
+                              个抖音号已在其他启用渠道中占用。
+                            </p>
+                          </div>
+                          <div class="material-match-builder__average">
+                            <span class="material-match-builder__average-label">平均分配</span>
+                            <n-input-number
+                              :value="materialMatchBatchTotals[item.channel.id] ?? null"
+                              :min="1"
+                              :precision="0"
+                              placeholder="素材总数"
+                              class="w-full"
+                              @update:value="setMaterialMatchBatchTotal(item.channel.id, $event)"
+                            />
+                            <n-button
+                              tertiary
+                              type="primary"
+                              :disabled="
+                                !getUserChannelSelectedMaterialAccountIds(item.channel.id).length
+                              "
+                              @click="applyUserChannelAverageMaterialRanges(item.channel.id)"
+                            >
+                              自动填写
+                            </n-button>
+                          </div>
+                        </div>
+
+                        <div
+                          v-if="item.config.douyinMaterialMatches.length > 0"
+                          class="material-match-list"
+                        >
+                          <div
+                            v-for="(match, matchIndex) in item.config.douyinMaterialMatches"
+                            :key="match.id"
+                            class="material-match-card"
+                          >
+                            <div class="material-match-card__summary">
+                              <div class="material-match-card__items">
+                                <div class="material-match-card__item">
+                                  <span class="material-match-card__order">{{
+                                    matchIndex + 1
+                                  }}</span>
+                                  <span class="material-match-card__name">
+                                    {{
+                                      getMaterialMatchAccountMeta(match).douyinAccount ||
+                                      '未选择抖音号'
+                                    }}
+                                  </span>
+                                </div>
+                                <span class="material-match-card__inline-id">
+                                  {{
+                                    formatMaterialMatchAccountId(
+                                      getMaterialMatchAccountMeta(match).douyinAccountId
+                                    )
+                                  }}
+                                </span>
+                                <div
+                                  class="material-match-card__item material-match-card__item--range"
+                                >
+                                  <Icon icon="mdi:video-outline" class="h-4 w-4 text-slate-500" />
+                                  <span class="material-match-card__range">
+                                    {{ match.materialRange || '未填写素材序号' }}
+                                  </span>
+                                </div>
+                              </div>
+                              <span
+                                class="channel-config-card__pill"
+                                :class="
+                                  match.materialRange
+                                    ? 'channel-config-card__pill--success'
+                                    : 'channel-config-card__pill--warning'
                                 "
                               >
-                                {{
-                                  isEditingUserChannelMatch(item.channel.id, match.id)
-                                    ? '收起'
-                                    : '编辑'
-                                }}
-                              </n-button>
-                              <n-button
-                                size="small"
-                                type="error"
-                                tertiary
-                                @click="removeUserChannelMatch(item.channel.id, match.id)"
-                              >
-                                删除
-                              </n-button>
+                                {{ match.materialRange ? '已分配' : '待填写' }}
+                              </span>
                             </div>
-                          </div>
-                          <div
-                            v-if="isEditingUserChannelMatch(item.channel.id, match.id)"
-                            class="material-match-card__editor"
-                          >
-                            <n-select
-                              v-model:value="match.douyinAccountRefId"
-                              :options="getUserDouyinAccountOptions()"
-                              filterable
-                              placeholder="请选择抖音号"
-                            />
-                            <n-input
-                              v-model:value="match.materialRange"
-                              placeholder="请输入素材序号，如 01-04"
-                            />
-                            <div class="material-match-card__hint">
-                              抖音号ID：{{
-                                getMaterialMatchAccountMeta(match).douyinAccountId || '未绑定'
-                              }}
-                              · 合作码：{{
-                                getMaterialMatchAccountMeta(match).cooperationCode || '未填写'
-                              }}
+                            <div
+                              class="material-match-card__editor material-match-card__editor--single"
+                            >
+                              <n-input
+                                v-model:value="match.materialRange"
+                                placeholder="请输入素材序号，如 01-04"
+                              />
                             </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div
-                        v-else
-                        class="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500"
-                      >
-                        当前渠道暂无匹配规则，点击下方“添加规则”为已绑定抖音号补充素材序号。
-                      </div>
-
-                      <div
-                        v-if="
-                          item.config.douyinMaterialMatches.length > 0 &&
-                          getFilteredMaterialMatches(
-                            item.channel.id,
-                            item.config.douyinMaterialMatches
-                          ).length === 0
-                        "
-                        class="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-500"
-                      >
-                        没有匹配到搜索结果，换个关键词试试。
-                      </div>
-
-                      <div class="material-match-actions">
-                        <n-button
-                          type="primary"
-                          tertiary
-                          :disabled="userForm.douyinAccounts.length === 0"
-                          @click="addUserChannelMatch(item.channel.id)"
+                        <div
+                          v-else
+                          class="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500"
                         >
-                          <template #icon>
-                            <Icon icon="mdi:plus" />
-                          </template>
-                          添加规则
-                        </n-button>
+                          先在上方选择抖音号，再填写或自动分配素材序号。
+                        </div>
                       </div>
                     </div>
                     <div v-if="!item.config.enabled" class="channel-config-card__empty">
@@ -1759,8 +1725,8 @@ const orderUsernameDrafts = reactive<Record<string, string>>({})
 const douyinAccountDrafts = reactive<Record<string, adminApi.DouyinAccount[]>>({})
 const douyinAccountExpandedState = reactive<Record<string, boolean>>({})
 const selectedDouyinAccountByUser = reactive<Record<string, string>>({})
-const materialMatchSearchDrafts = reactive<Record<string, string>>({})
-const editingMaterialMatchIds = reactive<Record<string, string>>({})
+const materialMatchBatchTotals = reactive<Record<string, number | null>>({})
+const selectedMaterialAccountIdsByChannel = reactive<Record<string, string[]>>({})
 const userChannelExpandedState = reactive<Record<string, boolean>>({})
 const userChannelReuseSourceIds = reactive<Record<string, string>>({})
 const draggedOrderUsername = reactive({
@@ -2768,11 +2734,11 @@ function resetUserForm() {
   Object.keys(orderUsernameDrafts).forEach(key => {
     delete orderUsernameDrafts[key]
   })
-  Object.keys(materialMatchSearchDrafts).forEach(key => {
-    delete materialMatchSearchDrafts[key]
+  Object.keys(materialMatchBatchTotals).forEach(key => {
+    delete materialMatchBatchTotals[key]
   })
-  Object.keys(editingMaterialMatchIds).forEach(key => {
-    delete editingMaterialMatchIds[key]
+  Object.keys(selectedMaterialAccountIdsByChannel).forEach(key => {
+    delete selectedMaterialAccountIdsByChannel[key]
   })
   Object.keys(userChannelExpandedState).forEach(key => {
     delete userChannelExpandedState[key]
@@ -2792,30 +2758,6 @@ function resetDownloadCenterForm() {
   Object.assign(downloadCenterForm, createDefaultDownloadCenterForm())
 }
 
-function addUserChannelMatch(channelId: string) {
-  if (!Array.isArray(userForm.douyinAccounts) || userForm.douyinAccounts.length === 0) {
-    message.warning('请先在“抖音号配置”里为该用户维护抖音号')
-    return
-  }
-
-  if (!userForm.channelConfigs[channelId]) {
-    userForm.channelConfigs[channelId] = createDefaultUserChannelConfig()
-  }
-
-  const nextMatch = {
-    id: crypto.randomUUID(),
-    douyinAccountRefId: '',
-    materialRange: '',
-  }
-
-  userForm.channelConfigs[channelId].douyinMaterialMatches.push(nextMatch)
-  editingMaterialMatchIds[channelId] = nextMatch.id
-}
-
-function updateMaterialMatchSearchDraft(channelId: string, value: string) {
-  materialMatchSearchDrafts[channelId] = value
-}
-
 function countConfiguredMaterialMatches(
   matches: adminApi.UserChannelBindingConfig['douyinMaterialMatches']
 ) {
@@ -2823,6 +2765,153 @@ function countConfiguredMaterialMatches(
     match =>
       Boolean(getBoundDouyinAccount(match.douyinAccountRefId)) && Boolean(match.materialRange)
   ).length
+}
+
+function createDraftUserChannelMaterialMatch(douyinAccountRefId: string) {
+  return {
+    id: crypto.randomUUID(),
+    douyinAccountRefId,
+    materialRange: '',
+  }
+}
+
+function syncUserChannelMaterialSelection(channelId: string) {
+  const matches = userForm.channelConfigs?.[channelId]?.douyinMaterialMatches || []
+  selectedMaterialAccountIdsByChannel[channelId] = matches
+    .map(match => String(match.douyinAccountRefId || '').trim())
+    .filter(Boolean)
+}
+
+function getUserChannelSelectedMaterialAccountIds(channelId: string) {
+  if (!Array.isArray(selectedMaterialAccountIdsByChannel[channelId])) {
+    syncUserChannelMaterialSelection(channelId)
+  }
+
+  return Array.isArray(selectedMaterialAccountIdsByChannel[channelId])
+    ? selectedMaterialAccountIdsByChannel[channelId]
+    : []
+}
+
+function getUserChannelOccupiedMaterialAccountIds(channelId: string) {
+  const occupiedIds = new Set<string>()
+
+  Object.entries(userForm.channelConfigs || {}).forEach(([currentChannelId, config]) => {
+    if (currentChannelId === channelId || !config?.enabled) {
+      return
+    }
+
+    ;(config.douyinMaterialMatches || []).forEach(match => {
+      const refId = String(match?.douyinAccountRefId || '').trim()
+      if (refId) {
+        occupiedIds.add(refId)
+      }
+    })
+  })
+
+  return occupiedIds
+}
+
+function getUserChannelOccupiedMaterialAccountCount(channelId: string) {
+  return getUserChannelOccupiedMaterialAccountIds(channelId).size
+}
+
+function getUserChannelMaterialSelectOptions(channelId: string) {
+  const selectedIds = new Set(getUserChannelSelectedMaterialAccountIds(channelId))
+  const occupiedIds = getUserChannelOccupiedMaterialAccountIds(channelId)
+
+  return getUserDouyinAccountOptions().map(option => ({
+    ...option,
+    disabled:
+      occupiedIds.has(String(option.value || '')) && !selectedIds.has(String(option.value || '')),
+  }))
+}
+
+function handleUserChannelMaterialSelectionChange(channelId: string, value: string[] | null) {
+  if (!userForm.channelConfigs[channelId]) {
+    userForm.channelConfigs[channelId] = createDefaultUserChannelConfig()
+  }
+
+  const occupiedIds = getUserChannelOccupiedMaterialAccountIds(channelId)
+  const selectedIds = Array.from(
+    new Set(
+      (Array.isArray(value) ? value : [])
+        .map(item => String(item || '').trim())
+        .filter(Boolean)
+        .filter(item => !occupiedIds.has(item))
+    )
+  )
+  const currentMatchMap = new Map(
+    userForm.channelConfigs[channelId].douyinMaterialMatches.map(match => [
+      String(match.douyinAccountRefId || '').trim(),
+      match,
+    ])
+  )
+
+  userForm.channelConfigs[channelId].douyinMaterialMatches = selectedIds.map(accountId => {
+    const currentMatch = currentMatchMap.get(accountId)
+    return currentMatch
+      ? {
+          ...currentMatch,
+          douyinAccountRefId: accountId,
+        }
+      : createDraftUserChannelMaterialMatch(accountId)
+  })
+  selectedMaterialAccountIdsByChannel[channelId] = selectedIds
+}
+
+function setMaterialMatchBatchTotal(channelId: string, value: number | null) {
+  materialMatchBatchTotals[channelId] = value
+}
+
+function applyUserChannelAverageMaterialRanges(channelId: string) {
+  const totalCount = Number(materialMatchBatchTotals[channelId])
+  const matches = userForm.channelConfigs?.[channelId]?.douyinMaterialMatches || []
+
+  if (!matches.length) {
+    message.warning('请先选择至少 1 个抖音号')
+    return
+  }
+
+  if (!Number.isFinite(totalCount) || totalCount <= 0) {
+    message.warning('请先输入有效的素材总数')
+    return
+  }
+
+  if (totalCount < matches.length) {
+    message.warning('素材总数不能少于已选择的抖音号数量')
+    return
+  }
+
+  const baseCount = Math.floor(totalCount / matches.length)
+  const remainder = totalCount % matches.length
+  const padLength = Math.max(2, String(totalCount).length)
+  let currentIndex = 1
+
+  matches.forEach((match, index) => {
+    const count = baseCount + (index < remainder ? 1 : 0)
+    const start = currentIndex
+    const end = currentIndex + count - 1
+    const formatNumber = (value: number) => String(value).padStart(padLength, '0')
+
+    match.materialRange =
+      count === 1 ? formatNumber(start) : `${formatNumber(start)}-${formatNumber(end)}`
+    currentIndex = end + 1
+  })
+
+  message.success(`已为当前渠道平均分配 ${totalCount} 个素材`)
+}
+
+function formatMaterialMatchAccountId(value?: string) {
+  const normalizedValue = String(value || '').trim()
+  if (!normalizedValue) {
+    return 'ID --'
+  }
+
+  if (normalizedValue.length <= 8) {
+    return `ID ${normalizedValue}`
+  }
+
+  return `ID ${normalizedValue.slice(0, 4)}...${normalizedValue.slice(-4)}`
 }
 
 function getUserChannelReuseOptions(channelId: string) {
@@ -2865,8 +2954,10 @@ function copyUserChannelConfig(channelId: string) {
 
   userForm.channelConfigs[channelId] = cloneUserChannelConfig(sourceConfig)
   userChannelExpandedState[channelId] = true
-  editingMaterialMatchIds[channelId] = ''
-  materialMatchSearchDrafts[channelId] = ''
+  handleUserChannelMaterialSelectionChange(
+    channelId,
+    userForm.channelConfigs[channelId].douyinMaterialMatches.map(match => match.douyinAccountRefId)
+  )
   orderUsernameDrafts[channelId] = ''
 
   message.success(`已将【${sourceChannelName}】配置复制到【${targetChannelName}】，后续可独立修改`)
@@ -2881,44 +2972,6 @@ function handleUserChannelReuseSelect(channelId: string, value: string | null) {
 
   copyUserChannelConfig(channelId)
   userChannelReuseSourceIds[channelId] = ''
-}
-
-function getFilteredMaterialMatches(
-  channelId: string,
-  matches: adminApi.UserChannelBindingConfig['douyinMaterialMatches']
-) {
-  const keyword = String(materialMatchSearchDrafts[channelId] || '')
-    .trim()
-    .toLowerCase()
-
-  if (!keyword) {
-    return matches
-  }
-
-  return matches.filter(match => {
-    const accountMeta = getMaterialMatchAccountMeta(match)
-
-    return [
-      accountMeta.douyinAccount,
-      accountMeta.douyinAccountId,
-      accountMeta.cooperationCode,
-      match.materialRange,
-    ]
-      .filter(Boolean)
-      .some(value => String(value).toLowerCase().includes(keyword))
-  })
-}
-
-function startEditUserChannelMatch(channelId: string, matchId: string) {
-  editingMaterialMatchIds[channelId] = matchId
-}
-
-function cancelEditUserChannelMatch(channelId: string) {
-  editingMaterialMatchIds[channelId] = ''
-}
-
-function isEditingUserChannelMatch(channelId: string, matchId: string) {
-  return editingMaterialMatchIds[channelId] === matchId
 }
 
 function updateOrderUsernameDraft(channelId: string, value: string) {
@@ -3036,12 +3089,26 @@ function submitEditOrderUsername(channelId: string) {
 function syncUserChannelConfigs() {
   const nextConfigs: Record<string, adminApi.UserChannelBindingConfig> = {}
   const selectedChannelIds = Array.isArray(userForm.channelIds) ? userForm.channelIds : []
+  const nextSelectedSet = new Set(selectedChannelIds)
 
   selectedChannelIds.forEach((channelId: string) => {
     nextConfigs[channelId] = normalizeUserChannelConfig(userForm.channelConfigs?.[channelId])
   })
 
   userForm.channelConfigs = nextConfigs
+  Object.keys(selectedMaterialAccountIdsByChannel).forEach(channelId => {
+    if (!nextSelectedSet.has(channelId)) {
+      delete selectedMaterialAccountIdsByChannel[channelId]
+    }
+  })
+  Object.keys(materialMatchBatchTotals).forEach(channelId => {
+    if (!nextSelectedSet.has(channelId)) {
+      delete materialMatchBatchTotals[channelId]
+    }
+  })
+  selectedChannelIds.forEach(channelId => {
+    syncUserChannelMaterialSelection(channelId)
+  })
   syncUserChannelExpandedState(selectedChannelIds)
   syncUserChannelReuseSourceState(selectedChannelIds)
 
@@ -3102,22 +3169,11 @@ function handleUserChannelEnabledChange(
 ) {
   config.enabled = value
   if (value) {
+    handleUserChannelMaterialSelectionChange(
+      channelId,
+      getUserChannelSelectedMaterialAccountIds(channelId)
+    )
     userChannelExpandedState[channelId] = true
-  }
-}
-
-function removeUserChannelMatch(channelId: string, matchId: string) {
-  const channelConfig = userForm.channelConfigs[channelId]
-  if (!channelConfig) {
-    return
-  }
-
-  channelConfig.douyinMaterialMatches = channelConfig.douyinMaterialMatches.filter(
-    match => match.id !== matchId
-  )
-
-  if (editingMaterialMatchIds[channelId] === matchId) {
-    editingMaterialMatchIds[channelId] = ''
   }
 }
 
@@ -3216,6 +3272,7 @@ async function saveUser() {
   try {
     delete (userForm as Record<string, unknown>).materialPreview
     syncUserChannelConfigs()
+    const enabledChannelMaterialMap = new Map<string, string>()
 
     for (const channelId of userForm.channelIds) {
       const channelConfig = userForm.channelConfigs?.[channelId]
@@ -3256,6 +3313,20 @@ async function saveUser() {
         if (configuredMatchRefIds.has(match.douyinAccountRefId)) {
           message.error(`【${channelName}】同一个抖音号只需要配置一条素材序号规则`)
           return
+        }
+
+        if (channelConfig?.enabled) {
+          const occupiedChannelName = enabledChannelMaterialMap.get(match.douyinAccountRefId)
+          if (occupiedChannelName) {
+            const accountName =
+              getBoundDouyinAccount(match.douyinAccountRefId)?.douyinAccount ||
+              match.douyinAccountRefId
+            message.error(
+              `抖音号「${accountName}」已在启用渠道【${occupiedChannelName}】配置，不能重复分配到【${channelName}】`
+            )
+            return
+          }
+          enabledChannelMaterialMap.set(match.douyinAccountRefId, channelName)
         }
 
         configuredMatchRefIds.add(match.douyinAccountRefId)
@@ -4428,6 +4499,50 @@ watch(
   font-size: 0.82rem;
 }
 
+.material-match-builder {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.material-match-builder__toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(220px, 0.8fr);
+  gap: 0.9rem;
+}
+
+.material-match-builder__selector,
+.material-match-builder__average {
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(221, 214, 254, 0.7);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.material-match-builder__label,
+.material-match-builder__average-label {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #5b21b6;
+}
+
+.material-match-builder__subtext,
+.material-match-builder__hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.76rem;
+  color: #64748b;
+}
+
+.material-match-builder__hint {
+  color: #b45309;
+}
+
+.material-match-builder__average {
+  display: grid;
+  gap: 0.75rem;
+  align-content: start;
+}
+
 .material-match-list {
   display: grid;
   gap: 0.8rem;
@@ -4470,6 +4585,19 @@ watch(
   color: #334155;
 }
 
+.material-match-card__order {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 9999px;
+  background: #ede9fe;
+  color: #6d28d9;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
 .material-match-card__item--muted {
   font-size: 0.82rem;
   color: #64748b;
@@ -4496,6 +4624,17 @@ watch(
   color: #0f172a;
 }
 
+.material-match-card__inline-id {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.55rem;
+  border-radius: 9999px;
+  background: #f5f3ff;
+  color: #6d28d9;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
 .material-match-card__range {
   font-family:
     ui-monospace, SFMono-Regular, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
@@ -4517,6 +4656,10 @@ watch(
   margin-top: 0.9rem;
   padding-top: 0.9rem;
   border-top: 1px dashed rgba(221, 214, 254, 0.9);
+}
+
+.material-match-card__editor--single {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .material-match-card__hint {
@@ -4694,24 +4837,16 @@ watch(
     width: 100%;
   }
 
+  .material-match-builder__toolbar {
+    grid-template-columns: 1fr;
+  }
+
   .material-match-card {
     padding: 0.85rem;
   }
 
-  .material-match-actions {
-    justify-content: stretch;
-  }
-
-  .material-match-actions :deep(.n-button) {
-    width: 100%;
-  }
-
-  .material-match-card__actions {
-    width: 100%;
-  }
-
-  .material-match-card__actions :deep(.n-button) {
-    flex: 1;
+  .material-match-builder__average {
+    padding-top: 0.85rem;
   }
 }
 
@@ -4724,7 +4859,7 @@ watch(
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .material-match-card__editor {
+  .material-match-card__editor:not(.material-match-card__editor--single) {
     grid-template-columns: 1.15fr 1fr;
   }
 }

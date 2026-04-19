@@ -41,6 +41,27 @@ function getDouyinAccount(user, douyinAccountRefId) {
     : null
 }
 
+function isDouyinAccountOccupiedByOtherEnabledChannels(user, currentChannelId, douyinAccountRefId) {
+  const normalizedChannelId = String(currentChannelId || '').trim()
+  const normalizedRefId = String(douyinAccountRefId || '').trim()
+
+  if (!normalizedChannelId || !normalizedRefId || !user?.channelConfigs) {
+    return false
+  }
+
+  return Object.entries(user.channelConfigs).some(([channelId, config]) => {
+    if (channelId === normalizedChannelId || !config?.enabled) {
+      return false
+    }
+
+    return Array.isArray(config?.douyinMaterialMatches)
+      ? config.douyinMaterialMatches.some(
+          match => String(match?.douyinAccountRefId || '').trim() === normalizedRefId
+        )
+      : false
+  })
+}
+
 router.get('/config', async ctx => {
   try {
     const { user, channelId } = await getCurrentUserContext(ctx)
@@ -91,6 +112,15 @@ router.post('/config', async ctx => {
       ctx.body = {
         code: -1,
         message: '所选抖音号信息不完整，请先补全抖音号名称和抖音号 ID',
+      }
+      return
+    }
+
+    if (isDouyinAccountOccupiedByOtherEnabledChannels(user, channelId, rawDouyinAccountRefId)) {
+      ctx.status = 400
+      ctx.body = {
+        code: -1,
+        message: '该抖音号已在其他已启用渠道配置素材序号',
       }
       return
     }
@@ -188,6 +218,15 @@ router.put('/config/:id', async ctx => {
       ctx.body = {
         code: -1,
         message: '所选抖音号信息不完整，请先补全抖音号名称和抖音号 ID',
+      }
+      return
+    }
+
+    if (isDouyinAccountOccupiedByOtherEnabledChannels(user, channelId, nextDouyinAccountRefId)) {
+      ctx.status = 400
+      ctx.body = {
+        code: -1,
+        message: '该抖音号已在其他已启用渠道配置素材序号',
       }
       return
     }
