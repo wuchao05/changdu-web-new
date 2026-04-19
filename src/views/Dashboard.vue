@@ -1100,6 +1100,12 @@ const ordersPagination = reactive({
   page: 1,
   pageSize: 10,
   showSizePicker: false,
+  prefix: ({ itemCount }: { itemCount?: number }) =>
+    h(
+      'span',
+      { class: 'orders-pagination-prefix' },
+      `订单总数 ${formatNumberValue(Number(itemCount || 0))}`
+    ),
   onChange: (page: number) => {
     ordersCurrentPage.value = page
   },
@@ -2230,6 +2236,14 @@ onUnmounted(() => {
   font-size: 0.72rem;
   line-height: 1.35;
   color: rgb(120 113 108);
+}
+
+.orders-pagination-prefix {
+  display: inline-flex;
+  align-items: center;
+  color: rgb(100 116 139);
+  font-size: 0.85rem;
+  font-weight: 600;
 }
 
 .order-user-tab.active .order-user-tab__label,
