@@ -2766,6 +2766,8 @@ function createDraftUserChannelMaterialMatch(douyinAccountRefId: string) {
   }
 }
 
+const USER_CHANNEL_MATERIAL_SELECT_ALL_VALUE = '__user_channel_material_select_all__'
+
 function syncUserChannelMaterialSelection(channelId: string) {
   const matches = userForm.channelConfigs?.[channelId]?.douyinMaterialMatches || []
   selectedMaterialAccountIdsByChannel[channelId] = matches
@@ -2806,15 +2808,43 @@ function getUserChannelOccupiedMaterialAccountCount(channelId: string) {
   return getUserChannelOccupiedMaterialAccountIds(channelId).size
 }
 
+function getUserChannelSelectableMaterialAccountIds(channelId: string) {
+  const occupiedIds = getUserChannelOccupiedMaterialAccountIds(channelId)
+
+  return getUserDouyinAccountOptions()
+    .map(option => String(option.value || '').trim())
+    .filter(accountId => accountId && !occupiedIds.has(accountId))
+}
+
+function areAllUserChannelSelectableMaterialAccountsSelected(channelId: string) {
+  const selectableIds = getUserChannelSelectableMaterialAccountIds(channelId)
+  if (!selectableIds.length) {
+    return false
+  }
+
+  const selectedIds = new Set(getUserChannelSelectedMaterialAccountIds(channelId))
+  return selectableIds.every(accountId => selectedIds.has(accountId))
+}
+
 function getUserChannelMaterialSelectOptions(channelId: string) {
   const selectedIds = new Set(getUserChannelSelectedMaterialAccountIds(channelId))
   const occupiedIds = getUserChannelOccupiedMaterialAccountIds(channelId)
+  const selectableIds = getUserChannelSelectableMaterialAccountIds(channelId)
 
-  return getUserDouyinAccountOptions().map(option => ({
-    ...option,
-    disabled:
-      occupiedIds.has(String(option.value || '')) && !selectedIds.has(String(option.value || '')),
-  }))
+  return [
+    {
+      label: areAllUserChannelSelectableMaterialAccountsSelected(channelId)
+        ? '取消全选'
+        : '全选可选抖音号',
+      value: USER_CHANNEL_MATERIAL_SELECT_ALL_VALUE,
+      disabled: !selectableIds.length,
+    },
+    ...getUserDouyinAccountOptions().map(option => ({
+      ...option,
+      disabled:
+        occupiedIds.has(String(option.value || '')) && !selectedIds.has(String(option.value || '')),
+    })),
+  ]
 }
 
 function handleUserChannelMaterialSelectionChange(channelId: string, value: string[] | null) {
@@ -2823,14 +2853,21 @@ function handleUserChannelMaterialSelectionChange(channelId: string, value: stri
   }
 
   const occupiedIds = getUserChannelOccupiedMaterialAccountIds(channelId)
-  const selectedIds = Array.from(
-    new Set(
-      (Array.isArray(value) ? value : [])
-        .map(item => String(item || '').trim())
-        .filter(Boolean)
-        .filter(item => !occupiedIds.has(item))
-    )
-  )
+  const rawSelectedIds = (Array.isArray(value) ? value : [])
+    .map(item => String(item || '').trim())
+    .filter(Boolean)
+  const includesSelectAll = rawSelectedIds.includes(USER_CHANNEL_MATERIAL_SELECT_ALL_VALUE)
+  const selectedIds = includesSelectAll
+    ? areAllUserChannelSelectableMaterialAccountsSelected(channelId)
+      ? []
+      : getUserChannelSelectableMaterialAccountIds(channelId)
+    : Array.from(
+        new Set(
+          rawSelectedIds
+            .filter(item => item !== USER_CHANNEL_MATERIAL_SELECT_ALL_VALUE)
+            .filter(item => !occupiedIds.has(item))
+        )
+      )
   const currentMatchMap = new Map(
     userForm.channelConfigs[channelId].douyinMaterialMatches.map(match => [
       String(match.douyinAccountRefId || '').trim(),

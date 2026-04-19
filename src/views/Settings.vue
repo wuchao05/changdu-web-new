@@ -307,31 +307,22 @@
             </div>
 
             <div v-else class="material-select-box">
-              <div class="material-select-box__header">
-                <div>
-                  <h4 class="text-sm font-semibold text-slate-900">选择抖音号</h4>
-                  <p class="mt-1 text-xs text-slate-500">
-                    共 {{ availableDouyinAccounts.length }} 个可用抖音号，当前已选
-                    {{ materialMatchesWithAccountCount }} 个。
-                  </p>
-                </div>
-                <n-checkbox
-                  :checked="allSelectableMaterialAccountsSelected"
-                  :indeterminate="materialSelectAllIndeterminate"
-                  :disabled="!selectableMaterialAccountIds.length"
-                  @update:checked="handleMaterialSelectAllChange"
-                >
-                  全选
-                </n-checkbox>
+              <div>
+                <h4 class="text-sm font-semibold text-slate-900">选择抖音号</h4>
+                <p class="mt-1 text-xs text-slate-500">
+                  共 {{ availableDouyinAccounts.length }} 个可用抖音号，当前已选
+                  {{ materialMatchesWithAccountCount }} 个。
+                </p>
               </div>
               <n-select
-                v-model:value="selectedMaterialAccountIds"
+                :value="selectedMaterialAccountIds"
                 multiple
                 filterable
                 clearable
                 max-tag-count="responsive"
                 :options="materialAccountSelectOptions"
                 placeholder="请选择当前渠道要使用的抖音号"
+                @update:value="handleMaterialSelectionChange"
               />
               <p v-if="occupiedMaterialAccountCount" class="material-select-box__hint">
                 有
@@ -440,7 +431,6 @@ import {
   useDialog,
   NButton,
   NCard,
-  NCheckbox,
   NInput,
   NSelect,
   NSwitch,
@@ -503,6 +493,7 @@ const savingAllMaterialMatches = ref(false)
 const buildBidInput = ref<number | null>(null)
 const averageMaterialTotal = ref<number | null>(null)
 const selectedMaterialAccountIds = ref<string[]>([])
+const MATERIAL_SELECT_ALL_VALUE = '__material_select_all__'
 const buildAdvanceDraft = ref({
   forbiddenAdvanceStartHour: '0',
   forbiddenAdvanceEndHour: '0',
@@ -682,12 +673,19 @@ const selectableMaterialAccountIds = computed(() =>
 const materialAccountSelectOptions = computed(() => {
   const currentSelectedIds = new Set(selectedMaterialAccountIds.value)
 
-  return availableDouyinAccounts.value.map(account => ({
-    label: account.douyinAccount || account.douyinAccountId || '未命名抖音号',
-    value: account.id,
-    disabled:
-      occupiedMaterialAccountIds.value.has(account.id) && !currentSelectedIds.has(account.id),
-  }))
+  return [
+    {
+      label: allSelectableMaterialAccountsSelected.value ? '取消全选' : '全选可选抖音号',
+      value: MATERIAL_SELECT_ALL_VALUE,
+      disabled: !selectableMaterialAccountIds.value.length,
+    },
+    ...availableDouyinAccounts.value.map(account => ({
+      label: account.douyinAccount || account.douyinAccountId || '未命名抖音号',
+      value: account.id,
+      disabled:
+        occupiedMaterialAccountIds.value.has(account.id) && !currentSelectedIds.has(account.id),
+    })),
+  ]
 })
 
 const allSelectableMaterialAccountsSelected = computed(() => {
@@ -698,17 +696,6 @@ const allSelectableMaterialAccountsSelected = computed(() => {
 
   const selectedIds = new Set(selectedMaterialAccountIds.value)
   return selectableIds.every(accountId => selectedIds.has(accountId))
-})
-
-const materialSelectAllIndeterminate = computed(() => {
-  const selectableIds = selectableMaterialAccountIds.value
-  if (!selectableIds.length) {
-    return false
-  }
-
-  const selectedIds = new Set(selectedMaterialAccountIds.value)
-  const selectedCount = selectableIds.filter(accountId => selectedIds.has(accountId)).length
-  return selectedCount > 0 && selectedCount < selectableIds.length
 })
 
 const activeChannelName = computed(() => {
@@ -1004,8 +991,26 @@ function syncMaterialMatchesFromSelectedIds(accountIds: string[]) {
   })
 }
 
-function handleMaterialSelectAllChange(checked: boolean) {
-  selectedMaterialAccountIds.value = checked ? [...selectableMaterialAccountIds.value] : []
+function handleMaterialSelectionChange(value: string[] | null) {
+  const rawSelectedIds = (Array.isArray(value) ? value : [])
+    .map(item => String(item || '').trim())
+    .filter(Boolean)
+  const includesSelectAll = rawSelectedIds.includes(MATERIAL_SELECT_ALL_VALUE)
+
+  if (includesSelectAll) {
+    selectedMaterialAccountIds.value = allSelectableMaterialAccountsSelected.value
+      ? []
+      : [...selectableMaterialAccountIds.value]
+    return
+  }
+
+  selectedMaterialAccountIds.value = Array.from(
+    new Set(
+      rawSelectedIds
+        .filter(item => item !== MATERIAL_SELECT_ALL_VALUE)
+        .filter(item => !occupiedMaterialAccountIds.value.has(item))
+    )
+  )
 }
 
 function applyAverageMaterialRanges() {
@@ -1225,14 +1230,6 @@ async function resetAllSettings() {
   padding: 16px;
 }
 
-.material-select-box__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
 .material-select-box__hint {
   margin: 10px 0 0;
   font-size: 12px;
@@ -1336,11 +1333,6 @@ async function resetAllSettings() {
 
   .material-panel__average-box {
     grid-template-columns: 1fr;
-  }
-
-  .material-select-box__header {
-    flex-direction: column;
-    align-items: stretch;
   }
 
   .material-rule-card {
