@@ -377,6 +377,17 @@ export function changePassword(currentPassword: string, newPassword: string) {
   })
 }
 
+export function updateCurrentChannelXtToken(xtToken: string) {
+  return request<{
+    user: UserProfile
+    runtimeUser: UserProfile | null
+    channel: { id: string; name: string } | null
+  }>('/session/xt-token', {
+    method: 'POST',
+    body: JSON.stringify({ xtToken }),
+  })
+}
+
 export function getCurrentSession() {
   return request<{
     user: UserProfile

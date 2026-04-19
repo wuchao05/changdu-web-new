@@ -199,6 +199,61 @@
           </div>
         </n-card>
 
+        <n-card v-if="sessionStore.activeChannelId" class="shadow-sm border border-gray-200">
+          <template #header>
+            <div class="flex items-center space-x-3">
+              <Icon icon="mdi:key-chain-variant" class="w-5 h-5 text-gray-600" />
+              <div>
+                <h3 class="text-lg font-semibold text-gray-900">形天上传</h3>
+                <p class="text-sm text-gray-500">
+                  按当前渠道维护 XT Token，与管理员后台里的用户渠道配置共用同一份数据
+                </p>
+              </div>
+            </div>
+          </template>
+          <div class="space-y-4">
+            <div
+              class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600"
+            >
+              <div class="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                <span
+                  >当前渠道：<strong class="text-gray-900">{{ activeChannelName }}</strong></span
+                >
+                <span
+                  >当前状态：<strong class="text-gray-900">{{
+                    currentXtToken ? '已配置' : '未配置'
+                  }}</strong></span
+                >
+              </div>
+              <p class="mt-2 text-xs text-gray-500">
+                这里保存后，管理员后台“用户渠道配置”里的同渠道 XT Token 会同步变更。
+              </p>
+            </div>
+
+            <div class="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <div class="space-y-2">
+                <label class="text-sm font-medium text-gray-700">XT Token</label>
+                <n-input
+                  v-model:value="xtTokenDraft"
+                  type="password"
+                  show-password-on="click"
+                  placeholder="请输入当前渠道的 XT Token"
+                />
+                <p class="text-xs text-gray-500">留空后保存即可清空当前渠道的 XT Token。</p>
+              </div>
+
+              <div class="flex flex-wrap gap-3">
+                <n-button type="primary" :loading="savingXtToken" @click="saveXtToken">
+                  保存
+                </n-button>
+                <n-button :disabled="savingXtToken || !xtTokenDraft" @click="resetXtTokenDraft">
+                  清空输入
+                </n-button>
+              </div>
+            </div>
+          </div>
+        </n-card>
+
         <n-card class="shadow-sm border border-gray-200">
           <template #header>
             <div class="flex items-center space-x-3">
@@ -443,6 +498,7 @@ import {
   updateBuildAdvanceConfig,
   type BuildAdvanceConfigResponse,
 } from '@/api/buildAdvance'
+import { updateCurrentChannelXtToken } from '@/api/admin'
 import { useSettingsStore } from '@/stores/settings'
 import { useApiConfigStore } from '@/stores/apiConfig'
 import { useSessionStore } from '@/stores/session'
@@ -490,10 +546,12 @@ const materialMatches = ref(douyinMaterialStore.matches)
 const savingBuildBid = ref(false)
 const savingBuildAdvance = ref(false)
 const savingAllMaterialMatches = ref(false)
+const savingXtToken = ref(false)
 const buildBidInput = ref<number | null>(null)
 const averageMaterialTotal = ref<number | null>(null)
 const selectedMaterialAccountIds = ref<string[]>([])
 const MATERIAL_SELECT_ALL_VALUE = '__material_select_all__'
+const xtTokenDraft = ref('')
 const buildAdvanceDraft = ref({
   forbiddenAdvanceStartHour: '0',
   forbiddenAdvanceEndHour: '0',
@@ -714,6 +772,7 @@ const activeChannelName = computed(() => {
 
 const showBuildBidCard = computed(() => buildBidConfig.value.channelBidEnabled)
 const showBuildAdvanceCard = computed(() => buildAdvanceConfig.value.allowCustom)
+const currentXtToken = computed(() => String(sessionStore.currentRuntimeUser?.xtToken || '').trim())
 
 const effectiveBuildBidLabel = computed(() => {
   if (!buildBidConfig.value.channelBidEnabled) {
@@ -765,6 +824,14 @@ watch(
       .filter(Boolean)
   },
   { immediate: true, deep: true }
+)
+
+watch(
+  () => [sessionStore.activeChannelId, currentXtToken.value],
+  () => {
+    xtTokenDraft.value = currentXtToken.value
+  },
+  { immediate: true }
 )
 
 watch(
@@ -899,6 +966,28 @@ async function resetBuildAdvance() {
   } finally {
     savingBuildAdvance.value = false
   }
+}
+
+async function saveXtToken() {
+  if (!sessionStore.activeChannelId) {
+    message.warning('请先选择渠道')
+    return
+  }
+
+  savingXtToken.value = true
+  try {
+    await updateCurrentChannelXtToken(xtTokenDraft.value)
+    await sessionStore.loadSession()
+    message.success('XT Token 已保存')
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '保存 XT Token 失败')
+  } finally {
+    savingXtToken.value = false
+  }
+}
+
+function resetXtTokenDraft() {
+  xtTokenDraft.value = ''
 }
 
 function updatePageSize(value: number) {

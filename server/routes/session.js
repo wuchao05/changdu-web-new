@@ -9,6 +9,8 @@ import {
   buildRuntimeUser,
   findUsersByChannelId,
   getDefaultDownloadCenterConfig,
+  normalizeUser,
+  readUser,
   sanitizeUser,
   resolveRuntimeContext,
   resolveUserChannel,
@@ -124,6 +126,53 @@ router.post('/password', requireSession, async ctx => {
   ctx.body = {
     code: 0,
     message: '密码修改成功',
+  }
+})
+
+router.post('/xt-token', requireSession, async ctx => {
+  const sessionUser = ctx.state.sessionUser
+  const requestedChannelId = String(ctx.get('x-studio-channel-id') || '').trim()
+  const { channel } = await resolveRuntimeContext(sessionUser, requestedChannelId)
+
+  if (!channel?.id) {
+    ctx.status = 400
+    ctx.body = {
+      code: 400,
+      message: '当前未选择渠道，无法保存 XT Token',
+    }
+    return
+  }
+
+  const currentUser = await readUser(sessionUser.id)
+  const xtToken = String(ctx.request.body?.xtToken || '').trim()
+  const channelConfigs = {
+    ...(currentUser.channelConfigs || {}),
+    [channel.id]: {
+      ...(currentUser.channelConfigs?.[channel.id] || {}),
+      xtToken,
+    },
+  }
+
+  const updatedUser = await writeUser(
+    normalizeUser({
+      ...currentUser,
+      channelConfigs,
+      updatedAt: new Date().toISOString(),
+    })
+  )
+  const runtimeUser = buildRuntimeUser(updatedUser, channel.id)
+
+  ctx.body = {
+    code: 0,
+    message: 'XT Token 保存成功',
+    data: {
+      user: sanitizeUser(updatedUser),
+      runtimeUser: sanitizeUser(runtimeUser),
+      channel: {
+        id: channel.id,
+        name: channel.name,
+      },
+    },
   }
 })
 
