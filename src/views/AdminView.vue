@@ -14,14 +14,7 @@
     </header>
 
     <main class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-      <div class="grid gap-4 md:grid-cols-4">
-        <n-card v-for="item in overviewCards" :key="item.label" :bordered="false" class="shadow-sm">
-          <p class="text-sm text-slate-500">{{ item.label }}</p>
-          <p class="mt-3 text-3xl font-bold text-slate-900">{{ item.value }}</p>
-        </n-card>
-      </div>
-
-      <n-card :bordered="false" class="mt-6 shadow-sm">
+      <n-card :bordered="false" class="shadow-sm">
         <n-tabs type="line" animated>
           <n-tab-pane name="users" tab="用户配置">
             <div class="mb-4 flex items-center justify-between gap-3">
@@ -1715,12 +1708,6 @@ const apiConfigStore = useApiConfigStore()
 const users = ref<adminApi.UserProfile[]>([])
 const channels = ref<adminApi.ChannelConfig[]>([])
 const downloadCenterConfigs = ref<adminApi.DownloadCenterConfig[]>([])
-const overview = ref({
-  userCount: 0,
-  channelCount: 0,
-  adminCount: 0,
-  normalCount: 0,
-})
 const userKeyword = ref('')
 const channelKeyword = ref('')
 const douyinAccountKeyword = ref('')
@@ -1938,13 +1925,6 @@ const downloadCenterDrawerWidth = computed(() => {
 
   return 860
 })
-
-const overviewCards = computed(() => [
-  { label: '用户总数', value: overview.value.userCount },
-  { label: '渠道总数', value: overview.value.channelCount },
-  { label: '管理员', value: overview.value.adminCount },
-  { label: '普通用户', value: overview.value.normalCount },
-])
 
 const filteredUsers = computed(() => {
   const keyword = userKeyword.value.trim().toLowerCase()
@@ -3221,13 +3201,11 @@ function handleUserChannelEnabledChange(
 }
 
 async function loadData() {
-  const [overviewData, userList, channelList, downloadCenterConfigList] = await Promise.all([
-    adminApi.getAdminOverview(),
+  const [userList, channelList, downloadCenterConfigList] = await Promise.all([
     adminApi.listUsers(),
     adminApi.listChannels(),
     adminApi.listDownloadCenterConfigs(),
   ])
-  overview.value = overviewData
   users.value = userList
   channels.value = channelList
   downloadCenterConfigs.value = downloadCenterConfigList
