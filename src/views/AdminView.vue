@@ -636,6 +636,31 @@
                     <div class="config-subpanel">
                       <div class="config-subpanel__head">
                         <div>
+                          <p class="text-sm font-semibold text-fuchsia-600">形天上传</p>
+                          <p class="mt-1 text-sm text-slate-500">
+                            为当前用户在当前渠道下配置素材库专用 XT Token，客户端会按所选渠道读取。
+                          </p>
+                        </div>
+                      </div>
+                      <n-form
+                        :model="item.config"
+                        label-placement="top"
+                        class="grid grid-cols-1 gap-3"
+                      >
+                        <n-form-item label="XT Token">
+                          <n-input
+                            v-model:value="item.config.xtToken"
+                            type="password"
+                            show-password-on="click"
+                            placeholder="请输入当前渠道的 XT Token"
+                          />
+                        </n-form-item>
+                      </n-form>
+                    </div>
+
+                    <div class="config-subpanel">
+                      <div class="config-subpanel__head">
+                        <div>
                           <p class="text-sm font-semibold text-emerald-600">飞书表格 ID</p>
                           <p class="mt-1 text-sm text-slate-500">
                             为当前渠道配置剧集清单、剧集状态和账户表的 table_id。
@@ -2456,6 +2481,7 @@ function createDefaultUserForm(): UserFormModel {
 function createDefaultUserChannelConfig(): adminApi.UserChannelBindingConfig {
   return {
     enabled: false,
+    xtToken: '',
     buildPreference: {
       bid: '',
     },
@@ -2535,6 +2561,7 @@ function normalizeUserChannelConfig(
     ...defaultConfig,
     ...config,
     enabled: typeof config?.enabled === 'boolean' ? config.enabled : false,
+    xtToken: String(config?.xtToken || '').trim(),
     buildPreference: {
       bid: String(config?.buildPreference?.bid || '').trim(),
     },
@@ -2621,6 +2648,7 @@ function cloneUserChannelConfig(
 
   return {
     ...normalizedConfig,
+    xtToken: normalizedConfig.xtToken,
     buildPreference: {
       ...normalizedConfig.buildPreference,
     },

@@ -18,6 +18,7 @@ export interface DouyinAccount {
 
 export interface UserChannelBindingConfig {
   enabled: boolean
+  xtToken: string
   buildPreference: {
     bid: string
   }
@@ -158,6 +159,7 @@ export interface UserProfile {
   channelNames?: string[]
   defaultChannelName?: string
   channelConfigEnabled?: boolean
+  xtToken?: string
 }
 
 export interface ChannelConfig {

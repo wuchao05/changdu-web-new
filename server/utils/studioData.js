@@ -99,6 +99,7 @@ function defaultDouyinAccount() {
 function defaultUserChannelConfig() {
   return {
     enabled: false,
+    xtToken: '',
     buildPreference: {
       bid: '',
     },
@@ -449,6 +450,7 @@ function normalizeUserChannelConfig(config = {}, douyinAccounts = []) {
 
   return {
     enabled: resolvedEnabled,
+    xtToken: String(config.xtToken || '').trim(),
     buildPreference: {
       bid: String(config.buildPreference?.bid || '').trim(),
     },
@@ -516,6 +518,7 @@ function hasCustomUserChannelConfig(config = {}, douyinAccounts = []) {
   const hasPermissionConfig =
     Boolean(config.permissions?.syncAccount) ||
     Object.values(config.permissions?.desktopMenus || {}).some(Boolean)
+  const hasXtToken = Boolean(String(config.xtToken || '').trim())
   const hasOrderUserStats =
     Boolean(config.orderUserStats?.enabled) ||
     (Array.isArray(config.orderUserStats?.usernames) && config.orderUserStats.usernames.length > 0)
@@ -523,6 +526,7 @@ function hasCustomUserChannelConfig(config = {}, douyinAccounts = []) {
   const hasBuildPreference = Boolean(String(config.buildPreference?.bid || '').trim())
 
   return (
+    hasXtToken ||
     hasBuildPreference ||
     hasFeishuConfig(normalizeFeishuConfig(config.feishu || config)) ||
     hasExplicitMaterialPreview ||
@@ -695,6 +699,7 @@ export function buildRuntimeUser(user = {}, channelId = '') {
 
   return {
     ...normalizedUser,
+    xtToken: channelConfig.xtToken,
     buildPreference: sourceChannelConfig.buildPreference,
     buildAdvanceConfig: sourceChannelConfig.buildAdvanceConfig,
     feishu: channelConfig.feishu,
