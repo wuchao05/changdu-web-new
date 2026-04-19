@@ -534,7 +534,7 @@
                     <div>
                       <p class="channel-config-card__switch-title">启用专属配置</p>
                       <p class="channel-config-card__switch-desc">
-                        打开后才会展示并启用当前渠道下的飞书、出价、素材预览、权限和抖音匹配素材配置。
+                        打开后才会启用当前渠道下的飞书、素材预览和权限等专属配置。
                       </p>
                     </div>
                     <div class="channel-config-card__switch-actions">
@@ -1157,7 +1157,7 @@
                       </div>
                     </div>
                     <div v-if="!item.config.enabled" class="channel-config-card__empty">
-                      当前渠道只作为数据查看渠道使用，未启用专属配置，因此不会展示飞书、素材预览、权限和抖音匹配素材配置项。
+                      当前渠道只作为数据查看渠道使用，未启用专属配置，因此飞书、素材预览和权限仍沿用默认能力；抖音匹配素材依然按当前渠道单独维护。
                     </div>
                   </div>
                 </div>

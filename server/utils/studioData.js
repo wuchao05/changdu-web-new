@@ -689,7 +689,7 @@ export function buildRuntimeUser(user = {}, channelId = '') {
   const sourceChannelConfig = getUserChannelConfig(normalizedUser, channelId)
   const channelConfig = getRuntimeUserChannelConfig(normalizedUser, channelId)
   const douyinMaterialMatches = resolveDouyinMaterialMatches(
-    channelConfig.douyinMaterialMatches,
+    sourceChannelConfig.douyinMaterialMatches,
     normalizedUser.douyinAccounts
   )
 
