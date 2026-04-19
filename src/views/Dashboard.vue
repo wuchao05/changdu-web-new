@@ -203,13 +203,7 @@
                 <Icon icon="mdi:chart-box-outline" class="w-5 h-5 text-blue-600" />
                 <div>
                   <h3 class="text-lg font-semibold text-slate-900">数据概览</h3>
-                  <div class="mt-1 flex items-center gap-2 flex-wrap">
-                    <p class="text-sm text-slate-500">实时数据，一目了然</p>
-                    <div class="refresh-status-pill" :class="{ active: autoRefreshEnabled }">
-                      <span class="refresh-status-dot"></span>
-                      <span>{{ autoRefreshLabel }}</span>
-                    </div>
-                  </div>
+                  <p class="mt-1 text-sm text-slate-500">实时数据，一目了然</p>
                 </div>
               </div>
               <div class="flex items-center gap-3">
@@ -221,7 +215,7 @@
                   type="button"
                   class="refresh-icon-button"
                   :disabled="overviewLoading"
-                  @click="autoRefresh.manualRefresh()"
+                  @click="triggerDashboardRefresh"
                   title="手动刷新"
                 >
                   <Icon
@@ -633,7 +627,6 @@ import { useUserAuth } from '@/composables/useUserAuth'
 import { useDynamicTitle } from '@/composables/useDynamicTitle'
 import { useSessionStore } from '@/stores/session'
 import { useSettingsStore } from '@/stores/settings'
-import { useAutoRefresh } from '@/composables/useAutoRefresh'
 import { getDataOverviewV1, getMonthlyRechargeAnalyze, getOrders, getReport } from '@/api'
 import type {
   ReportData,
@@ -737,13 +730,6 @@ const channelTabs = computed(() => {
 const hasChannelTabs = computed(() => channelTabs.value.length > 0)
 const activeChannelTabId = computed(
   () => sessionStore.activeChannelId || sessionStore.currentChannel?.id || ''
-)
-const autoRefreshEnabled = computed(() => settingsStore.settings.autoRefresh)
-const autoRefreshIntervalSeconds = computed(() => settingsStore.settings.refreshInterval)
-const autoRefreshLabel = computed(() =>
-  autoRefreshEnabled.value
-    ? `自动刷新已开启，每 ${autoRefreshIntervalSeconds.value} 秒更新一次`
-    : '自动刷新未开启，可在设置中心开启'
 )
 const desktopUserLabels = computed(() => userLabels.value.filter(Boolean))
 const mobileUserLabels = computed(() =>
@@ -1399,12 +1385,6 @@ async function triggerDashboardRefresh() {
   await loadDashboardData()
 }
 
-const autoRefresh = useAutoRefresh(() => {
-  triggerDashboardRefresh().catch(error => {
-    console.error('自动刷新首页数据失败:', error)
-  })
-})
-
 async function fetchOverviewData() {
   if (!hasActiveChannel.value || !canAccessOverview.value) {
     overviewToday.value = null
@@ -1674,7 +1654,6 @@ onMounted(async () => {
       console.error('加载抖音号匹配素材失败:', error)
     })
     await loadDashboardData()
-    autoRefresh.startAutoRefresh()
   }
 })
 
@@ -1688,9 +1667,6 @@ watch(
       loadDashboardData().catch(error => {
         console.error('加载首页数据失败:', error)
       })
-      autoRefresh.startAutoRefresh()
-    } else {
-      autoRefresh.stopAutoRefresh()
     }
   },
   { immediate: false }
@@ -1728,7 +1704,6 @@ watch(
 
 onUnmounted(() => {
   window.removeEventListener('resize', checkMobile)
-  autoRefresh.stopAutoRefresh()
 })
 </script>
 
@@ -2039,36 +2014,6 @@ onUnmounted(() => {
 .user-label-badge--clickable:hover {
   transform: translateY(-1px);
   box-shadow: 0 10px 24px -16px rgba(37, 99, 235, 0.8);
-}
-
-.refresh-status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  border-radius: 9999px;
-  padding: 0.22rem 0.7rem;
-  background: rgba(226, 232, 240, 0.7);
-  color: rgb(100 116 139);
-  font-size: 0.75rem;
-  line-height: 1rem;
-}
-
-.refresh-status-pill.active {
-  background: rgba(220, 252, 231, 0.8);
-  color: rgb(22 101 52);
-}
-
-.refresh-status-dot {
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 9999px;
-  background: currentColor;
-  opacity: 0.45;
-}
-
-.refresh-status-pill.active .refresh-status-dot {
-  opacity: 1;
-  animation: refresh-breath 1.6s ease-in-out infinite;
 }
 
 .refresh-icon-button {
@@ -2415,18 +2360,6 @@ onUnmounted(() => {
 
 .order-branch-card.active .order-branch-card__amount-label {
   color: rgb(14 116 144);
-}
-
-@keyframes refresh-breath {
-  0%,
-  100% {
-    transform: scale(0.85);
-    opacity: 0.45;
-  }
-  50% {
-    transform: scale(1.1);
-    opacity: 1;
-  }
 }
 
 @keyframes order-tab-skeleton {

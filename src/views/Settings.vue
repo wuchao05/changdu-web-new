@@ -257,48 +257,6 @@
         <n-card class="shadow-sm border border-gray-200">
           <template #header>
             <div class="flex items-center space-x-3">
-              <Icon icon="mdi:refresh" class="w-5 h-5 text-gray-600" />
-              <div>
-                <h3 class="text-lg font-semibold text-gray-900">自动刷新</h3>
-                <p class="text-sm text-gray-500">控制首页和列表页的数据刷新节奏</p>
-              </div>
-            </div>
-          </template>
-          <div class="space-y-4">
-            <div class="flex items-center justify-between">
-              <div>
-                <h4 class="text-base font-medium text-gray-900">启用自动刷新</h4>
-                <p class="text-sm text-gray-500">定期自动刷新数据</p>
-              </div>
-              <n-switch
-                v-model:value="localSettings.autoRefresh"
-                @update:value="updateAutoRefresh"
-              />
-            </div>
-
-            <div
-              v-if="localSettings.autoRefresh"
-              class="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4"
-            >
-              <div class="space-y-2">
-                <label class="text-sm font-medium text-gray-700">刷新间隔时间（秒）</label>
-                <n-input-number
-                  v-model:value="localSettings.refreshInterval"
-                  :min="30"
-                  :max="600"
-                  :step="30"
-                  class="w-full"
-                  @update:value="(value: number | null) => value && updateRefreshInterval(value)"
-                />
-                <p class="text-xs text-gray-500">建议 60-300 秒</p>
-              </div>
-            </div>
-          </div>
-        </n-card>
-
-        <n-card class="shadow-sm border border-gray-200">
-          <template #header>
-            <div class="flex items-center space-x-3">
               <Icon icon="mdi:account-group-outline" class="w-5 h-5 text-gray-600" />
               <div>
                 <h3 class="text-lg font-semibold text-gray-900">抖音号素材配置</h3>
@@ -481,16 +439,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
-import {
-  useMessage,
-  useDialog,
-  NButton,
-  NCard,
-  NInput,
-  NSelect,
-  NSwitch,
-  NInputNumber,
-} from 'naive-ui'
+import { useMessage, useDialog, NButton, NCard, NInput, NSelect, NInputNumber } from 'naive-ui'
 import { getBuildBidConfig, updateBuildBidConfig, type BuildBidConfig } from '@/api/buildBid'
 import {
   getBuildAdvanceConfig,
@@ -521,8 +470,6 @@ const douyinMaterialStore = useDouyinMaterialStore()
 const localSettings = ref({
   pageSize: 10,
   defaultDateRange: 'today' as 'today' | '3days' | '7days' | '30days' | 'all',
-  autoRefresh: false,
-  refreshInterval: 60,
   autoUploadEnabled: false,
   autoUploadInterval: 300,
 })
@@ -802,8 +749,6 @@ function initLocalState() {
   localSettings.value = {
     pageSize: settings.pageSize,
     defaultDateRange: settings.defaultDateRange,
-    autoRefresh: settings.autoRefresh,
-    refreshInterval: settings.refreshInterval,
     autoUploadEnabled: settings.autoUploadEnabled,
     autoUploadInterval: settings.autoUploadInterval,
   }
@@ -1002,16 +947,6 @@ function updateDateRange(value: 'today' | '3days' | '7days' | '30days' | 'all') 
   } else {
     message.success('默认查询天数已更新')
   }
-}
-
-function updateAutoRefresh(value: boolean) {
-  settingsStore.updateSettings({ autoRefresh: value })
-  message.success(`自动刷新已${value ? '开启' : '关闭'}`)
-}
-
-function updateRefreshInterval(value: number) {
-  settingsStore.updateSettings({ refreshInterval: value })
-  message.success('刷新间隔已更新')
 }
 
 function clearCache() {

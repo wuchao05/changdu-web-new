@@ -4,8 +4,6 @@ import { ref } from 'vue'
 export interface AppSettings {
   pageSize: number
   defaultDateRange: 'today' | '3days' | '7days' | '30days' | 'all' // 默认查询天数
-  autoRefresh: boolean
-  refreshInterval: number // 自动刷新间隔（秒）
   autoUploadEnabled: boolean
   autoUploadInterval: number // 自动上传轮询间隔（秒）
 }
@@ -13,8 +11,6 @@ export interface AppSettings {
 const DEFAULT_SETTINGS: AppSettings = {
   pageSize: 10,
   defaultDateRange: 'today',
-  autoRefresh: false,
-  refreshInterval: 60,
   autoUploadEnabled: false,
   autoUploadInterval: 300,
 }
