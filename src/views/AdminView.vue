@@ -1069,20 +1069,21 @@
                                   <span class="material-match-card__order">{{
                                     matchIndex + 1
                                   }}</span>
-                                  <span class="material-match-card__name">
-                                    {{
-                                      getMaterialMatchAccountMeta(match).douyinAccount ||
-                                      '未选择抖音号'
-                                    }}
-                                  </span>
+                                  <div class="material-match-card__account-line">
+                                    <span class="material-match-card__name">
+                                      {{
+                                        getMaterialMatchAccountMeta(match).douyinAccount ||
+                                        '未选择抖音号'
+                                      }}
+                                    </span>
+                                    <span
+                                      v-if="getMaterialMatchAccountMeta(match).douyinAccountId"
+                                      class="material-match-card__account-id"
+                                    >
+                                      ID {{ getMaterialMatchAccountMeta(match).douyinAccountId }}
+                                    </span>
+                                  </div>
                                 </div>
-                                <span class="material-match-card__inline-id">
-                                  {{
-                                    formatMaterialMatchAccountId(
-                                      getMaterialMatchAccountMeta(match).douyinAccountId
-                                    )
-                                  }}
-                                </span>
                                 <div
                                   class="material-match-card__item material-match-card__item--range"
                                 >
@@ -1092,16 +1093,6 @@
                                   </span>
                                 </div>
                               </div>
-                              <span
-                                class="channel-config-card__pill"
-                                :class="
-                                  match.materialRange
-                                    ? 'channel-config-card__pill--success'
-                                    : 'channel-config-card__pill--warning'
-                                "
-                              >
-                                {{ match.materialRange ? '已分配' : '待填写' }}
-                              </span>
                             </div>
                             <div
                               class="material-match-card__editor material-match-card__editor--single"
@@ -2901,19 +2892,6 @@ function applyUserChannelAverageMaterialRanges(channelId: string) {
   message.success(`已为当前渠道平均分配 ${totalCount} 个素材`)
 }
 
-function formatMaterialMatchAccountId(value?: string) {
-  const normalizedValue = String(value || '').trim()
-  if (!normalizedValue) {
-    return 'ID --'
-  }
-
-  if (normalizedValue.length <= 8) {
-    return `ID ${normalizedValue}`
-  }
-
-  return `ID ${normalizedValue.slice(0, 4)}...${normalizedValue.slice(-4)}`
-}
-
 function getUserChannelReuseOptions(channelId: string) {
   return selectedUserChannels.value
     .filter(channel => channel.id !== channelId)
@@ -4585,6 +4563,14 @@ watch(
   color: #334155;
 }
 
+.material-match-card__account-line {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
 .material-match-card__order {
   display: inline-flex;
   align-items: center;
@@ -4624,15 +4610,11 @@ watch(
   color: #0f172a;
 }
 
-.material-match-card__inline-id {
+.material-match-card__account-id {
   display: inline-flex;
   align-items: center;
-  padding: 0.25rem 0.55rem;
-  border-radius: 9999px;
-  background: #f5f3ff;
-  color: #6d28d9;
-  font-size: 0.74rem;
-  font-weight: 700;
+  color: #64748b;
+  font-size: 0.78rem;
 }
 
 .material-match-card__range {

@@ -340,28 +340,18 @@
                 <div class="material-rule-card__content">
                   <div class="material-rule-card__top">
                     <div class="material-rule-card__account-block">
-                      <p class="material-rule-card__account-name">
-                        {{ getMaterialMatchAccountMeta(match).douyinAccount || '未命名抖音号' }}
+                      <p class="material-rule-card__account-name-row">
+                        <span class="material-rule-card__account-name">
+                          {{ getMaterialMatchAccountMeta(match).douyinAccount || '未命名抖音号' }}
+                        </span>
+                        <span
+                          v-if="getMaterialMatchAccountMeta(match).douyinAccountId"
+                          class="material-rule-card__account-id"
+                        >
+                          ID {{ getMaterialMatchAccountMeta(match).douyinAccountId }}
+                        </span>
                       </p>
-                      <span
-                        class="material-rule-card__id"
-                        :title="getMaterialMatchAccountMeta(match).douyinAccountId || ''"
-                      >
-                        {{
-                          formatDouyinAccountId(getMaterialMatchAccountMeta(match).douyinAccountId)
-                        }}
-                      </span>
                     </div>
-                    <span
-                      class="material-rule-card__status"
-                      :class="
-                        isMaterialMatchValid(match)
-                          ? 'material-rule-card__status--ready'
-                          : 'material-rule-card__status--draft'
-                      "
-                    >
-                      {{ isMaterialMatchValid(match) ? '已完成' : '待完善' }}
-                    </span>
                   </div>
                   <div class="material-rule-card__bottom">
                     <n-input v-model:value="match.materialRange" placeholder="素材序号，如 01-05" />
@@ -939,19 +929,6 @@ function getMaterialMatchAccountMeta(match: {
   }
 }
 
-function formatDouyinAccountId(value?: string) {
-  const normalizedValue = String(value || '').trim()
-  if (!normalizedValue) {
-    return 'ID --'
-  }
-
-  if (normalizedValue.length <= 8) {
-    return `ID ${normalizedValue}`
-  }
-
-  return `ID ${normalizedValue.slice(0, 4)}...${normalizedValue.slice(-4)}`
-}
-
 function createDraftMaterialMatch(douyinAccountRefId: string) {
   return {
     id: `draft-${crypto.randomUUID()}`,
@@ -1252,42 +1229,27 @@ async function resetAllSettings() {
   min-width: 0;
 }
 
+.material-rule-card__account-name-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+}
+
 .material-rule-card__account-name {
-  margin: 0 0 6px;
+  margin: 0;
   font-size: 14px;
   font-weight: 600;
   color: #0f172a;
 }
 
-.material-rule-card__id,
-.material-rule-card__status {
+.material-rule-card__account-id {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  height: 30px;
-  padding: 0 10px;
-  border-radius: 999px;
   font-size: 12px;
-  font-weight: 600;
+  color: #64748b;
   white-space: nowrap;
-}
-
-.material-rule-card__id {
-  border: 1px solid #dbeafe;
-  background: #f8fbff;
-  color: #1d4ed8;
-}
-
-.material-rule-card__status--ready {
-  border: 1px solid #bbf7d0;
-  background: #f0fdf4;
-  color: #166534;
-}
-
-.material-rule-card__status--draft {
-  border: 1px solid #fde68a;
-  background: #fffbeb;
-  color: #b45309;
 }
 
 .material-rule-card__bottom {
@@ -1332,6 +1294,10 @@ async function resetAllSettings() {
 
   .material-rule-card__top {
     flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .material-rule-card__account-name-row {
     align-items: flex-start;
   }
 }
