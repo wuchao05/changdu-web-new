@@ -351,7 +351,7 @@
       v-model:show="showUserModal"
       placement="right"
       :width="userDrawerWidth"
-      class="admin-form-drawer"
+      class="admin-form-drawer admin-form-drawer--streamlined"
     >
       <n-drawer-content closable body-content-style="padding: 0">
         <template #header>
@@ -1167,7 +1167,7 @@
       v-model:show="showChannelModal"
       placement="right"
       :width="channelDrawerWidth"
-      class="admin-form-drawer"
+      class="admin-form-drawer admin-form-drawer--streamlined"
     >
       <n-drawer-content closable body-content-style="padding: 0">
         <template #header>
@@ -3732,6 +3732,77 @@ watch(
 
 .drawer-panel--white {
   background: rgba(255, 255, 255, 0.96);
+}
+
+:deep(.admin-form-drawer--streamlined .n-drawer-body) {
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 46%, #ffffff 100%);
+}
+
+:deep(.admin-form-drawer--streamlined .n-drawer-header) {
+  padding-bottom: 4px;
+}
+
+:deep(.admin-form-drawer--streamlined .drawer-hero__icon),
+:deep(.admin-form-drawer--streamlined .panel-head__icon),
+:deep(.admin-form-drawer--streamlined .drawer-hero__pill .iconify) {
+  display: none;
+}
+
+:deep(.admin-form-drawer--streamlined .drawer-hero) {
+  gap: 0.5rem;
+  align-items: center;
+}
+
+:deep(.admin-form-drawer--streamlined .drawer-hero__title) {
+  font-size: 1.2rem;
+}
+
+:deep(.admin-form-drawer--streamlined .drawer-hero__meta) {
+  margin-top: 0.55rem;
+  gap: 0.45rem;
+}
+
+:deep(.admin-form-drawer--streamlined .drawer-hero__pill) {
+  padding: 0.32rem 0.62rem;
+  background: rgba(241, 245, 249, 0.9);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  font-weight: 500;
+}
+
+:deep(.admin-form-drawer--streamlined .drawer-panel) {
+  padding: 1.05rem;
+  border: 0;
+  border-radius: 1rem;
+  box-shadow: none;
+  background: #ffffff;
+}
+
+:deep(.admin-form-drawer--streamlined .drawer-panel + .drawer-panel),
+:deep(.admin-form-drawer--streamlined .admin-form-drawer__content > .grid + .drawer-panel),
+:deep(.admin-form-drawer--streamlined .admin-form-drawer__content > .drawer-panel + .grid) {
+  margin-top: 0.2rem;
+}
+
+:deep(.admin-form-drawer--streamlined .panel-head) {
+  margin-bottom: 0.8rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+:deep(.admin-form-drawer--streamlined .panel-head__title) {
+  margin-top: 0;
+  font-size: 1rem;
+}
+
+:deep(.admin-form-drawer--streamlined .channel-config-card),
+:deep(.admin-form-drawer--streamlined .advance-config-block),
+:deep(.admin-form-drawer--streamlined .config-subpanel),
+:deep(.admin-form-drawer--streamlined .material-match-card),
+:deep(.admin-form-drawer--streamlined .douyin-account-user-card) {
+  border-width: 1px;
+  border-color: #e2e8f0;
+  border-radius: 0.9rem;
+  box-shadow: none;
 }
 
 .panel-head {
