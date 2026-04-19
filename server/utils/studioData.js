@@ -699,7 +699,7 @@ export function buildRuntimeUser(user = {}, channelId = '') {
 
   return {
     ...normalizedUser,
-    xtToken: channelConfig.xtToken,
+    xtToken: sourceChannelConfig.xtToken,
     buildPreference: sourceChannelConfig.buildPreference,
     buildAdvanceConfig: sourceChannelConfig.buildAdvanceConfig,
     feishu: channelConfig.feishu,
