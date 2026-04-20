@@ -344,34 +344,40 @@
       v-model:show="showUserModal"
       placement="right"
       :width="userDrawerWidth"
-      class="admin-form-drawer admin-form-drawer--streamlined"
+      class="admin-form-drawer admin-form-drawer--user"
     >
-      <n-drawer-content
-        closable
-        body-content-style="padding: 0"
-        class="admin-form-drawer--streamlined"
-      >
+      <n-drawer-content closable body-content-style="padding: 0">
         <template #header>
-          <div class="drawer-hero drawer-hero--user">
-            <div class="drawer-hero__icon">
-              <Icon icon="mdi:account-cog-outline" class="h-6 w-6" />
-            </div>
+          <div class="drawer-hero drawer-hero--user user-drawer-hero">
             <div class="min-w-0 flex-1">
-              <p class="drawer-hero__eyebrow">用户配置</p>
-              <h2 class="drawer-hero__title">
-                {{ editingUserId ? '编辑用户' : '新增用户' }}
-              </h2>
-              <!-- <p class="drawer-hero__desc"> -->
-              <!--   统一维护账号、渠道权限和运行时配置，页面上下文会保留在右侧抽屉中。 -->
-              <!-- </p> -->
-              <div class="drawer-hero__meta">
-                <span class="drawer-hero__pill">
-                  <Icon icon="mdi:account-circle-outline" class="h-4 w-4" />
+              <div class="user-drawer-hero__head">
+                <div class="min-w-0">
+                  <p class="drawer-hero__eyebrow">用户配置</p>
+                  <h2 class="drawer-hero__title">
+                    {{ editingUserId ? '编辑用户' : '新增用户' }}
+                  </h2>
+                </div>
+                <div class="drawer-hero__meta user-drawer-hero__meta">
+                  <span class="drawer-hero__pill user-drawer-hero__pill">
+                    {{ userForm.nickname || userForm.account || '未命名用户' }}
+                  </span>
+                  <span class="drawer-hero__pill user-drawer-hero__pill">
+                    {{ selectedUserChannelForms.length }} 个渠道配置
+                  </span>
+                </div>
+              </div>
+              <div class="user-drawer-hero__summary">
+                <span class="user-drawer-hero__summary-label">账号</span>
+                <span class="user-drawer-hero__summary-value">
                   {{ userForm.nickname || userForm.account || '未命名用户' }}
                 </span>
-                <span class="drawer-hero__pill">
-                  <Icon icon="mdi:source-branch" class="h-4 w-4" />
-                  {{ selectedUserChannelForms.length }} 个渠道配置
+                <span class="user-drawer-hero__summary-separator">/</span>
+                <span class="user-drawer-hero__summary-label">默认渠道</span>
+                <span class="user-drawer-hero__summary-value">
+                  {{
+                    defaultChannelOptions.find(option => option.value === userForm.defaultChannelId)
+                      ?.label || '未设置'
+                  }}
                 </span>
               </div>
             </div>
@@ -380,17 +386,14 @@
 
         <div class="admin-form-drawer__body">
           <div class="admin-form-drawer__content space-y-5">
-            <section class="drawer-panel drawer-panel--muted">
-              <div class="panel-head">
-                <div class="panel-head__icon panel-head__icon--blue">
-                  <Icon icon="mdi:badge-account-horizontal-outline" class="h-5 w-5" />
-                </div>
+            <section class="drawer-panel drawer-panel--muted user-drawer-panel">
+              <div class="panel-head panel-head--plain">
                 <div class="min-w-0 flex-1">
-                  <p class="panel-head__eyebrow text-blue-600">基础信息</p>
+                  <p class="panel-head__eyebrow text-slate-500">基础信息</p>
                   <h3 class="panel-head__title">账号与渠道归属</h3>
-                  <!-- <p class="panel-head__desc"> -->
-                  <!--   先确认昵称、登录账号、身份类型和默认渠道，再继续配置分渠道能力。 -->
-                  <!-- </p> -->
+                  <p class="panel-head__desc panel-head__desc--compact">
+                    先确认账号身份，再指定可访问渠道和默认落地渠道。
+                  </p>
                 </div>
               </div>
               <n-form
@@ -455,33 +458,45 @@
               </n-form>
             </section>
 
-            <section class="drawer-panel drawer-panel--white">
-              <div class="panel-head">
-                <div class="panel-head__icon panel-head__icon--emerald">
-                  <Icon icon="mdi:tune-variant" class="h-5 w-5" />
-                </div>
+            <section class="drawer-panel drawer-panel--white user-drawer-panel">
+              <div class="panel-head panel-head--plain user-channel-panel-head">
                 <div class="min-w-0 flex-1">
-                  <p class="panel-head__eyebrow text-emerald-600">按渠道配置</p>
+                  <p class="panel-head__eyebrow text-slate-500">按渠道配置</p>
                   <h3 class="panel-head__title">运行时业务参数</h3>
-                  <!-- <p class="panel-head__desc"> -->
-                  <!--   同一个用户可以在不同渠道下分别配置飞书表和抖音匹配素材，运行时会跟随当前渠道切换。 -->
-                  <!-- </p> -->
+                  <p class="panel-head__desc panel-head__desc--compact">
+                    切换下方渠道标签，分别维护该渠道的专属参数、权限和素材规则。
+                  </p>
                 </div>
               </div>
-              <div v-if="selectedUserChannelForms.length > 0" class="space-y-4">
+              <div v-if="selectedUserChannelForms.length > 0" class="user-channel-workspace">
+                <div class="user-channel-tabs">
+                  <button
+                    v-for="item in selectedUserChannelForms"
+                    :key="item.channel.id"
+                    type="button"
+                    class="user-channel-tab"
+                    :class="{
+                      'user-channel-tab--active': activeUserChannelId === item.channel.id,
+                    }"
+                    @click="activeUserChannelId = item.channel.id"
+                  >
+                    <span class="user-channel-tab__name">{{ item.channel.name }}</span>
+                    <span
+                      v-if="userForm.defaultChannelId === item.channel.id"
+                      class="user-channel-tab__mark"
+                    >
+                      默认
+                    </span>
+                  </button>
+                </div>
+
                 <div
                   v-for="item in selectedUserChannelForms"
-                  :key="item.channel.id"
-                  class="channel-config-card"
+                  v-show="activeUserChannelId === item.channel.id"
+                  :key="`${item.channel.id}-panel`"
+                  class="channel-config-card channel-config-card--flat"
                 >
-                  <div
-                    class="channel-config-card__head"
-                    role="button"
-                    tabindex="0"
-                    @click="toggleUserChannelSection(item.channel.id)"
-                    @keydown.enter.prevent="toggleUserChannelSection(item.channel.id)"
-                    @keydown.space.prevent="toggleUserChannelSection(item.channel.id)"
-                  >
+                  <div class="channel-config-card__head channel-config-card__head--static">
                     <div class="min-w-0 flex-1">
                       <div class="flex flex-wrap items-center gap-2">
                         <p class="channel-config-card__title">{{ item.channel.name }}</p>
@@ -489,57 +504,45 @@
                           v-if="userForm.defaultChannelId === item.channel.id"
                           size="small"
                           type="success"
-                          bordered
+                          :bordered="false"
+                          round
                         >
                           默认渠道
                         </n-tag>
                       </div>
                       <p class="channel-config-card__desc">
-                        当前渠道下的飞书表、素材预览、权限和抖音素材映射都会独立生效。
+                        当前渠道下的飞书、素材预览、权限和抖音号规则都会独立保存。
                       </p>
                     </div>
-                    <div class="channel-config-card__meta">
-                      <span class="channel-config-card__pill">
-                        <Icon icon="mdi:television-play" class="h-4 w-4" />
+                    <div class="channel-config-card__meta channel-config-card__meta--left">
+                      <span class="channel-config-card__pill channel-config-card__pill--neutral">
                         {{ item.config.enabled ? '专属配置已启用' : '仅查看数据' }}
                       </span>
-                      <span class="channel-config-card__pill">
-                        <Icon icon="mdi:link-variant" class="h-4 w-4" />
+                      <span class="channel-config-card__pill channel-config-card__pill--info">
                         {{ countConfiguredMaterialMatches(item.config.douyinMaterialMatches) }}
                         条有效规则
                       </span>
-                      <button
-                        type="button"
-                        class="channel-config-card__toggle"
-                        @click.stop="toggleUserChannelSection(item.channel.id)"
-                      >
-                        <Icon
-                          :icon="
-                            isUserChannelSectionExpanded(item.channel.id)
-                              ? 'mdi:chevron-up'
-                              : 'mdi:chevron-down'
-                          "
-                          class="h-4 w-4"
-                        />
-                        {{
-                          isUserChannelSectionExpanded(item.channel.id) ? '收起配置' : '展开配置'
-                        }}
-                      </button>
                     </div>
                   </div>
-                  <div class="channel-config-card__switch" @click.stop>
+
+                  <div
+                    class="channel-config-card__switch channel-config-card__switch--refined"
+                    @click.stop
+                  >
                     <div>
-                      <p class="channel-config-card__switch-title">启用专属配置</p>
+                      <p class="channel-config-card__switch-title">专属配置</p>
                       <p class="channel-config-card__switch-desc">
-                        打开后才会启用当前渠道下的飞书、素材预览和权限等专属配置。
+                        打开后本渠道按当前设置生效；关闭时只保留查看能力。
                       </p>
                     </div>
-                    <div class="channel-config-card__switch-actions">
+                    <div
+                      class="channel-config-card__switch-actions channel-config-card__switch-actions--wide"
+                    >
                       <n-select
                         :value="userChannelReuseSourceIds[item.channel.id] || null"
                         :options="getUserChannelReuseOptions(item.channel.id)"
                         clearable
-                        placeholder="复用渠道"
+                        placeholder="复用其他渠道配置"
                         class="channel-config-card__reuse-select"
                         @update:value="handleUserChannelReuseSelect(item.channel.id, $event)"
                       />
@@ -552,7 +555,12 @@
                       />
                     </div>
                   </div>
-                  <div v-if="isUserChannelSectionExpanded(item.channel.id)" class="mt-1">
+
+                  <div v-if="!item.config.enabled" class="channel-config-card__empty">
+                    当前渠道未启用专属配置，运行时仍沿用默认能力；这里的内容可以提前填写，启用后立即生效。
+                  </div>
+
+                  <div class="user-channel-grid">
                     <div
                       v-if="item.channel.juliang.buildConfig.enableCustomBid"
                       class="config-subpanel config-subpanel--amber"
@@ -561,7 +569,7 @@
                         <div>
                           <p class="text-sm font-semibold text-amber-600">搭建出价</p>
                           <p class="mt-1 text-sm text-slate-500">
-                            管理当前用户在当前渠道下的搭建出价；未填写时自动使用渠道默认值。
+                            未填写时自动回退到渠道默认出价。
                           </p>
                         </div>
                         <span class="channel-config-card__pill channel-config-card__pill--warning">
@@ -593,15 +601,13 @@
                         <div>
                           <p class="text-sm font-semibold text-blue-600">智能搭建时机</p>
                           <p class="mt-1 text-sm text-slate-500">
-                            打开后，用户可以在设置中心按当前渠道单独覆盖智能搭建时机；未单独保存时仍沿用渠道默认规则。
+                            控制用户是否可以在设置中心覆盖该渠道的默认规则。
                           </p>
                         </div>
                         <div class="toggle-hero">
                           <div>
                             <p class="toggle-hero__title">允许用户自定义</p>
-                            <p class="toggle-hero__desc">
-                              关闭后，设置中心不展示该入口，且不会应用用户自己的覆盖规则。
-                            </p>
+                            <p class="toggle-hero__desc">关闭后，设置中心不显示该入口。</p>
                           </div>
                           <n-switch v-model:value="item.config.buildAdvanceConfig.allowCustom" />
                         </div>
@@ -635,7 +641,7 @@
                         <div>
                           <p class="text-sm font-semibold text-fuchsia-600">形天上传</p>
                           <p class="mt-1 text-sm text-slate-500">
-                            为当前用户在当前渠道下配置素材库专用 XT Token，客户端会按所选渠道读取。
+                            当前渠道的 XT Token，客户端会按所选渠道读取。
                           </p>
                         </div>
                       </div>
@@ -660,7 +666,7 @@
                         <div>
                           <p class="text-sm font-semibold text-emerald-600">飞书表格 ID</p>
                           <p class="mt-1 text-sm text-slate-500">
-                            为当前渠道配置剧集清单、剧集状态和账户表的 table_id。
+                            维护剧集清单、剧集状态和账户表的 table_id。
                           </p>
                         </div>
                       </div>
@@ -695,14 +701,14 @@
                         <div>
                           <p class="text-sm font-semibold text-sky-600">素材预览</p>
                           <p class="mt-1 text-sm text-slate-500">
-                            控制当前用户在当前渠道下的素材预览开关、轮询间隔和搭建时间窗口。
+                            配置预览开关、轮询频率和飞书筛选时间窗口。
                           </p>
                         </div>
                         <div class="toggle-hero">
                           <div>
                             <p class="toggle-hero__title">启用素材预览</p>
                             <p class="toggle-hero__desc">
-                              建议默认开启，便于预览管理器按渠道工作。
+                              建议保持开启，便于预览管理器按渠道运行。
                             </p>
                           </div>
                           <n-switch v-model:value="item.config.materialPreview.enabled" />
@@ -740,11 +746,11 @@
                       </n-form>
                     </div>
 
-                    <div class="config-subpanel">
+                    <div class="config-subpanel channel-config-section--wide">
                       <div class="mb-3">
                         <p class="text-sm font-semibold text-amber-600">权限控制</p>
                         <p class="mt-1 text-sm text-slate-500">
-                          按终端划分当前用户在当前渠道下可访问哪些工作台入口。
+                          按终端决定当前用户在该渠道下能看到哪些入口。
                         </p>
                       </div>
                       <div class="permission-groups">
@@ -869,12 +875,11 @@
                       </div>
                     </div>
 
-                    <div class="config-subpanel">
+                    <div class="config-subpanel channel-config-section--wide">
                       <div class="mb-3">
                         <p class="text-sm font-semibold text-rose-600">订单按用户统计</p>
                         <p class="mt-1 text-sm text-slate-500">
-                          开启后，首页订单统计会按“推广链来源包含用户名”自动生成专属 tab，
-                          并展示当前时间段该用户名对应的充值总金额。
+                          根据推广链来源中的用户名拆分首页订单统计展示。
                         </p>
                       </div>
                       <n-form
@@ -980,12 +985,14 @@
                       </n-form>
                     </div>
 
-                    <div class="config-subpanel config-subpanel--violet">
+                    <div
+                      class="config-subpanel config-subpanel--violet channel-config-section--wide"
+                    >
                       <div class="config-subpanel__head config-subpanel__head--split">
                         <div>
                           <p class="text-sm font-semibold text-violet-600">抖音号匹配素材</p>
                           <p class="mt-1 text-sm text-slate-500">
-                            先选择当前渠道要使用的抖音号，再按素材总数自动平均分配素材序号。
+                            先选择抖音号，再按素材总数自动分配或手动填写素材序号。
                           </p>
                         </div>
                         <div class="flex flex-wrap items-center justify-end gap-3">
@@ -993,7 +1000,7 @@
                             <div>
                               <p class="toggle-hero__title">独立订单统计</p>
                               <p class="toggle-hero__desc">
-                                打开后，订单统计只展示推广链来源命中当前用户已绑定抖音号名称的订单。
+                                只统计命中当前用户已绑定抖音号名称的订单。
                               </p>
                             </div>
                             <n-switch v-model:value="item.config.independentOrderStats.enabled" />
@@ -1028,7 +1035,7 @@
                             <div>
                               <p class="material-match-builder__label">选择抖音号</p>
                               <p class="material-match-builder__subtext">
-                                已在其他已启用渠道占用的抖音号，这里不可重复选择。
+                                已在其他启用渠道占用的抖音号，这里不可重复选择。
                               </p>
                             </div>
                             <n-select
@@ -1134,9 +1141,6 @@
                           先在上方选择抖音号，再填写或自动分配素材序号。
                         </div>
                       </div>
-                    </div>
-                    <div v-if="!item.config.enabled" class="channel-config-card__empty">
-                      当前渠道只作为数据查看渠道使用，未启用专属配置，因此飞书、素材预览和权限仍沿用默认能力；抖音匹配素材依然按当前渠道单独维护。
                     </div>
                   </div>
                 </div>
@@ -1732,13 +1736,13 @@ const savingDownloadCenter = ref(false)
 const savingDouyinAccountUserId = ref('')
 const sortingChannels = ref(false)
 const viewportWidth = ref(typeof window === 'undefined' ? 1440 : window.innerWidth)
+const activeUserChannelId = ref('')
 const orderUsernameDrafts = reactive<Record<string, string>>({})
 const douyinAccountDrafts = reactive<Record<string, adminApi.DouyinAccount[]>>({})
 const douyinAccountExpandedState = reactive<Record<string, boolean>>({})
 const selectedDouyinAccountByUser = reactive<Record<string, string>>({})
 const materialMatchBatchTotals = reactive<Record<string, number | null>>({})
 const selectedMaterialAccountIdsByChannel = reactive<Record<string, string[]>>({})
-const userChannelExpandedState = reactive<Record<string, boolean>>({})
 const userChannelReuseSourceIds = reactive<Record<string, string>>({})
 const draggedOrderUsername = reactive({
   channelId: '',
@@ -2747,12 +2751,10 @@ function resetUserForm() {
   Object.keys(selectedMaterialAccountIdsByChannel).forEach(key => {
     delete selectedMaterialAccountIdsByChannel[key]
   })
-  Object.keys(userChannelExpandedState).forEach(key => {
-    delete userChannelExpandedState[key]
-  })
   Object.keys(userChannelReuseSourceIds).forEach(key => {
     delete userChannelReuseSourceIds[key]
   })
+  activeUserChannelId.value = ''
   cancelEditOrderUsername()
   resetOrderUsernameDrag()
 }
@@ -2984,12 +2986,12 @@ function copyUserChannelConfig(channelId: string) {
     channels.value.find(channel => channel.id === channelId)?.name || `渠道 ${channelId}`
 
   userForm.channelConfigs[channelId] = cloneUserChannelConfig(sourceConfig)
-  userChannelExpandedState[channelId] = true
   handleUserChannelMaterialSelectionChange(
     channelId,
     userForm.channelConfigs[channelId].douyinMaterialMatches.map(match => match.douyinAccountRefId)
   )
   orderUsernameDrafts[channelId] = ''
+  activeUserChannelId.value = channelId
 
   message.success(`已将【${sourceChannelName}】配置复制到【${targetChannelName}】，后续可独立修改`)
 }
@@ -3140,27 +3142,12 @@ function syncUserChannelConfigs() {
   selectedChannelIds.forEach(channelId => {
     syncUserChannelMaterialSelection(channelId)
   })
-  syncUserChannelExpandedState(selectedChannelIds)
   syncUserChannelReuseSourceState(selectedChannelIds)
+  syncActiveUserChannelId(selectedChannelIds)
 
   if (userForm.defaultChannelId && !selectedChannelIds.includes(userForm.defaultChannelId)) {
     userForm.defaultChannelId = ''
   }
-}
-
-function syncUserChannelExpandedState(selectedChannelIds: string[]) {
-  const nextSelectedSet = new Set(selectedChannelIds)
-  Object.keys(userChannelExpandedState).forEach(channelId => {
-    if (!nextSelectedSet.has(channelId)) {
-      delete userChannelExpandedState[channelId]
-    }
-  })
-
-  selectedChannelIds.forEach(channelId => {
-    if (typeof userChannelExpandedState[channelId] !== 'boolean') {
-      userChannelExpandedState[channelId] = false
-    }
-  })
 }
 
 function syncUserChannelReuseSourceState(selectedChannelIds: string[]) {
@@ -3185,12 +3172,22 @@ function syncUserChannelReuseSourceState(selectedChannelIds: string[]) {
   })
 }
 
-function isUserChannelSectionExpanded(channelId: string) {
-  return Boolean(userChannelExpandedState[channelId])
-}
+function syncActiveUserChannelId(selectedChannelIds: string[]) {
+  if (!selectedChannelIds.length) {
+    activeUserChannelId.value = ''
+    return
+  }
 
-function toggleUserChannelSection(channelId: string) {
-  userChannelExpandedState[channelId] = !isUserChannelSectionExpanded(channelId)
+  if (activeUserChannelId.value && selectedChannelIds.includes(activeUserChannelId.value)) {
+    return
+  }
+
+  if (userForm.defaultChannelId && selectedChannelIds.includes(userForm.defaultChannelId)) {
+    activeUserChannelId.value = userForm.defaultChannelId
+    return
+  }
+
+  activeUserChannelId.value = selectedChannelIds[0] || ''
 }
 
 function handleUserChannelEnabledChange(
@@ -3204,8 +3201,8 @@ function handleUserChannelEnabledChange(
       channelId,
       getUserChannelSelectedMaterialAccountIds(channelId)
     )
-    userChannelExpandedState[channelId] = true
   }
+  activeUserChannelId.value = channelId
 }
 
 async function loadData() {
@@ -3789,6 +3786,256 @@ watch(
   border-color: #e2e8f0;
   border-radius: 0.9rem;
   box-shadow: none;
+}
+
+:deep(.admin-form-drawer--user .n-drawer-body) {
+  background:
+    radial-gradient(circle at top left, rgba(226, 232, 240, 0.42), transparent 28%),
+    linear-gradient(180deg, #f8fafc 0%, #ffffff 42%, #ffffff 100%);
+}
+
+:deep(.admin-form-drawer--user .n-drawer-header) {
+  padding-bottom: 6px;
+}
+
+.user-drawer-hero {
+  padding: 0.25rem 0 0.1rem;
+}
+
+.user-drawer-hero__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.9rem;
+}
+
+.user-drawer-hero__meta {
+  margin-top: 0;
+  justify-content: flex-end;
+}
+
+.user-drawer-hero__pill {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #334155;
+}
+
+.user-drawer-hero__summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.7rem;
+  font-size: 0.82rem;
+}
+
+.user-drawer-hero__summary-label {
+  color: #64748b;
+}
+
+.user-drawer-hero__summary-value {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.user-drawer-hero__summary-separator {
+  color: #cbd5e1;
+}
+
+.user-drawer-panel {
+  border-radius: 1.1rem;
+  border-color: rgba(226, 232, 240, 0.9);
+  box-shadow: 0 14px 30px -32px rgba(15, 23, 42, 0.24);
+}
+
+.panel-head--plain {
+  gap: 0;
+  margin-bottom: 1rem;
+}
+
+.panel-head__desc--compact {
+  max-width: 42rem;
+  margin-top: 0.38rem;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.user-channel-workspace {
+  display: grid;
+  gap: 1rem;
+}
+
+.user-channel-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.user-channel-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid #dbe3ee;
+  border-radius: 9999px;
+  background: #ffffff;
+  color: #475569;
+  font-size: 0.84rem;
+  font-weight: 700;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.user-channel-tab:hover {
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+.user-channel-tab--active {
+  border-color: #cbd5e1;
+  background: #0f172a;
+  color: #f8fafc;
+  box-shadow: 0 12px 24px -20px rgba(15, 23, 42, 0.65);
+}
+
+.user-channel-tab__name {
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-channel-tab__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.25rem;
+  padding: 0 0.42rem;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.16);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.channel-config-card--flat {
+  padding: 1.1rem;
+  border-color: rgba(226, 232, 240, 0.95);
+  background: #ffffff;
+  box-shadow: 0 18px 34px -34px rgba(15, 23, 42, 0.18);
+}
+
+.channel-config-card__head--static {
+  margin-bottom: 0.8rem;
+  cursor: default;
+}
+
+.channel-config-card__meta--left {
+  justify-content: flex-start;
+}
+
+.channel-config-card__switch--refined {
+  margin: 0 0 1rem;
+  padding: 0.95rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.channel-config-card__switch-actions--wide {
+  min-width: min(100%, 21rem);
+  justify-content: flex-end;
+}
+
+.channel-config-card--flat .channel-config-card__reuse-select {
+  width: 12rem;
+}
+
+.channel-config-card__pill--neutral {
+  border-color: rgba(226, 232, 240, 0.9);
+  background: #ffffff;
+  color: #475569;
+}
+
+.channel-config-card__pill--warning {
+  border-color: rgba(253, 230, 138, 0.95);
+  background: rgba(255, 251, 235, 0.98);
+  color: #b45309;
+}
+
+.user-channel-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.channel-config-section--wide {
+  grid-column: 1 / -1;
+}
+
+.channel-config-card--flat .config-subpanel {
+  height: 100%;
+  padding: 0.95rem 1rem;
+  border-color: #e2e8f0;
+  border-radius: 1rem;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.channel-config-card--flat .config-subpanel + .config-subpanel {
+  margin-top: 0;
+}
+
+.channel-config-card--flat .config-subpanel--amber {
+  background: linear-gradient(180deg, rgba(255, 251, 235, 0.7), #ffffff);
+}
+
+.channel-config-card--flat .config-subpanel--blue,
+.channel-config-card--flat .config-subpanel--sky,
+.channel-config-card--flat .config-subpanel--violet {
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.85), #ffffff);
+}
+
+.channel-config-card--flat .config-subpanel__head {
+  margin-bottom: 0.75rem;
+}
+
+.channel-config-card--flat .toggle-hero {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.channel-config-card--flat .toggle-hero__title {
+  font-size: 0.8rem;
+}
+
+.channel-config-card--flat .toggle-hero__desc {
+  max-width: 16rem;
+  font-size: 0.74rem;
+}
+
+.channel-config-card--flat .permission-group,
+.channel-config-card--flat .permission-card,
+.channel-config-card--flat .material-match-card,
+.channel-config-card--flat .material-match-builder__selector,
+.channel-config-card--flat .material-match-builder__average {
+  border-color: #e2e8f0;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.channel-config-card--flat .permission-group--desktop {
+  background: linear-gradient(180deg, rgba(255, 251, 235, 0.45), #ffffff);
+}
+
+.channel-config-card--flat .permission-card--recommended {
+  background: linear-gradient(180deg, rgba(255, 251, 235, 0.72), #ffffff);
 }
 
 .panel-head {
@@ -4863,6 +5110,21 @@ watch(
     border-radius: 1.1rem;
   }
 
+  .user-drawer-hero__head,
+  .user-drawer-hero__meta,
+  .user-channel-tabs {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .user-channel-tab {
+    justify-content: space-between;
+  }
+
+  .user-channel-grid {
+    grid-template-columns: 1fr;
+  }
+
   .drawer-hero,
   .panel-head,
   .advance-config-block__header,
@@ -4915,6 +5177,10 @@ watch(
     justify-content: space-between;
   }
 
+  .channel-config-card--flat .channel-config-card__reuse-select {
+    width: 100%;
+  }
+
   .channel-config-card__reuse-select {
     width: 100%;
   }
@@ -4934,6 +5200,10 @@ watch(
 
   .permission-card__body {
     align-items: flex-start;
+  }
+
+  .channel-config-card--flat .toggle-hero {
+    width: 100%;
   }
 
   .material-match-search {
