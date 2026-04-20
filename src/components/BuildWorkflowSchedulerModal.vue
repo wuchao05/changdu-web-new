@@ -126,6 +126,11 @@ interface FeishuDramaRecord {
     上架时间?: { type: number; value: [number] } // DateTime 字段格式
     当前状态?: string
     抖音素材?: [{ text: string }] // 抖音素材字段，从飞书状态表获取
+    推送素材ID?:
+      | number
+      | string
+      | [{ text: string }]
+      | { type: number; value: Array<number | string> }
     备注?: [{ text: string }] | string // 备注字段，用于记录失败或跳过原因
   }
 }
@@ -217,6 +222,7 @@ const materialPreviewStatus = ref<materialPreviewApi.MaterialPreviewStatus | nul
 const isLoadingMaterialPreview = ref(false)
 const switchingMaterialPreview = ref(false)
 const savingMaterialPreviewConfig = ref(false)
+const dramaMaterialStatusMap = ref<Record<string, buildWorkflowApi.DramaMaterialLibraryStatus>>({})
 const materialPreviewPollingTimer = ref<ReturnType<typeof setInterval> | null>(null)
 const savingBuildAdvance = ref(false)
 
@@ -338,6 +344,72 @@ function getCurrentEarliestBuildTime(drama: FeishuDramaRecord) {
   return getEarliestBuildTime(drama, currentBuildConfig.value || {})
 }
 
+function getDramaMaterialStatus(
+  drama: FeishuDramaRecord
+): buildWorkflowApi.DramaMaterialLibraryStatus {
+  return (
+    dramaMaterialStatusMap.value[drama.record_id] || {
+      recordId: drama.record_id,
+      dramaName: drama.fields['剧名']?.[0]?.text || '',
+      materialId: '',
+      status: null,
+      ready: false,
+      reason: 'loading',
+      message: '素材入库状态校验中',
+    }
+  )
+}
+
+function isDramaMaterialReady(drama: FeishuDramaRecord) {
+  return getDramaMaterialStatus(drama).ready
+}
+
+function canBuildDrama(drama: FeishuDramaRecord, currentTime?: string | number | Date | Dayjs) {
+  return isDramaMaterialReady(drama) && canBuildByCurrentRule(drama, currentTime)
+}
+
+function getDramaBuildBlockedMessage(drama: FeishuDramaRecord) {
+  const materialStatus = getDramaMaterialStatus(drama)
+  if (!materialStatus.ready) {
+    return materialStatus.message
+  }
+
+  const earliestBuildTime = getCurrentEarliestBuildTime(drama)
+  return earliestBuildTime
+    ? `未到可搭建时间，最早可在 ${earliestBuildTime.format('YYYY-MM-DD HH:mm')} 提交搭建`
+    : '未到可搭建时间'
+}
+
+function getDramaDisabledButtonText(drama: FeishuDramaRecord) {
+  return isDramaMaterialReady(drama) ? '未到时间' : '未入库'
+}
+
+async function refreshDramaMaterialStatuses(targetDramas: FeishuDramaRecord[]) {
+  if (targetDramas.length === 0) {
+    dramaMaterialStatusMap.value = {}
+    return
+  }
+
+  const result = await buildWorkflowApi.queryDramaMaterialLibraryStatuses(targetDramas)
+  const nextMap: Record<string, buildWorkflowApi.DramaMaterialLibraryStatus> = {}
+
+  result.data.items.forEach(item => {
+    if (item.recordId) {
+      nextMap[item.recordId] = item
+    }
+  })
+
+  dramaMaterialStatusMap.value = nextMap
+}
+
+function logMaterialBlockedDrama(drama: FeishuDramaRecord) {
+  const dramaName = drama.fields['剧名']?.[0]?.text || '未知'
+  const materialStatus = getDramaMaterialStatus(drama)
+  console.log(
+    `[优先级选择] 跳过 "${dramaName}"：推送素材ID ${materialStatus.materialId || '-'}，${materialStatus.message}`
+  )
+}
+
 async function assertDramaBuildWindowAllowed(drama: FeishuDramaRecord) {
   const result = await buildWorkflowApi.validateBuildWindow(drama)
   if (result.data.canBuild) {
@@ -345,9 +417,10 @@ async function assertDramaBuildWindowAllowed(drama: FeishuDramaRecord) {
   }
 
   throw new Error(
-    result.data.earliestBuildTime
-      ? `未到可搭建时间，最早可在 ${result.data.earliestBuildTime} 提交搭建`
-      : '未到可搭建时间'
+    result.data.blockMessage ||
+      (result.data.earliestBuildTime
+        ? `未到可搭建时间，最早可在 ${result.data.earliestBuildTime} 提交搭建`
+        : '未到可搭建时间')
   )
 }
 
@@ -425,7 +498,7 @@ async function waitForConfiguredMicroAppAsset(
 const dramasColumns: DataTableColumns<FeishuDramaRecord> = [
   {
     type: 'selection',
-    disabled: row => !canBuildByCurrentRule(row),
+    disabled: row => !canBuildDrama(row),
   },
   {
     title: '剧名',
@@ -473,6 +546,43 @@ const dramasColumns: DataTableColumns<FeishuDramaRecord> = [
     },
   },
   {
+    title: '素材状态',
+    key: 'materialLibraryStatus',
+    width: 140,
+    render: row => {
+      const materialStatus = getDramaMaterialStatus(row)
+      const type = materialStatus.ready
+        ? 'success'
+        : materialStatus.reason === 'query_failed'
+          ? 'error'
+          : 'warning'
+      const label = materialStatus.ready
+        ? '已入库'
+        : materialStatus.reason === 'missing_material_id'
+          ? '缺少素材ID'
+          : materialStatus.reason === 'missing_xt_token'
+            ? '缺少XT Token'
+            : materialStatus.reason === 'expired_xt_token'
+              ? 'XT Token失效'
+              : materialStatus.status !== null
+                ? `待入库(${materialStatus.status})`
+                : '待入库'
+
+      return h(NTooltip, null, {
+        trigger: () =>
+          h(
+            NTag,
+            {
+              type,
+              size: 'small',
+            },
+            { default: () => label }
+          ),
+        default: () => materialStatus.message,
+      })
+    },
+  },
+  {
     title: '当前状态',
     key: 'status',
     width: 80,
@@ -502,7 +612,7 @@ const dramasColumns: DataTableColumns<FeishuDramaRecord> = [
     fixed: 'right',
     render: row => {
       const isBuilding = manuallyBuildingIds.value.has(row.record_id)
-      const canBuild = canBuildByCurrentRule(row)
+      const canBuild = canBuildDrama(row)
       // 只有后台模式正在运行且有任务执行时，才禁用按钮
       const isBackgroundRunning = backgroundSchedulerStatus.value?.enabled === true
       const hasRunningTask =
@@ -523,7 +633,7 @@ const dramasColumns: DataTableColumns<FeishuDramaRecord> = [
             isBuilding
               ? h('span', { style: { color: '#999' } }, '搭建中...')
               : !canBuild
-                ? h('span', { style: { color: '#999' } }, '未到时间')
+                ? h('span', { style: { color: '#999' } }, getDramaDisabledButtonText(row))
                 : '开始搭建',
         }
       )
@@ -789,8 +899,9 @@ async function loadPendingDramas() {
       const dateB = b.fields['日期'] || 0
       return dateA - dateB
     })
+    await refreshDramaMaterialStatuses(dramas.value)
     selectedRowKeys.value = selectedRowKeys.value.filter(recordId =>
-      dramas.value.some(drama => drama.record_id === recordId && canBuildByCurrentRule(drama))
+      dramas.value.some(drama => drama.record_id === recordId && canBuildDrama(drama))
     )
 
     console.log(`找到 ${dramas.value.length} 部待搭建剧集（已按日期排序）`)
@@ -852,6 +963,7 @@ async function executePollingCycle() {
       true // 包含短剧ID字段
     )
     dramas.value = result.data?.items || []
+    await refreshDramaMaterialStatuses(dramas.value)
     isLoadingDramas.value = false
 
     console.log(`查询到 ${dramas.value.length} 部待搭建剧集`)
@@ -861,11 +973,18 @@ async function executePollingCycle() {
     })
 
     // 2. 选择最高优先级剧集
-    const selectedDrama = selectHighestPriorityDrama(dramas.value, {
+    const materialReadyDramas = dramas.value.filter(drama => {
+      const ready = isDramaMaterialReady(drama)
+      if (!ready) {
+        logMaterialBlockedDrama(drama)
+      }
+      return ready
+    })
+    const selectedDrama = selectHighestPriorityDrama(materialReadyDramas, {
       currentTime: dayjs().tz(WORKFLOW_TIMEZONE),
       buildConfig: currentBuildConfig.value || {},
       onSkip: (
-        drama: any,
+        drama: FeishuDramaRecord,
         context: {
           publishTime: Dayjs
           earliestBuildTime: Dayjs | null
@@ -1232,6 +1351,7 @@ function resetState() {
   materialPreviewConfig.value = null
   switchingMaterialPreview.value = false
   savingMaterialPreviewConfig.value = false
+  dramaMaterialStatusMap.value = {}
   buildAdvanceConfig.value = createDefaultBuildAdvanceConfig()
   syncBuildAdvanceDraftFromConfig(buildAdvanceConfig.value)
   savingBuildAdvance.value = false
@@ -1239,13 +1359,8 @@ function resetState() {
 
 // 开始搭建单个剧集
 async function handleBuildSingleDrama(drama: FeishuDramaRecord) {
-  if (!canBuildByCurrentRule(drama)) {
-    const earliestBuildTime = getCurrentEarliestBuildTime(drama)
-    message.warning(
-      earliestBuildTime
-        ? `未到可搭建时间，最早可在 ${earliestBuildTime.format('YYYY-MM-DD HH:mm')} 提交搭建`
-        : '未到可搭建时间'
-    )
+  if (!canBuildDrama(drama)) {
+    message.warning(getDramaBuildBlockedMessage(drama))
     return
   }
 
@@ -1303,7 +1418,7 @@ async function startAutoBuild() {
   const selectedDramas = dramas.value.filter(drama =>
     selectedRowKeys.value.includes(drama.record_id)
   )
-  const buildableSelectedDramas = selectedDramas.filter(drama => canBuildByCurrentRule(drama))
+  const buildableSelectedDramas = selectedDramas.filter(drama => canBuildDrama(drama))
 
   if (selectedDramas.length === 0) {
     message.warning('没有找到选中的剧集')
@@ -1311,12 +1426,25 @@ async function startAutoBuild() {
   }
 
   if (buildableSelectedDramas.length === 0) {
-    message.warning('选中的剧集都还未到可搭建时间')
+    const hasMaterialBlockedDrama = selectedDramas.some(drama => !isDramaMaterialReady(drama))
+    message.warning(
+      hasMaterialBlockedDrama ? '选中的剧集素材还未进入巨量视频库' : '选中的剧集都还未到可搭建时间'
+    )
     return
   }
 
   if (buildableSelectedDramas.length !== selectedDramas.length) {
-    message.warning('已自动跳过未到可搭建时间的剧集')
+    const hasMaterialBlockedDrama = selectedDramas.some(drama => !isDramaMaterialReady(drama))
+    const hasTimeBlockedDrama = selectedDramas.some(
+      drama => isDramaMaterialReady(drama) && !canBuildByCurrentRule(drama)
+    )
+    message.warning(
+      hasMaterialBlockedDrama && hasTimeBlockedDrama
+        ? '已自动跳过素材未入库或未到可搭建时间的剧集'
+        : hasMaterialBlockedDrama
+          ? '已自动跳过素材未入库的剧集'
+          : '已自动跳过未到可搭建时间的剧集'
+    )
   }
 
   selectedRowKeys.value = buildableSelectedDramas.map(drama => drama.record_id)

@@ -455,6 +455,16 @@ export interface BackgroundSchedulerTaskHistory {
   completedAt: string
 }
 
+export interface DramaMaterialLibraryStatus {
+  recordId: string
+  dramaName: string
+  materialId: string
+  status: number | null
+  ready: boolean
+  reason: string
+  message: string
+}
+
 /**
  * 后台调度器当前任务类型
  */
@@ -597,6 +607,31 @@ export async function triggerBackgroundSchedulerBuild(params: {
   return result
 }
 
+export async function queryDramaMaterialLibraryStatuses(dramas: unknown[]): Promise<{
+  code: number
+  message: string
+  data: {
+    items: DramaMaterialLibraryStatus[]
+  }
+}> {
+  const response = await fetch(`${ENV.BASE_URL}/build-workflow/material-library-statuses`, {
+    method: 'POST',
+    headers: buildSessionHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ dramas }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`查询素材入库状态失败: ${response.statusText}`)
+  }
+
+  const result = await response.json()
+  if (result.code !== 0) {
+    throw new Error(result.message || '查询素材入库状态失败')
+  }
+
+  return result
+}
+
 export async function validateBuildWindow(drama: unknown): Promise<{
   code: number
   message: string
@@ -604,6 +639,11 @@ export async function validateBuildWindow(drama: unknown): Promise<{
     canBuild: boolean
     earliestBuildTime: string | null
     ruleDescription: string
+    materialId: string
+    materialStatus: number | null
+    materialReady: boolean
+    blockReason: string
+    blockMessage: string
   }
 }> {
   const response = await fetch(`${ENV.BASE_URL}/build-workflow/validate-build-window`, {

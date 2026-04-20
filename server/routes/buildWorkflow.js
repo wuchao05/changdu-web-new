@@ -25,6 +25,10 @@ import {
   getAdvanceRuleDescription,
   getEarliestBuildTime,
 } from '../utils/buildWorkflowRules.js'
+import {
+  queryDramaMaterialLibraryStatus,
+  queryDramaMaterialLibraryStatuses,
+} from '../utils/materialLibrary.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -249,16 +253,33 @@ router.post('/validate-build-window', async ctx => {
     }
 
     const buildConfig = ctx.state.channelRuntime?.buildConfig || {}
+    const xtToken = String(getRuntimeUser(ctx)?.xtToken || '').trim()
+    const materialStatus = await queryDramaMaterialLibraryStatus(drama, xtToken)
     const earliestBuildTime = getEarliestBuildTime(drama, buildConfig)
-    const canBuild = canBuildDramaNow(drama, new Date(), buildConfig)
+    const canBuildByTime = canBuildDramaNow(drama, new Date(), buildConfig)
+    const canBuild = materialStatus.ready && canBuildByTime
+    const blockedMessage = !materialStatus.ready
+      ? materialStatus.message
+      : earliestBuildTime
+        ? `未到可搭建时间，最早可在 ${earliestBuildTime.format('YYYY-MM-DD HH:mm')} 提交搭建`
+        : '未到可搭建时间'
 
     ctx.body = {
       code: 0,
-      message: canBuild ? '当前可搭建' : '未到可搭建时间',
+      message: canBuild ? '当前可搭建' : blockedMessage,
       data: {
         canBuild,
         earliestBuildTime: earliestBuildTime ? earliestBuildTime.format('YYYY-MM-DD HH:mm') : null,
         ruleDescription: getAdvanceRuleDescription(buildConfig),
+        materialId: materialStatus.materialId,
+        materialStatus: materialStatus.status,
+        materialReady: materialStatus.ready,
+        blockReason: canBuild
+          ? 'ready'
+          : materialStatus.ready
+            ? 'build_time'
+            : materialStatus.reason,
+        blockMessage: canBuild ? '' : blockedMessage,
       },
     }
   } catch (error) {
@@ -266,6 +287,28 @@ router.post('/validate-build-window', async ctx => {
     ctx.body = {
       code: -1,
       message: error.message || '校验搭建时机失败',
+    }
+  }
+})
+
+router.post('/material-library-statuses', async ctx => {
+  try {
+    const dramas = Array.isArray(ctx.request.body?.dramas) ? ctx.request.body.dramas : []
+    const xtToken = String(getRuntimeUser(ctx)?.xtToken || '').trim()
+    const items = await queryDramaMaterialLibraryStatuses(dramas, xtToken)
+
+    ctx.body = {
+      code: 0,
+      message: 'success',
+      data: {
+        items,
+      },
+    }
+  } catch (error) {
+    ctx.status = 500
+    ctx.body = {
+      code: -1,
+      message: error.message || '查询素材入库状态失败',
     }
   }
 })

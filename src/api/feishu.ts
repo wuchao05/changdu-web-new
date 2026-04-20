@@ -1125,9 +1125,10 @@ class FeishuApiService {
           '上架时间',
           '评级',
           '抖音素材',
+          '推送素材ID',
           '备注',
         ]
-      : ['剧名', '账户', '日期', '当前状态', '上架时间', '评级', '抖音素材', '备注']
+      : ['剧名', '账户', '日期', '当前状态', '上架时间', '评级', '抖音素材', '推送素材ID', '备注']
 
     const response = await fetch(`${ENV.BASE_URL}/feishu/bitable/drama-status/pending-build`, {
       method: 'POST',

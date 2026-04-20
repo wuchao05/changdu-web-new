@@ -31,6 +31,7 @@ import {
   getEarliestBuildTime,
   selectHighestPriorityDrama,
 } from '../utils/buildWorkflowRules.js'
+import { queryDramaMaterialLibraryStatuses } from '../utils/materialLibrary.js'
 import {
   getChannelLabel,
   normalizeChannelRuntime,
@@ -75,6 +76,7 @@ function createDefaultSchedulerState() {
       buildPreference: {
         bid: '',
       },
+      xtToken: '',
       buildAdvanceConfig: {
         ...DEFAULT_USER_BUILD_ADVANCE_CONFIG,
       },
@@ -270,6 +272,9 @@ async function ensureSchedulerRuntime(channelRuntime = null, instanceKey = getAc
             ''
         ).trim(),
       },
+      xtToken: String(
+        channelRuntime.runtimeUser?.xtToken || channelRuntime.runtimeUserConfig?.xtToken || ''
+      ).trim(),
       buildAdvanceConfig: normalizeUserBuildAdvanceConfig(
         channelRuntime.runtimeUser?.buildAdvanceConfig ||
           channelRuntime.runtimeUserConfig?.buildAdvanceConfig ||
@@ -304,6 +309,7 @@ async function ensureSchedulerRuntime(channelRuntime = null, instanceKey = getAc
           buildPreference: {
             bid: String(latestRuntimeUser?.buildPreference?.bid || '').trim(),
           },
+          xtToken: String(latestRuntimeUser?.xtToken || '').trim(),
           buildAdvanceConfig: normalizeUserBuildAdvanceConfig(
             latestRuntimeUser?.buildAdvanceConfig || DEFAULT_USER_BUILD_ADVANCE_CONFIG
           ),
@@ -347,6 +353,60 @@ function getDramaStatusTableId() {
     state.tableId ||
     state.runtimeUserConfig?.feishu?.dramaStatusTableId ||
     FEISHU_CONFIG.table_ids.drama_status
+  )
+}
+
+function getRuntimeXtToken() {
+  return String(getActiveSchedulerState().runtimeUserConfig?.xtToken || '').trim()
+}
+
+async function attachDramaMaterialLibraryStatus(dramas) {
+  const dramaList = Array.isArray(dramas) ? dramas : []
+  if (dramaList.length === 0) {
+    return dramaList
+  }
+
+  const statusItems = await queryDramaMaterialLibraryStatuses(dramaList, getRuntimeXtToken())
+  const statusMap = new Map(statusItems.map(item => [String(item.recordId || '').trim(), item]))
+
+  dramaList.forEach(drama => {
+    drama._materialLibraryStatus = statusMap.get(String(drama?.record_id || '').trim()) || {
+      recordId: String(drama?.record_id || '').trim(),
+      dramaName: String(drama?.fields?.['剧名']?.[0]?.text || '').trim(),
+      materialId: '',
+      status: null,
+      ready: false,
+      reason: 'query_failed',
+      message: '素材入库状态校验失败',
+    }
+  })
+
+  return dramaList
+}
+
+function getDramaMaterialLibraryStatus(drama) {
+  return (
+    drama?._materialLibraryStatus || {
+      materialId: '',
+      status: null,
+      ready: false,
+      reason: 'query_failed',
+      message: '素材入库状态未校验',
+    }
+  )
+}
+
+function canBuildDramaWithMaterialStatus(drama, currentTime, buildConfig = getBuildRuleConfig()) {
+  return (
+    getDramaMaterialLibraryStatus(drama).ready && canBuildDramaNow(drama, currentTime, buildConfig)
+  )
+}
+
+function logMaterialBlockedDrama(drama) {
+  const dramaName = drama?.fields?.['剧名']?.[0]?.text || '未知'
+  const materialStatus = getDramaMaterialLibraryStatus(drama)
+  buildConsole.log(
+    `[优先级选择] 跳过 "${dramaName}"：推送素材ID ${materialStatus.materialId || '-'}，${materialStatus.message}`
   )
 }
 
@@ -442,6 +502,7 @@ async function getPendingSetupDramas() {
           '上架时间',
           '评级',
           '抖音素材',
+          '推送素材ID',
           '备注',
         ],
         page_size: 100,
@@ -469,6 +530,7 @@ async function getPendingSetupDramas() {
   items.forEach(item => {
     item._tableId = dramaStatusTableId
   })
+  await attachDramaMaterialLibraryStatus(items)
   return items
 }
 
@@ -484,7 +546,7 @@ async function refreshQueueSnapshotForInstance(instanceKey, options = {}) {
       const now = new Date()
       const buildRuleConfig = getBuildRuleConfig()
       const buildableCount = dramas.filter(drama =>
-        canBuildDramaNow(drama, now, buildRuleConfig)
+        canBuildDramaWithMaterialStatus(drama, now, buildRuleConfig)
       ).length
 
       updateQueueSnapshot(state, dramas.length, buildableCount, now.toISOString())
@@ -1752,7 +1814,7 @@ async function executePollingCycle() {
     let dramas = await getPendingSetupDramas()
     buildConsole.log('[后台搭建] 查询到 ' + dramas.length + ' 部待搭建剧集')
     const buildableCount = dramas.filter(drama =>
-      canBuildDramaNow(drama, now, getBuildRuleConfig())
+      canBuildDramaWithMaterialStatus(drama, now, getBuildRuleConfig())
     ).length
     updateQueueSnapshot(state, dramas.length, buildableCount, now.toISOString())
     buildConsole.log(`[后台搭建] 当前队列快照: 待搭建 ${dramas.length}，可搭建 ${buildableCount}`)
@@ -1761,10 +1823,18 @@ async function executePollingCycle() {
     // 2. 循环处理，��到成功或没有剧集
     let dramaIndex = 0
     while (dramas.length > 0) {
+      await attachDramaMaterialLibraryStatus(dramas)
       buildConsole.log(
         `[后台搭建] ====== 第 ${dramaIndex + 1} 次尝试，队列中还有 ${dramas.length} 部剧集 ======`
       )
-      const selectedDrama = selectHighestPriorityDrama(dramas, {
+      const materialReadyDramas = dramas.filter(drama => {
+        const ready = getDramaMaterialLibraryStatus(drama).ready
+        if (!ready) {
+          logMaterialBlockedDrama(drama)
+        }
+        return ready
+      })
+      const selectedDrama = selectHighestPriorityDrama(materialReadyDramas, {
         currentTime: now,
         buildConfig: getBuildRuleConfig(),
         onSkip: (drama, context) => {
@@ -2155,7 +2225,7 @@ async function buildSpecificDrama(dramaId) {
     const buildRuleConfig = getBuildRuleConfig()
     const now = new Date()
     const buildableCount = dramas.filter(drama =>
-      canBuildDramaNow(drama, now, buildRuleConfig)
+      canBuildDramaWithMaterialStatus(drama, now, buildRuleConfig)
     ).length
     updateQueueSnapshot(state, dramas.length, buildableCount, now.toISOString())
     buildConsole.log(`[后台搭建] 当前队列快照: 待搭建 ${dramas.length}，可搭建 ${buildableCount}`)
@@ -2168,6 +2238,11 @@ async function buildSpecificDrama(dramaId) {
     }
 
     const dramaName = targetDrama.fields['剧名']?.[0]?.text || '未知'
+    const materialStatus = getDramaMaterialLibraryStatus(targetDrama)
+    if (!materialStatus.ready) {
+      throw new Error(`剧集 ${dramaName} ${materialStatus.message}`)
+    }
+
     const publishTime = getDramaPublishTime(targetDrama)
     if (!publishTime) {
       throw new Error(`剧集 ${dramaName} 缺少上架时间，无法提交搭建`)
@@ -2178,7 +2253,7 @@ async function buildSpecificDrama(dramaId) {
       throw new Error(`剧集 ${dramaName} 缺少最早可搭建时间，无法提交搭建`)
     }
 
-    if (!canBuildDramaNow(targetDrama, new Date(), buildRuleConfig)) {
+    if (!canBuildDramaWithMaterialStatus(targetDrama, new Date(), buildRuleConfig)) {
       throw new Error(
         `剧集 ${dramaName} 未到可搭建时间，最早可在 ${earliestBuildTime.format('YYYY-MM-DD HH:mm')} 提交搭建`
       )
