@@ -386,21 +386,15 @@
 
         <div class="admin-form-drawer__body">
           <div class="admin-form-drawer__content space-y-5">
-            <section class="drawer-panel drawer-panel--muted user-drawer-panel">
-              <div class="panel-head panel-head--plain">
-                <div class="min-w-0 flex-1">
-                  <p class="panel-head__eyebrow text-slate-500">基础信息</p>
-                  <h3 class="panel-head__title">账号与渠道归属</h3>
-                  <p class="panel-head__desc panel-head__desc--compact">
-                    先确认账号身份，再指定可访问渠道和默认落地渠道。
-                  </p>
-                </div>
+            <section class="drawer-panel drawer-panel--muted user-drawer-panel user-basic-panel">
+              <div class="panel-head panel-head--compact">
+                <h3 class="panel-head__title panel-head__title--compact">基础信息</h3>
               </div>
               <n-form
                 :model="userForm"
                 label-placement="top"
                 autocomplete="off"
-                class="grid grid-cols-1 gap-3 md:grid-cols-2"
+                class="user-basic-form grid grid-cols-1 gap-x-3 gap-y-1 md:grid-cols-2 xl:grid-cols-3"
               >
                 <n-form-item label="昵称">
                   <n-input v-model:value="userForm.nickname" placeholder="请输入昵称" />
@@ -415,13 +409,11 @@
                     }"
                   />
                 </n-form-item>
-                <n-form-item label="业务前缀" class="md:col-span-2">
-                  <div class="space-y-2">
-                    <n-input v-model:value="userForm.brandName" placeholder="默认小红" />
-                    <p class="text-xs text-slate-500">
-                      用到账户备注、推广链命名、搭建流程中的项目和广告命名。
-                    </p>
-                  </div>
+                <n-form-item label="用户类型">
+                  <n-select v-model:value="userForm.userType" :options="userTypeOptions" />
+                </n-form-item>
+                <n-form-item label="业务前缀">
+                  <n-input v-model:value="userForm.brandName" placeholder="默认小红" />
                 </n-form-item>
                 <n-form-item label="密码">
                   <n-input
@@ -435,18 +427,6 @@
                     }"
                   />
                 </n-form-item>
-                <n-form-item label="用户类型">
-                  <n-select v-model:value="userForm.userType" :options="userTypeOptions" />
-                </n-form-item>
-                <n-form-item label="可访问渠道">
-                  <n-select
-                    v-model:value="userForm.channelIds"
-                    :options="channelOptions"
-                    clearable
-                    multiple
-                    placeholder="请选择可访问渠道"
-                  />
-                </n-form-item>
                 <n-form-item label="默认渠道">
                   <n-select
                     v-model:value="userForm.defaultChannelId"
@@ -455,39 +435,44 @@
                     placeholder="请选择默认渠道"
                   />
                 </n-form-item>
+                <n-form-item label="可访问渠道" class="md:col-span-2 xl:col-span-3">
+                  <n-select
+                    v-model:value="userForm.channelIds"
+                    :options="channelOptions"
+                    clearable
+                    multiple
+                    placeholder="请选择可访问渠道"
+                  />
+                </n-form-item>
               </n-form>
             </section>
 
-            <section class="drawer-panel drawer-panel--white user-drawer-panel">
-              <div class="panel-head panel-head--plain user-channel-panel-head">
-                <div class="min-w-0 flex-1">
-                  <p class="panel-head__eyebrow text-slate-500">按渠道配置</p>
-                  <h3 class="panel-head__title">运行时业务参数</h3>
-                  <p class="panel-head__desc panel-head__desc--compact">
-                    切换下方渠道标签，分别维护该渠道的专属参数、权限和素材规则。
-                  </p>
-                </div>
+            <section class="drawer-panel drawer-panel--white user-drawer-panel user-channel-panel">
+              <div class="panel-head panel-head--compact user-channel-panel-head">
+                <h3 class="panel-head__title panel-head__title--compact">按渠道配置</h3>
               </div>
               <div v-if="selectedUserChannelForms.length > 0" class="user-channel-workspace">
-                <div class="user-channel-tabs">
-                  <button
-                    v-for="item in selectedUserChannelForms"
-                    :key="item.channel.id"
-                    type="button"
-                    class="user-channel-tab"
-                    :class="{
-                      'user-channel-tab--active': activeUserChannelId === item.channel.id,
-                    }"
-                    @click="activeUserChannelId = item.channel.id"
-                  >
-                    <span class="user-channel-tab__name">{{ item.channel.name }}</span>
-                    <span
-                      v-if="userForm.defaultChannelId === item.channel.id"
-                      class="user-channel-tab__mark"
+                <div class="user-channel-tabs-wrap">
+                  <div class="user-channel-tabs">
+                    <button
+                      v-for="item in selectedUserChannelForms"
+                      :key="item.channel.id"
+                      type="button"
+                      class="user-channel-tab"
+                      :class="{
+                        'user-channel-tab--active': activeUserChannelId === item.channel.id,
+                      }"
+                      @click="activeUserChannelId = item.channel.id"
                     >
-                      默认
-                    </span>
-                  </button>
+                      <span class="user-channel-tab__name">{{ item.channel.name }}</span>
+                      <span
+                        v-if="userForm.defaultChannelId === item.channel.id"
+                        class="user-channel-tab__mark"
+                      >
+                        默认
+                      </span>
+                    </button>
+                  </div>
                 </div>
 
                 <div
@@ -510,9 +495,6 @@
                           默认渠道
                         </n-tag>
                       </div>
-                      <p class="channel-config-card__desc">
-                        当前渠道下的飞书、素材预览、权限和抖音号规则都会独立保存。
-                      </p>
                     </div>
                     <div class="channel-config-card__meta channel-config-card__meta--left">
                       <span class="channel-config-card__pill channel-config-card__pill--neutral">
@@ -531,9 +513,6 @@
                   >
                     <div>
                       <p class="channel-config-card__switch-title">专属配置</p>
-                      <p class="channel-config-card__switch-desc">
-                        打开后本渠道按当前设置生效；关闭时只保留查看能力。
-                      </p>
                     </div>
                     <div
                       class="channel-config-card__switch-actions channel-config-card__switch-actions--wide"
@@ -557,7 +536,7 @@
                   </div>
 
                   <div v-if="!item.config.enabled" class="channel-config-card__empty">
-                    当前渠道未启用专属配置，运行时仍沿用默认能力；这里的内容可以提前填写，启用后立即生效。
+                    当前未启用专属配置
                   </div>
 
                   <div class="user-channel-grid">
@@ -568,9 +547,6 @@
                       <div class="config-subpanel__head config-subpanel__head--split">
                         <div>
                           <p class="text-sm font-semibold text-amber-600">搭建出价</p>
-                          <p class="mt-1 text-sm text-slate-500">
-                            未填写时自动回退到渠道默认出价。
-                          </p>
                         </div>
                         <span class="channel-config-card__pill channel-config-card__pill--warning">
                           渠道默认 {{ item.channel.juliang.buildConfig.defaultBid || '未配置' }}
@@ -600,14 +576,10 @@
                       <div class="config-subpanel__head config-subpanel__head--split">
                         <div>
                           <p class="text-sm font-semibold text-blue-600">智能搭建时机</p>
-                          <p class="mt-1 text-sm text-slate-500">
-                            控制用户是否可以在设置中心覆盖该渠道的默认规则。
-                          </p>
                         </div>
                         <div class="toggle-hero">
                           <div>
                             <p class="toggle-hero__title">允许用户自定义</p>
-                            <p class="toggle-hero__desc">关闭后，设置中心不显示该入口。</p>
                           </div>
                           <n-switch v-model:value="item.config.buildAdvanceConfig.allowCustom" />
                         </div>
@@ -640,9 +612,6 @@
                       <div class="config-subpanel__head">
                         <div>
                           <p class="text-sm font-semibold text-fuchsia-600">形天上传</p>
-                          <p class="mt-1 text-sm text-slate-500">
-                            当前渠道的 XT Token，客户端会按所选渠道读取。
-                          </p>
                         </div>
                       </div>
                       <n-form
@@ -665,9 +634,6 @@
                       <div class="config-subpanel__head">
                         <div>
                           <p class="text-sm font-semibold text-emerald-600">飞书表格 ID</p>
-                          <p class="mt-1 text-sm text-slate-500">
-                            维护剧集清单、剧集状态和账户表的 table_id。
-                          </p>
                         </div>
                       </div>
                       <n-form
@@ -700,16 +666,10 @@
                       <div class="config-subpanel__head config-subpanel__head--split">
                         <div>
                           <p class="text-sm font-semibold text-sky-600">素材预览</p>
-                          <p class="mt-1 text-sm text-slate-500">
-                            配置预览开关、轮询频率和飞书筛选时间窗口。
-                          </p>
                         </div>
                         <div class="toggle-hero">
                           <div>
                             <p class="toggle-hero__title">启用素材预览</p>
-                            <p class="toggle-hero__desc">
-                              建议保持开启，便于预览管理器按渠道运行。
-                            </p>
                           </div>
                           <n-switch v-model:value="item.config.materialPreview.enabled" />
                         </div>
@@ -749,9 +709,6 @@
                     <div class="config-subpanel channel-config-section--wide">
                       <div class="mb-3">
                         <p class="text-sm font-semibold text-amber-600">权限控制</p>
-                        <p class="mt-1 text-sm text-slate-500">
-                          按终端决定当前用户在该渠道下能看到哪些入口。
-                        </p>
                       </div>
                       <div class="permission-groups">
                         <section class="permission-group permission-group--web">
@@ -759,9 +716,6 @@
                             <div>
                               <p class="permission-group__eyebrow">Web 端</p>
                               <h4 class="permission-group__title">网页工作台权限</h4>
-                              <p class="permission-group__desc">
-                                可控制当前用户在当前渠道下能否看到首页数据概览、数据报表，以及是否开放同步账户入口。
-                              </p>
                             </div>
                           </div>
                           <div class="permission-grid">
@@ -780,9 +734,6 @@
                                       Web 端
                                     </span>
                                   </div>
-                                  <p class="permission-card__meta">
-                                    {{ permission.description }}
-                                  </p>
                                 </div>
                                 <n-switch
                                   :value="item.config.permissions.webMenus[permission.key]"
@@ -808,9 +759,6 @@
                                       Web 端
                                     </span>
                                   </div>
-                                  <p class="permission-card__meta">
-                                    允许进入网页工作台的同步账户入口。
-                                  </p>
                                 </div>
                                 <n-switch v-model:value="item.config.permissions.syncAccount" />
                               </div>
@@ -822,9 +770,6 @@
                             <div>
                               <p class="permission-group__eyebrow">客户端</p>
                               <h4 class="permission-group__title">客户端入口权限</h4>
-                              <p class="permission-group__desc">
-                                建议优先开启前四项；“上传搭建”和“形天上传”根据实际投放流程按需开启。
-                              </p>
                             </div>
                           </div>
                           <div class="permission-grid">
@@ -853,9 +798,6 @@
                                       {{ permission.recommended ? '推荐开启' : '按需开启' }}
                                     </span>
                                   </div>
-                                  <p class="permission-card__meta">
-                                    {{ permission.description }}
-                                  </p>
                                 </div>
                                 <n-switch
                                   :value="item.config.permissions.desktopMenus[permission.key]"
@@ -878,9 +820,6 @@
                     <div class="config-subpanel channel-config-section--wide">
                       <div class="mb-3">
                         <p class="text-sm font-semibold text-rose-600">订单按用户统计</p>
-                        <p class="mt-1 text-sm text-slate-500">
-                          根据推广链来源中的用户名拆分首页订单统计展示。
-                        </p>
                       </div>
                       <n-form
                         :model="item.config.orderUserStats"
@@ -976,10 +915,6 @@
                                 新增用户名
                               </n-button>
                             </div>
-                            <p class="text-xs text-slate-400">
-                              支持拖拽排序，双击用户名可直接修改。列表顺序会同步决定首页订单统计 tab
-                              的展示顺序。
-                            </p>
                           </div>
                         </n-form-item>
                       </n-form>
@@ -991,17 +926,11 @@
                       <div class="config-subpanel__head config-subpanel__head--split">
                         <div>
                           <p class="text-sm font-semibold text-violet-600">抖音号匹配素材</p>
-                          <p class="mt-1 text-sm text-slate-500">
-                            先选择抖音号，再按素材总数自动分配或手动填写素材序号。
-                          </p>
                         </div>
                         <div class="flex flex-wrap items-center justify-end gap-3">
                           <div class="toggle-hero">
                             <div>
                               <p class="toggle-hero__title">独立订单统计</p>
-                              <p class="toggle-hero__desc">
-                                只统计命中当前用户已绑定抖音号名称的订单。
-                              </p>
                             </div>
                             <n-switch v-model:value="item.config.independentOrderStats.enabled" />
                           </div>
@@ -1032,12 +961,7 @@
                       <div v-else class="material-match-builder">
                         <div class="material-match-builder__toolbar">
                           <div class="material-match-builder__selector">
-                            <div>
-                              <p class="material-match-builder__label">选择抖音号</p>
-                              <p class="material-match-builder__subtext">
-                                已在其他启用渠道占用的抖音号，这里不可重复选择。
-                              </p>
-                            </div>
+                            <p class="material-match-builder__label">选择抖音号</p>
                             <n-select
                               :value="getUserChannelSelectedMaterialAccountIds(item.channel.id)"
                               multiple
@@ -1051,14 +975,6 @@
                                   handleUserChannelMaterialSelectionChange(item.channel.id, value)
                               "
                             />
-                            <p
-                              v-if="getUserChannelOccupiedMaterialAccountCount(item.channel.id) > 0"
-                              class="material-match-builder__hint"
-                            >
-                              当前有
-                              {{ getUserChannelOccupiedMaterialAccountCount(item.channel.id) }}
-                              个抖音号已在其他启用渠道中占用。
-                            </p>
                           </div>
                           <div class="material-match-builder__average">
                             <span class="material-match-builder__average-label">平均分配</span>
@@ -1149,7 +1065,7 @@
                 v-else
                 class="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-8 text-center text-sm text-slate-500"
               >
-                请先为用户选择可访问渠道，然后再按渠道填写飞书表和抖音匹配素材配置。
+                请先选择可访问渠道。
               </div>
             </section>
           </div>
@@ -2822,10 +2738,6 @@ function getUserChannelOccupiedMaterialAccountIds(channelId: string) {
   return occupiedIds
 }
 
-function getUserChannelOccupiedMaterialAccountCount(channelId: string) {
-  return getUserChannelOccupiedMaterialAccountIds(channelId).size
-}
-
 function getUserChannelSelectableMaterialAccountIds(channelId: string) {
   const occupiedIds = getUserChannelOccupiedMaterialAccountIds(channelId)
 
@@ -3849,9 +3761,26 @@ watch(
   box-shadow: 0 14px 30px -32px rgba(15, 23, 42, 0.24);
 }
 
+.user-basic-panel {
+  padding: 0.95rem 1rem;
+}
+
+.user-channel-panel {
+  padding-top: 0.95rem;
+}
+
 .panel-head--plain {
   gap: 0;
   margin-bottom: 1rem;
+}
+
+.panel-head--compact {
+  margin-bottom: 0.75rem;
+}
+
+.panel-head__title--compact {
+  margin-top: 0;
+  font-size: 0.96rem;
 }
 
 .panel-head__desc--compact {
@@ -3861,9 +3790,32 @@ watch(
   line-height: 1.55;
 }
 
+.user-basic-form {
+  align-items: start;
+}
+
+:deep(.user-basic-form .n-form-item) {
+  margin-bottom: 0;
+}
+
 .user-channel-workspace {
   display: grid;
-  gap: 1rem;
+  gap: 0.75rem;
+}
+
+.user-channel-tabs-wrap {
+  position: sticky;
+  top: -0.25rem;
+  z-index: 12;
+  margin: -0.2rem 0 0.3rem;
+  padding: 0.2rem 0 0.6rem;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.98) 0%,
+    rgba(255, 255, 255, 0.94) 78%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  backdrop-filter: blur(10px);
 }
 
 .user-channel-tabs {
@@ -3923,14 +3875,14 @@ watch(
 }
 
 .channel-config-card--flat {
-  padding: 1.1rem;
+  padding: 0.95rem;
   border-color: rgba(226, 232, 240, 0.95);
   background: #ffffff;
   box-shadow: 0 18px 34px -34px rgba(15, 23, 42, 0.18);
 }
 
 .channel-config-card__head--static {
-  margin-bottom: 0.8rem;
+  margin-bottom: 0.65rem;
   cursor: default;
 }
 
@@ -3940,7 +3892,7 @@ watch(
 
 .channel-config-card__switch--refined {
   margin: 0 0 1rem;
-  padding: 0.95rem 1rem;
+  padding: 0.75rem 0.9rem;
   border-radius: 1rem;
   border: 1px solid #e2e8f0;
   background: #f8fafc;
@@ -3970,7 +3922,7 @@ watch(
 .user-channel-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.9rem;
+  gap: 0.75rem;
 }
 
 .channel-config-section--wide {
@@ -3979,7 +3931,7 @@ watch(
 
 .channel-config-card--flat .config-subpanel {
   height: 100%;
-  padding: 0.95rem 1rem;
+  padding: 0.85rem 0.9rem;
   border-color: #e2e8f0;
   border-radius: 1rem;
   background: #ffffff;
@@ -4001,7 +3953,7 @@ watch(
 }
 
 .channel-config-card--flat .config-subpanel__head {
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.65rem;
 }
 
 .channel-config-card--flat .toggle-hero {
@@ -4012,12 +3964,7 @@ watch(
 }
 
 .channel-config-card--flat .toggle-hero__title {
-  font-size: 0.8rem;
-}
-
-.channel-config-card--flat .toggle-hero__desc {
-  max-width: 16rem;
-  font-size: 0.74rem;
+  font-size: 0.78rem;
 }
 
 .channel-config-card--flat .permission-group,
@@ -5115,6 +5062,10 @@ watch(
   .user-channel-tabs {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .user-channel-tabs-wrap {
+    top: -0.15rem;
   }
 
   .user-channel-tab {
