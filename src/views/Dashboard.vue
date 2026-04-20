@@ -486,15 +486,25 @@
             <n-data-table
               class="orders-table"
               :columns="orderColumns"
-              :data="orderRows"
+              :data="pagedOrderRows"
               :loading="ordersLoading"
               :bordered="false"
               :single-line="false"
               striped
               size="small"
-              :pagination="ordersPagination"
               :scroll-x="1100"
             />
+            <div class="orders-table-footer">
+              <span class="orders-pagination-prefix">
+                共{{ formatNumberValue(orderRows.length) }}个订单
+              </span>
+              <n-pagination
+                :page="ordersCurrentPage"
+                :page-size="ordersPagination.pageSize"
+                :item-count="orderRows.length"
+                @update:page="handleOrdersPageChange"
+              />
+            </div>
           </n-card>
 
           <n-card v-if="canAccessReport" :bordered="false" class="shadow-sm">
@@ -611,6 +621,7 @@ import {
   NFormItem,
   NInput,
   NModal,
+  NPagination,
   NSelect,
   NTooltip,
   type DropdownOption,
@@ -975,6 +986,12 @@ const orderRows = computed<OrderItem[]>(() => {
   return rootPromotionOrders.value
 })
 
+const pagedOrderRows = computed<OrderItem[]>(() => {
+  const pageSize = Number(ordersPagination.pageSize || 10)
+  const startIndex = Math.max(ordersCurrentPage.value - 1, 0) * pageSize
+  return orderRows.value.slice(startIndex, startIndex + pageSize)
+})
+
 const orderUserTabs = computed(() => {
   if (isIndependentOrderStatsMode.value) {
     return []
@@ -1087,12 +1104,6 @@ const ordersPagination = reactive({
   page: 1,
   pageSize: 10,
   showSizePicker: false,
-  prefix: ({ itemCount }: { itemCount?: number }) =>
-    h(
-      'span',
-      { class: 'orders-pagination-prefix' },
-      `共${formatNumberValue(Number(itemCount || 0))}个订单`
-    ),
   onChange: (page: number) => {
     ordersCurrentPage.value = page
   },
@@ -1681,6 +1692,10 @@ watch(ordersCurrentPage, page => {
   ordersPagination.page = page
 })
 
+function handleOrdersPageChange(page: number) {
+  ordersCurrentPage.value = page
+}
+
 watch(
   [activePromotionUserName, orderBranchCardItems],
   ([activeUsername, branchCards]) => {
@@ -2184,24 +2199,25 @@ onUnmounted(() => {
   color: rgb(120 113 108);
 }
 
-:deep(.orders-table .n-data-table__pagination) {
-  display: flex;
-  width: 100%;
-}
-
-:deep(.orders-table .n-data-table__pagination .n-pagination) {
+.orders-table-footer {
   display: flex;
   align-items: center;
-  width: 100%;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-top: 1rem;
 }
 
 .orders-pagination-prefix {
   display: inline-flex;
   align-items: center;
-  margin-right: auto;
+  flex-shrink: 0;
   color: rgb(100 116 139);
   font-size: 0.85rem;
   font-weight: 600;
+}
+
+:deep(.orders-table-footer .n-pagination) {
+  margin-left: auto;
 }
 
 .order-user-tab.active .order-user-tab__label,
