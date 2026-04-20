@@ -1090,7 +1090,7 @@ const ordersPagination = reactive({
     h(
       'span',
       { class: 'orders-pagination-prefix' },
-      `订单总数 ${formatNumberValue(Number(itemCount || 0))}`
+      `总订单：${formatNumberValue(Number(itemCount || 0))}个`
     ),
   onChange: (page: number) => {
     ordersCurrentPage.value = page
@@ -2186,6 +2186,7 @@ onUnmounted(() => {
 .orders-pagination-prefix {
   display: inline-flex;
   align-items: center;
+  margin-right: auto;
   color: rgb(100 116 139);
   font-size: 0.85rem;
   font-weight: 600;
