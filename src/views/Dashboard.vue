@@ -484,6 +484,7 @@
               </div>
             </div>
             <n-data-table
+              class="orders-table"
               :columns="orderColumns"
               :data="orderRows"
               :loading="ordersLoading"
@@ -1090,7 +1091,7 @@ const ordersPagination = reactive({
     h(
       'span',
       { class: 'orders-pagination-prefix' },
-      `总订单：${formatNumberValue(Number(itemCount || 0))}个`
+      `共${formatNumberValue(Number(itemCount || 0))}个订单`
     ),
   onChange: (page: number) => {
     ordersCurrentPage.value = page
@@ -2181,6 +2182,17 @@ onUnmounted(() => {
   font-size: 0.72rem;
   line-height: 1.35;
   color: rgb(120 113 108);
+}
+
+:deep(.orders-table .n-data-table__pagination) {
+  display: flex;
+  width: 100%;
+}
+
+:deep(.orders-table .n-data-table__pagination .n-pagination) {
+  display: flex;
+  align-items: center;
+  width: 100%;
 }
 
 .orders-pagination-prefix {
