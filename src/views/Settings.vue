@@ -187,6 +187,9 @@
                 </div>
                 <div class="material-panel__stats">
                   <span class="material-panel__stat">{{ materialMatches.length }} 条规则</span>
+                  <span class="material-panel__stat material-panel__stat--violet"
+                    >总素材 {{ displayedMaterialTotalCount }}</span
+                  >
                   <span class="material-panel__stat material-panel__stat--success"
                     >{{ validMaterialMatchCount }} 条有效</span
                   >
@@ -194,7 +197,7 @@
               </div>
               <div class="material-panel__actions">
                 <div class="material-panel__average-box">
-                  <span class="material-panel__average-label">平均分配</span>
+                  <span class="material-panel__average-label">素材总数</span>
                   <n-input-number
                     v-model:value="averageMaterialTotal"
                     :min="1"
@@ -202,14 +205,6 @@
                     placeholder="素材总数"
                     class="material-panel__average-input"
                   />
-                  <n-button
-                    tertiary
-                    type="primary"
-                    :disabled="!materialMatchesWithAccountCount"
-                    @click="applyAverageMaterialRanges"
-                  >
-                    自动填写
-                  </n-button>
                 </div>
                 <n-button
                   quaternary
@@ -222,7 +217,7 @@
                 </n-button>
               </div>
               <p class="material-panel__note">
-                先选抖音号，再按素材总数自动平均分配；已在其他渠道占用的抖音号不可重复选择。
+                先选抖音号，再填写素材总数自动平均分配；已在其他渠道占用的抖音号不可重复选择。
               </p>
             </div>
 
@@ -258,11 +253,11 @@
               </p>
             </div>
 
-            <div v-if="materialMatches.length" class="space-y-3">
+            <div v-if="materialMatches.length" class="material-rule-grid">
               <div
                 v-for="(match, index) in materialMatches"
                 :key="match.id"
-                class="material-rule-card"
+                class="material-rule-card material-rule-card--compact"
               >
                 <div class="material-rule-card__index">{{ index + 1 }}</div>
                 <div class="material-rule-card__content">
@@ -281,8 +276,11 @@
                       </p>
                     </div>
                   </div>
-                  <div class="material-rule-card__bottom">
-                    <n-input v-model:value="match.materialRange" placeholder="素材序号，如 01-05" />
+                  <div class="material-rule-card__bottom material-rule-card__bottom--compact">
+                    <span class="material-rule-card__range">{{ match.materialRange || '--' }}</span>
+                    <span class="material-rule-card__count">
+                      {{ getMaterialRangeCount(match.materialRange) || 0 }} 个素材
+                    </span>
                   </div>
                 </div>
               </div>
@@ -292,7 +290,7 @@
               v-else
               class="rounded-2xl border border-dashed border-gray-300 bg-white px-4 py-10 text-center text-sm text-gray-500"
             >
-              先从上方选择抖音号，再填写或自动分配素材序号。
+              先从上方选择抖音号，再填写素材总数自动平均分配。
             </div>
           </div>
         </n-card>
@@ -542,6 +540,11 @@ const validMaterialMatchCount = computed(
   () => materialMatches.value.filter(match => isMaterialMatchValid(match)).length
 )
 
+const displayedMaterialTotalCount = computed(() => {
+  const totalCount = getMaterialMatchTotalCount(materialMatches.value)
+  return totalCount || 0
+})
+
 const materialMatchesWithAccountCount = computed(
   () => materialMatches.value.filter(match => String(match.douyinAccountRefId || '').trim()).length
 )
@@ -569,6 +572,7 @@ watch(
     selectedMaterialAccountIds.value = value
       .map(item => String(item.douyinAccountRefId || '').trim())
       .filter(Boolean)
+    averageMaterialTotal.value = getMaterialMatchTotalCount(value)
   },
   { immediate: true, deep: true }
 )
@@ -588,6 +592,14 @@ watch(
   },
   { deep: true }
 )
+
+watch(averageMaterialTotal, value => {
+  if (!materialMatchesWithAccountCount.value || !value) {
+    return
+  }
+
+  applyAverageMaterialRanges(true)
+})
 
 watch(
   () => sessionStore.activeChannelId,
@@ -713,6 +725,31 @@ function isMaterialMatchValid(match: { douyinAccountRefId?: string; materialRang
   )
 }
 
+function getMaterialRangeCount(materialRange?: string) {
+  const normalizedRange = String(materialRange || '').trim()
+  if (!normalizedRange) {
+    return 0
+  }
+
+  const [startText, endText] = normalizedRange.split('-').map(item => String(item || '').trim())
+  const start = Number(startText)
+  const end = endText ? Number(endText) : start
+
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start <= 0 || end < start) {
+    return 0
+  }
+
+  return end - start + 1
+}
+
+function getMaterialMatchTotalCount(matches: Array<{ materialRange?: string }>) {
+  const totalCount = matches.reduce(
+    (sum, match) => sum + getMaterialRangeCount(match.materialRange),
+    0
+  )
+  return totalCount > 0 ? totalCount : null
+}
+
 function getMaterialMatchAccountMeta(match: {
   douyinAccountRefId?: string
   douyinAccount?: string
@@ -765,6 +802,13 @@ function syncMaterialMatchesFromSelectedIds(accountIds: string[]) {
         }
       : createDraftMaterialMatch(accountId)
   })
+
+  if (averageMaterialTotal.value) {
+    applyAverageMaterialRanges(true)
+    return
+  }
+
+  averageMaterialTotal.value = getMaterialMatchTotalCount(materialMatches.value)
 }
 
 function handleMaterialSelectionChange(value: string[] | null) {
@@ -789,7 +833,7 @@ function handleMaterialSelectionChange(value: string[] | null) {
   )
 }
 
-function applyAverageMaterialRanges() {
+function applyAverageMaterialRanges(silent = false) {
   const totalCount = Number(averageMaterialTotal.value)
   const matches = materialMatches.value.filter(match =>
     String(match.douyinAccountRefId || '').trim()
@@ -826,7 +870,9 @@ function applyAverageMaterialRanges() {
     currentIndex = end + 1
   })
 
-  message.success(`已按 ${matches.length} 个抖音号平均分配 ${totalCount} 个素材`)
+  if (!silent) {
+    message.success(`已按 ${matches.length} 个抖音号平均分配 ${totalCount} 个素材`)
+  }
 }
 
 async function saveAllMaterialMatches() {
@@ -841,7 +887,7 @@ async function saveAllMaterialMatches() {
 
   const invalidMatch = materialMatches.value.find(match => !isMaterialMatchValid(match))
   if (invalidMatch) {
-    message.warning('请先为所有已选择的抖音号填写素材序号')
+    message.warning('请先填写素材总数完成平均分配')
     return
   }
 
@@ -972,6 +1018,12 @@ async function resetAllSettings() {
   color: #166534;
 }
 
+.material-panel__stat--violet {
+  border-color: #ddd6fe;
+  background: #f5f3ff;
+  color: #6d28d9;
+}
+
 .material-panel__actions {
   display: flex;
   align-items: center;
@@ -982,7 +1034,7 @@ async function resetAllSettings() {
 
 .material-panel__average-box {
   display: grid;
-  grid-template-columns: auto minmax(120px, 180px) auto;
+  grid-template-columns: auto minmax(120px, 180px);
   gap: 10px;
   align-items: center;
 }
@@ -1022,6 +1074,16 @@ async function resetAllSettings() {
   border-radius: 18px;
   background: #fff;
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.04);
+}
+
+.material-rule-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.material-rule-card--compact {
+  padding: 12px;
 }
 
 .material-rule-card__index {
@@ -1079,6 +1141,34 @@ async function resetAllSettings() {
   margin-top: 12px;
 }
 
+.material-rule-card__bottom--compact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.material-rule-card__range {
+  font-family:
+    ui-monospace, SFMono-Regular, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: #5b21b6;
+}
+
+.material-rule-card__count {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #f5f3ff;
+  color: #6d28d9;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 :deep(.n-card .n-card-header) {
   padding: 16px 20px 12px;
   border-bottom: 1px solid #f0f0f0;
@@ -1115,12 +1205,21 @@ async function resetAllSettings() {
     grid-template-columns: 1fr;
   }
 
+  .material-rule-grid {
+    grid-template-columns: 1fr;
+  }
+
   .material-rule-card__top {
     flex-direction: column;
     align-items: flex-start;
   }
 
   .material-rule-card__account-name-row {
+    align-items: flex-start;
+  }
+
+  .material-rule-card__bottom--compact {
+    flex-direction: column;
     align-items: flex-start;
   }
 }

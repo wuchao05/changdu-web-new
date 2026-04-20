@@ -662,19 +662,11 @@
                         <div>
                           <p class="text-sm font-semibold text-sky-600">素材预览</p>
                         </div>
-                        <div class="flex flex-wrap items-center justify-end gap-3">
-                          <div class="toggle-hero">
-                            <div>
-                              <p class="toggle-hero__title">允许用户自定义</p>
-                            </div>
-                            <n-switch v-model:value="item.config.materialPreview.allowCustom" />
+                        <div class="toggle-hero">
+                          <div>
+                            <p class="toggle-hero__title">允许用户自定义</p>
                           </div>
-                          <div class="toggle-hero">
-                            <div>
-                              <p class="toggle-hero__title">启用素材预览</p>
-                            </div>
-                            <n-switch v-model:value="item.config.materialPreview.enabled" />
-                          </div>
+                          <n-switch v-model:value="item.config.materialPreview.allowCustom" />
                         </div>
                       </div>
                       <n-form
@@ -945,6 +937,12 @@
                             </div>
                             <n-switch v-model:value="item.config.independentOrderStats.enabled" />
                           </div>
+                          <span
+                            class="channel-config-card__pill channel-config-card__pill--neutral"
+                          >
+                            总素材
+                            {{ getMaterialMatchTotalCount(item.config.douyinMaterialMatches) || 0 }}
+                          </span>
                           <span class="channel-config-card__pill channel-config-card__pill--violet">
                             {{ item.config.douyinMaterialMatches.length }} 条规则
                           </span>
@@ -988,7 +986,7 @@
                             />
                           </div>
                           <div class="material-match-builder__average">
-                            <span class="material-match-builder__average-label">平均分配</span>
+                            <span class="material-match-builder__average-label">素材总数</span>
                             <n-input-number
                               :value="materialMatchBatchTotals[item.channel.id] ?? null"
                               :min="1"
@@ -997,30 +995,22 @@
                               class="w-full"
                               @update:value="setMaterialMatchBatchTotal(item.channel.id, $event)"
                             />
-                            <n-button
-                              tertiary
-                              type="primary"
-                              :disabled="
-                                !getUserChannelSelectedMaterialAccountIds(item.channel.id).length
-                              "
-                              @click="applyUserChannelAverageMaterialRanges(item.channel.id)"
-                            >
-                              自动填写
-                            </n-button>
                           </div>
                         </div>
 
                         <div
                           v-if="item.config.douyinMaterialMatches.length > 0"
-                          class="material-match-list"
+                          class="material-match-list material-match-list--compact"
                         >
                           <div
                             v-for="(match, matchIndex) in item.config.douyinMaterialMatches"
                             :key="match.id"
-                            class="material-match-card"
+                            class="material-match-card material-match-card--compact"
                           >
                             <div class="material-match-card__summary">
-                              <div class="material-match-card__items">
+                              <div
+                                class="material-match-card__items material-match-card__items--stacked"
+                              >
                                 <div class="material-match-card__item">
                                   <span class="material-match-card__order">{{
                                     matchIndex + 1
@@ -1040,23 +1030,15 @@
                                     </span>
                                   </div>
                                 </div>
-                                <div
-                                  class="material-match-card__item material-match-card__item--range"
-                                >
-                                  <Icon icon="mdi:video-outline" class="h-4 w-4 text-slate-500" />
-                                  <span class="material-match-card__range">
-                                    {{ match.materialRange || '未填写素材序号' }}
+                                <div class="material-match-card__meta-row">
+                                  <span class="material-match-card__range">{{
+                                    match.materialRange || '--'
+                                  }}</span>
+                                  <span class="material-match-card__count">
+                                    {{ getMaterialRangeCount(match.materialRange) || 0 }} 个素材
                                   </span>
                                 </div>
                               </div>
-                            </div>
-                            <div
-                              class="material-match-card__editor material-match-card__editor--single"
-                            >
-                              <n-input
-                                v-model:value="match.materialRange"
-                                placeholder="请输入素材序号，如 01-04"
-                              />
                             </div>
                           </div>
                         </div>
@@ -1065,7 +1047,7 @@
                           v-else
                           class="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500"
                         >
-                          先在上方选择抖音号，再填写或自动分配素材序号。
+                          先在上方选择抖音号，再填写素材总数自动平均分配。
                         </div>
                       </div>
                     </div>
@@ -2723,6 +2705,40 @@ function countConfiguredMaterialMatches(
   ).length
 }
 
+function getMaterialRangeCount(materialRange?: string) {
+  const normalizedRange = String(materialRange || '').trim()
+  if (!normalizedRange) {
+    return 0
+  }
+
+  const [startText, endText] = normalizedRange.split('-').map(item => String(item || '').trim())
+  const start = Number(startText)
+  const end = endText ? Number(endText) : start
+
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start <= 0 || end < start) {
+    return 0
+  }
+
+  return end - start + 1
+}
+
+function getMaterialMatchTotalCount(
+  matches: adminApi.UserChannelBindingConfig['douyinMaterialMatches']
+) {
+  const totalCount = matches.reduce(
+    (sum, match) => sum + getMaterialRangeCount(match.materialRange),
+    0
+  )
+  return totalCount > 0 ? totalCount : null
+}
+
+function syncUserChannelMaterialBatchTotal(channelId: string) {
+  const currentTotal = getMaterialMatchTotalCount(
+    userForm.channelConfigs?.[channelId]?.douyinMaterialMatches || []
+  )
+  materialMatchBatchTotals[channelId] = currentTotal
+}
+
 function countUserCustomizableSections(config: adminApi.UserChannelBindingConfig) {
   return [
     config.buildAdvanceConfig.allowCustom,
@@ -2747,6 +2763,7 @@ function syncUserChannelMaterialSelection(channelId: string) {
   selectedMaterialAccountIdsByChannel[channelId] = matches
     .map(match => String(match.douyinAccountRefId || '').trim())
     .filter(Boolean)
+  syncUserChannelMaterialBatchTotal(channelId)
 }
 
 function getUserChannelSelectedMaterialAccountIds(channelId: string) {
@@ -2855,13 +2872,23 @@ function handleUserChannelMaterialSelectionChange(channelId: string, value: stri
       : createDraftUserChannelMaterialMatch(accountId)
   })
   selectedMaterialAccountIdsByChannel[channelId] = selectedIds
+
+  if (materialMatchBatchTotals[channelId]) {
+    applyUserChannelAverageMaterialRanges(channelId, true)
+    return
+  }
+
+  syncUserChannelMaterialBatchTotal(channelId)
 }
 
 function setMaterialMatchBatchTotal(channelId: string, value: number | null) {
   materialMatchBatchTotals[channelId] = value
+  if (value && getUserChannelSelectedMaterialAccountIds(channelId).length > 0) {
+    applyUserChannelAverageMaterialRanges(channelId, true)
+  }
 }
 
-function applyUserChannelAverageMaterialRanges(channelId: string) {
+function applyUserChannelAverageMaterialRanges(channelId: string, silent = false) {
   const totalCount = Number(materialMatchBatchTotals[channelId])
   const matches = userForm.channelConfigs?.[channelId]?.douyinMaterialMatches || []
 
@@ -2896,7 +2923,9 @@ function applyUserChannelAverageMaterialRanges(channelId: string) {
     currentIndex = end + 1
   })
 
-  message.success(`已为当前渠道平均分配 ${totalCount} 个素材`)
+  if (!silent) {
+    message.success(`已为当前渠道平均分配 ${totalCount} 个素材`)
+  }
 }
 
 function getUserChannelReuseOptions(channelId: string) {
@@ -3260,7 +3289,7 @@ async function saveUser() {
         }
 
         if (!hasRef || !hasRange) {
-          message.error(`【${channelName}】请为每条抖音号匹配素材规则同时选择抖音号并填写素材序号`)
+          message.error(`【${channelName}】请先填写素材总数并完成平均分配`)
           return
         }
 
@@ -4862,6 +4891,11 @@ watch(
   gap: 0.8rem;
 }
 
+.material-match-list--compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
 .material-match-actions {
   display: flex;
   justify-content: flex-end;
@@ -4874,6 +4908,10 @@ watch(
   border: 1px solid rgba(221, 214, 254, 0.8);
   background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 18px 34px -30px rgba(91, 33, 182, 0.2);
+}
+
+.material-match-card--compact {
+  padding: 0.75rem 0.85rem;
 }
 
 .material-match-card__summary {
@@ -4889,6 +4927,13 @@ watch(
   align-items: center;
   gap: 0.85rem;
   min-width: 0;
+}
+
+.material-match-card__items--stacked {
+  width: 100%;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.55rem;
 }
 
 .material-match-card__item {
@@ -4958,6 +5003,25 @@ watch(
     ui-monospace, SFMono-Regular, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
     'Courier New', monospace;
   font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.material-match-card__meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding-left: 2rem;
+}
+
+.material-match-card__count {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.12rem 0.48rem;
+  border-radius: 9999px;
+  background: #f5f3ff;
+  color: #7c3aed;
+  font-size: 0.72rem;
   font-weight: 700;
 }
 
@@ -5190,6 +5254,14 @@ watch(
     padding: 0.85rem;
   }
 
+  .material-match-list--compact {
+    grid-template-columns: 1fr;
+  }
+
+  .material-match-card__meta-row {
+    padding-left: 0;
+  }
+
   .material-match-builder__average {
     padding-top: 0.85rem;
   }
@@ -5202,10 +5274,6 @@ watch(
 
   .permission-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .material-match-card__editor:not(.material-match-card__editor--single) {
-    grid-template-columns: 1.15fr 1fr;
   }
 }
 </style>
