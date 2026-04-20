@@ -19,6 +19,9 @@ export interface DouyinAccount {
 export interface UserChannelBindingConfig {
   enabled: boolean
   xtToken: string
+  xtTokenConfig: {
+    allowCustom: boolean
+  }
   buildPreference: {
     bid: string
   }
@@ -35,6 +38,7 @@ export interface UserChannelBindingConfig {
     accountTableId: string
   }
   materialPreview: {
+    allowCustom: boolean
     enabled: boolean
     intervalMinutes: number
     buildTimeWindowStart: number
@@ -63,6 +67,9 @@ export interface UserChannelBindingConfig {
   }
   independentOrderStats: {
     enabled: boolean
+  }
+  douyinMaterialConfig: {
+    allowCustom: boolean
   }
   douyinMaterialMatches: Array<{
     id: string

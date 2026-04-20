@@ -498,7 +498,7 @@
                     </div>
                     <div class="channel-config-card__meta channel-config-card__meta--left">
                       <span class="channel-config-card__pill channel-config-card__pill--neutral">
-                        {{ item.config.enabled ? '专属配置已启用' : '仅查看数据' }}
+                        已开放 {{ countUserCustomizableSections(item.config) }} 项用户自定义
                       </span>
                       <span class="channel-config-card__pill channel-config-card__pill--info">
                         {{ countConfiguredMaterialMatches(item.config.douyinMaterialMatches) }}
@@ -512,7 +512,7 @@
                     @click.stop
                   >
                     <div>
-                      <p class="channel-config-card__switch-title">专属配置</p>
+                      <p class="channel-config-card__switch-title">快捷操作</p>
                     </div>
                     <div
                       class="channel-config-card__switch-actions channel-config-card__switch-actions--wide"
@@ -525,18 +525,7 @@
                         class="channel-config-card__reuse-select"
                         @update:value="handleUserChannelReuseSelect(item.channel.id, $event)"
                       />
-                      <n-switch
-                        :value="item.config.enabled"
-                        @update:value="
-                          (value: boolean) =>
-                            handleUserChannelEnabledChange(item.channel.id, item.config, value)
-                        "
-                      />
                     </div>
-                  </div>
-
-                  <div v-if="!item.config.enabled" class="channel-config-card__empty">
-                    当前未启用专属配置
                   </div>
 
                   <div class="user-channel-grid">
@@ -609,9 +598,15 @@
                     </div>
 
                     <div class="config-subpanel">
-                      <div class="config-subpanel__head">
+                      <div class="config-subpanel__head config-subpanel__head--split">
                         <div>
                           <p class="text-sm font-semibold text-fuchsia-600">形天上传</p>
+                        </div>
+                        <div class="toggle-hero">
+                          <div>
+                            <p class="toggle-hero__title">允许用户自定义</p>
+                          </div>
+                          <n-switch v-model:value="item.config.xtTokenConfig.allowCustom" />
                         </div>
                       </div>
                       <n-form
@@ -667,11 +662,19 @@
                         <div>
                           <p class="text-sm font-semibold text-sky-600">素材预览</p>
                         </div>
-                        <div class="toggle-hero">
-                          <div>
-                            <p class="toggle-hero__title">启用素材预览</p>
+                        <div class="flex flex-wrap items-center justify-end gap-3">
+                          <div class="toggle-hero">
+                            <div>
+                              <p class="toggle-hero__title">允许用户自定义</p>
+                            </div>
+                            <n-switch v-model:value="item.config.materialPreview.allowCustom" />
                           </div>
-                          <n-switch v-model:value="item.config.materialPreview.enabled" />
+                          <div class="toggle-hero">
+                            <div>
+                              <p class="toggle-hero__title">启用素材预览</p>
+                            </div>
+                            <n-switch v-model:value="item.config.materialPreview.enabled" />
+                          </div>
                         </div>
                       </div>
                       <n-form
@@ -928,6 +931,14 @@
                           <p class="text-sm font-semibold text-violet-600">抖音号匹配素材</p>
                         </div>
                         <div class="flex flex-wrap items-center justify-end gap-3">
+                          <div class="toggle-hero">
+                            <div>
+                              <p class="toggle-hero__title">允许用户自定义</p>
+                            </div>
+                            <n-switch
+                              v-model:value="item.config.douyinMaterialConfig.allowCustom"
+                            />
+                          </div>
                           <div class="toggle-hero">
                             <div>
                               <p class="toggle-hero__title">独立订单统计</p>
@@ -2388,8 +2399,11 @@ function createDefaultUserForm(): UserFormModel {
 
 function createDefaultUserChannelConfig(): adminApi.UserChannelBindingConfig {
   return {
-    enabled: false,
+    enabled: true,
     xtToken: '',
+    xtTokenConfig: {
+      allowCustom: false,
+    },
     buildPreference: {
       bid: '',
     },
@@ -2406,6 +2420,7 @@ function createDefaultUserChannelConfig(): adminApi.UserChannelBindingConfig {
       accountTableId: '',
     },
     materialPreview: {
+      allowCustom: false,
       enabled: true,
       intervalMinutes: 20,
       buildTimeWindowStart: 90,
@@ -2434,6 +2449,9 @@ function createDefaultUserChannelConfig(): adminApi.UserChannelBindingConfig {
     },
     independentOrderStats: {
       enabled: false,
+    },
+    douyinMaterialConfig: {
+      allowCustom: false,
     },
     douyinMaterialMatches: [],
   }
@@ -2468,8 +2486,11 @@ function normalizeUserChannelConfig(
   return {
     ...defaultConfig,
     ...config,
-    enabled: typeof config?.enabled === 'boolean' ? config.enabled : false,
+    enabled: true,
     xtToken: String(config?.xtToken || '').trim(),
+    xtTokenConfig: {
+      allowCustom: Boolean(config?.xtTokenConfig?.allowCustom),
+    },
     buildPreference: {
       bid: String(config?.buildPreference?.bid || '').trim(),
     },
@@ -2493,6 +2514,7 @@ function normalizeUserChannelConfig(
     materialPreview: {
       ...defaultConfig.materialPreview,
       ...(config?.materialPreview || {}),
+      allowCustom: Boolean(config?.materialPreview?.allowCustom),
       enabled: Boolean(config?.materialPreview?.enabled),
     },
     permissions: {
@@ -2543,6 +2565,9 @@ function normalizeUserChannelConfig(
       ...(config?.independentOrderStats || {}),
       enabled: Boolean(config?.independentOrderStats?.enabled),
     },
+    douyinMaterialConfig: {
+      allowCustom: Boolean(config?.douyinMaterialConfig?.allowCustom),
+    },
     douyinMaterialMatches,
   }
 }
@@ -2557,6 +2582,9 @@ function cloneUserChannelConfig(
   return {
     ...normalizedConfig,
     xtToken: normalizedConfig.xtToken,
+    xtTokenConfig: {
+      ...normalizedConfig.xtTokenConfig,
+    },
     buildPreference: {
       ...normalizedConfig.buildPreference,
     },
@@ -2584,6 +2612,9 @@ function cloneUserChannelConfig(
     },
     independentOrderStats: {
       ...normalizedConfig.independentOrderStats,
+    },
+    douyinMaterialConfig: {
+      ...normalizedConfig.douyinMaterialConfig,
     },
     douyinMaterialMatches: normalizedConfig.douyinMaterialMatches.map(match => ({
       ...match,
@@ -2692,6 +2723,15 @@ function countConfiguredMaterialMatches(
   ).length
 }
 
+function countUserCustomizableSections(config: adminApi.UserChannelBindingConfig) {
+  return [
+    config.buildAdvanceConfig.allowCustom,
+    config.xtTokenConfig.allowCustom,
+    config.materialPreview.allowCustom,
+    config.douyinMaterialConfig.allowCustom,
+  ].filter(Boolean).length
+}
+
 function createDraftUserChannelMaterialMatch(douyinAccountRefId: string) {
   return {
     id: crypto.randomUUID(),
@@ -2723,7 +2763,7 @@ function getUserChannelOccupiedMaterialAccountIds(channelId: string) {
   const occupiedIds = new Set<string>()
 
   Object.entries(userForm.channelConfigs || {}).forEach(([currentChannelId, config]) => {
-    if (currentChannelId === channelId || !config?.enabled) {
+    if (currentChannelId === channelId) {
       return
     }
 
@@ -2862,14 +2902,10 @@ function applyUserChannelAverageMaterialRanges(channelId: string) {
 function getUserChannelReuseOptions(channelId: string) {
   return selectedUserChannels.value
     .filter(channel => channel.id !== channelId)
-    .map(channel => {
-      const config = userForm.channelConfigs?.[channel.id]
-
-      return {
-        label: `${channel.name}${config?.enabled ? '（已启用）' : '（未启用）'}`,
-        value: channel.id,
-      }
-    })
+    .map(channel => ({
+      label: channel.name,
+      value: channel.id,
+    }))
 }
 
 function copyUserChannelConfig(channelId: string) {
@@ -3102,21 +3138,6 @@ function syncActiveUserChannelId(selectedChannelIds: string[]) {
   activeUserChannelId.value = selectedChannelIds[0] || ''
 }
 
-function handleUserChannelEnabledChange(
-  channelId: string,
-  config: adminApi.UserChannelBindingConfig,
-  value: boolean
-) {
-  config.enabled = value
-  if (value) {
-    handleUserChannelMaterialSelectionChange(
-      channelId,
-      getUserChannelSelectedMaterialAccountIds(channelId)
-    )
-  }
-  activeUserChannelId.value = channelId
-}
-
 async function loadData() {
   const [userList, channelList, downloadCenterConfigList] = await Promise.all([
     adminApi.listUsers(),
@@ -3210,7 +3231,7 @@ async function saveUser() {
   try {
     delete (userForm as Record<string, unknown>).materialPreview
     syncUserChannelConfigs()
-    const enabledChannelMaterialMap = new Map<string, string>()
+    const channelMaterialMap = new Map<string, string>()
 
     for (const channelId of userForm.channelIds) {
       const channelConfig = userForm.channelConfigs?.[channelId]
@@ -3253,19 +3274,18 @@ async function saveUser() {
           return
         }
 
-        if (channelConfig?.enabled) {
-          const occupiedChannelName = enabledChannelMaterialMap.get(match.douyinAccountRefId)
-          if (occupiedChannelName) {
-            const accountName =
-              getBoundDouyinAccount(match.douyinAccountRefId)?.douyinAccount ||
-              match.douyinAccountRefId
-            message.error(
-              `抖音号「${accountName}」已在启用渠道【${occupiedChannelName}】配置，不能重复分配到【${channelName}】`
-            )
-            return
-          }
-          enabledChannelMaterialMap.set(match.douyinAccountRefId, channelName)
+        const occupiedChannelName = channelMaterialMap.get(match.douyinAccountRefId)
+        if (occupiedChannelName) {
+          const accountName =
+            getBoundDouyinAccount(match.douyinAccountRefId)?.douyinAccount ||
+            match.douyinAccountRefId
+          message.error(
+            `抖音号「${accountName}」已在渠道【${occupiedChannelName}】配置，不能重复分配到【${channelName}】`
+          )
+          return
         }
+
+        channelMaterialMap.set(match.douyinAccountRefId, channelName)
 
         configuredMatchRefIds.add(match.douyinAccountRefId)
       }

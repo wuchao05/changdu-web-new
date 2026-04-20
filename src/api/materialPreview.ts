@@ -31,6 +31,7 @@ export interface MaterialPreviewStatus {
 export interface MaterialPreviewControlParams {
   userId?: string
   channelId?: string
+  enabled?: boolean
   intervalMinutes?: number
   buildTimeWindowStart?: number
   buildTimeWindowEnd?: number
@@ -40,7 +41,9 @@ export function startMaterialPreview(params: MaterialPreviewControlParams = {}) 
   return httpInstance.post('/material-preview/start', params).then(res => res.data)
 }
 
-export function stopMaterialPreview(params: Pick<MaterialPreviewControlParams, 'userId' | 'channelId'> = {}) {
+export function stopMaterialPreview(
+  params: Pick<MaterialPreviewControlParams, 'userId' | 'channelId'> = {}
+) {
   return httpInstance.post('/material-preview/stop', params).then(res => res.data)
 }
 
@@ -48,7 +51,9 @@ export function updateMaterialPreview(params: MaterialPreviewControlParams = {})
   return httpInstance.post('/material-preview/update', params).then(res => res.data)
 }
 
-export function triggerMaterialPreview(params: Pick<MaterialPreviewControlParams, 'userId' | 'channelId'> = {}) {
+export function triggerMaterialPreview(
+  params: Pick<MaterialPreviewControlParams, 'userId' | 'channelId'> = {}
+) {
   return httpInstance.post('/material-preview/trigger', params).then(res => res.data)
 }
 
@@ -87,10 +92,14 @@ export function cleanupMaterialPreview(
   return httpInstance.post('/material-preview/cleanup', params).then(res => res.data)
 }
 
-export function getMaterialPreviewStatus(params: Pick<MaterialPreviewControlParams, 'userId' | 'channelId'> = {}) {
+export function getMaterialPreviewStatus(
+  params: Pick<MaterialPreviewControlParams, 'userId' | 'channelId'> = {}
+) {
   return httpInstance.get('/material-preview/status', { params }).then(res => res.data)
 }
 
-export function listMaterialPreviewStatus(params: Pick<MaterialPreviewControlParams, 'userId' | 'channelId'> = {}) {
+export function listMaterialPreviewStatus(
+  params: Pick<MaterialPreviewControlParams, 'userId' | 'channelId'> = {}
+) {
   return httpInstance.get('/material-preview/status/list', { params }).then(res => res.data)
 }

@@ -56,6 +56,7 @@ function normalizeAuthTokens(user = {}) {
 
 function defaultMaterialPreview() {
   return {
+    allowCustom: false,
     enabled: true,
     intervalMinutes: 20,
     buildTimeWindowStart: 90,
@@ -98,8 +99,11 @@ function defaultDouyinAccount() {
 
 function defaultUserChannelConfig() {
   return {
-    enabled: false,
+    enabled: true,
     xtToken: '',
+    xtTokenConfig: {
+      allowCustom: false,
+    },
     buildPreference: {
       bid: '',
     },
@@ -126,6 +130,9 @@ function defaultUserChannelConfig() {
     },
     orderUserStats: defaultOrderUserStats(),
     independentOrderStats: defaultIndependentOrderStats(),
+    douyinMaterialConfig: {
+      allowCustom: false,
+    },
     douyinMaterialMatches: [],
   }
 }
@@ -442,15 +449,14 @@ function normalizeFeishuConfig(feishu = {}) {
 }
 
 function normalizeUserChannelConfig(config = {}, douyinAccounts = []) {
-  const resolvedEnabled =
-    typeof config.enabled === 'boolean'
-      ? config.enabled
-      : hasCustomUserChannelConfig(config, douyinAccounts)
   const defaultConfig = defaultUserChannelConfig()
 
   return {
-    enabled: resolvedEnabled,
+    enabled: true,
     xtToken: String(config.xtToken || '').trim(),
+    xtTokenConfig: {
+      allowCustom: Boolean(config.xtTokenConfig?.allowCustom),
+    },
     buildPreference: {
       bid: String(config.buildPreference?.bid || '').trim(),
     },
@@ -459,6 +465,7 @@ function normalizeUserChannelConfig(config = {}, douyinAccounts = []) {
     materialPreview: {
       ...defaultMaterialPreview(),
       ...(config.materialPreview || {}),
+      allowCustom: Boolean(config.materialPreview?.allowCustom),
       enabled: Boolean(config.materialPreview?.enabled),
     },
     permissions: {
@@ -495,47 +502,14 @@ function normalizeUserChannelConfig(config = {}, douyinAccounts = []) {
       ...(config.independentOrderStats || {}),
       enabled: Boolean(config.independentOrderStats?.enabled),
     },
+    douyinMaterialConfig: {
+      allowCustom: Boolean(config.douyinMaterialConfig?.allowCustom),
+    },
     douyinMaterialMatches: normalizeDouyinMaterialMatches(
       config.douyinMaterialMatches,
       douyinAccounts
     ),
   }
-}
-
-function hasCustomUserChannelConfig(config = {}, douyinAccounts = []) {
-  if (!config || typeof config !== 'object') {
-    return false
-  }
-
-  const hasExplicitMaterialPreview =
-    config.materialPreview &&
-    typeof config.materialPreview === 'object' &&
-    Object.keys(config.materialPreview).length > 0
-  const hasExplicitWebPermissionConfig =
-    typeof config.permissions?.webMenus?.overview === 'boolean' ||
-    typeof config.permissions?.webMenus?.report === 'boolean' ||
-    typeof config.permissions?.webMenus?.buildSubmit === 'boolean'
-  const hasPermissionConfig =
-    Boolean(config.permissions?.syncAccount) ||
-    Object.values(config.permissions?.desktopMenus || {}).some(Boolean)
-  const hasXtToken = Boolean(String(config.xtToken || '').trim())
-  const hasOrderUserStats =
-    Boolean(config.orderUserStats?.enabled) ||
-    (Array.isArray(config.orderUserStats?.usernames) && config.orderUserStats.usernames.length > 0)
-  const hasIndependentOrderStats = Boolean(config.independentOrderStats?.enabled)
-  const hasBuildPreference = Boolean(String(config.buildPreference?.bid || '').trim())
-
-  return (
-    hasXtToken ||
-    hasBuildPreference ||
-    hasFeishuConfig(normalizeFeishuConfig(config.feishu || config)) ||
-    hasExplicitMaterialPreview ||
-    hasExplicitWebPermissionConfig ||
-    hasPermissionConfig ||
-    hasOrderUserStats ||
-    hasIndependentOrderStats ||
-    normalizeDouyinMaterialMatches(config.douyinMaterialMatches, douyinAccounts).length > 0
-  )
 }
 
 function hasFeishuConfig(feishu = {}) {
@@ -563,6 +537,7 @@ function normalizeUserChannelConfigs(
   const legacyMaterialPreview = {
     ...defaultMaterialPreview(),
     ...(user.materialPreview || {}),
+    allowCustom: false,
     enabled: Boolean(user.materialPreview?.enabled),
   }
   const legacyDouyinMaterialMatches = normalizeDouyinMaterialMatches(
@@ -667,25 +642,8 @@ function getDefaultRuntimeMaterialPreview(user = {}, defaultChannelId = '') {
   return getRuntimeUserChannelConfig(user, defaultChannelId).materialPreview
 }
 
-function getReadonlyChannelRuntimeConfig() {
-  return {
-    ...defaultUserChannelConfig(),
-    enabled: false,
-    materialPreview: {
-      ...defaultMaterialPreview(),
-      enabled: false,
-    },
-  }
-}
-
 function getRuntimeUserChannelConfig(user = {}, channelId = '') {
-  const channelConfig = getUserChannelConfig(user, channelId)
-
-  if (channelConfig.enabled) {
-    return channelConfig
-  }
-
-  return getReadonlyChannelRuntimeConfig()
+  return getUserChannelConfig(user, channelId)
 }
 
 export function buildRuntimeUser(user = {}, channelId = '') {
@@ -708,7 +666,7 @@ export function buildRuntimeUser(user = {}, channelId = '') {
     orderUserStats: channelConfig.orderUserStats,
     independentOrderStats: channelConfig.independentOrderStats,
     douyinMaterialMatches,
-    channelConfigEnabled: Boolean(sourceChannelConfig.enabled),
+    channelConfigEnabled: true,
   }
 }
 

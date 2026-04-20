@@ -51,7 +51,9 @@ async function resolveTargetContext(ctx) {
   }
 
   const persistedUser =
-    targetUser.id === sessionUser.id && !requestedUserId ? await readUser(sessionUser.id) : await readUser(targetUser.id)
+    targetUser.id === sessionUser.id && !requestedUserId
+      ? await readUser(sessionUser.id)
+      : await readUser(targetUser.id)
 
   const channelRuntime = await resolveChannelRuntimeById(runtimeContext.channel.id)
   const instanceKey = buildRuntimeInstanceKey({
@@ -86,6 +88,7 @@ async function persistMaterialPreviewConfig(user, channelId, patch = {}) {
 
 function normalizePreviewConfig(channelConfig, overrides = {}) {
   return {
+    allowCustom: Boolean(channelConfig.materialPreview?.allowCustom),
     enabled:
       overrides.enabled !== undefined
         ? Boolean(overrides.enabled)
@@ -99,6 +102,18 @@ function normalizePreviewConfig(channelConfig, overrides = {}) {
     buildTimeWindowEnd: Number(
       overrides.buildTimeWindowEnd || channelConfig.materialPreview?.buildTimeWindowEnd || 20
     ),
+  }
+}
+
+function assertMaterialPreviewCustomizable(targetContext) {
+  if (targetContext.sessionUser?.userType === 'admin') {
+    return
+  }
+
+  if (!targetContext.channelConfig?.materialPreview?.allowCustom) {
+    const error = new Error('当前渠道未开放用户自定义素材预览')
+    error.status = 403
+    throw error
   }
 }
 
@@ -139,6 +154,7 @@ function buildPreviewTaskConfig(targetContext, body = {}) {
 router.post('/start', async ctx => {
   try {
     const targetContext = await resolveTargetContext(ctx)
+    assertMaterialPreviewCustomizable(targetContext)
     const config = normalizePreviewConfig(targetContext.channelConfig, ctx.request.body || {})
     await persistMaterialPreviewConfig(targetContext.user, targetContext.channel.id, {
       ...config,
@@ -170,6 +186,7 @@ router.post('/start', async ctx => {
 router.post('/stop', async ctx => {
   try {
     const targetContext = await resolveTargetContext(ctx)
+    assertMaterialPreviewCustomizable(targetContext)
     await persistMaterialPreviewConfig(targetContext.user, targetContext.channel.id, {
       enabled: false,
     })
@@ -193,9 +210,19 @@ router.post('/stop', async ctx => {
 router.post('/update', async ctx => {
   try {
     const targetContext = await resolveTargetContext(ctx)
+    assertMaterialPreviewCustomizable(targetContext)
     const updates = normalizePreviewConfig(targetContext.channelConfig, ctx.request.body || {})
     await persistMaterialPreviewConfig(targetContext.user, targetContext.channel.id, updates)
-    const result = await materialPreviewManager.updatePreview(targetContext.instanceKey, updates)
+    let result
+
+    try {
+      result = await materialPreviewManager.updatePreview(targetContext.instanceKey, updates)
+    } catch (error) {
+      if (!String(error?.message || '').includes('素材预览不存在')) {
+        throw error
+      }
+      result = materialPreviewManager.getStatus(targetContext.instanceKey)
+    }
 
     ctx.body = {
       code: 0,

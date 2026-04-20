@@ -50,7 +50,7 @@ function isDouyinAccountOccupiedByOtherEnabledChannels(user, currentChannelId, d
   }
 
   return Object.entries(user.channelConfigs).some(([channelId, config]) => {
-    if (channelId === normalizedChannelId || !config?.enabled) {
+    if (channelId === normalizedChannelId) {
       return false
     }
 
@@ -62,6 +62,18 @@ function isDouyinAccountOccupiedByOtherEnabledChannels(user, currentChannelId, d
   })
 }
 
+function assertDouyinMaterialCustomizable(ctx, channelConfig) {
+  if (ctx.state.sessionUser?.userType === 'admin') {
+    return
+  }
+
+  if (!channelConfig?.douyinMaterialConfig?.allowCustom) {
+    const error = new Error('当前渠道未开放用户自定义抖音号匹配素材')
+    error.status = 403
+    throw error
+  }
+}
+
 router.get('/config', async ctx => {
   try {
     const { user, channelId } = await getCurrentUserContext(ctx)
@@ -71,7 +83,7 @@ router.get('/config', async ctx => {
       data: getResolvedMatches(user, channelId),
     }
   } catch (error) {
-    ctx.status = 500
+    ctx.status = error.status || 500
     ctx.body = {
       code: -1,
       message: '读取配置失败',
@@ -95,6 +107,7 @@ router.post('/config', async ctx => {
     }
 
     const { user, channelConfig, channelId } = await getCurrentUserContext(ctx)
+    assertDouyinMaterialCustomizable(ctx, channelConfig)
 
     const selectedDouyinAccount = getDouyinAccount(user, rawDouyinAccountRefId)
 
@@ -120,7 +133,7 @@ router.post('/config', async ctx => {
       ctx.status = 400
       ctx.body = {
         code: -1,
-        message: '该抖音号已在其他已启用渠道配置素材序号',
+        message: '该抖音号已在其他渠道配置素材序号',
       }
       return
     }
@@ -159,10 +172,10 @@ router.post('/config', async ctx => {
       data: createdMatch || null,
     }
   } catch (error) {
-    ctx.status = 500
+    ctx.status = error.status || 500
     ctx.body = {
       code: -1,
-      message: '添加失败',
+      message: error.message || '添加失败',
       error: error.message,
     }
   }
@@ -172,6 +185,7 @@ router.put('/config/:id', async ctx => {
   try {
     const { id } = ctx.params
     const { user, channelConfig, channelId } = await getCurrentUserContext(ctx)
+    assertDouyinMaterialCustomizable(ctx, channelConfig)
     const index = channelConfig.douyinMaterialMatches.findIndex(item => item.id === id)
 
     if (index < 0) {
@@ -226,7 +240,7 @@ router.put('/config/:id', async ctx => {
       ctx.status = 400
       ctx.body = {
         code: -1,
-        message: '该抖音号已在其他已启用渠道配置素材序号',
+        message: '该抖音号已在其他渠道配置素材序号',
       }
       return
     }
@@ -263,10 +277,10 @@ router.put('/config/:id', async ctx => {
       data: resolvedMatch || null,
     }
   } catch (error) {
-    ctx.status = 500
+    ctx.status = error.status || 500
     ctx.body = {
       code: -1,
-      message: '更新失败',
+      message: error.message || '更新失败',
       error: error.message,
     }
   }
@@ -276,6 +290,7 @@ router.delete('/config/:id', async ctx => {
   try {
     const { id } = ctx.params
     const { user, channelConfig } = await getCurrentUserContext(ctx)
+    assertDouyinMaterialCustomizable(ctx, channelConfig)
     const index = channelConfig.douyinMaterialMatches.findIndex(item => item.id === id)
 
     if (index < 0) {
@@ -297,10 +312,10 @@ router.delete('/config/:id', async ctx => {
       data: deleted,
     }
   } catch (error) {
-    ctx.status = 500
+    ctx.status = error.status || 500
     ctx.body = {
       code: -1,
-      message: '删除失败',
+      message: error.message || '删除失败',
       error: error.message,
     }
   }

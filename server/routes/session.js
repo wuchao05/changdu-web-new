@@ -7,6 +7,7 @@ import {
 } from '../utils/studioSession.js'
 import {
   buildRuntimeUser,
+  ensureUserChannelConfig,
   findUsersByChannelId,
   getDefaultDownloadCenterConfig,
   normalizeUser,
@@ -144,11 +145,22 @@ router.post('/xt-token', requireSession, async ctx => {
   }
 
   const currentUser = await readUser(sessionUser.id)
+  const channelConfig = ensureUserChannelConfig(currentUser, channel.id)
+
+  if (sessionUser.userType !== 'admin' && !channelConfig.xtTokenConfig?.allowCustom) {
+    ctx.status = 403
+    ctx.body = {
+      code: 403,
+      message: '当前渠道未开放用户自定义 XT Token',
+    }
+    return
+  }
+
   const xtToken = String(ctx.request.body?.xtToken || '').trim()
   const channelConfigs = {
     ...(currentUser.channelConfigs || {}),
     [channel.id]: {
-      ...(currentUser.channelConfigs?.[channel.id] || {}),
+      ...channelConfig,
       xtToken,
     },
   }
@@ -234,6 +246,7 @@ router.get('/me', async ctx => {
           accountTableId: runtimeUser?.feishu?.accountTableId || '',
         },
         materialPreview: runtimeUser?.materialPreview || {
+          allowCustom: false,
           enabled: true,
           intervalMinutes: 20,
           buildTimeWindowStart: 90,

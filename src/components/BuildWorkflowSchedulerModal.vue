@@ -12,6 +12,8 @@ import {
   NTooltip,
   NRadioGroup,
   NRadio,
+  NSelect,
+  NInputNumber,
   useMessage,
 } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
@@ -19,6 +21,12 @@ import { Icon } from '@iconify/vue'
 import { feishuApi } from '@/api/feishu'
 import { FEISHU_CONFIG } from '@/config/feishu'
 import * as adminApi from '@/api/admin'
+import {
+  getBuildAdvanceConfig,
+  resetBuildAdvanceConfig,
+  updateBuildAdvanceConfig,
+  type BuildAdvanceConfigResponse,
+} from '@/api/buildAdvance'
 import * as buildWorkflowApi from '@/api/buildWorkflow'
 import * as materialPreviewApi from '@/api/materialPreview'
 import { filterMaterials, sortMaterialsBySequence, type Material } from '@/utils/materialFilter'
@@ -208,7 +216,100 @@ const currentBrandName = ref('小红')
 const materialPreviewStatus = ref<materialPreviewApi.MaterialPreviewStatus | null>(null)
 const isLoadingMaterialPreview = ref(false)
 const switchingMaterialPreview = ref(false)
+const savingMaterialPreviewConfig = ref(false)
 const materialPreviewPollingTimer = ref<ReturnType<typeof setInterval> | null>(null)
+const savingBuildAdvance = ref(false)
+
+function createDefaultBuildAdvanceConfig(): BuildAdvanceConfigResponse {
+  return {
+    channelId: '',
+    channelName: '',
+    allowCustom: false,
+    useCustom: false,
+    channelDefaultConfig: {
+      forbiddenAdvanceStartHour: '0',
+      forbiddenAdvanceEndHour: '0',
+      advanceBuildHours: '0',
+    },
+    userCustomConfig: {
+      forbiddenAdvanceStartHour: '0',
+      forbiddenAdvanceEndHour: '0',
+      advanceBuildHours: '0',
+    },
+    effectiveConfig: {
+      forbiddenAdvanceStartHour: '0',
+      forbiddenAdvanceEndHour: '0',
+      advanceBuildHours: '0',
+    },
+    effectiveSource: 'channel',
+  }
+}
+
+const buildAdvanceConfig = ref<BuildAdvanceConfigResponse>(createDefaultBuildAdvanceConfig())
+const buildAdvanceDraft = ref({
+  forbiddenAdvanceStartHour: '0',
+  forbiddenAdvanceEndHour: '0',
+  advanceBuildHours: '0',
+})
+const advanceHourOptions = Array.from({ length: 25 }, (_, hour) => ({
+  label: `${String(hour).padStart(2, '0')}:00`,
+  value: String(hour),
+}))
+const advanceHourEndOptions = advanceHourOptions
+
+function normalizeAdvanceHourValue(value: string | number | null | undefined) {
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue)) {
+    return 0
+  }
+
+  if (numericValue < 0) {
+    return 0
+  }
+
+  if (numericValue > 24) {
+    return 24
+  }
+
+  return Math.floor(numericValue)
+}
+
+function normalizeAdvanceHoursValue(value: string | number | null | undefined) {
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue) || numericValue < 0) {
+    return 0
+  }
+
+  return Math.floor(numericValue)
+}
+
+function syncBuildAdvanceDraftFromConfig(data: BuildAdvanceConfigResponse) {
+  const sourceConfig = data.useCustom ? data.userCustomConfig : data.channelDefaultConfig
+  buildAdvanceDraft.value = {
+    forbiddenAdvanceStartHour: String(
+      normalizeAdvanceHourValue(sourceConfig.forbiddenAdvanceStartHour)
+    ),
+    forbiddenAdvanceEndHour: String(
+      normalizeAdvanceHourValue(sourceConfig.forbiddenAdvanceEndHour)
+    ),
+    advanceBuildHours: String(normalizeAdvanceHoursValue(sourceConfig.advanceBuildHours)),
+  }
+}
+
+function handleBuildAdvanceHourChange(
+  field: 'forbiddenAdvanceStartHour' | 'forbiddenAdvanceEndHour',
+  value: string | null
+) {
+  buildAdvanceDraft.value[field] = String(normalizeAdvanceHourValue(value))
+}
+
+function handleBuildAdvanceHoursChange(value: number | null) {
+  buildAdvanceDraft.value.advanceBuildHours = String(normalizeAdvanceHoursValue(value))
+}
+
+function getBuildAdvanceHoursInputValue(value: string | number | null | undefined) {
+  return normalizeAdvanceHoursValue(value)
+}
 
 // 选中的剧集
 const selectedRowKeys = ref<string[]>([])
@@ -465,16 +566,24 @@ const statistics = computed(() => {
 
 // 是否显示进度
 const showProgress = computed(() => buildRecords.value.length > 0)
-const showMaterialPreviewSwitch = computed(
-  () =>
-    Boolean(materialPreviewConfig.value) ||
-    Boolean(materialPreviewConfig.value?.enabled) ||
-    Boolean(materialPreviewStatus.value?.enabled) ||
-    Boolean(materialPreviewStatus.value?.running)
-)
+const showMaterialPreviewPanel = computed(() => Boolean(materialPreviewConfig.value?.allowCustom))
 const isMaterialPreviewEnabled = computed(() =>
   Boolean(materialPreviewStatus.value?.enabled || materialPreviewStatus.value?.running)
 )
+const showBuildAdvancePanel = computed(() => Boolean(buildAdvanceConfig.value.allowCustom))
+const showRuntimeConfigPanel = computed(
+  () => showBuildAdvancePanel.value || showMaterialPreviewPanel.value
+)
+const currentBuildAdvanceText = computed(() =>
+  getAdvanceRuleDescription(buildAdvanceConfig.value.effectiveConfig)
+)
+const currentMaterialPreviewSummary = computed(() => {
+  if (!materialPreviewConfig.value) {
+    return '未配置'
+  }
+
+  return `${materialPreviewConfig.value.intervalMinutes} 分钟 / ${materialPreviewConfig.value.buildTimeWindowStart}-${materialPreviewConfig.value.buildTimeWindowEnd} 分钟`
+})
 
 // 监听显示状态变化
 function handleUpdateShow(show: boolean) {
@@ -494,6 +603,7 @@ watch(
         loadPendingDramas(),
         loadBackgroundSchedulerStatus(),
         loadMaterialPreviewPanelData(),
+        loadBuildAdvancePanelData(),
       ])
       // 如果后台调度器正在运行，开始轮询状态
       if (backgroundSchedulerStatus.value?.enabled) {
@@ -519,10 +629,22 @@ async function loadMaterialPreviewConfig() {
     String(sessionData?.runtimeUser?.brandName || sessionData?.user?.brandName || '小红').trim() ||
     '小红'
   materialPreviewConfig.value = sessionData.materialPreview || {
+    allowCustom: false,
     enabled: false,
     intervalMinutes: 20,
     buildTimeWindowStart: 90,
     buildTimeWindowEnd: 20,
+  }
+}
+
+async function loadBuildAdvancePanelData() {
+  try {
+    const data = await getBuildAdvanceConfig()
+    buildAdvanceConfig.value = data
+    syncBuildAdvanceDraftFromConfig(data)
+  } catch {
+    buildAdvanceConfig.value = createDefaultBuildAdvanceConfig()
+    syncBuildAdvanceDraftFromConfig(buildAdvanceConfig.value)
   }
 }
 
@@ -540,6 +662,65 @@ async function loadMaterialPreviewPanelData() {
     message.error(`加载素材预览状态失败: ${getErrorMessage(error)}`)
   } finally {
     isLoadingMaterialPreview.value = false
+  }
+}
+
+async function saveMaterialPreviewConfig() {
+  if (!materialPreviewConfig.value) {
+    return
+  }
+
+  savingMaterialPreviewConfig.value = true
+  try {
+    await materialPreviewApi.updateMaterialPreview({
+      enabled: materialPreviewConfig.value.enabled,
+      intervalMinutes: materialPreviewConfig.value.intervalMinutes,
+      buildTimeWindowStart: materialPreviewConfig.value.buildTimeWindowStart,
+      buildTimeWindowEnd: materialPreviewConfig.value.buildTimeWindowEnd,
+    })
+    await loadMaterialPreviewPanelData()
+    message.success('素材预览配置已保存')
+  } catch (error) {
+    console.error('保存素材预览配置失败:', error)
+    message.error(`保存素材预览配置失败: ${getErrorMessage(error)}`)
+  } finally {
+    savingMaterialPreviewConfig.value = false
+  }
+}
+
+async function saveBuildAdvance() {
+  savingBuildAdvance.value = true
+  try {
+    const data = await updateBuildAdvanceConfig({
+      forbiddenAdvanceStartHour: buildAdvanceDraft.value.forbiddenAdvanceStartHour,
+      forbiddenAdvanceEndHour: buildAdvanceDraft.value.forbiddenAdvanceEndHour,
+      advanceBuildHours: buildAdvanceDraft.value.advanceBuildHours,
+    })
+    buildAdvanceConfig.value = data
+    syncBuildAdvanceDraftFromConfig(data)
+    await loadMaterialPreviewConfig()
+    message.success('智能搭建时机已保存')
+  } catch (error) {
+    console.error('保存智能搭建时机失败:', error)
+    message.error(`保存智能搭建时机失败: ${getErrorMessage(error)}`)
+  } finally {
+    savingBuildAdvance.value = false
+  }
+}
+
+async function resetBuildAdvance() {
+  savingBuildAdvance.value = true
+  try {
+    const data = await resetBuildAdvanceConfig()
+    buildAdvanceConfig.value = data
+    syncBuildAdvanceDraftFromConfig(data)
+    await loadMaterialPreviewConfig()
+    message.success('已恢复渠道默认智能搭建时机')
+  } catch (error) {
+    console.error('恢复智能搭建时机失败:', error)
+    message.error(`恢复智能搭建时机失败: ${getErrorMessage(error)}`)
+  } finally {
+    savingBuildAdvance.value = false
   }
 }
 
@@ -1050,6 +1231,10 @@ function resetState() {
   currentBuildConfig.value = null
   materialPreviewConfig.value = null
   switchingMaterialPreview.value = false
+  savingMaterialPreviewConfig.value = false
+  buildAdvanceConfig.value = createDefaultBuildAdvanceConfig()
+  syncBuildAdvanceDraftFromConfig(buildAdvanceConfig.value)
+  savingBuildAdvance.value = false
 }
 
 // 开始搭建单个剧集
@@ -1892,11 +2077,107 @@ onBeforeUnmount(() => {
   >
     <!-- 自定义标题 -->
     <template #header>
-      <div class="modal-header">
-        <span>提交搭建</span>
-        <div class="header-actions">
-          <n-tooltip v-if="showMaterialPreviewSwitch" placement="bottom" trigger="hover">
-            <template #trigger>
+      <div class="modal-header-shell">
+        <div class="modal-header">
+          <span>提交搭建</span>
+          <div class="header-actions">
+            <n-select
+              v-model:value="pollingInterval"
+              :options="pollingOptions"
+              placeholder="开始自动搭建"
+              :disabled="
+                autoPollingEnabled ||
+                isBuilding ||
+                backgroundSchedulerStatus?.enabled ||
+                showRunModeSelector
+              "
+              style="width: 160px"
+              @update:value="handlePollingIntervalChange"
+            />
+            <!-- 运行模式选择器 -->
+            <template v-if="showRunModeSelector">
+              <n-radio-group v-model:value="runMode" size="small">
+                <n-radio value="frontend">前台运行</n-radio>
+                <n-radio value="backend">后台运行</n-radio>
+              </n-radio-group>
+              <n-button type="primary" size="small" @click="confirmStartPolling"> 确定 </n-button>
+              <n-button size="small" @click="cancelRunModeSelection"> 取消 </n-button>
+            </template>
+          </div>
+        </div>
+
+        <div v-if="showRuntimeConfigPanel" class="modal-header-configs">
+          <section v-if="showBuildAdvancePanel" class="header-config-chip header-config-chip--blue">
+            <div class="header-config-chip__head">
+              <div>
+                <p class="header-config-chip__title">智能搭建时机</p>
+                <p class="header-config-chip__meta">{{ currentBuildAdvanceText }}</p>
+              </div>
+              <n-tag size="small" :bordered="false" round>
+                {{ buildAdvanceConfig.useCustom ? '个人规则' : '渠道默认' }}
+              </n-tag>
+            </div>
+            <div class="header-config-chip__body header-config-chip__body--advance">
+              <div class="header-config-chip__field">
+                <span class="header-config-chip__label">开始</span>
+                <n-select
+                  :value="buildAdvanceDraft.forbiddenAdvanceStartHour"
+                  size="small"
+                  :options="advanceHourOptions"
+                  @update:value="handleBuildAdvanceHourChange('forbiddenAdvanceStartHour', $event)"
+                />
+              </div>
+              <div class="header-config-chip__field">
+                <span class="header-config-chip__label">结束</span>
+                <n-select
+                  :value="buildAdvanceDraft.forbiddenAdvanceEndHour"
+                  size="small"
+                  :options="advanceHourEndOptions"
+                  @update:value="handleBuildAdvanceHourChange('forbiddenAdvanceEndHour', $event)"
+                />
+              </div>
+              <div class="header-config-chip__field">
+                <span class="header-config-chip__label">提前</span>
+                <n-input-number
+                  :value="getBuildAdvanceHoursInputValue(buildAdvanceDraft.advanceBuildHours)"
+                  size="small"
+                  :min="0"
+                  :precision="0"
+                  class="w-full"
+                  @update:value="handleBuildAdvanceHoursChange"
+                >
+                  <template #suffix>小时</template>
+                </n-input-number>
+              </div>
+              <div class="header-config-chip__actions">
+                <n-button
+                  type="primary"
+                  size="small"
+                  :loading="savingBuildAdvance"
+                  @click="saveBuildAdvance"
+                >
+                  保存
+                </n-button>
+                <n-button
+                  size="small"
+                  :disabled="savingBuildAdvance || !buildAdvanceConfig.useCustom"
+                  @click="resetBuildAdvance"
+                >
+                  默认
+                </n-button>
+              </div>
+            </div>
+          </section>
+
+          <section
+            v-if="showMaterialPreviewPanel && materialPreviewConfig"
+            class="header-config-chip header-config-chip--sky"
+          >
+            <div class="header-config-chip__head">
+              <div>
+                <p class="header-config-chip__title">素材预览</p>
+                <p class="header-config-chip__meta">{{ currentMaterialPreviewSummary }}</p>
+              </div>
               <div class="preview-switch-inline">
                 <span class="preview-switch-label">预览</span>
                 <n-switch
@@ -1906,31 +2187,59 @@ onBeforeUnmount(() => {
                   @update:value="handleMaterialPreviewToggle"
                 />
               </div>
-            </template>
-            开启预览后搭建素材可在 10 分钟左右显示在抖音上
-          </n-tooltip>
-          <n-select
-            v-model:value="pollingInterval"
-            :options="pollingOptions"
-            placeholder="开始自动搭建"
-            :disabled="
-              autoPollingEnabled ||
-              isBuilding ||
-              backgroundSchedulerStatus?.enabled ||
-              showRunModeSelector
-            "
-            style="width: 160px"
-            @update:value="handlePollingIntervalChange"
-          />
-          <!-- 运行模式选择器 -->
-          <template v-if="showRunModeSelector">
-            <n-radio-group v-model:value="runMode" size="small">
-              <n-radio value="frontend">前台运行</n-radio>
-              <n-radio value="backend">后台运行</n-radio>
-            </n-radio-group>
-            <n-button type="primary" size="small" @click="confirmStartPolling"> 确定 </n-button>
-            <n-button size="small" @click="cancelRunModeSelection"> 取消 </n-button>
-          </template>
+            </div>
+            <div class="header-config-chip__body header-config-chip__body--preview">
+              <div class="header-config-chip__field">
+                <span class="header-config-chip__label">间隔</span>
+                <n-input-number
+                  v-model:value="materialPreviewConfig.intervalMinutes"
+                  size="small"
+                  :min="1"
+                  :precision="0"
+                  class="w-full"
+                >
+                  <template #suffix>分</template>
+                </n-input-number>
+              </div>
+              <div class="header-config-chip__field">
+                <span class="header-config-chip__label">起始</span>
+                <n-input-number
+                  v-model:value="materialPreviewConfig.buildTimeWindowStart"
+                  size="small"
+                  :min="1"
+                  :precision="0"
+                  class="w-full"
+                >
+                  <template #suffix>分钟前</template>
+                </n-input-number>
+              </div>
+              <div class="header-config-chip__field">
+                <span class="header-config-chip__label">结束</span>
+                <n-input-number
+                  v-model:value="materialPreviewConfig.buildTimeWindowEnd"
+                  size="small"
+                  :min="0"
+                  :precision="0"
+                  class="w-full"
+                >
+                  <template #suffix>分钟前</template>
+                </n-input-number>
+              </div>
+              <div class="header-config-chip__actions">
+                <n-button
+                  type="primary"
+                  size="small"
+                  :loading="savingMaterialPreviewConfig"
+                  @click="saveMaterialPreviewConfig"
+                >
+                  保存
+                </n-button>
+                <n-tag size="small" :type="isMaterialPreviewEnabled ? 'success' : 'default'" round>
+                  {{ isMaterialPreviewEnabled ? '运行中' : '已停止' }}
+                </n-tag>
+              </div>
+            </div>
+          </section>
         </div>
       </div>
     </template>
@@ -3041,10 +3350,86 @@ onBeforeUnmount(() => {
 }
 
 /* Header 操作区域样式 */
+.modal-header-shell {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+}
+
 .header-actions {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.modal-header-configs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.header-config-chip {
+  padding: 10px 12px;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.header-config-chip--blue {
+  background: linear-gradient(180deg, rgba(239, 246, 255, 0.72), #fff);
+}
+
+.header-config-chip--sky {
+  background: linear-gradient(180deg, rgba(240, 249, 255, 0.78), #fff);
+}
+
+.header-config-chip__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.header-config-chip__title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.header-config-chip__meta {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #64748b;
+}
+
+.header-config-chip__body {
+  display: grid;
+  gap: 8px;
+}
+
+.header-config-chip__body--advance,
+.header-config-chip__body--preview {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.header-config-chip__field {
+  display: grid;
+  gap: 4px;
+}
+
+.header-config-chip__label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.header-config-chip__actions {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
 .preview-switch-inline {
@@ -3194,5 +3579,33 @@ onBeforeUnmount(() => {
   color: rgba(255, 255, 255, 0.9);
   line-height: 1.5;
   word-break: break-all;
+}
+
+@media (max-width: 960px) {
+  .modal-header-configs {
+    grid-template-columns: 1fr;
+  }
+
+  .header-config-chip__body--advance,
+  .header-config-chip__body--preview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .header-config-chip__head,
+  .header-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .header-config-chip__actions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .header-config-chip__body--advance,
+  .header-config-chip__body--preview {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

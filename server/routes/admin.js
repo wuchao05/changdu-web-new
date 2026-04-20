@@ -166,15 +166,11 @@ function validateUserChannelMaterialConfigs(userPayload = {}, channels = []) {
 
       localMatchSet.add(refId)
 
-      if (!config?.enabled) {
-        return
-      }
-
       const occupiedChannelName = enabledMatchChannelMap.get(refId)
       if (occupiedChannelName) {
         const accountName = douyinAccountNameMap.get(refId) || refId
         const error = new Error(
-          `抖音号「${accountName}」已在启用渠道【${occupiedChannelName}】配置，不能重复分配到【${channelName}】`
+          `抖音号「${accountName}」已在渠道【${occupiedChannelName}】配置，不能重复分配到【${channelName}】`
         )
         error.status = 400
         throw error

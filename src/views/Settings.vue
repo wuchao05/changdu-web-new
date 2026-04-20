@@ -17,7 +17,7 @@
 
     <main class="px-6 py-8">
       <div class="max-w-4xl mx-auto space-y-6">
-        <n-card v-if="showBuildBidCard" class="shadow-sm border border-gray-200">
+        <n-card class="shadow-sm border border-gray-200">
           <template #header>
             <div class="flex items-center space-x-3">
               <Icon icon="mdi:cog" class="w-5 h-5 text-gray-600" />
@@ -113,93 +113,7 @@
           </div>
         </n-card>
 
-        <n-card v-if="showBuildAdvanceCard" class="shadow-sm border border-gray-200">
-          <template #header>
-            <div class="flex items-center space-x-3">
-              <Icon icon="mdi:clock-outline" class="w-5 h-5 text-gray-600" />
-              <div>
-                <h3 class="text-lg font-semibold text-gray-900">智能搭建时机</h3>
-                <p class="text-sm text-gray-500">
-                  按当前渠道单独覆盖最早可搭建时间，未保存时沿用渠道默认规则
-                </p>
-              </div>
-            </div>
-          </template>
-          <div class="space-y-4">
-            <div
-              class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600"
-            >
-              <div class="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-                <span
-                  >当前渠道：<strong class="text-gray-900">{{ activeChannelName }}</strong></span
-                >
-                <span
-                  >当前生效规则：<strong class="text-gray-900">{{
-                    effectiveBuildAdvanceText
-                  }}</strong></span
-                >
-              </div>
-              <p class="mt-2 text-xs text-gray-500">
-                渠道默认：{{ channelDefaultBuildAdvanceText }}
-              </p>
-            </div>
-
-            <div class="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
-              <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
-                <div class="space-y-2">
-                  <label class="text-sm font-medium text-gray-700">禁提前开始</label>
-                  <n-select
-                    :value="buildAdvanceDraft.forbiddenAdvanceStartHour"
-                    :options="advanceHourOptions"
-                    @update:value="
-                      handleBuildAdvanceHourChange('forbiddenAdvanceStartHour', $event)
-                    "
-                  />
-                </div>
-                <div class="flex items-end justify-center pb-2 text-sm text-gray-400">至</div>
-                <div class="space-y-2">
-                  <label class="text-sm font-medium text-gray-700">禁提前结束</label>
-                  <n-select
-                    :value="buildAdvanceDraft.forbiddenAdvanceEndHour"
-                    :options="advanceHourEndOptions"
-                    @update:value="handleBuildAdvanceHourChange('forbiddenAdvanceEndHour', $event)"
-                  />
-                </div>
-              </div>
-
-              <div class="space-y-2">
-                <label class="text-sm font-medium text-gray-700">其他时段提前搭建</label>
-                <n-input-number
-                  :value="getBuildAdvanceHoursInputValue(buildAdvanceDraft.advanceBuildHours)"
-                  :min="0"
-                  :precision="0"
-                  class="w-full"
-                  @update:value="handleBuildAdvanceHoursChange"
-                >
-                  <template #suffix>小时</template>
-                </n-input-number>
-                <p class="text-xs text-gray-500">
-                  开始和结束填一样表示不启用禁提前时段；设为 0
-                  时，其余时段也必须等上架时间后才能搭建。
-                </p>
-              </div>
-
-              <div class="flex flex-wrap gap-3">
-                <n-button type="primary" :loading="savingBuildAdvance" @click="saveBuildAdvance">
-                  保存
-                </n-button>
-                <n-button
-                  :disabled="savingBuildAdvance || !buildAdvanceConfig.useCustom"
-                  @click="resetBuildAdvance"
-                >
-                  恢复渠道默认
-                </n-button>
-              </div>
-            </div>
-          </div>
-        </n-card>
-
-        <n-card v-if="sessionStore.activeChannelId" class="shadow-sm border border-gray-200">
+        <n-card v-if="showXtTokenCard" class="shadow-sm border border-gray-200">
           <template #header>
             <div class="flex items-center space-x-3">
               <Icon icon="mdi:key-chain-variant" class="w-5 h-5 text-gray-600" />
@@ -254,7 +168,7 @@
           </div>
         </n-card>
 
-        <n-card class="shadow-sm border border-gray-200">
+        <n-card v-if="showDouyinMaterialCard" class="shadow-sm border border-gray-200">
           <template #header>
             <div class="flex items-center space-x-3">
               <Icon icon="mdi:account-group-outline" class="w-5 h-5 text-gray-600" />
@@ -308,7 +222,7 @@
                 </n-button>
               </div>
               <p class="material-panel__note">
-                先选抖音号，再按素材总数自动平均分配；已在其他启用渠道占用的抖音号不可重复选择。
+                先选抖音号，再按素材总数自动平均分配；已在其他渠道占用的抖音号不可重复选择。
               </p>
             </div>
 
@@ -340,7 +254,7 @@
               <p v-if="occupiedMaterialAccountCount" class="material-select-box__hint">
                 有
                 {{ occupiedMaterialAccountCount }}
-                个抖音号已被其他已启用渠道占用，因此这里不可重复选择。
+                个抖音号已被其他渠道占用，因此这里不可重复选择。
               </p>
             </div>
 
@@ -441,19 +355,12 @@ import { computed, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useMessage, useDialog, NButton, NCard, NInput, NSelect, NInputNumber } from 'naive-ui'
 import { getBuildBidConfig, updateBuildBidConfig, type BuildBidConfig } from '@/api/buildBid'
-import {
-  getBuildAdvanceConfig,
-  resetBuildAdvanceConfig,
-  updateBuildAdvanceConfig,
-  type BuildAdvanceConfigResponse,
-} from '@/api/buildAdvance'
-import { updateCurrentChannelXtToken } from '@/api/admin'
+import { updateCurrentChannelXtToken, type UserChannelBindingConfig } from '@/api/admin'
 import { useSettingsStore } from '@/stores/settings'
 import { useApiConfigStore } from '@/stores/apiConfig'
 import { useSessionStore } from '@/stores/session'
 import { useDouyinMaterialStore } from '@/stores/douyinMaterial'
 import { formatBuildBidInputValue, parseBuildBidInputValue } from '@/utils/buildBid'
-import { getAdvanceRuleDescription } from '@/shared/buildWorkflowRules'
 
 defineOptions({
   name: 'SettingsPage',
@@ -491,7 +398,6 @@ const dateRangeOptions = [
 
 const materialMatches = ref(douyinMaterialStore.matches)
 const savingBuildBid = ref(false)
-const savingBuildAdvance = ref(false)
 const savingAllMaterialMatches = ref(false)
 const savingXtToken = ref(false)
 const buildBidInput = ref<number | null>(null)
@@ -499,11 +405,6 @@ const averageMaterialTotal = ref<number | null>(null)
 const selectedMaterialAccountIds = ref<string[]>([])
 const MATERIAL_SELECT_ALL_VALUE = '__material_select_all__'
 const xtTokenDraft = ref('')
-const buildAdvanceDraft = ref({
-  forbiddenAdvanceStartHour: '0',
-  forbiddenAdvanceEndHour: '0',
-  advanceBuildHours: '0',
-})
 
 function createDefaultBuildBidConfig(): BuildBidConfig {
   return {
@@ -518,101 +419,6 @@ function createDefaultBuildBidConfig(): BuildBidConfig {
 }
 
 const buildBidConfig = ref<BuildBidConfig>(createDefaultBuildBidConfig())
-
-function createDefaultBuildAdvanceConfig(): BuildAdvanceConfigResponse {
-  return {
-    channelId: '',
-    channelName: '',
-    allowCustom: false,
-    useCustom: false,
-    channelDefaultConfig: {
-      forbiddenAdvanceStartHour: '0',
-      forbiddenAdvanceEndHour: '0',
-      advanceBuildHours: '0',
-    },
-    userCustomConfig: {
-      forbiddenAdvanceStartHour: '0',
-      forbiddenAdvanceEndHour: '0',
-      advanceBuildHours: '0',
-    },
-    effectiveConfig: {
-      forbiddenAdvanceStartHour: '0',
-      forbiddenAdvanceEndHour: '0',
-      advanceBuildHours: '0',
-    },
-    effectiveSource: 'channel',
-  }
-}
-
-const buildAdvanceConfig = ref<BuildAdvanceConfigResponse>(createDefaultBuildAdvanceConfig())
-
-const advanceHourOptions = Array.from({ length: 25 }, (_, hour) => ({
-  label: `${String(hour).padStart(2, '0')}:00`,
-  value: String(hour),
-}))
-
-const advanceHourEndOptions = advanceHourOptions
-
-function normalizeAdvanceHourValue(value: string | number | null | undefined) {
-  const numericValue = Number(value)
-  if (!Number.isFinite(numericValue)) {
-    return 0
-  }
-
-  if (numericValue < 0) {
-    return 0
-  }
-
-  if (numericValue > 24) {
-    return 24
-  }
-
-  return Math.floor(numericValue)
-}
-
-function normalizeAdvanceHoursValue(value: string | number | null | undefined) {
-  const numericValue = Number(value)
-  if (!Number.isFinite(numericValue) || numericValue < 0) {
-    return 0
-  }
-  return Math.floor(numericValue)
-}
-
-function syncBuildAdvanceDraftFromConfig(data: BuildAdvanceConfigResponse) {
-  const sourceConfig = data.useCustom ? data.userCustomConfig : data.channelDefaultConfig
-  buildAdvanceDraft.value = {
-    forbiddenAdvanceStartHour: String(
-      normalizeAdvanceHourValue(sourceConfig.forbiddenAdvanceStartHour)
-    ),
-    forbiddenAdvanceEndHour: String(
-      normalizeAdvanceHourValue(sourceConfig.forbiddenAdvanceEndHour)
-    ),
-    advanceBuildHours: String(normalizeAdvanceHoursValue(sourceConfig.advanceBuildHours)),
-  }
-}
-
-function formatBuildAdvanceText(config: {
-  forbiddenAdvanceStartHour?: string
-  forbiddenAdvanceEndHour?: string
-  advanceBuildHours?: string
-}) {
-  return getAdvanceRuleDescription(config)
-}
-
-function handleBuildAdvanceHourChange(
-  field: 'forbiddenAdvanceStartHour' | 'forbiddenAdvanceEndHour',
-  value: string | null
-) {
-  buildAdvanceDraft.value[field] = String(normalizeAdvanceHourValue(value))
-}
-
-function getBuildAdvanceHoursInputValue(value: string | number | null | undefined) {
-  return normalizeAdvanceHoursValue(value)
-}
-
-function handleBuildAdvanceHoursChange(value: number | null) {
-  buildAdvanceDraft.value.advanceBuildHours = String(normalizeAdvanceHoursValue(value))
-}
 
 const availableDouyinAccounts = computed(() => {
   const runtimeAccounts = Array.isArray(sessionStore.currentRuntimeUser?.douyinAccounts)
@@ -630,21 +436,20 @@ const hasAvailableDouyinAccounts = computed(() => availableDouyinAccounts.value.
 const currentChannelConfigs = computed(() => {
   const runtimeConfigs = sessionStore.currentRuntimeUser?.channelConfigs
   if (runtimeConfigs && typeof runtimeConfigs === 'object') {
-    return runtimeConfigs as Record<
-      string,
-      { enabled?: boolean; douyinMaterialMatches?: Array<{ douyinAccountRefId?: string }> }
-    >
+    return runtimeConfigs as Record<string, UserChannelBindingConfig>
   }
 
   const userConfigs = sessionStore.currentUser?.channelConfigs
   if (userConfigs && typeof userConfigs === 'object') {
-    return userConfigs as Record<
-      string,
-      { enabled?: boolean; douyinMaterialMatches?: Array<{ douyinAccountRefId?: string }> }
-    >
+    return userConfigs as Record<string, UserChannelBindingConfig>
   }
 
-  return {}
+  return {} as Record<string, UserChannelBindingConfig>
+})
+
+const activeUserChannelConfig = computed(() => {
+  const activeChannelId = String(sessionStore.activeChannelId || '').trim()
+  return activeChannelId ? currentChannelConfigs.value[activeChannelId] || null : null
 })
 
 const occupiedMaterialAccountIds = computed(() => {
@@ -652,7 +457,7 @@ const occupiedMaterialAccountIds = computed(() => {
   const occupiedIds = new Set<string>()
 
   Object.entries(currentChannelConfigs.value).forEach(([channelId, config]) => {
-    if (!config?.enabled || channelId === currentChannelId) {
+    if (channelId === currentChannelId) {
       return
     }
 
@@ -718,8 +523,13 @@ const activeChannelName = computed(() => {
 })
 
 const showBuildBidCard = computed(() => buildBidConfig.value.channelBidEnabled)
-const showBuildAdvanceCard = computed(() => buildAdvanceConfig.value.allowCustom)
 const currentXtToken = computed(() => String(sessionStore.currentRuntimeUser?.xtToken || '').trim())
+const showXtTokenCard = computed(() =>
+  Boolean(activeUserChannelConfig.value?.xtTokenConfig?.allowCustom)
+)
+const showDouyinMaterialCard = computed(() =>
+  Boolean(activeUserChannelConfig.value?.douyinMaterialConfig?.allowCustom)
+)
 
 const effectiveBuildBidLabel = computed(() => {
   if (!buildBidConfig.value.channelBidEnabled) {
@@ -727,14 +537,6 @@ const effectiveBuildBidLabel = computed(() => {
   }
   return buildBidConfig.value.effectiveBid || '未配置'
 })
-
-const effectiveBuildAdvanceText = computed(() =>
-  formatBuildAdvanceText(buildAdvanceConfig.value.effectiveConfig)
-)
-
-const channelDefaultBuildAdvanceText = computed(() =>
-  formatBuildAdvanceText(buildAdvanceConfig.value.channelDefaultConfig)
-)
 
 const validMaterialMatchCount = computed(
   () => materialMatches.value.filter(match => isMaterialMatchValid(match)).length
@@ -796,18 +598,13 @@ watch(
       averageMaterialTotal.value = null
       buildBidConfig.value = createDefaultBuildBidConfig()
       buildBidInput.value = null
-      buildAdvanceConfig.value = createDefaultBuildAdvanceConfig()
-      syncBuildAdvanceDraftFromConfig(buildAdvanceConfig.value)
       return
     }
     buildBidConfig.value = createDefaultBuildBidConfig()
     buildBidInput.value = null
-    buildAdvanceConfig.value = createDefaultBuildAdvanceConfig()
     averageMaterialTotal.value = null
-    syncBuildAdvanceDraftFromConfig(buildAdvanceConfig.value)
     void douyinMaterialStore.loadFromServer(true)
     void loadBuildBidConfig()
-    void loadBuildAdvanceConfig()
   },
   { immediate: true }
 )
@@ -826,23 +623,6 @@ async function loadBuildBidConfig() {
   } catch {
     buildBidConfig.value = createDefaultBuildBidConfig()
     buildBidInput.value = null
-  }
-}
-
-async function loadBuildAdvanceConfig() {
-  if (!sessionStore.activeChannelId) {
-    buildAdvanceConfig.value = createDefaultBuildAdvanceConfig()
-    syncBuildAdvanceDraftFromConfig(buildAdvanceConfig.value)
-    return
-  }
-
-  try {
-    const data = await getBuildAdvanceConfig()
-    buildAdvanceConfig.value = data
-    syncBuildAdvanceDraftFromConfig(data)
-  } catch {
-    buildAdvanceConfig.value = createDefaultBuildAdvanceConfig()
-    syncBuildAdvanceDraftFromConfig(buildAdvanceConfig.value)
   }
 }
 
@@ -883,34 +663,6 @@ async function saveBuildBid() {
 async function resetBuildBid() {
   buildBidInput.value = null
   await persistBuildBid('')
-}
-
-async function saveBuildAdvance() {
-  savingBuildAdvance.value = true
-  try {
-    const data = await updateBuildAdvanceConfig({
-      forbiddenAdvanceStartHour: buildAdvanceDraft.value.forbiddenAdvanceStartHour,
-      forbiddenAdvanceEndHour: buildAdvanceDraft.value.forbiddenAdvanceEndHour,
-      advanceBuildHours: buildAdvanceDraft.value.advanceBuildHours,
-    })
-    buildAdvanceConfig.value = data
-    syncBuildAdvanceDraftFromConfig(data)
-    message.success('智能搭建时机已保存')
-  } finally {
-    savingBuildAdvance.value = false
-  }
-}
-
-async function resetBuildAdvance() {
-  savingBuildAdvance.value = true
-  try {
-    const data = await resetBuildAdvanceConfig()
-    buildAdvanceConfig.value = data
-    syncBuildAdvanceDraftFromConfig(data)
-    message.success('已恢复渠道默认智能搭建时机')
-  } finally {
-    savingBuildAdvance.value = false
-  }
 }
 
 async function saveXtToken() {
@@ -1083,7 +835,7 @@ async function saveAllMaterialMatches() {
   )
 
   if (occupiedConflict) {
-    message.warning('存在已被其他启用渠道占用的抖音号，请先取消选择后再保存')
+    message.warning('存在已被其他渠道占用的抖音号，请先取消选择后再保存')
     return
   }
 

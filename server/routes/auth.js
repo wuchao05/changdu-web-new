@@ -95,6 +95,7 @@ router.get('/config', async ctx => {
           accountTableId: runtimeUser?.feishu?.accountTableId || '',
         },
         materialPreview: runtimeUser?.materialPreview || {
+          allowCustom: false,
           enabled: true,
           intervalMinutes: 20,
           buildTimeWindowStart: 90,
