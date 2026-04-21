@@ -19,6 +19,8 @@ import {
 import { clearExistingProjects } from '../utils/buildWorkflowProjectCleanup.js'
 import { createSessionRuntimeContextMiddleware } from '../utils/runtimeContextMiddleware.js'
 import { buildRuntimeInstanceKey } from '../utils/runtimeInstance.js'
+import { readUser, resolveRuntimeContext } from '../utils/studioData.js'
+import { normalizeChannelRuntime } from '../utils/channelRuntime.js'
 import { resolveEffectiveBuildBid } from '../utils/buildBid.js'
 import {
   canBuildDramaNow,
@@ -2269,6 +2271,91 @@ router.post('/scheduler/trigger', async ctx => {
     ctx.body = {
       code: -1,
       message: error.message || '触发搭建任务失败',
+    }
+  }
+})
+
+// ─── 管理员控制路由 ───
+
+async function resolveAdminTargetContext(ctx) {
+  const sessionUser = ctx.state.sessionUser
+  const { userId, channelId } = ctx.request.body || {}
+
+  if (!userId || !channelId) {
+    ctx.throw(400, '必须指定 userId 和 channelId')
+  }
+
+  if (sessionUser.userType !== 'admin') {
+    ctx.throw(403, '仅管理员可操作')
+  }
+
+  const targetUser = await readUser(userId)
+  const runtimeContext = await resolveRuntimeContext(targetUser, channelId)
+  if (!runtimeContext.runtimeUser || !runtimeContext.channel) {
+    ctx.throw(400, '目标用户下未找到可用渠道')
+  }
+
+  const channelRuntime = normalizeChannelRuntime({
+    channel: runtimeContext.channel,
+    runtimeUser: runtimeContext.runtimeUser,
+  })
+
+  return {
+    runtimeUser: runtimeContext.runtimeUser,
+    channel: runtimeContext.channel,
+    channelRuntime,
+    requestedChannelId: channelId,
+    availableChannels: runtimeContext.availableChannels,
+  }
+}
+
+router.post('/scheduler/admin/start', async ctx => {
+  try {
+    const targetContext = await resolveAdminTargetContext(ctx)
+    const { intervalMinutes, table_id } = ctx.request.body || {}
+
+    if (!intervalMinutes || typeof intervalMinutes !== 'number' || intervalMinutes < 1) {
+      ctx.status = 400
+      ctx.body = {
+        code: -1,
+        message: '轮询间隔必须是大于等于1的数字（单位：分钟）',
+      }
+      return
+    }
+
+    const status = await startScheduler(intervalMinutes, table_id, targetContext)
+
+    ctx.body = {
+      code: 0,
+      message: '后台调度器已启动',
+      data: status,
+    }
+  } catch (error) {
+    console.error('[搭建调度器API] 管理员启动失败:', error)
+    ctx.status = error.status || 500
+    ctx.body = {
+      code: -1,
+      message: error.message || '启动后台调度器失败',
+    }
+  }
+})
+
+router.post('/scheduler/admin/stop', async ctx => {
+  try {
+    const targetContext = await resolveAdminTargetContext(ctx)
+    const status = await stopScheduler(targetContext)
+
+    ctx.body = {
+      code: 0,
+      message: '后台调度器已停止',
+      data: status,
+    }
+  } catch (error) {
+    console.error('[搭建调度器API] 管理员停止失败:', error)
+    ctx.status = error.status || 500
+    ctx.body = {
+      code: -1,
+      message: error.message || '停止后台调度器失败',
     }
   }
 })

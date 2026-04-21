@@ -12,6 +12,8 @@ import {
 } from '../services/autoSubmitScheduler.js'
 import { createSessionRuntimeContextMiddleware } from '../utils/runtimeContextMiddleware.js'
 import { buildRuntimeInstanceKey } from '../utils/runtimeInstance.js'
+import { readUser, resolveRuntimeContext } from '../utils/studioData.js'
+import { normalizeChannelRuntime } from '../utils/channelRuntime.js'
 
 const router = new Router({
   prefix: '/api/auto-submit',
@@ -250,6 +252,95 @@ router.post('/batch-submit', async ctx => {
     ctx.body = {
       code: -1,
       message: error.message || '批量提交失败',
+    }
+  }
+})
+
+// ─── 管理员控制路由 ───
+
+async function resolveAdminTargetContext(ctx) {
+  const sessionUser = ctx.state.sessionUser
+  const { userId, channelId } = ctx.request.body || {}
+
+  if (!userId || !channelId) {
+    ctx.throw(400, '必须指定 userId 和 channelId')
+  }
+
+  if (sessionUser.userType !== 'admin') {
+    ctx.throw(403, '仅管理员可操作')
+  }
+
+  const targetUser = await readUser(userId)
+  const runtimeContext = await resolveRuntimeContext(targetUser, channelId)
+  if (!runtimeContext.runtimeUser || !runtimeContext.channel) {
+    ctx.throw(400, '目标用户下未找到可用渠道')
+  }
+
+  const channelRuntime = normalizeChannelRuntime({
+    channel: runtimeContext.channel,
+    runtimeUser: runtimeContext.runtimeUser,
+  })
+
+  return {
+    runtimeUser: runtimeContext.runtimeUser,
+    channel: runtimeContext.channel,
+    channelRuntime,
+    requestedChannelId: channelId,
+    availableChannels: runtimeContext.availableChannels,
+  }
+}
+
+router.post('/admin/start', async ctx => {
+  try {
+    const targetContext = await resolveAdminTargetContext(ctx)
+    const instanceKey = buildRuntimeInstanceKey(targetContext)
+    const { intervalMinutes, onlyRedFlag, runOnce, submitRangeDays } = ctx.request.body || {}
+
+    const result = await startScheduler(
+      instanceKey,
+      {
+        intervalMinutes: typeof intervalMinutes === 'number' ? intervalMinutes : 5,
+        onlyRedFlag: onlyRedFlag === true,
+        runOnce: runOnce === true,
+        submitRangeDays: [1, 2, 3].includes(Number(submitRangeDays))
+          ? Number(submitRangeDays)
+          : 3,
+      },
+      targetContext
+    )
+
+    ctx.body = {
+      code: result.success ? 0 : -1,
+      message: result.message,
+      data: getSchedulerStatus(instanceKey),
+    }
+  } catch (error) {
+    console.error('[自动提交API] 管理员启动失败:', error)
+    ctx.status = error.status || 500
+    ctx.body = {
+      code: -1,
+      message: error.message || '启动失败',
+    }
+  }
+})
+
+router.post('/admin/stop', async ctx => {
+  try {
+    const targetContext = await resolveAdminTargetContext(ctx)
+    const instanceKey = buildRuntimeInstanceKey(targetContext)
+    const result = await stopScheduler(instanceKey)
+
+    ctx.body = {
+      code: result.success ? 0 : -1,
+      message: result.message,
+      data: getSchedulerStatus(instanceKey),
+    }
+  } catch (error) {
+    console.error('[自动提交API] 管理员停止失败:', error)
+    ctx.status = error.status || 500
+    ctx.body = {
+      code: -1,
+      message: error.message || '停止失败',
     }
   }
 })

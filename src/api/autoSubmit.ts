@@ -74,3 +74,18 @@ export function triggerAutoSubmit(): Promise<AutoSubmitResponse> {
 export function resetAutoSubmitStats(): Promise<AutoSubmitResponse> {
   return httpInstance.post('/auto-submit/reset-stats', {}).then(res => res.data)
 }
+
+export interface AdminAutoSubmitParams extends StartAutoSubmitParams {
+  userId: string
+  channelId: string
+}
+
+export function adminStartAutoSubmit(params: AdminAutoSubmitParams): Promise<AutoSubmitResponse> {
+  return httpInstance.post('/auto-submit/admin/start', params).then(res => res.data)
+}
+
+export function adminStopAutoSubmit(
+  params: Pick<AdminAutoSubmitParams, 'userId' | 'channelId'>
+): Promise<AutoSubmitResponse> {
+  return httpInstance.post('/auto-submit/admin/stop', params).then(res => res.data)
+}

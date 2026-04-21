@@ -710,3 +710,62 @@ export async function validateAndCreateMicroapp(params: {
 
   return result
 }
+
+export async function adminStartBackgroundScheduler(params: {
+  userId: string
+  channelId: string
+  intervalMinutes: number
+  tableId?: string
+}): Promise<{
+  code: number
+  message: string
+  data: BackgroundSchedulerStatus
+}> {
+  const response = await fetch(`${ENV.BASE_URL}/build-workflow/scheduler/admin/start`, {
+    method: 'POST',
+    headers: buildSessionHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      userId: params.userId,
+      channelId: params.channelId,
+      intervalMinutes: params.intervalMinutes,
+      table_id: params.tableId,
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`管理员启动后台调度器失败: ${response.statusText}`)
+  }
+
+  const result = await response.json()
+  if (result.code !== 0) {
+    throw new Error(result.message || '管理员启动后台调度器失败')
+  }
+
+  return result
+}
+
+export async function adminStopBackgroundScheduler(params: {
+  userId: string
+  channelId: string
+}): Promise<{
+  code: number
+  message: string
+  data: BackgroundSchedulerStatus
+}> {
+  const response = await fetch(`${ENV.BASE_URL}/build-workflow/scheduler/admin/stop`, {
+    method: 'POST',
+    headers: buildSessionHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(params),
+  })
+
+  if (!response.ok) {
+    throw new Error(`管理员停止后台调度器失败: ${response.statusText}`)
+  }
+
+  const result = await response.json()
+  if (result.code !== 0) {
+    throw new Error(result.message || '管理员停止后台调度器失败')
+  }
+
+  return result
+}

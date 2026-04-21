@@ -233,7 +233,19 @@
                         上次运行：{{ task.lastRunTimeText || '暂无' }}
                       </p>
                     </div>
-                    <span class="task-monitor__state">{{ getTaskStateText(task) }}</span>
+                    <div class="task-monitor__controls">
+                      <n-switch
+                        :value="task.enabled"
+                        :loading="isTaskToggling(group.userId, channel.channelId, task.key)"
+                        :disabled="isTaskToggling(group.userId, channel.channelId, task.key)"
+                        size="small"
+                        @update:value="
+                          (val: boolean) =>
+                            handleTaskToggle(group.userId, channel.channelId, task, val)
+                        "
+                      />
+                      <span class="task-monitor__state">{{ getTaskStateText(task) }}</span>
+                    </div>
                   </div>
 
                   <div class="task-monitor__fact-grid">
@@ -285,7 +297,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
-import { NAlert, NButton, NEmpty, NSelect, NSpin } from 'naive-ui'
+import { createDiscreteApi, NAlert, NButton, NEmpty, NSelect, NSpin, NSwitch } from 'naive-ui'
 import {
   getSchedulerOverview,
   type SchedulerOverviewAutoSubmitTask,
@@ -295,6 +307,12 @@ import {
   type SchedulerOverviewResponse,
   type SchedulerOverviewUserGroup,
 } from '@/api/admin'
+import { adminStartAutoSubmit, adminStopAutoSubmit } from '@/api/autoSubmit'
+import {
+  adminStartBackgroundScheduler,
+  adminStopBackgroundScheduler,
+} from '@/api/buildWorkflow'
+import { startMaterialPreview, stopMaterialPreview } from '@/api/materialPreview'
 
 defineOptions({
   name: 'SchedulerOverviewView',
@@ -643,6 +661,81 @@ function toggleAbnormalOnly() {
 function handleUserFilterChange(value: string | null) {
   selectedUserId.value = value ? String(value) : null
   void fetchOverview({ silent: true })
+}
+
+const { message: discreteMessage } = createDiscreteApi(['message'])
+const togglingTasks = ref(new Set<string>())
+
+function buildToggleKey(userId: string, channelId: string, taskKey: string) {
+  return `${userId}__${channelId}__${taskKey}`
+}
+
+function isTaskToggling(userId: string, channelId: string, taskKey: string) {
+  return togglingTasks.value.has(buildToggleKey(userId, channelId, taskKey))
+}
+
+async function handleTaskToggle(
+  userId: string,
+  channelId: string,
+  task: SchedulerOverviewTask,
+  enable: boolean
+) {
+  const key = buildToggleKey(userId, channelId, task.key)
+  if (togglingTasks.value.has(key)) return
+
+  const next = new Set(togglingTasks.value)
+  next.add(key)
+  togglingTasks.value = next
+
+  try {
+    if (task.key === 'autoSubmit') {
+      if (enable) {
+        await adminStartAutoSubmit({
+          userId,
+          channelId,
+          intervalMinutes: task.intervalMinutes || 5,
+          onlyRedFlag: task.onlyRedFlag,
+          runOnce: task.runOnce,
+          submitRangeDays: task.submitRangeDays,
+        })
+      } else {
+        await adminStopAutoSubmit({ userId, channelId })
+      }
+    } else if (task.key === 'buildWorkflow') {
+      if (enable) {
+        await adminStartBackgroundScheduler({
+          userId,
+          channelId,
+          intervalMinutes: task.intervalMinutes || 10,
+          tableId: task.tableId || undefined,
+        })
+      } else {
+        await adminStopBackgroundScheduler({ userId, channelId })
+      }
+    } else if (task.key === 'materialPreview') {
+      if (enable) {
+        await startMaterialPreview({
+          userId,
+          channelId,
+          intervalMinutes: task.intervalMinutes || 20,
+          buildTimeWindowStart: task.buildTimeWindowStart,
+          buildTimeWindowEnd: task.buildTimeWindowEnd,
+        })
+      } else {
+        await stopMaterialPreview({ userId, channelId })
+      }
+    }
+    discreteMessage.success(`${task.title} 已${enable ? '启动' : '停止'}`)
+    await fetchOverview({ silent: true })
+  } catch (error) {
+    discreteMessage.error(
+      `操作失败：${error instanceof Error ? error.message : '未知错误'}`
+    )
+  } finally {
+    const updated = new Set(togglingTasks.value)
+    updated.delete(key)
+    togglingTasks.value = updated
+  }
 }
 
 onMounted(async () => {
@@ -1503,6 +1596,13 @@ onBeforeUnmount(() => {
   margin: 6px 0 0;
   color: rgba(186, 221, 255, 0.6);
   font-size: 12px;
+}
+
+.task-monitor__controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .task-monitor__state {
