@@ -2291,10 +2291,20 @@ async function resolveAdminTargetContext(ctx) {
     ctx.throw(403, '仅管理员可操作')
   }
 
-  const targetUser = await readUser(userId)
+  let targetUser
+  try {
+    targetUser = await readUser(userId)
+  } catch {
+    ctx.throw(404, `用户 ${userId} 不存在`)
+  }
+
   const runtimeContext = await resolveRuntimeContext(targetUser, channelId)
   if (!runtimeContext.runtimeUser || !runtimeContext.channel) {
     ctx.throw(400, '目标用户下未找到可用渠道')
+  }
+
+  if (runtimeContext.channel.id !== channelId) {
+    ctx.throw(400, `用户 ${userId} 没有渠道 ${channelId} 的访问权限`)
   }
 
   const channelRuntime = normalizeChannelRuntime({
