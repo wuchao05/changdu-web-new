@@ -24,6 +24,7 @@ export interface UserChannelBindingConfig {
     allowCustom: boolean
   }
   buildPreference: {
+    allowCustom: boolean
     bid: string
   }
   buildAdvanceConfig: {
@@ -110,6 +111,7 @@ export interface UserProfile {
   douyinAccounts: DouyinAccount[]
   channelConfigs?: Record<string, UserChannelBindingConfig>
   buildPreference?: {
+    allowCustom: boolean
     bid: string
   }
   buildAdvanceConfig?: {

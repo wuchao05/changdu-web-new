@@ -71,9 +71,6 @@
                   }}</strong></span
                 >
               </div>
-              <p class="mt-2 text-xs text-gray-500">
-                默认出价：{{ buildBidConfig.channelDefaultBid || '未配置' }}
-              </p>
             </div>
 
             <div class="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
@@ -90,6 +87,7 @@
                   :value="getBuildBidInputDisplayValue()"
                   :min="0"
                   :step="0.1"
+                  :precision="1"
                   clearable
                   class="w-full"
                   placeholder="未填写时使用默认出价"
@@ -410,6 +408,7 @@ function createDefaultBuildBidConfig(): BuildBidConfig {
     channelId: '',
     channelName: '',
     channelBidEnabled: false,
+    allowCustom: false,
     channelDefaultBid: '',
     userBid: '',
     effectiveBid: '',
@@ -533,7 +532,9 @@ const activeChannelType = computed(() => {
   return sessionStore.currentChannel?.type || 'other'
 })
 
-const showBuildBidCard = computed(() => buildBidConfig.value.channelBidEnabled)
+const showBuildBidCard = computed(
+  () => buildBidConfig.value.channelBidEnabled && buildBidConfig.value.allowCustom
+)
 const currentXtToken = computed(() => String(sessionStore.currentRuntimeUser?.xtToken || '').trim())
 const showXtTokenCard = computed(() =>
   isXingtianChannelType(activeChannelType.value) &&
@@ -653,11 +654,7 @@ async function loadBuildBidConfig() {
 }
 
 function getBuildBidInputDisplayValue() {
-  if (buildBidInput.value !== null) {
-    return buildBidInput.value
-  }
-
-  return parseBuildBidInputValue(buildBidConfig.value.channelDefaultBid)
+  return buildBidInput.value
 }
 
 function handleBuildBidInputChange(value: number | null) {
@@ -678,11 +675,6 @@ async function persistBuildBid(bid: string) {
 
 async function saveBuildBid() {
   const nextBid = formatBuildBidInputValue(buildBidInput.value)
-  if (!buildBidConfig.value.userBid && nextBid === buildBidConfig.value.channelDefaultBid) {
-    await persistBuildBid('')
-    return
-  }
-
   await persistBuildBid(nextBid)
 }
 

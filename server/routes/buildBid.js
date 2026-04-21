@@ -35,6 +35,7 @@ async function getCurrentUserContext(ctx) {
 
 function buildResponse(channel, channelConfig) {
   const buildConfig = normalizeBuildConfig(channel?.juliang?.buildConfig || DEFAULT_BUILD_CONFIG)
+  const allowCustom = Boolean(channelConfig?.buildPreference?.allowCustom)
   const channelDefaultBid = normalizeBuildBidValue(buildConfig.defaultBid)
   const userBid = normalizeBuildBidValue(channelConfig?.buildPreference?.bid)
   const effectiveBid = buildConfig.enableCustomBid ? userBid || channelDefaultBid : ''
@@ -43,6 +44,7 @@ function buildResponse(channel, channelConfig) {
     channelId: String(channel?.id || '').trim(),
     channelName: String(channel?.name || '').trim(),
     channelBidEnabled: Boolean(buildConfig.enableCustomBid),
+    allowCustom,
     channelDefaultBid,
     userBid,
     effectiveBid,
@@ -77,6 +79,7 @@ router.put('/config', async ctx => {
   try {
     const { user, channel, channelConfig } = await getCurrentUserContext(ctx)
     const buildConfig = normalizeBuildConfig(channel?.juliang?.buildConfig || DEFAULT_BUILD_CONFIG)
+    const allowCustom = Boolean(channelConfig?.buildPreference?.allowCustom)
     const bid = normalizeBuildBidValue(ctx.request.body?.bid)
 
     if (bid && !buildConfig.enableCustomBid) {
@@ -84,6 +87,15 @@ router.put('/config', async ctx => {
       ctx.body = {
         code: -1,
         message: '当前渠道未开启自定义出价',
+      }
+      return
+    }
+
+    if (!allowCustom) {
+      ctx.status = 400
+      ctx.body = {
+        code: -1,
+        message: '当前渠道未开放个人搭建出价配置',
       }
       return
     }

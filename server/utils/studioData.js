@@ -106,6 +106,7 @@ function defaultUserChannelConfig() {
       allowCustom: false,
     },
     buildPreference: {
+      allowCustom: false,
       bid: '',
     },
     buildAdvanceConfig: {
@@ -460,6 +461,7 @@ function normalizeUserChannelConfig(config = {}, douyinAccounts = []) {
       allowCustom: Boolean(config.xtTokenConfig?.allowCustom),
     },
     buildPreference: {
+      allowCustom: Boolean(config.buildPreference?.allowCustom),
       bid: String(config.buildPreference?.bid || '').trim(),
     },
     buildAdvanceConfig: normalizeUserBuildAdvanceConfig(config.buildAdvanceConfig),

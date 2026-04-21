@@ -4,6 +4,7 @@ export interface BuildBidConfig {
   channelId: string
   channelName: string
   channelBidEnabled: boolean
+  allowCustom: boolean
   channelDefaultBid: string
   userBid: string
   effectiveBid: string

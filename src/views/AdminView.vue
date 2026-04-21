@@ -355,15 +355,11 @@
             <div class="min-w-0 flex-1">
               <div class="user-drawer-hero__head">
                 <div class="min-w-0">
-                  <p class="drawer-hero__eyebrow">用户配置</p>
                   <h2 class="drawer-hero__title">
                     {{ editingUserId ? '编辑用户' : '新增用户' }}
                   </h2>
                 </div>
                 <div class="drawer-hero__meta user-drawer-hero__meta">
-                  <span class="drawer-hero__pill user-drawer-hero__pill">
-                    {{ userForm.nickname || userForm.account || '未命名用户' }}
-                  </span>
                   <span class="drawer-hero__pill user-drawer-hero__pill">
                     {{ selectedUserChannelForms.length }} 个渠道配置
                   </span>
@@ -540,21 +536,20 @@
                         <div>
                           <p class="text-sm font-semibold text-amber-600">搭建出价（稳定成本）</p>
                         </div>
-                        <span class="channel-config-card__pill channel-config-card__pill--warning">
-                          渠道默认 {{ item.channel.juliang.buildConfig.defaultBid || '未配置' }}
-                        </span>
+                        <div class="toggle-hero">
+                          <div>
+                            <p class="toggle-hero__title">允许用户自定义</p>
+                          </div>
+                          <n-switch v-model:value="item.config.buildPreference.allowCustom" />
+                        </div>
                       </div>
                       <n-form label-placement="top" class="grid grid-cols-1 gap-3 md:grid-cols-2">
                         <n-form-item label="出价">
                           <n-input-number
-                            :value="
-                              getUserBuildBidInputValue(
-                                item.config.buildPreference.bid,
-                                item.channel.juliang.buildConfig.defaultBid
-                              )
-                            "
+                            :value="getUserBuildBidInputValue(item.config.buildPreference.bid)"
                             :min="0"
                             :step="0.1"
+                            :precision="1"
                             clearable
                             class="w-full"
                             placeholder="未填写时使用默认出价"
@@ -1300,6 +1295,7 @@
                       :value="getBuildBidInputValue(channelForm.juliang.buildConfig.defaultBid)"
                       :min="0"
                       :step="0.1"
+                      :precision="1"
                       clearable
                       class="w-full"
                       placeholder="请输入默认出价"
@@ -2151,15 +2147,9 @@ function handleChannelDefaultBidChange(value: number | null) {
 }
 
 function getUserBuildBidInputValue(
-  userBid: string | null | undefined,
-  defaultBid: string | null | undefined
+  userBid: string | null | undefined
 ) {
-  const userBidValue = parseBuildBidInputValue(userBid)
-  if (userBidValue !== null) {
-    return userBidValue
-  }
-
-  return parseBuildBidInputValue(defaultBid)
+  return parseBuildBidInputValue(userBid)
 }
 
 function handleUserBuildBidChange(config: adminApi.UserChannelBindingConfig, value: number | null) {
@@ -2457,6 +2447,7 @@ function createDefaultUserChannelConfig(): adminApi.UserChannelBindingConfig {
       allowCustom: false,
     },
     buildPreference: {
+      allowCustom: false,
       bid: '',
     },
     buildAdvanceConfig: {
@@ -2544,6 +2535,7 @@ function normalizeUserChannelConfig(
       allowCustom: Boolean(config?.xtTokenConfig?.allowCustom),
     },
     buildPreference: {
+      allowCustom: Boolean(config?.buildPreference?.allowCustom),
       bid: String(config?.buildPreference?.bid || '').trim(),
     },
     buildAdvanceConfig: {
