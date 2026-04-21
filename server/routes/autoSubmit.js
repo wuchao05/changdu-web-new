@@ -30,6 +30,7 @@ router.post('/start', async ctx => {
   try {
     const { intervalMinutes, onlyRedFlag, runOnce, submitRangeDays } = ctx.request.body || {}
     const instanceKey = buildRuntimeInstanceKey(ctx.state.autoSubmitContext)
+    console.log('[自动提交API] 用户启动，instanceKey:', instanceKey)
 
     if (typeof runOnce !== 'undefined' && typeof runOnce !== 'boolean') {
       ctx.status = 400
@@ -106,6 +107,7 @@ router.post('/start', async ctx => {
 router.post('/stop', async ctx => {
   try {
     const instanceKey = buildRuntimeInstanceKey(ctx.state.autoSubmitContext)
+    console.log('[自动提交API] 用户停止，instanceKey:', instanceKey)
     const result = await stopScheduler(instanceKey)
 
     ctx.body = {
@@ -294,6 +296,7 @@ router.post('/admin/start', async ctx => {
   try {
     const targetContext = await resolveAdminTargetContext(ctx)
     const instanceKey = buildRuntimeInstanceKey(targetContext)
+    console.log('[自动提交API] 管理员启动，目标 instanceKey:', instanceKey)
     const { intervalMinutes, onlyRedFlag, runOnce, submitRangeDays } = ctx.request.body || {}
 
     const result = await startScheduler(
@@ -328,6 +331,7 @@ router.post('/admin/stop', async ctx => {
   try {
     const targetContext = await resolveAdminTargetContext(ctx)
     const instanceKey = buildRuntimeInstanceKey(targetContext)
+    console.log('[自动提交API] 管理员停止，目标 instanceKey:', instanceKey)
     const result = await stopScheduler(instanceKey)
 
     ctx.body = {

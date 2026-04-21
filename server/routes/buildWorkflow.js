@@ -2155,6 +2155,7 @@ function sleep(ms) {
 router.post('/scheduler/start', async ctx => {
   try {
     const { intervalMinutes, table_id } = ctx.request.body
+    console.log('[搭建调度器API] 用户启动，instanceKey:', buildRuntimeInstanceKey(ctx.state.buildWorkflowContext))
 
     if (!intervalMinutes || typeof intervalMinutes !== 'number' || intervalMinutes < 1) {
       ctx.status = 400
@@ -2197,6 +2198,7 @@ router.post('/scheduler/start', async ctx => {
  */
 router.post('/scheduler/stop', async ctx => {
   try {
+    console.log('[搭建调度器API] 用户停止，instanceKey:', buildRuntimeInstanceKey(ctx.state.buildWorkflowContext))
     const status = await stopScheduler(ctx.state.buildWorkflowContext)
 
     ctx.body = {
@@ -2312,6 +2314,8 @@ async function resolveAdminTargetContext(ctx) {
 router.post('/scheduler/admin/start', async ctx => {
   try {
     const targetContext = await resolveAdminTargetContext(ctx)
+    const resolvedKey = buildRuntimeInstanceKey(targetContext)
+    console.log('[搭建调度器API] 管理员启动，目标 instanceKey:', resolvedKey)
     const { intervalMinutes, table_id } = ctx.request.body || {}
 
     if (!intervalMinutes || typeof intervalMinutes !== 'number' || intervalMinutes < 1) {
@@ -2343,6 +2347,8 @@ router.post('/scheduler/admin/start', async ctx => {
 router.post('/scheduler/admin/stop', async ctx => {
   try {
     const targetContext = await resolveAdminTargetContext(ctx)
+    const resolvedKey = buildRuntimeInstanceKey(targetContext)
+    console.log('[搭建调度器API] 管理员停止，目标 instanceKey:', resolvedKey)
     const status = await stopScheduler(targetContext)
 
     ctx.body = {

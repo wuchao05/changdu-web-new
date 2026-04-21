@@ -154,6 +154,7 @@ function buildPreviewTaskConfig(targetContext, body = {}) {
 router.post('/start', async ctx => {
   try {
     const targetContext = await resolveTargetContext(ctx)
+    console.log('[素材预览API] 启动，instanceKey:', targetContext.instanceKey, '用户:', targetContext.user?.id, '渠道:', targetContext.channel?.id)
     assertMaterialPreviewCustomizable(targetContext)
     const config = normalizePreviewConfig(targetContext.channelConfig, ctx.request.body || {})
     await persistMaterialPreviewConfig(targetContext.user, targetContext.channel.id, {
@@ -186,6 +187,7 @@ router.post('/start', async ctx => {
 router.post('/stop', async ctx => {
   try {
     const targetContext = await resolveTargetContext(ctx)
+    console.log('[素材预览API] 停止，instanceKey:', targetContext.instanceKey, '用户:', targetContext.user?.id, '渠道:', targetContext.channel?.id)
     assertMaterialPreviewCustomizable(targetContext)
     await persistMaterialPreviewConfig(targetContext.user, targetContext.channel.id, {
       enabled: false,
