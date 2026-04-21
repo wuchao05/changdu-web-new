@@ -40,7 +40,7 @@ export const BUILD_WORKFLOW_CONFIG = {
     project: {
       budget: 300,
       inventory_catalog: 5, // 穿山甲
-      smart_bid_type: 7, // 自定义出价
+      smart_bid_type: 7, // 竞价策略：最大转化（不传bid；0=稳定成本，需传bid）
       flow_control_mode: 0,
       budget_mode: 0, // 0 表示日预算
       product_platform_id: '1969743078737707', // 待后续修改

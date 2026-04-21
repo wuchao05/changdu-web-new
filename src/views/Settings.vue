@@ -52,8 +52,8 @@
             <div class="flex items-center space-x-3">
               <Icon icon="mdi:cash-multiple" class="w-5 h-5 text-gray-600" />
               <div>
-                <h3 class="text-lg font-semibold text-gray-900">搭建出价</h3>
-                <p class="text-sm text-gray-500">按当前渠道设置搭建出价，未填写时自动使用默认值</p>
+                <h3 class="text-lg font-semibold text-gray-900">搭建出价（稳定成本）</h3>
+                <p class="text-sm text-gray-500">当前渠道竞价策略为稳定成本，按渠道设置出价，未填写时自动使用默认值</p>
               </div>
             </div>
           </template>

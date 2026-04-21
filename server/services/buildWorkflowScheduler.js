@@ -1094,13 +1094,14 @@ async function createProject(params) {
     last_frame: [],
     effective_frame: [],
     track_url_send_type: '2',
+    // 竞价策略：稳定成本(0)需传bid，最大转化(7)不传bid
     ...(bidConfig.enabled
       ? {
-          smart_bid_type: 0,
+          smart_bid_type: 0, // 稳定成本
           bid: bidConfig.bid,
         }
       : {
-          smart_bid_type: projectConfig.smart_bid_type,
+          smart_bid_type: projectConfig.smart_bid_type, // 最大转化
         }),
     is_search_speed_phase_four: false,
     budget: projectConfig.budget,

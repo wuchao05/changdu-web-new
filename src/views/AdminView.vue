@@ -535,7 +535,7 @@
                     >
                       <div class="config-subpanel__head config-subpanel__head--split">
                         <div>
-                          <p class="text-sm font-semibold text-amber-600">搭建出价</p>
+                          <p class="text-sm font-semibold text-amber-600">搭建出价（稳定成本）</p>
                         </div>
                         <span class="channel-config-card__pill channel-config-card__pill--warning">
                           渠道默认 {{ item.channel.juliang.buildConfig.defaultBid || '未配置' }}
@@ -1270,12 +1270,12 @@
                       v-model:value="channelForm.juliang.buildConfig.recycleAccountsWhenExhausted"
                     />
                   </n-form-item>
-                  <n-form-item label="自定义出价">
-                    <n-switch v-model:value="channelForm.juliang.buildConfig.enableCustomBid" />
+                  <n-form-item :label="`竞价策略：${channelForm.juliang.buildConfig.enableCustomBid ? '稳定成本' : '最大转化'}`">
+                    <n-switch v-model:value="channelForm.juliang.buildConfig.enableCustomBid" @update:value="handleEnableCustomBidChange" />
                   </n-form-item>
                   <n-form-item
                     v-if="channelForm.juliang.buildConfig.enableCustomBid"
-                    label="默认出价"
+                    label="默认出价（稳定成本）"
                   >
                     <n-input-number
                       :value="getBuildBidInputValue(channelForm.juliang.buildConfig.defaultBid)"
@@ -2076,6 +2076,12 @@ function getBuildBidInputValue(value: string | null | undefined) {
   return parseBuildBidInputValue(value)
 }
 
+function handleEnableCustomBidChange(enabled: boolean) {
+  if (enabled && !channelForm.juliang.buildConfig.defaultBid) {
+    channelForm.juliang.buildConfig.defaultBid = '1'
+  }
+}
+
 function handleChannelDefaultBidChange(value: number | null) {
   channelForm.juliang.buildConfig.defaultBid = formatBuildBidInputValue(value)
 }
@@ -2619,8 +2625,8 @@ function createDefaultChannelForm(): ChannelFormModel {
         useNewMicroAppAssetFlow: false,
         clearExistingProjectsBeforeBuild: false,
         recycleAccountsWhenExhausted: false,
-        enableCustomBid: false,
-        defaultBid: '',
+        enableCustomBid: true,
+        defaultBid: '1',
         advertiserName: '',
         ebpid: '',
         microAppName: '',

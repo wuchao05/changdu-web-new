@@ -11,10 +11,22 @@
           "productId": "1764165838361148283",
           "productPlatformId": "1969743078737707",
           "landingUrl": "https://www.chengzijianzhan.com/tetris/page/7552876685726089254/",
+          "useNewMicroAppAssetFlow": false,
+          "clearExistingProjectsBeforeBuild": false,
+          "recycleAccountsWhenExhausted": false,
+          "enableCustomBid": false,
+          "defaultBid": "",
+          "advertiserName": "",
+          "ebpid": "",
           "microAppName": "每日剧场",
           "microAppId": "tt9c36ea8b0305b6c401",
+          "microAppInstanceId": "",
           "ccId": "1849832732821859",
-          "rechargeTemplateId": "1126190"
+          "rechargeTemplateId": "1126190",
+          "adCallbackConfigId": "",
+          "forbiddenAdvanceStartHour": "0",
+          "forbiddenAdvanceEndHour": "0",
+          "advanceBuildHours": "0"
         }
       },
       "changdu": {
@@ -42,10 +54,22 @@
           "productId": "1772337158212170202",
           "productPlatformId": "1249425120839434",
           "landingUrl": "https://www.chengzijianzhan.com/tetris/page/7594336418756476938",
+          "useNewMicroAppAssetFlow": false,
+          "clearExistingProjectsBeforeBuild": false,
+          "recycleAccountsWhenExhausted": false,
+          "enableCustomBid": true,
+          "defaultBid": "1",
+          "advertiserName": "",
+          "ebpid": "",
           "microAppName": "甜荔剧场",
           "microAppId": "tt366340dea95001ea01",
+          "microAppInstanceId": "",
           "ccId": "1836040363127815",
-          "rechargeTemplateId": "1242710"
+          "rechargeTemplateId": "1242710",
+          "adCallbackConfigId": "",
+          "forbiddenAdvanceStartHour": "0",
+          "forbiddenAdvanceEndHour": "0",
+          "advanceBuildHours": "0"
         }
       },
       "changdu": {
@@ -60,8 +84,8 @@
         "cookie": ""
       },
       "createdAt": "2026-03-27T11:02:58.858Z",
-      "updatedAt": "2026-03-27T11:02:58.858Z"
+      "updatedAt": "2026-04-21T07:49:47.275Z"
     }
   ],
-  "updatedAt": "2026-03-27T11:02:58.858Z"
+  "updatedAt": "2026-04-21T07:49:47.275Z"
 }
