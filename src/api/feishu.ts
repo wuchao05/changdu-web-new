@@ -1090,7 +1090,8 @@ class FeishuApiService {
     tableId?: string,
     date?: string,
     signal?: AbortSignal,
-    includeBookId: boolean = false
+    includeBookId: boolean = false,
+    includePushMaterialId: boolean = false
   ): Promise<FeishuSearchRecordResponse> {
     const resolvedTableId = tableId || this.getDramaStatusTableId()
     const conditions: Array<{ field_name: string; operator: string; value: string[] }> = [
@@ -1116,19 +1117,12 @@ class FeishuApiService {
     }
 
     const fieldNames = includeBookId
-      ? [
-          '剧名',
-          '短剧ID',
-          '账户',
-          '日期',
-          '当前状态',
-          '上架时间',
-          '评级',
-          '抖音素材',
-          '推送素材ID',
-          '备注',
-        ]
-      : ['剧名', '账户', '日期', '当前状态', '上架时间', '评级', '抖音素材', '推送素材ID', '备注']
+      ? ['剧名', '短剧ID', '账户', '日期', '当前状态', '上架时间', '评级', '抖音素材', '备注']
+      : ['剧名', '账户', '日期', '当前状态', '上架时间', '评级', '抖音素材', '备注']
+
+    if (includePushMaterialId) {
+      fieldNames.splice(fieldNames.length - 1, 0, '推送素材ID')
+    }
 
     const response = await fetch(`${ENV.BASE_URL}/feishu/bitable/drama-status/pending-build`, {
       method: 'POST',

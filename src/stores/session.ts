@@ -18,8 +18,8 @@ interface SessionRequestError extends Error {
 export const useSessionStore = defineStore('session', () => {
   const currentUser = ref<adminApi.UserProfile | null>(null)
   const currentRuntimeUser = ref<adminApi.UserProfile | null>(null)
-  const currentChannel = ref<{ id: string; name: string } | null>(null)
-  const availableChannels = ref<Array<{ id: string; name: string }>>([])
+  const currentChannel = ref<adminApi.ChannelSummary | null>(null)
+  const availableChannels = ref<adminApi.ChannelSummary[]>([])
   const currentChannelUsers = ref<adminApi.UserProfile[]>([])
   const selectedChannelId = ref('')
   const initialized = ref(false)

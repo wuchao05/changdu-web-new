@@ -93,6 +93,9 @@
                           <span class="channel-sort-card__name">{{
                             channel.name || '未命名渠道'
                           }}</span>
+                          <n-tag size="small" :bordered="false" round type="info">
+                            {{ getChannelTypeLabel(channel.type) }}
+                          </n-tag>
                         </div>
                         <div class="channel-sort-card__meta">
                           <n-tag size="small" :bordered="false" round type="info">
@@ -498,7 +501,7 @@
                     </div>
                     <div class="channel-config-card__meta channel-config-card__meta--left">
                       <span class="channel-config-card__pill channel-config-card__pill--neutral">
-                        已开放 {{ countUserCustomizableSections(item.config) }} 项用户自定义
+                        已开放 {{ countUserCustomizableSections(item.channel, item.config) }} 项用户自定义
                       </span>
                       <span class="channel-config-card__pill channel-config-card__pill--info">
                         {{ countConfiguredMaterialMatches(item.config.douyinMaterialMatches) }}
@@ -597,7 +600,7 @@
                       </div>
                     </div>
 
-                    <div class="config-subpanel">
+                    <div v-if="isXingtianChannel(item.channel)" class="config-subpanel">
                       <div class="config-subpanel__head config-subpanel__head--split">
                         <div>
                           <p class="text-sm font-semibold text-fuchsia-600">形天上传</p>
@@ -769,7 +772,7 @@
                           </div>
                           <div class="permission-grid">
                             <div
-                              v-for="permission in desktopPermissionOptions"
+                              v-for="permission in getDesktopPermissionOptions(item.channel)"
                               :key="permission.key"
                               class="permission-card"
                               :class="{
@@ -1103,6 +1106,10 @@
                   {{ channelForm.name || '未命名渠道' }}
                 </span>
                 <span class="drawer-hero__pill">
+                  <Icon icon="mdi:shape-outline" class="h-4 w-4" />
+                  {{ getChannelTypeLabel(channelForm.type) }}
+                </span>
+                <span class="drawer-hero__pill">
                   <Icon icon="mdi:rocket-launch-outline" class="h-4 w-4" />
                   {{ channelForm.juliang.buildConfig.microAppName || '待配置投放参数' }}
                 </span>
@@ -1124,9 +1131,21 @@
                   <!-- <p class="panel-head__desc">用于管理员后台展示、用户关联和运行时配置映射。</p> -->
                 </div>
               </div>
-              <n-form :model="channelForm" label-placement="top">
+              <n-form
+                :model="channelForm"
+                label-placement="top"
+                class="grid grid-cols-1 gap-3 md:grid-cols-2"
+              >
                 <n-form-item label="渠道名称" class="mb-0">
                   <n-input v-model:value="channelForm.name" placeholder="请输入渠道名称" />
+                </n-form-item>
+                <n-form-item label="渠道类型" class="mb-0">
+                  <n-select
+                    :value="channelForm.type"
+                    :options="channelTypeOptions"
+                    placeholder="请选择渠道类型"
+                    @update:value="handleChannelTypeChange"
+                  />
                 </n-form-item>
               </n-form>
 
@@ -1619,6 +1638,13 @@ import {
   normalizeBuildBidValue,
   parseBuildBidInputValue,
 } from '@/utils/buildBid'
+import {
+  CHANNEL_TYPE_OPTIONS,
+  getChannelTypeLabel,
+  isXingtianChannelType,
+  normalizeChannelType,
+  type ChannelType,
+} from '@/utils/channelType'
 
 const router = useRouter()
 const message = useMessage()
@@ -1682,6 +1708,7 @@ interface UserFormModel {
 
 interface ChannelFormModel {
   name: string
+  type: ChannelType
   juliang: adminApi.ChannelConfig['juliang']
   changdu: adminApi.ChannelConfig['changdu']
   adx: NonNullable<adminApi.ChannelConfig['adx']>
@@ -1714,6 +1741,7 @@ const userTypeOptions = [
   { label: '管理员', value: 'admin' },
   { label: '普通用户', value: 'normal' },
 ]
+const channelTypeOptions = CHANNEL_TYPE_OPTIONS
 const advanceHourOptions = Array.from({ length: 24 }, (_, hour) => ({
   label: `${String(hour).padStart(2, '0')}:00`,
   value: String(hour),
@@ -1935,7 +1963,24 @@ const userColumns: DataTableColumns<adminApi.UserProfile> = [
 ]
 
 const channelColumns: DataTableColumns<adminApi.ChannelConfig> = [
-  { title: '渠道名称', key: 'name' },
+  {
+    title: '渠道名称',
+    key: 'name',
+    render: row =>
+      h('div', { class: 'flex items-center gap-2' }, [
+        h('span', row.name || '-'),
+        h(
+          NTag,
+          {
+            size: 'small',
+            type: 'info',
+            bordered: false,
+            round: true,
+          },
+          () => getChannelTypeLabel(row.type)
+        ),
+      ]),
+  },
   {
     title: '小程序名称',
     key: 'juliang.buildConfig.microAppName',
@@ -2074,6 +2119,25 @@ function handleAdvanceHourChange(field: BuildAdvanceHourField, value: string | n
 
 function getBuildBidInputValue(value: string | null | undefined) {
   return parseBuildBidInputValue(value)
+}
+
+function isXingtianChannel(channel?: Pick<adminApi.ChannelConfig, 'type'> | null) {
+  return isXingtianChannelType(channel?.type)
+}
+
+function getDesktopPermissionOptions(channel?: Pick<adminApi.ChannelConfig, 'type'> | null) {
+  return desktopPermissionOptions.filter(permission =>
+    permission.key === 'upload' ? isXingtianChannel(channel) : true
+  )
+}
+
+function handleChannelTypeChange(value: string | null) {
+  const nextType = normalizeChannelType(value)
+  channelForm.type = nextType
+  channelForm.juliang.buildConfig.enableCustomBid = nextType === 'xingtian'
+  if (nextType === 'xingtian' && !channelForm.juliang.buildConfig.defaultBid) {
+    channelForm.juliang.buildConfig.defaultBid = '1'
+  }
 }
 
 function handleEnableCustomBidChange(enabled: boolean) {
@@ -2614,6 +2678,7 @@ function cloneUserChannelConfig(
 function createDefaultChannelForm(): ChannelFormModel {
   return {
     name: '',
+    type: 'other',
     juliang: {
       cookie: '',
       buildConfig: {
@@ -2625,8 +2690,8 @@ function createDefaultChannelForm(): ChannelFormModel {
         useNewMicroAppAssetFlow: false,
         clearExistingProjectsBeforeBuild: false,
         recycleAccountsWhenExhausted: false,
-        enableCustomBid: true,
-        defaultBid: '1',
+        enableCustomBid: false,
+        defaultBid: '',
         advertiserName: '',
         ebpid: '',
         microAppName: '',
@@ -2745,10 +2810,13 @@ function syncUserChannelMaterialBatchTotal(channelId: string) {
   materialMatchBatchTotals[channelId] = currentTotal
 }
 
-function countUserCustomizableSections(config: adminApi.UserChannelBindingConfig) {
+function countUserCustomizableSections(
+  channel: adminApi.ChannelConfig,
+  config: adminApi.UserChannelBindingConfig
+) {
   return [
     config.buildAdvanceConfig.allowCustom,
-    config.xtTokenConfig.allowCustom,
+    isXingtianChannel(channel) ? config.xtTokenConfig.allowCustom : false,
     config.materialPreview.allowCustom,
     config.douyinMaterialConfig.allowCustom,
   ].filter(Boolean).length
@@ -3365,6 +3433,7 @@ async function saveUser() {
 async function saveChannel() {
   savingChannel.value = true
   try {
+    channelForm.type = normalizeChannelType(channelForm.type)
     if (channelForm.juliang.buildConfig.enableCustomBid) {
       const defaultBid = normalizeBuildBidValue(channelForm.juliang.buildConfig.defaultBid)
       if (!defaultBid) {

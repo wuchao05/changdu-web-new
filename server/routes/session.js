@@ -20,6 +20,7 @@ import {
 import { DEFAULT_BUILD_CONFIG, normalizeBuildConfig } from '../config/buildConfig.js'
 import { buildServiceLogPrefix } from '../utils/serviceLogger.js'
 import { applyUserBuildAdvanceToBuildConfig } from '../utils/buildAdvanceConfig.js'
+import { isXingtianChannelType, normalizeChannelType } from '../utils/channelType.js'
 
 const router = new Router({
   prefix: '/api/session',
@@ -61,12 +62,14 @@ router.post('/login', async ctx => {
     ctx.body = {
       code: 0,
       message: '登录成功',
-      data: {
-        token,
-        user: sanitizeUser(user),
-        channel: channel ? { id: channel.id, name: channel.name } : null,
-      },
-    }
+        data: {
+          token,
+          user: sanitizeUser(user),
+          channel: channel
+            ? { id: channel.id, name: channel.name, type: normalizeChannelType(channel.type) }
+            : null,
+        },
+      }
   } catch (error) {
     ctx.status = 500
     ctx.body = {
@@ -144,6 +147,15 @@ router.post('/xt-token', requireSession, async ctx => {
     return
   }
 
+  if (!isXingtianChannelType(channel?.type)) {
+    ctx.status = 400
+    ctx.body = {
+      code: 400,
+      message: '当前渠道不是形天类型，无需配置 XT Token',
+    }
+    return
+  }
+
   const currentUser = await readUser(sessionUser.id)
   const channelConfig = ensureUserChannelConfig(currentUser, channel.id)
 
@@ -177,14 +189,15 @@ router.post('/xt-token', requireSession, async ctx => {
   ctx.body = {
     code: 0,
     message: 'XT Token 保存成功',
-    data: {
-      user: sanitizeUser(updatedUser),
-      runtimeUser: sanitizeUser(runtimeUser),
-      channel: {
-        id: channel.id,
-        name: channel.name,
+      data: {
+        user: sanitizeUser(updatedUser),
+        runtimeUser: sanitizeUser(runtimeUser),
+        channel: {
+          id: channel.id,
+          name: channel.name,
+          type: normalizeChannelType(channel.type),
+        },
       },
-    },
   }
 })
 
@@ -218,9 +231,15 @@ router.get('/me', async ctx => {
       data: {
         user: sanitizeUser(user),
         runtimeUser: runtimeUser ? sanitizeUser(runtimeUser) : null,
-        channel: channel ? { id: channel.id, name: channel.name } : null,
+        channel: channel
+          ? { id: channel.id, name: channel.name, type: normalizeChannelType(channel.type) }
+          : null,
         availableChannels: Array.isArray(availableChannels)
-          ? availableChannels.map(item => ({ id: item.id, name: item.name }))
+          ? availableChannels.map(item => ({
+              id: item.id,
+              name: item.name,
+              type: normalizeChannelType(item.type),
+            }))
           : [],
         channelBoundUsers,
         platforms: {

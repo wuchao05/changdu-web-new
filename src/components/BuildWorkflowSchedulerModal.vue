@@ -29,6 +29,7 @@ import {
 } from '@/api/buildAdvance'
 import * as buildWorkflowApi from '@/api/buildWorkflow'
 import * as materialPreviewApi from '@/api/materialPreview'
+import { useSessionStore } from '@/stores/session'
 import { filterMaterials, sortMaterialsBySequence, type Material } from '@/utils/materialFilter'
 import {
   parsePromotionUrl,
@@ -45,6 +46,7 @@ import {
   selectHighestPriorityDrama,
 } from '@/shared/buildWorkflowRules'
 import { generateMicroAppLink, extractAppIdFromParams } from '@/utils/microAppLink'
+import { isXingtianChannelType } from '@/utils/channelType'
 import BuildProgressTable, { type BuildDramaRecord } from './BuildProgressTable.vue'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
@@ -55,6 +57,7 @@ dayjs.extend(utc)
 dayjs.extend(timezone)
 
 const message = useMessage()
+const sessionStore = useSessionStore()
 const BUILD_RETRY_BASE_DELAY_MS = 2000
 const BUILD_RETRY_MAX_DELAY_MS = 10000
 
@@ -225,6 +228,18 @@ const savingMaterialPreviewConfig = ref(false)
 const dramaMaterialStatusMap = ref<Record<string, buildWorkflowApi.DramaMaterialLibraryStatus>>({})
 const materialPreviewPollingTimer = ref<ReturnType<typeof setInterval> | null>(null)
 const savingBuildAdvance = ref(false)
+const activeChannelType = computed(() => {
+  const activeChannelId = String(sessionStore.activeChannelId || '').trim()
+  if (activeChannelId) {
+    const matchedChannel = sessionStore.availableChannels.find(channel => channel.id === activeChannelId)
+    if (matchedChannel) {
+      return matchedChannel.type
+    }
+  }
+
+  return sessionStore.currentChannel?.type || 'other'
+})
+const isXingtianChannel = computed(() => isXingtianChannelType(activeChannelType.value))
 
 function createDefaultBuildAdvanceConfig(): BuildAdvanceConfigResponse {
   return {
@@ -361,6 +376,9 @@ function getDramaMaterialStatus(
 }
 
 function isDramaMaterialReady(drama: FeishuDramaRecord) {
+  if (!isXingtianChannel.value) {
+    return true
+  }
   return getDramaMaterialStatus(drama).ready
 }
 
@@ -385,6 +403,11 @@ function getDramaDisabledButtonText(drama: FeishuDramaRecord) {
 }
 
 async function refreshDramaMaterialStatuses(targetDramas: FeishuDramaRecord[]) {
+  if (!isXingtianChannel.value) {
+    dramaMaterialStatusMap.value = {}
+    return
+  }
+
   if (targetDramas.length === 0) {
     dramaMaterialStatusMap.value = {}
     return
@@ -495,151 +518,161 @@ async function waitForConfiguredMicroAppAsset(
 }
 
 // 剧集列表表格列定义
-const dramasColumns: DataTableColumns<FeishuDramaRecord> = [
-  {
-    type: 'selection',
-    disabled: row => !canBuildDrama(row),
-  },
-  {
-    title: '剧名',
-    key: 'dramaName',
-    width: 180,
-    ellipsis: {
-      tooltip: true,
+const dramasColumns = computed<DataTableColumns<FeishuDramaRecord>>(() => {
+  const columns: DataTableColumns<FeishuDramaRecord> = [
+    {
+      type: 'selection',
+      disabled: row => !canBuildDrama(row),
     },
-    render: row => row.fields['剧名']?.[0]?.text || '-',
-  },
-  {
-    title: '账户',
-    key: 'accountId',
-    width: 140,
-    render: row => row.fields['账户']?.[0]?.text || '-',
-  },
-  {
-    title: '日期',
-    key: 'date',
-    width: 110,
-    render: row => {
-      const timestamp = row.fields['日期']
-      if (!timestamp) return '-'
-      return dayjs(timestamp).format('YYYY-MM-DD')
+    {
+      title: '剧名',
+      key: 'dramaName',
+      width: 180,
+      ellipsis: {
+        tooltip: true,
+      },
+      render: row => row.fields['剧名']?.[0]?.text || '-',
     },
-  },
-  {
-    title: '上架时间',
-    key: 'publishTime',
-    width: 150,
-    render: row => {
-      const publishTime = getDramaPublishTime(row)
-      if (!publishTime) return '-'
-      return publishTime.format('YYYY-MM-DD HH:mm')
+    {
+      title: '账户',
+      key: 'accountId',
+      width: 140,
+      render: row => row.fields['账户']?.[0]?.text || '-',
     },
-  },
-  {
-    title: '最早可搭建时间',
-    key: 'earliestBuildTime',
-    width: 160,
-    render: row => {
-      const earliestBuildTime = getCurrentEarliestBuildTime(row)
-      if (!earliestBuildTime) return '-'
-      return earliestBuildTime.format('YYYY-MM-DD HH:mm')
+    {
+      title: '日期',
+      key: 'date',
+      width: 110,
+      render: row => {
+        const timestamp = row.fields['日期']
+        if (!timestamp) return '-'
+        return dayjs(timestamp).format('YYYY-MM-DD')
+      },
     },
-  },
-  {
-    title: '素材状态',
-    key: 'materialLibraryStatus',
-    width: 140,
-    render: row => {
-      const materialStatus = getDramaMaterialStatus(row)
-      const type = materialStatus.ready
-        ? 'success'
-        : materialStatus.reason === 'query_failed'
-          ? 'error'
-          : 'warning'
-      const label = materialStatus.ready
-        ? '已入库'
-        : materialStatus.reason === 'missing_material_id'
-          ? '缺少素材ID'
-          : materialStatus.reason === 'missing_xt_token'
-            ? '缺少XT Token'
-            : materialStatus.reason === 'expired_xt_token'
-              ? 'XT Token失效'
-              : materialStatus.status !== null
-                ? `待入库(${materialStatus.status})`
-                : '待入库'
+    {
+      title: '上架时间',
+      key: 'publishTime',
+      width: 150,
+      render: row => {
+        const publishTime = getDramaPublishTime(row)
+        if (!publishTime) return '-'
+        return publishTime.format('YYYY-MM-DD HH:mm')
+      },
+    },
+    {
+      title: '最早可搭建时间',
+      key: 'earliestBuildTime',
+      width: 160,
+      render: row => {
+        const earliestBuildTime = getCurrentEarliestBuildTime(row)
+        if (!earliestBuildTime) return '-'
+        return earliestBuildTime.format('YYYY-MM-DD HH:mm')
+      },
+    },
+  ]
 
-      return h(NTooltip, null, {
-        trigger: () =>
-          h(
-            NTag,
-            {
-              type,
-              size: 'small',
-            },
-            { default: () => label }
-          ),
-        default: () => materialStatus.message,
-      })
-    },
-  },
-  {
-    title: '当前状态',
-    key: 'status',
-    width: 80,
-    render: row => {
-      const status = row.fields['当前状态'] || '-'
-      const typeMap: Record<string, 'success' | 'warning' | 'error' | 'info' | 'default'> = {
-        待搭建: 'warning',
-        已完成: 'success',
-        待资产化: 'info',
-        搭建失败: 'error',
-        跳过搭建: 'default',
-      }
-      return h(
-        NTag,
-        {
-          type: typeMap[status] || 'default',
-          size: 'small',
-        },
-        { default: () => status }
-      )
-    },
-  },
-  {
-    title: '操作',
-    key: 'actions',
-    width: 100,
-    fixed: 'right',
-    render: row => {
-      const isBuilding = manuallyBuildingIds.value.has(row.record_id)
-      const canBuild = canBuildDrama(row)
-      // 只有后台模式正在运行且有任务执行时，才禁用按钮
-      const isBackgroundRunning = backgroundSchedulerStatus.value?.enabled === true
-      const hasRunningTask =
-        isBackgroundRunning && backgroundSchedulerStatus.value?.currentTask !== null
-      const disabled = isBuilding || hasRunningTask || !canBuild
+  if (isXingtianChannel.value) {
+    columns.push({
+      title: '素材状态',
+      key: 'materialLibraryStatus',
+      width: 140,
+      render: row => {
+        const materialStatus = getDramaMaterialStatus(row)
+        const type = materialStatus.ready
+          ? 'success'
+          : materialStatus.reason === 'query_failed'
+            ? 'error'
+            : 'warning'
+        const label = materialStatus.ready
+          ? '已入库'
+          : materialStatus.reason === 'missing_material_id'
+            ? '缺少素材ID'
+            : materialStatus.reason === 'missing_xt_token'
+              ? '缺少XT Token'
+              : materialStatus.reason === 'expired_xt_token'
+                ? 'XT Token失效'
+                : materialStatus.status !== null
+                  ? `待入库(${materialStatus.status})`
+                  : '待入库'
 
-      return h(
-        NButton,
-        {
-          text: true,
-          type: 'primary',
-          size: 'small',
-          disabled,
-          onClick: () => handleBuildSingleDrama(row),
-        },
-        {
-          default: () =>
-            isBuilding
-              ? h('span', { style: { color: '#999' } }, '搭建中...')
-              : !canBuild
-                ? h('span', { style: { color: '#999' } }, getDramaDisabledButtonText(row))
-                : '开始搭建',
+        return h(NTooltip, null, {
+          trigger: () =>
+            h(
+              NTag,
+              {
+                type,
+                size: 'small',
+              },
+              { default: () => label }
+            ),
+          default: () => materialStatus.message,
+        })
+      },
+    })
+  }
+
+  columns.push(
+    {
+      title: '当前状态',
+      key: 'status',
+      width: 80,
+      render: row => {
+        const status = row.fields['当前状态'] || '-'
+        const typeMap: Record<string, 'success' | 'warning' | 'error' | 'info' | 'default'> = {
+          待搭建: 'warning',
+          已完成: 'success',
+          待资产化: 'info',
+          搭建失败: 'error',
+          跳过搭建: 'default',
         }
-      )
+        return h(
+          NTag,
+          {
+            type: typeMap[status] || 'default',
+            size: 'small',
+          },
+          { default: () => status }
+        )
+      },
     },
-  },
-]
+    {
+      title: '操作',
+      key: 'actions',
+      width: 100,
+      fixed: 'right',
+      render: row => {
+        const isBuilding = manuallyBuildingIds.value.has(row.record_id)
+        const canBuild = canBuildDrama(row)
+        // 只有后台模式正在运行且有任务执行时，才禁用按钮
+        const isBackgroundRunning = backgroundSchedulerStatus.value?.enabled === true
+        const hasRunningTask =
+          isBackgroundRunning && backgroundSchedulerStatus.value?.currentTask !== null
+        const disabled = isBuilding || hasRunningTask || !canBuild
+
+        return h(
+          NButton,
+          {
+            text: true,
+            type: 'primary',
+            size: 'small',
+            disabled,
+            onClick: () => handleBuildSingleDrama(row),
+          },
+          {
+            default: () =>
+              isBuilding
+                ? h('span', { style: { color: '#999' } }, '搭建中...')
+                : !canBuild
+                  ? h('span', { style: { color: '#999' } }, getDramaDisabledButtonText(row))
+                  : '开始搭建',
+          }
+        )
+      },
+    }
+  )
+
+  return columns
+})
 
 // 资产化步骤定义
 const assetizationSteps = computed(() => [
@@ -890,7 +923,13 @@ async function loadPendingDramas() {
     buildError.value = null
 
     console.log('========== 查询待搭建剧集 ==========')
-    const result = await feishuApi.getPendingSetupDramas(undefined, undefined, undefined, true)
+    const result = await feishuApi.getPendingSetupDramas(
+      undefined,
+      undefined,
+      undefined,
+      true,
+      isXingtianChannel.value
+    )
     const items = result.data?.items || []
 
     // 按日期排序（日期早的排在前面）
@@ -960,7 +999,8 @@ async function executePollingCycle() {
       undefined,
       undefined,
       undefined,
-      true // 包含短剧ID字段
+      true,
+      isXingtianChannel.value
     )
     dramas.value = result.data?.items || []
     await refreshDramaMaterialStatuses(dramas.value)

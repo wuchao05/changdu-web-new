@@ -28,9 +28,11 @@ import {
   getEarliestBuildTime,
 } from '../utils/buildWorkflowRules.js'
 import {
+  buildDramaMaterialLibraryBypassStatus,
   queryDramaMaterialLibraryStatus,
   queryDramaMaterialLibraryStatuses,
 } from '../utils/materialLibrary.js'
+import { isXingtianChannelType } from '../utils/channelType.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -105,6 +107,14 @@ function getRuntimeUser(input = null) {
     return input.runtimeUser
   }
   return null
+}
+
+function shouldValidateMaterialLibrary(input = null) {
+  return isXingtianChannelType(getRuntimeContext(input)?.channelType)
+}
+
+function buildBypassMaterialStatus(drama) {
+  return buildDramaMaterialLibraryBypassStatus(drama)
 }
 
 function getBuildConfig(input = null) {
@@ -255,8 +265,9 @@ router.post('/validate-build-window', async ctx => {
     }
 
     const buildConfig = ctx.state.channelRuntime?.buildConfig || {}
-    const xtToken = String(getRuntimeUser(ctx)?.xtToken || '').trim()
-    const materialStatus = await queryDramaMaterialLibraryStatus(drama, xtToken)
+    const materialStatus = shouldValidateMaterialLibrary(ctx)
+      ? await queryDramaMaterialLibraryStatus(drama, String(getRuntimeUser(ctx)?.xtToken || '').trim())
+      : buildBypassMaterialStatus(drama)
     const earliestBuildTime = getEarliestBuildTime(drama, buildConfig)
     const canBuildByTime = canBuildDramaNow(drama, new Date(), buildConfig)
     const canBuild = materialStatus.ready && canBuildByTime
@@ -276,6 +287,7 @@ router.post('/validate-build-window', async ctx => {
         materialId: materialStatus.materialId,
         materialStatus: materialStatus.status,
         materialReady: materialStatus.ready,
+        requiresMaterialCheck: shouldValidateMaterialLibrary(ctx),
         blockReason: canBuild
           ? 'ready'
           : materialStatus.ready
@@ -296,8 +308,9 @@ router.post('/validate-build-window', async ctx => {
 router.post('/material-library-statuses', async ctx => {
   try {
     const dramas = Array.isArray(ctx.request.body?.dramas) ? ctx.request.body.dramas : []
-    const xtToken = String(getRuntimeUser(ctx)?.xtToken || '').trim()
-    const items = await queryDramaMaterialLibraryStatuses(dramas, xtToken)
+    const items = shouldValidateMaterialLibrary(ctx)
+      ? await queryDramaMaterialLibraryStatuses(dramas, String(getRuntimeUser(ctx)?.xtToken || '').trim())
+      : dramas.map(drama => buildBypassMaterialStatus(drama))
 
     ctx.body = {
       code: 0,

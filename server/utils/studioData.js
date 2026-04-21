@@ -3,6 +3,7 @@ import path from 'path'
 import crypto from 'crypto'
 import { fileURLToPath } from 'url'
 import { DEFAULT_BUILD_CONFIG, normalizeBuildConfig } from '../config/buildConfig.js'
+import { CHANNEL_TYPE_OTHER, normalizeChannelType } from './channelType.js'
 import {
   DEFAULT_USER_BUILD_ADVANCE_CONFIG,
   normalizeUserBuildAdvanceConfig,
@@ -141,6 +142,7 @@ function defaultChannelConfig() {
   return {
     id: crypto.randomUUID(),
     name: '',
+    type: CHANNEL_TYPE_OTHER,
     juliang: {
       cookie: '',
       buildConfig: normalizeBuildConfig(DEFAULT_BUILD_CONFIG),
@@ -742,6 +744,7 @@ export function normalizeChannel(channel = {}) {
   return {
     id: String(channel.id || base.id),
     name: String(channel.name || '').trim(),
+    type: normalizeChannelType(channel.type),
     juliang: {
       cookie: String(rawJuliang.cookie || '').trim(),
       buildConfig: {

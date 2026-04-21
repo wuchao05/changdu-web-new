@@ -63,6 +63,16 @@ function buildBlockedResult(materialId, reason, message, status = null) {
   }
 }
 
+export function buildNotRequiredResult(message = '当前渠道无需校验素材入库状态') {
+  return {
+    materialId: '',
+    status: null,
+    ready: true,
+    reason: 'not_required',
+    message,
+  }
+}
+
 function buildReadyResult(materialId, status) {
   return {
     materialId,
@@ -176,6 +186,17 @@ export async function queryMaterialLibraryStatus(materialId, xtToken) {
 export async function queryDramaMaterialLibraryStatus(drama, xtToken) {
   const materialId = getDramaMaterialId(drama)
   return queryMaterialLibraryStatus(materialId, xtToken)
+}
+
+export function buildDramaMaterialLibraryBypassStatus(
+  drama,
+  message = '当前渠道无需校验素材入库状态'
+) {
+  return {
+    recordId: String(drama?.record_id || '').trim(),
+    dramaName: String(drama?.fields?.['剧名']?.[0]?.text || '').trim(),
+    ...buildNotRequiredResult(message),
+  }
 }
 
 export async function queryDramaMaterialLibraryStatuses(dramas, xtToken, options = {}) {

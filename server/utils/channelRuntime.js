@@ -3,6 +3,7 @@ import { getSessionUser } from './studioSession.js'
 import { readChannels, resolveRuntimeContext } from './studioData.js'
 import { CHANGDU_DISTRIBUTOR_ID, CHANGDU_SECRET_KEY } from '../config/changdu.js'
 import { applyUserBuildAdvanceToBuildConfig } from './buildAdvanceConfig.js'
+import { normalizeChannelType } from './channelType.js'
 
 const DEFAULT_APP_TYPE = '7'
 const DEFAULT_AGW_JS_CONV = 'str'
@@ -26,6 +27,7 @@ function buildRuntimeFromChannel(channel = null, runtimeUser = null) {
   return {
     channelId: String(channel?.id || '').trim(),
     channelName: String(channel?.name || '').trim(),
+    channelType: normalizeChannelType(channel?.type),
     buildConfig,
     juliang: {
       cookie: juliangCookie,
@@ -49,6 +51,7 @@ export function normalizeChannelRuntime(runtime = {}) {
     return {
       channelId: String(runtime.channelId || '').trim(),
       channelName: String(runtime.channelName || '').trim(),
+      channelType: normalizeChannelType(runtime.channelType),
       buildConfig: normalizeBuildConfig(runtime.buildConfig),
       juliang: {
         cookie: String(runtime.juliang.cookie || '').trim(),

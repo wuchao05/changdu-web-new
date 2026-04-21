@@ -1,6 +1,7 @@
 import { ENV } from '@/config/env'
 import type { BuildConfig } from './buildConfig'
 import { buildSessionHeaders } from '@/utils/sessionToken'
+import type { ChannelType } from '@/utils/channelType'
 
 interface RequestError extends Error {
   status?: number
@@ -172,6 +173,7 @@ export interface UserProfile {
 export interface ChannelConfig {
   id: string
   name: string
+  type: ChannelType
   juliang: {
     cookie: string
     buildConfig: BuildConfig
@@ -189,6 +191,12 @@ export interface ChannelConfig {
   }
   createdAt: string
   updatedAt: string
+}
+
+export interface ChannelSummary {
+  id: string
+  name: string
+  type: ChannelType
 }
 
 export interface SchedulerOverviewTaskBase {
@@ -361,7 +369,7 @@ export function login(account: string, password: string) {
   return request<{
     token: string
     user: UserProfile
-    channel: { id: string; name: string } | null
+    channel: ChannelSummary | null
   }>('/session/login', {
     method: 'POST',
     body: JSON.stringify({ account, password }),
@@ -388,7 +396,7 @@ export function updateCurrentChannelXtToken(xtToken: string) {
   return request<{
     user: UserProfile
     runtimeUser: UserProfile | null
-    channel: { id: string; name: string } | null
+    channel: ChannelSummary | null
   }>('/session/xt-token', {
     method: 'POST',
     body: JSON.stringify({ xtToken }),
@@ -399,8 +407,8 @@ export function getCurrentSession() {
   return request<{
     user: UserProfile
     runtimeUser: UserProfile | null
-    channel: { id: string; name: string } | null
-    availableChannels: Array<{ id: string; name: string }>
+    channel: ChannelSummary | null
+    availableChannels: ChannelSummary[]
     channelBoundUsers: UserProfile[]
     platforms: {
       changdu?: {

@@ -31,7 +31,10 @@ import {
   getEarliestBuildTime,
   selectHighestPriorityDrama,
 } from '../utils/buildWorkflowRules.js'
-import { queryDramaMaterialLibraryStatuses } from '../utils/materialLibrary.js'
+import {
+  buildDramaMaterialLibraryBypassStatus,
+  queryDramaMaterialLibraryStatuses,
+} from '../utils/materialLibrary.js'
 import {
   getChannelLabel,
   normalizeChannelRuntime,
@@ -44,6 +47,7 @@ import {
 } from '../utils/runtimeInstance.js'
 import { buildServiceLogPrefix, createScopedConsole } from '../utils/serviceLogger.js'
 import { resolveEffectiveBuildBid } from '../utils/buildBid.js'
+import { isXingtianChannelType } from '../utils/channelType.js'
 import {
   DEFAULT_USER_BUILD_ADVANCE_CONFIG,
   applyUserBuildAdvanceToBuildConfig,
@@ -360,9 +364,20 @@ function getRuntimeXtToken() {
   return String(getActiveSchedulerState().runtimeUserConfig?.xtToken || '').trim()
 }
 
+function shouldValidateMaterialLibrary() {
+  return isXingtianChannelType(getSchedulerRuntime().channelType)
+}
+
 async function attachDramaMaterialLibraryStatus(dramas) {
   const dramaList = Array.isArray(dramas) ? dramas : []
   if (dramaList.length === 0) {
+    return dramaList
+  }
+
+  if (!shouldValidateMaterialLibrary()) {
+    dramaList.forEach(drama => {
+      drama._materialLibraryStatus = buildDramaMaterialLibraryBypassStatus(drama)
+    })
     return dramaList
   }
 
@@ -483,6 +498,21 @@ async function getFeishuAccessToken() {
 async function getPendingSetupDramas() {
   const accessToken = await getFeishuAccessToken()
   const dramaStatusTableId = getDramaStatusTableId()
+  const fieldNames = [
+    '剧名',
+    '短剧ID',
+    '账户',
+    '日期',
+    '当前状态',
+    '上架时间',
+    '评级',
+    '抖音素材',
+    '备注',
+  ]
+
+  if (shouldValidateMaterialLibrary()) {
+    fieldNames.splice(fieldNames.length - 1, 0, '推送素材ID')
+  }
 
   const response = await fetch(
     `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.app_token}/tables/${dramaStatusTableId}/records/search`,
@@ -493,18 +523,7 @@ async function getPendingSetupDramas() {
         Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({
-        field_names: [
-          '剧名',
-          '短剧ID',
-          '账户',
-          '日期',
-          '当前状态',
-          '上架时间',
-          '评级',
-          '抖音素材',
-          '推送素材ID',
-          '备注',
-        ],
+        field_names: fieldNames,
         page_size: 100,
         filter: {
           conjunction: 'and',

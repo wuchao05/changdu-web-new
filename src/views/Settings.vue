@@ -359,6 +359,7 @@ import { useApiConfigStore } from '@/stores/apiConfig'
 import { useSessionStore } from '@/stores/session'
 import { useDouyinMaterialStore } from '@/stores/douyinMaterial'
 import { formatBuildBidInputValue, parseBuildBidInputValue } from '@/utils/buildBid'
+import { isXingtianChannelType } from '@/utils/channelType'
 
 defineOptions({
   name: 'SettingsPage',
@@ -520,9 +521,22 @@ const activeChannelName = computed(() => {
   return sessionStore.currentChannel?.name || '未选择渠道'
 })
 
+const activeChannelType = computed(() => {
+  const activeChannelId = String(sessionStore.activeChannelId || '').trim()
+  if (activeChannelId) {
+    const matchedChannel = sessionStore.availableChannels.find(channel => channel.id === activeChannelId)
+    if (matchedChannel) {
+      return matchedChannel.type
+    }
+  }
+
+  return sessionStore.currentChannel?.type || 'other'
+})
+
 const showBuildBidCard = computed(() => buildBidConfig.value.channelBidEnabled)
 const currentXtToken = computed(() => String(sessionStore.currentRuntimeUser?.xtToken || '').trim())
 const showXtTokenCard = computed(() =>
+  isXingtianChannelType(activeChannelType.value) &&
   Boolean(activeUserChannelConfig.value?.xtTokenConfig?.allowCustom)
 )
 const showDouyinMaterialCard = computed(() =>

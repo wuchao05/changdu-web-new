@@ -1639,7 +1639,7 @@ router.post('/bitable/drama-status/pending-build', async ctx => {
     const accessToken = tokenJson.tenant_access_token
 
     const searchRequestBody = {
-      field_names: field_names || ['剧名', '当前状态', '推送素材ID'],
+      field_names: field_names || ['剧名', '当前状态'],
       page_size: page_size || 100,
       filter: filter || {
         conjunction: 'and',

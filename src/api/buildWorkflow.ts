@@ -642,6 +642,7 @@ export async function validateBuildWindow(drama: unknown): Promise<{
     materialId: string
     materialStatus: number | null
     materialReady: boolean
+    requiresMaterialCheck: boolean
     blockReason: string
     blockMessage: string
   }
