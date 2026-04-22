@@ -793,7 +793,7 @@ onBeforeUnmount(() => {
 
 .terminal-shell__meta-title {
   color: #cbd5e1;
-  font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+  font-family: var(--app-font-family);
 }
 
 .terminal-shell__meta-right {
@@ -872,7 +872,7 @@ onBeforeUnmount(() => {
   color: #e2e8f0;
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+  font-family: var(--app-font-family);
 }
 
 .terminal-shell__empty {

@@ -497,7 +497,8 @@
                     </div>
                     <div class="channel-config-card__meta channel-config-card__meta--left">
                       <span class="channel-config-card__pill channel-config-card__pill--neutral">
-                        已开放 {{ countUserCustomizableSections(item.channel, item.config) }} 项用户自定义
+                        已开放
+                        {{ countUserCustomizableSections(item.channel, item.config) }} 项用户自定义
                       </span>
                       <span class="channel-config-card__pill channel-config-card__pill--info">
                         {{ countConfiguredMaterialMatches(item.config.douyinMaterialMatches) }}
@@ -1284,8 +1285,13 @@
                       v-model:value="channelForm.juliang.buildConfig.recycleAccountsWhenExhausted"
                     />
                   </n-form-item>
-                  <n-form-item :label="`竞价策略：${channelForm.juliang.buildConfig.enableCustomBid ? '稳定成本' : '最大转化'}`">
-                    <n-switch v-model:value="channelForm.juliang.buildConfig.enableCustomBid" @update:value="handleEnableCustomBidChange" />
+                  <n-form-item
+                    :label="`竞价策略：${channelForm.juliang.buildConfig.enableCustomBid ? '稳定成本' : '最大转化'}`"
+                  >
+                    <n-switch
+                      v-model:value="channelForm.juliang.buildConfig.enableCustomBid"
+                      @update:value="handleEnableCustomBidChange"
+                    />
                   </n-form-item>
                   <n-form-item
                     v-if="channelForm.juliang.buildConfig.enableCustomBid"
@@ -2146,9 +2152,7 @@ function handleChannelDefaultBidChange(value: number | null) {
   channelForm.juliang.buildConfig.defaultBid = formatBuildBidInputValue(value)
 }
 
-function getUserBuildBidInputValue(
-  userBid: string | null | undefined
-) {
+function getUserBuildBidInputValue(userBid: string | null | undefined) {
   return parseBuildBidInputValue(userBid)
 }
 
@@ -5066,9 +5070,7 @@ watch(
 }
 
 .material-match-card__range {
-  font-family:
-    ui-monospace, SFMono-Regular, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
-    'Courier New', monospace;
+  font-family: var(--app-font-family);
   font-size: 0.92rem;
   font-weight: 700;
 }

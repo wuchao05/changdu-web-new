@@ -53,7 +53,9 @@
               <Icon icon="mdi:cash-multiple" class="w-5 h-5 text-gray-600" />
               <div>
                 <h3 class="text-lg font-semibold text-gray-900">搭建出价（稳定成本）</h3>
-                <p class="text-sm text-gray-500">当前渠道竞价策略为稳定成本，按渠道设置出价，未填写时自动使用默认值</p>
+                <p class="text-sm text-gray-500">
+                  当前渠道竞价策略为稳定成本，按渠道设置出价，未填写时自动使用默认值
+                </p>
               </div>
             </div>
           </template>
@@ -523,7 +525,9 @@ const activeChannelName = computed(() => {
 const activeChannelType = computed(() => {
   const activeChannelId = String(sessionStore.activeChannelId || '').trim()
   if (activeChannelId) {
-    const matchedChannel = sessionStore.availableChannels.find(channel => channel.id === activeChannelId)
+    const matchedChannel = sessionStore.availableChannels.find(
+      channel => channel.id === activeChannelId
+    )
     if (matchedChannel) {
       return matchedChannel.type
     }
@@ -536,9 +540,10 @@ const showBuildBidCard = computed(
   () => buildBidConfig.value.channelBidEnabled && buildBidConfig.value.allowCustom
 )
 const currentXtToken = computed(() => String(sessionStore.currentRuntimeUser?.xtToken || '').trim())
-const showXtTokenCard = computed(() =>
-  isXingtianChannelType(activeChannelType.value) &&
-  Boolean(activeUserChannelConfig.value?.xtTokenConfig?.allowCustom)
+const showXtTokenCard = computed(
+  () =>
+    isXingtianChannelType(activeChannelType.value) &&
+    Boolean(activeUserChannelConfig.value?.xtTokenConfig?.allowCustom)
 )
 const showDouyinMaterialCard = computed(() =>
   Boolean(activeUserChannelConfig.value?.douyinMaterialConfig?.allowCustom)
@@ -1155,9 +1160,7 @@ async function resetAllSettings() {
 }
 
 .material-rule-card__range {
-  font-family:
-    ui-monospace, SFMono-Regular, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
-    'Courier New', monospace;
+  font-family: var(--app-font-family);
   font-size: 14px;
   font-weight: 700;
   color: #5b21b6;

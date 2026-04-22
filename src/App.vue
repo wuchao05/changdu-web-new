@@ -8,11 +8,22 @@ import {
   NNotificationProvider,
   zhCN,
   dateZhCN,
+  type GlobalThemeOverrides,
 } from 'naive-ui'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 
 import AppFooter from '@/components/AppFooter.vue'
 import DebugConsoleDrawer from '@/components/DebugConsoleDrawer.vue'
+
+const globalFontFamily =
+  "'Maple Mono NF CN', 'Maple Mono', 'Maple Mono CN', 'SFMono-Regular', 'Cascadia Mono', 'JetBrains Mono', 'Fira Code', 'Consolas', 'Liberation Mono', 'PingFang SC', 'Microsoft YaHei UI', 'Noto Sans CJK SC', monospace"
+
+const themeOverrides: GlobalThemeOverrides = {
+  common: {
+    fontFamily: globalFontFamily,
+    fontFamilyMono: globalFontFamily,
+  },
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -39,7 +50,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <n-config-provider :locale="zhCN" :date-locale="dateZhCN">
+  <n-config-provider :locale="zhCN" :date-locale="dateZhCN" :theme-overrides="themeOverrides">
     <n-global-style />
     <n-message-provider>
       <n-dialog-provider>

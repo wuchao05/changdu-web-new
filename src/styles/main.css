@@ -5,12 +5,23 @@
 
 /* 全局样式重置 */
 body {
-  @apply font-sans antialiased;
+  @apply antialiased;
   margin: 0;
   padding: 0;
+  font-family: var(--app-font-family);
   /* 只在需要时显示滚动条 */
   overflow-x: auto;
   overflow-y: auto;
+}
+
+html,
+body,
+#app,
+button,
+input,
+textarea,
+select {
+  font-family: var(--app-font-family);
 }
 
 #app {

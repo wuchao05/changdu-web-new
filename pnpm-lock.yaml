@@ -11,6 +11,12 @@ importers:
 
   .:
     dependencies:
+      '@chinese-fonts/maple-mono-cn':
+        specifier: 2.0.0
+        version: 2.0.0
+      '@fontsource/maple-mono':
+        specifier: 5.2.6
+        version: 5.2.6
       '@iconify/vue':
         specifier: ^5.0.0
         version: 5.0.0(vue@3.5.21(typescript@5.8.3))
@@ -353,6 +359,9 @@ packages:
     resolution: {integrity: sha512-ctxtJ/eA+t+6q2++vj5j7FYX3nRu311q1wfYH3xjlLOsczhlhxAg2FWNUXhpGvAw3BWo1xBcvOV6/YLc2r5FJw==}
     hasBin: true
 
+  '@chinese-fonts/maple-mono-cn@2.0.0':
+    resolution: {integrity: sha512-DrPvr2/SjeGBtOspkJY6ygFlPnltCCJlmZIgVbupHp3tvxBrIjBz8aIT1obCxqz61cJP9eNU977tse7c8NiLZw==}
+
   '@commitlint/cli@19.8.1':
     resolution: {integrity: sha512-LXUdNIkspyxrlV6VDHWBmCZRtkEVRpBKxi2Gtw3J54cGWhLCTouVD/Q6ZSaSvd2YaDObWK8mDjrz3TIKtaQMAA==}
     engines: {node: '>=v18'}
@@ -653,6 +662,9 @@ packages:
     peerDependenciesMeta:
       '@noble/hashes':
         optional: true
+
+  '@fontsource/maple-mono@5.2.6':
+    resolution: {integrity: sha512-+VAD7z8nyTkaiz2/Ww639Z5Kp/YJIL4dNMQxydqSMafNb5nKxFeoRq6W3g9WJ04IcBjdBmn0dKFNk90lyz7K+w==}
 
   '@hapi/bourne@3.0.0':
     resolution: {integrity: sha512-Waj1cwPXJDucOib4a3bAISsKJVb15MKi9IvmTI/7ssVEm6sywXGjVJDhl6/umt1pK1ZS7PacXU3A1PmFKHEZ2w==}
@@ -4046,6 +4058,8 @@ snapshots:
     dependencies:
       css-tree: 3.2.1
 
+  '@chinese-fonts/maple-mono-cn@2.0.0': {}
+
   '@commitlint/cli@19.8.1(@types/node@22.18.3)(typescript@5.8.3)':
     dependencies:
       '@commitlint/format': 19.8.1
@@ -4309,6 +4323,8 @@ snapshots:
   '@exodus/bytes@1.15.0(@noble/hashes@1.8.0)':
     optionalDependencies:
       '@noble/hashes': 1.8.0
+
+  '@fontsource/maple-mono@5.2.6': {}
 
   '@hapi/bourne@3.0.0': {}
 
