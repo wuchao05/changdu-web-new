@@ -4,6 +4,7 @@ import {
   deleteUser,
   getDefaultDownloadCenterConfig,
   listUsers,
+  buildRuntimeUser,
   readChannels,
   readDownloadCenterConfigs,
   sanitizeUser,
@@ -293,7 +294,7 @@ function buildAutoSubmitTask(status, nowMs) {
   }
 }
 
-function buildBuildWorkflowTask(status, nowMs) {
+function buildBuildWorkflowTask(status, nowMs, douyinMaterialSummary = { total: 0, items: [] }) {
   const taskHistory = Array.isArray(status?.taskHistory) ? status.taskHistory : []
   const latestRecord = taskHistory[0] || null
   const currentTask = status?.currentTask || null
@@ -345,6 +346,7 @@ function buildBuildWorkflowTask(status, nowMs) {
       buildableCount: 0,
       updatedAt: null,
     },
+    douyinMaterialSummary,
     stats: status?.stats || {
       totalBuilt: 0,
       successCount: 0,
@@ -428,9 +430,52 @@ function buildTaskSummary(tasks) {
   }
 }
 
-function createSchedulerOverviewItem({ userId, runtimeUserName, account, channelId, channelName }) {
+function getMaterialRangeCount(materialRange = '') {
+  const normalizedRange = String(materialRange || '').trim()
+  if (!normalizedRange) {
+    return 0
+  }
+
+  const [startText, endText] = normalizedRange.split('-').map(item => String(item || '').trim())
+  const start = Number(startText)
+  const end = endText ? Number(endText) : start
+
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start <= 0 || end < start) {
+    return 0
+  }
+
+  return end - start + 1
+}
+
+function buildDouyinMaterialSummary(user = {}, channelId = '') {
+  const runtimeUser = buildRuntimeUser(user, channelId)
+  const items = Array.isArray(runtimeUser.douyinMaterialMatches)
+    ? runtimeUser.douyinMaterialMatches
+        .map(match => ({
+          douyinAccount: String(match?.douyinAccount || '').trim(),
+          materialRange: String(match?.materialRange || '').trim(),
+          materialCount: getMaterialRangeCount(match?.materialRange),
+        }))
+        .filter(item => item.douyinAccount && item.materialRange)
+    : []
+
+  return {
+    total: items.length,
+    items,
+  }
+}
+
+function createSchedulerOverviewItem({
+  userId,
+  runtimeUserName,
+  account,
+  channelId,
+  channelName,
+  defaultChannelId = '',
+  douyinMaterialSummary,
+}) {
   const autoSubmit = buildAutoSubmitTask(null, Date.now())
-  const buildWorkflow = buildBuildWorkflowTask(null, Date.now())
+  const buildWorkflow = buildBuildWorkflowTask(null, Date.now(), douyinMaterialSummary)
   const materialPreview = buildMaterialPreviewTask(null, Date.now())
   const tasks = {
     autoSubmit,
@@ -444,6 +489,7 @@ function createSchedulerOverviewItem({ userId, runtimeUserName, account, channel
     account,
     channelId,
     channelName,
+    defaultChannelId,
     tasks,
     summary: buildTaskSummary(tasks),
   }
@@ -520,12 +566,14 @@ router.get('/scheduler-overview', async ctx => {
           account: user.account,
           channelId: normalizedChannelId,
           channelName: channelMap.get(normalizedChannelId)?.name || normalizedChannelId,
+          defaultChannelId: user.defaultChannelId || '',
+          douyinMaterialSummary: buildDouyinMaterialSummary(user, normalizedChannelId),
         })
       )
     }
   }
 
-  function ensureOverviewItem(status, fallbackChannelName = '') {
+  function ensureOverviewItem(status) {
     const userId = String(status?.userId || '').trim()
     const channelId = String(status?.channelId || '').trim()
     if (!userId || !channelId) {
@@ -537,16 +585,7 @@ router.get('/scheduler-overview', async ctx => {
 
     const key = buildUserChannelKey(userId, channelId)
     if (!itemMap.has(key)) {
-      itemMap.set(
-        key,
-        createSchedulerOverviewItem({
-          userId,
-          runtimeUserName: String(status?.runtimeUserName || '').trim() || userId,
-          account: '',
-          channelId,
-          channelName: String(status?.channelName || '').trim() || fallbackChannelName || channelId,
-        })
-      )
+      return null
     }
 
     return itemMap.get(key)
@@ -565,7 +604,11 @@ router.get('/scheduler-overview', async ctx => {
     if (!item) {
       continue
     }
-    item.tasks.buildWorkflow = buildBuildWorkflowTask(status, nowMs)
+    item.tasks.buildWorkflow = buildBuildWorkflowTask(
+      status,
+      nowMs,
+      item.tasks.buildWorkflow.douyinMaterialSummary
+    )
   }
 
   for (const status of materialPreviewStatuses) {
@@ -614,11 +657,20 @@ router.get('/scheduler-overview', async ctx => {
       ...userGroup,
       summary: buildSchedulerUserSummary(userGroup.channels),
       channels: [...userGroup.channels].sort((first, second) => {
-        if (first.summary.hasAbnormal !== second.summary.hasAbnormal) {
-          return first.summary.hasAbnormal ? -1 : 1
+        const firstIsDefault = first.channelId === first.defaultChannelId
+        const secondIsDefault = second.channelId === second.defaultChannelId
+        if (firstIsDefault !== secondIsDefault) {
+          return firstIsDefault ? -1 : 1
+        }
+
+        if (first.summary.enabledCount !== second.summary.enabledCount) {
+          return second.summary.enabledCount - first.summary.enabledCount
         }
         if (first.summary.runningCount !== second.summary.runningCount) {
           return second.summary.runningCount - first.summary.runningCount
+        }
+        if (first.summary.abnormalCount !== second.summary.abnormalCount) {
+          return second.summary.abnormalCount - first.summary.abnormalCount
         }
         return first.channelName.localeCompare(second.channelName, 'zh-CN')
       }),

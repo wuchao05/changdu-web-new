@@ -263,6 +263,14 @@ export interface SchedulerOverviewBuildWorkflowTask extends SchedulerOverviewTas
     buildableCount: number
     updatedAt: string | null
   }
+  douyinMaterialSummary: {
+    total: number
+    items: Array<{
+      douyinAccount: string
+      materialRange: string
+      materialCount: number
+    }>
+  }
   stats: {
     totalBuilt: number
     successCount: number
@@ -301,6 +309,7 @@ export interface SchedulerOverviewItem {
   account: string
   channelId: string
   channelName: string
+  defaultChannelId?: string
   tasks: {
     autoSubmit: SchedulerOverviewAutoSubmitTask
     buildWorkflow: SchedulerOverviewBuildWorkflowTask

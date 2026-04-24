@@ -261,7 +261,34 @@
                       <span class="task-monitor__fact-label">核心统计</span>
                       <span class="task-monitor__fact-value">{{ formatTaskStats(task) }}</span>
                     </div>
-                    <div class="task-monitor__fact">
+                    <n-tooltip v-if="task.key === 'buildWorkflow'" trigger="hover" placement="top">
+                      <template #trigger>
+                        <div class="task-monitor__fact task-monitor__fact--hoverable">
+                          <span class="task-monitor__fact-label">抖音号数</span>
+                          <span class="task-monitor__fact-value">{{ formatTaskExtra(task) }}</span>
+                        </div>
+                      </template>
+                      <div class="douyin-material-tooltip">
+                        <template v-if="task.douyinMaterialSummary.items.length">
+                          <div
+                            v-for="item in task.douyinMaterialSummary.items"
+                            :key="`${task.key}-${item.douyinAccount}-${item.materialRange}`"
+                            class="douyin-material-tooltip__row"
+                          >
+                            <span class="douyin-material-tooltip__name">{{
+                              item.douyinAccount
+                            }}</span>
+                            <span class="douyin-material-tooltip__count">
+                              {{ item.materialCount }} 个素材
+                            </span>
+                          </div>
+                        </template>
+                        <span v-else class="douyin-material-tooltip__empty"
+                          >暂无抖音号素材配置</span
+                        >
+                      </div>
+                    </n-tooltip>
+                    <div v-else class="task-monitor__fact">
                       <span class="task-monitor__fact-label">{{ getFourthFactLabel(task) }}</span>
                       <span class="task-monitor__fact-value">{{ formatTaskExtra(task) }}</span>
                     </div>
@@ -297,7 +324,16 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
-import { createDiscreteApi, NAlert, NButton, NEmpty, NSelect, NSpin, NSwitch } from 'naive-ui'
+import {
+  createDiscreteApi,
+  NAlert,
+  NButton,
+  NEmpty,
+  NSelect,
+  NSpin,
+  NSwitch,
+  NTooltip,
+} from 'naive-ui'
 import {
   getSchedulerOverview,
   type SchedulerOverviewAutoSubmitTask,
@@ -308,10 +344,7 @@ import {
   type SchedulerOverviewUserGroup,
 } from '@/api/admin'
 import { adminStartAutoSubmit, adminStopAutoSubmit } from '@/api/autoSubmit'
-import {
-  adminStartBackgroundScheduler,
-  adminStopBackgroundScheduler,
-} from '@/api/buildWorkflow'
+import { adminStartBackgroundScheduler, adminStopBackgroundScheduler } from '@/api/buildWorkflow'
 import { startMaterialPreview, stopMaterialPreview } from '@/api/materialPreview'
 
 defineOptions({
@@ -442,16 +475,51 @@ function formatInterval(task: SchedulerOverviewTask) {
   return `${task.intervalMinutes} 分钟`
 }
 
+function formatTaskRunningDuration(task: SchedulerOverviewTask) {
+  if (!task.running) {
+    return '未运行'
+  }
+
+  const startTime = String(task.currentTask?.startTime || '').trim()
+  const startTimestamp = Date.parse(startTime)
+  if (!Number.isFinite(startTimestamp)) {
+    return '运行中'
+  }
+
+  const durationMs = Math.max(Date.now() - startTimestamp, 0)
+  const totalMinutes = Math.floor(durationMs / 60_000)
+  const days = Math.floor(totalMinutes / (24 * 60))
+  const hours = Math.floor((totalMinutes % (24 * 60)) / 60)
+  const minutes = totalMinutes % 60
+  const parts: string[] = []
+
+  if (days > 0) {
+    parts.push(`${days}天`)
+  }
+  if (hours > 0) {
+    parts.push(`${hours}小时`)
+  }
+  if (minutes > 0 || parts.length === 0) {
+    parts.push(`${minutes}分钟`)
+  }
+
+  return parts.join('')
+}
+
+function formatMaterialPreviewTimeWindow(task: SchedulerOverviewMaterialPreviewTask) {
+  return `前 ${task.buildTimeWindowStart} 分钟到后 ${task.buildTimeWindowEnd} 分钟`
+}
+
 function formatCurrentTask(task: SchedulerOverviewTask) {
   if (task.key === 'autoSubmit') {
     return task.submissionType
   }
 
   if (task.key === 'buildWorkflow') {
-    return String(task.queueSnapshot?.pendingCount || 0)
+    return `${Number(task.queueSnapshot?.buildableCount || 0)}/${Number(task.queueSnapshot?.pendingCount || 0)}`
   }
 
-  return task.running ? '执行中' : '待机'
+  return formatMaterialPreviewTimeWindow(task)
 }
 
 function formatTaskStats(task: SchedulerOverviewTask) {
@@ -468,14 +536,14 @@ function formatTaskStats(task: SchedulerOverviewTask) {
 
 function formatTaskExtra(task: SchedulerOverviewTask) {
   if (task.key === 'autoSubmit') {
-    return `近${task.submitRangeDays}天 · ${task.runningDurationText}`
+    return `近${task.submitRangeDays}天`
   }
 
   if (task.key === 'buildWorkflow') {
-    return String(task.queueSnapshot?.buildableCount || 0)
+    return `${Number(task.douyinMaterialSummary?.total || 0)}个抖音号`
   }
 
-  return `前 ${task.buildTimeWindowStart} 分钟到后 ${task.buildTimeWindowEnd} 分钟`
+  return formatTaskRunningDuration(task)
 }
 
 function getSecondFactLabel(task: SchedulerOverviewTask) {
@@ -483,19 +551,19 @@ function getSecondFactLabel(task: SchedulerOverviewTask) {
     return '提交类型'
   }
   if (task.key === 'buildWorkflow') {
-    return '待搭建剧'
+    return '可搭建/待搭建'
   }
-  return '当前状态'
+  return '时间窗口'
 }
 
 function getFourthFactLabel(task: SchedulerOverviewTask) {
   if (task.key === 'autoSubmit') {
-    return '运行时长'
+    return '提交范围'
   }
   if (task.key === 'buildWorkflow') {
-    return '可搭建剧'
+    return '抖音号数'
   }
-  return '时间窗口'
+  return '运行时长'
 }
 
 function getTaskHistory(task: SchedulerOverviewTask) {
@@ -728,9 +796,7 @@ async function handleTaskToggle(
     discreteMessage.success(`${task.title} 已${enable ? '启动' : '停止'}`)
     await fetchOverview({ silent: true })
   } catch (error) {
-    discreteMessage.error(
-      `操作失败：${error instanceof Error ? error.message : '未知错误'}`
-    )
+    discreteMessage.error(`操作失败：${error instanceof Error ? error.message : '未知错误'}`)
   } finally {
     const updated = new Set(togglingTasks.value)
     updated.delete(key)
@@ -1634,6 +1700,18 @@ onBeforeUnmount(() => {
   background: rgba(15, 23, 42, 0.46);
 }
 
+.task-monitor__fact--hoverable {
+  cursor: help;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.task-monitor__fact--hoverable:hover {
+  background: rgba(14, 116, 144, 0.2);
+  outline: 1px solid rgba(103, 232, 249, 0.28);
+}
+
 .task-monitor__fact-label {
   color: rgba(186, 221, 255, 0.58);
   font-size: 11px;
@@ -1644,6 +1722,39 @@ onBeforeUnmount(() => {
   font-size: 12px;
   line-height: 1.6;
   word-break: break-word;
+}
+
+.douyin-material-tooltip {
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.douyin-material-tooltip__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 12px;
+}
+
+.douyin-material-tooltip__name {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #e0f7ff;
+}
+
+.douyin-material-tooltip__count {
+  flex-shrink: 0;
+  color: #99f6e4;
+}
+
+.douyin-material-tooltip__empty {
+  color: rgba(226, 242, 255, 0.72);
+  font-size: 12px;
 }
 
 .task-monitor__alerts {
