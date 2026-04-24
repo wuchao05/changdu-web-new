@@ -125,6 +125,8 @@ function defaultUserChannelConfig() {
       webMenus: {
         overview: true,
         report: true,
+        orderStats: true,
+        dramaClip: true,
         buildSubmit: true,
       },
       desktopMenus: {
@@ -497,6 +499,14 @@ function normalizeUserChannelConfig(config = {}, douyinAccounts = []) {
           typeof config.permissions?.webMenus?.report === 'boolean'
             ? config.permissions.webMenus.report
             : defaultConfig.permissions.webMenus.report,
+        orderStats:
+          typeof config.permissions?.webMenus?.orderStats === 'boolean'
+            ? config.permissions.webMenus.orderStats
+            : defaultConfig.permissions.webMenus.orderStats,
+        dramaClip:
+          typeof config.permissions?.webMenus?.dramaClip === 'boolean'
+            ? config.permissions.webMenus.dramaClip
+            : defaultConfig.permissions.webMenus.dramaClip,
         buildSubmit:
           typeof config.permissions?.webMenus?.buildSubmit === 'boolean'
             ? config.permissions.webMenus.buildSubmit

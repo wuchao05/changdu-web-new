@@ -51,6 +51,8 @@ export interface UserChannelBindingConfig {
     webMenus: {
       overview: boolean
       report: boolean
+      orderStats: boolean
+      dramaClip: boolean
       buildSubmit: boolean
     }
     desktopMenus: {
@@ -135,6 +137,8 @@ export interface UserProfile {
     webMenus: {
       overview: boolean
       report: boolean
+      orderStats: boolean
+      dramaClip: boolean
       buildSubmit: boolean
     }
     desktopMenus: {

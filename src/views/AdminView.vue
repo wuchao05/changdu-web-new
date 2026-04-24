@@ -1810,6 +1810,16 @@ const webPermissionOptions: Array<{
     description: '控制首页充值日报表格是否展示。',
   },
   {
+    key: 'orderStats',
+    label: '订单统计',
+    description: '控制首页订单统计模块是否展示。',
+  },
+  {
+    key: 'dramaClip',
+    label: '爆剧爆剪',
+    description: '控制首页“爆剧爆剪”入口是否展示。',
+  },
+  {
     key: 'buildSubmit',
     label: '提交搭建',
     description: '控制首页“提交搭建”按钮是否展示。',
@@ -2559,6 +2569,8 @@ function createDefaultUserChannelConfig(): adminApi.UserChannelBindingConfig {
       webMenus: {
         overview: true,
         report: true,
+        orderStats: true,
+        dramaClip: true,
         buildSubmit: true,
       },
       desktopMenus: {
@@ -2659,6 +2671,14 @@ function normalizeUserChannelConfig(
           typeof config?.permissions?.webMenus?.report === 'boolean'
             ? config.permissions.webMenus.report
             : defaultConfig.permissions.webMenus.report,
+        orderStats:
+          typeof config?.permissions?.webMenus?.orderStats === 'boolean'
+            ? config.permissions.webMenus.orderStats
+            : defaultConfig.permissions.webMenus.orderStats,
+        dramaClip:
+          typeof config?.permissions?.webMenus?.dramaClip === 'boolean'
+            ? config.permissions.webMenus.dramaClip
+            : defaultConfig.permissions.webMenus.dramaClip,
         buildSubmit:
           typeof config?.permissions?.webMenus?.buildSubmit === 'boolean'
             ? config.permissions.webMenus.buildSubmit

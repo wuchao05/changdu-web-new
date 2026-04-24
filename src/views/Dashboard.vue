@@ -99,6 +99,7 @@
             </n-button>
 
             <n-button
+              v-if="canAccessDramaClip"
               text
               :disabled="!hasActiveChannel"
               @click="router.push('/clip')"
@@ -308,7 +309,7 @@
         </n-card>
 
         <div class="space-y-6">
-          <n-card :bordered="false" class="shadow-sm">
+          <n-card v-if="canAccessOrderStats" :bordered="false" class="shadow-sm">
             <template #header>
               <div class="flex flex-wrap items-start justify-between gap-4">
                 <div class="flex items-center gap-3">
@@ -657,6 +658,16 @@ const canAccessReport = computed(
   () =>
     hasActiveChannel.value &&
     Boolean(sessionStore.currentRuntimeUser?.permissions?.webMenus?.report)
+)
+const canAccessOrderStats = computed(
+  () =>
+    hasActiveChannel.value &&
+    Boolean(sessionStore.currentRuntimeUser?.permissions?.webMenus?.orderStats)
+)
+const canAccessDramaClip = computed(
+  () =>
+    hasActiveChannel.value &&
+    Boolean(sessionStore.currentRuntimeUser?.permissions?.webMenus?.dramaClip)
 )
 const hasAccountTableId = computed(() => Boolean(apiConfigStore.config.accountTableId))
 const dashboardSubtitle = computed(() => '数据驱动，精准运营')
