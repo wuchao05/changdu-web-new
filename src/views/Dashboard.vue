@@ -415,6 +415,31 @@
                 </div>
               </div>
             </div>
+            <div v-if="shouldShowOwnOrderSummary" class="own-order-summary mb-4">
+              <div class="own-order-summary__header">
+                <div>
+                  <p class="own-order-summary__eyebrow">我的订单统计</p>
+                  <h4 class="own-order-summary__title">当前时间范围汇总</h4>
+                </div>
+                <span class="own-order-summary__badge">仅展示本人订单</span>
+              </div>
+              <div class="own-order-summary__grid">
+                <div
+                  v-for="card in ownOrderSummaryCards"
+                  :key="card.key"
+                  class="own-order-summary-card"
+                >
+                  <div class="own-order-summary-card__icon" :class="card.iconClass">
+                    <Icon :icon="card.icon" class="h-5 w-5" />
+                  </div>
+                  <div class="min-w-0">
+                    <p class="own-order-summary-card__label">{{ card.label }}</p>
+                    <p class="own-order-summary-card__value">{{ card.value }}</p>
+                    <p class="own-order-summary-card__meta">{{ card.meta }}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
             <n-data-table
               class="orders-table"
               :columns="orderColumns"
@@ -898,6 +923,44 @@ const orderRows = computed<OrderItem[]>(() => {
 
   return rootPromotionOrders.value
 })
+
+const shouldShowOwnOrderSummary = computed(
+  () => canAccessOrderStats.value && ordersData.value?.order_visibility_scope === 'own'
+)
+const ownOrderDateRangeText = computed(() => {
+  if (!orderDateRange.value) {
+    return '当前筛选时间范围'
+  }
+
+  const [begin, end] = orderDateRange.value
+  return `${begin} 至 ${end}`
+})
+const ownOrderTotalAmount = computed(() =>
+  typeof ordersData.value?.total_amount === 'number'
+    ? ordersData.value.total_amount
+    : calculateOrderRechargeAmount(orderRows.value)
+)
+const ownOrderTotalCount = computed(() =>
+  typeof ordersData.value?.total === 'number' ? ordersData.value.total : orderRows.value.length
+)
+const ownOrderSummaryCards = computed(() => [
+  {
+    key: 'amount',
+    label: '总充值金额',
+    value: formatCurrency(ownOrderTotalAmount.value),
+    meta: ownOrderDateRangeText.value,
+    icon: 'mdi:cash-multiple',
+    iconClass: 'own-order-summary-card__icon--amount',
+  },
+  {
+    key: 'orders',
+    label: '总订单数',
+    value: `${formatNumberValue(ownOrderTotalCount.value)} 单`,
+    meta: '当前条件命中的本人订单',
+    icon: 'mdi:receipt-text-check-outline',
+    iconClass: 'own-order-summary-card__icon--orders',
+  },
+])
 
 const pagedOrderRows = computed<OrderItem[]>(() => {
   const pageSize = Number(ordersPagination.pageSize || 10)
@@ -2029,6 +2092,120 @@ onUnmounted(() => {
   color: rgb(120 113 108);
 }
 
+.own-order-summary {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(245, 158, 11, 0.16);
+  border-radius: 1.1rem;
+  padding: 0.95rem;
+  background:
+    radial-gradient(circle at top right, rgba(251, 191, 36, 0.24), transparent 34%),
+    radial-gradient(circle at bottom left, rgba(14, 165, 233, 0.14), transparent 30%),
+    linear-gradient(135deg, rgba(255, 251, 235, 0.98), rgba(255, 255, 255, 0.98));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.86),
+    0 18px 42px -34px rgba(180, 83, 9, 0.42);
+}
+
+.own-order-summary__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.85rem;
+  margin-bottom: 0.78rem;
+}
+
+.own-order-summary__eyebrow {
+  margin: 0;
+  color: rgb(217 119 6);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.own-order-summary__title {
+  margin: 0.12rem 0 0;
+  color: rgb(15 23 42);
+  font-size: 0.98rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.own-order-summary__badge {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 0.22rem 0.58rem;
+  border-radius: 9999px;
+  color: rgb(180 83 9);
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.16);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.own-order-summary__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.own-order-summary-card {
+  display: flex;
+  align-items: center;
+  gap: 0.78rem;
+  min-width: 0;
+  padding: 0.88rem 0.92rem;
+  border: 1px solid rgba(255, 255, 255, 0.76);
+  border-radius: 0.95rem;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 12px 26px -24px rgba(15, 23, 42, 0.38);
+  backdrop-filter: blur(10px);
+}
+
+.own-order-summary-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2.55rem;
+  height: 2.55rem;
+  border-radius: 0.85rem;
+  color: white;
+  box-shadow: 0 12px 24px -18px currentColor;
+}
+
+.own-order-summary-card__icon--amount {
+  background: linear-gradient(135deg, rgb(245 158 11), rgb(249 115 22));
+}
+
+.own-order-summary-card__icon--orders {
+  background: linear-gradient(135deg, rgb(14 165 233), rgb(37 99 235));
+}
+
+.own-order-summary-card__label {
+  margin: 0;
+  color: rgb(100 116 139);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.own-order-summary-card__value {
+  margin: 0.12rem 0 0;
+  color: rgb(15 23 42);
+  font-size: 1.24rem;
+  font-weight: 900;
+  line-height: 1.18;
+}
+
+.own-order-summary-card__meta {
+  margin: 0.18rem 0 0;
+  color: rgb(148 163 184);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
 .orders-table-footer {
   display: flex;
   align-items: center;
@@ -2233,6 +2410,14 @@ onUnmounted(() => {
 @media (max-width: 640px) {
   .order-user-tabs {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .own-order-summary__header {
+    flex-direction: column;
+  }
+
+  .own-order-summary__grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .order-branch-panel__grid {
