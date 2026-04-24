@@ -149,7 +149,7 @@
 
               <div class="terminal-loader__copy">
                 <p class="terminal-loader__title">正在接入日志流</p>
-                <p class="terminal-loader__desc">同步最近 20,000 条服务端输出，请稍候</p>
+                <p class="terminal-loader__desc">同步最近 10,000 条服务端输出，请稍候</p>
               </div>
 
               <div class="terminal-loader__code" aria-hidden="true">
@@ -494,7 +494,7 @@ function startStream() {
   const streamId = activeStreamId
 
   disconnectStream = connectDebugLogStream({
-    limit: 20000,
+    limit: 10000,
     onConnected: () => {
       if (streamId !== activeStreamId) {
         return
