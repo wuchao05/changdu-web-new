@@ -842,17 +842,6 @@
                             :options="orderUserSortModeOptions"
                           />
                         </n-form-item>
-                        <n-form-item label="子用户列表" class="md:col-span-2">
-                          <n-select
-                            v-model:value="item.config.orderUserStats.childUserIds"
-                            :options="orderChildUserOptions"
-                            multiple
-                            filterable
-                            clearable
-                            max-tag-count="responsive"
-                            placeholder="请选择子用户，订单统计会使用这些子用户的全部抖音号名称匹配"
-                          />
-                        </n-form-item>
                         <n-form-item label="用户名列表" class="md:col-span-2">
                           <div class="w-full space-y-3">
                             <div
@@ -932,6 +921,17 @@
                               </n-button>
                             </div>
                           </div>
+                        </n-form-item>
+                        <n-form-item label="子用户列表" class="md:col-span-2">
+                          <n-select
+                            v-model:value="item.config.orderUserStats.childUserIds"
+                            :options="orderChildUserOptions"
+                            multiple
+                            filterable
+                            clearable
+                            max-tag-count="responsive"
+                            placeholder="请选择子用户，订单统计会使用这些子用户的全部抖音号名称匹配"
+                          />
                         </n-form-item>
                       </n-form>
                     </div>

@@ -687,7 +687,6 @@ const activePromotionUserName = ref('')
 const activeBranchUserId = ref('')
 const savingPassword = ref(false)
 const changePasswordFormRef = ref<FormInst | null>(null)
-const ORDER_BRANCH_ROOT_USERNAME = '小红'
 
 type DateRangeValue = [string, string] | null
 const reportDateRange = ref<DateRangeValue>(null)
@@ -874,10 +873,29 @@ const reportRows = computed<ReportRow[]>(() => {
   return candidates.find(item => Array.isArray(item)) || []
 })
 
-const orderSummaryUsernames = computed(() =>
+const orderSummaryTargets = computed(() =>
   Array.isArray(ordersData.value?.promotion_user_summaries)
-    ? (ordersData.value?.promotion_user_summaries || []).map(item => item.username)
+    ? (ordersData.value?.promotion_user_summaries || []).map(item => ({
+        username: item.username,
+        aliases:
+          Array.isArray(item.aliases) && item.aliases.length > 0 ? item.aliases : [item.username],
+      }))
     : []
+)
+const orderStatsChildUserIds = computed(() =>
+  Array.isArray(sessionStore.currentRuntimeUser?.orderUserStats?.childUserIds)
+    ? sessionStore.currentRuntimeUser.orderUserStats.childUserIds
+        .map(item => String(item || '').trim())
+        .filter(Boolean)
+    : []
+)
+const orderStatsParentUserName = computed(() =>
+  String(
+    sessionStore.currentRuntimeUser?.nickname ||
+      sessionStore.currentRuntimeUser?.account ||
+      sessionStore.currentRuntimeUser?.id ||
+      ''
+  ).trim()
 )
 
 const allOrderRows = computed<OrderItem[]>(() => ordersData.value?.data || [])
@@ -890,15 +908,27 @@ function getChannelUserDouyinAccounts(user: adminApi.UserProfile) {
   return configuredAccounts.filter((item, index, list) => list.indexOf(item) === index)
 }
 
+function getOrderSummaryTarget(username: string) {
+  return orderSummaryTargets.value.find(target => target.username === username) || null
+}
+
+function isOrderMatchedBySummaryTarget(order: OrderItem, username: string) {
+  const target = getOrderSummaryTarget(username)
+  if (!target) {
+    return false
+  }
+
+  const promotionName = String(order.promotion_name || '').trim()
+  return target.aliases.some(alias => promotionName.includes(alias))
+}
+
 const rootPromotionOrders = computed(() => {
   if (!activePromotionUserName.value) {
     return allOrderRows.value
   }
 
-  return allOrderRows.value.filter(
-    order =>
-      matchOrderPromotionUser(order.promotion_name, orderSummaryUsernames.value) ===
-      activePromotionUserName.value
+  return allOrderRows.value.filter(order =>
+    isOrderMatchedBySummaryTarget(order, activePromotionUserName.value)
   )
 })
 
@@ -913,15 +943,30 @@ function matchOrdersByDouyinAccounts(orders: OrderItem[], douyinAccounts: string
   })
 }
 
-const orderBranchUsers = computed(() =>
-  sessionStore.currentChannelUsers
-    .filter(user => Boolean(String(user.id || '').trim()))
+const orderBranchUsers = computed(() => {
+  const childUserIdSet = new Set(orderStatsChildUserIds.value)
+  if (childUserIdSet.size === 0) {
+    return []
+  }
+
+  const usersById = new Map(
+    sessionStore.currentChannelUsers
+      .filter(user => Boolean(String(user.id || '').trim()))
+      .map(user => [user.id, user])
+  )
+  const parentUser = sessionStore.currentRuntimeUser
+  const branchUsers = [
+    parentUser,
+    ...orderStatsChildUserIds.value.map(userId => usersById.get(userId)).filter(Boolean),
+  ].filter((user): user is adminApi.UserProfile => Boolean(user))
+
+  return branchUsers
     .map(user => ({
       ...user,
       douyinAccounts: getChannelUserDouyinAccounts(user),
     }))
     .filter(user => user.douyinAccounts.length > 0)
-)
+})
 
 const orderBranchCardItems = computed(() =>
   orderBranchUsers.value
@@ -963,7 +1008,8 @@ const activeBranchCard = computed(
 const shouldShowOrderBranch = computed(
   () =>
     !isIndependentOrderStatsMode.value &&
-    activePromotionUserName.value === ORDER_BRANCH_ROOT_USERNAME &&
+    orderStatsChildUserIds.value.length > 0 &&
+    activePromotionUserName.value === orderStatsParentUserName.value &&
     orderBranchCardItems.value.length > 0
 )
 
@@ -1345,20 +1391,6 @@ function calculateOrderRechargeAmount(orders: OrderItem[]) {
   }, 0)
 }
 
-function matchOrderPromotionUser(promotionName: string, usernames: string[]) {
-  const normalizedPromotionName = String(promotionName || '').trim()
-  if (!normalizedPromotionName || !Array.isArray(usernames) || usernames.length === 0) {
-    return ''
-  }
-
-  const matchedUsernames = usernames.filter(username => normalizedPromotionName.includes(username))
-  if (matchedUsernames.length === 0) {
-    return ''
-  }
-
-  return [...matchedUsernames].sort((left, right) => right.length - left.length)[0]
-}
-
 function getCurrentMonthDateRange() {
   const now = new Date()
   const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -1635,7 +1667,7 @@ function handlePromotionUserTabChange(username: string) {
   }
 
   activePromotionUserName.value = username
-  if (username !== ORDER_BRANCH_ROOT_USERNAME) {
+  if (username !== orderStatsParentUserName.value) {
     activeBranchUserId.value = ''
   }
   ordersCurrentPage.value = 1
@@ -1699,7 +1731,7 @@ function handleOrdersPageChange(page: number) {
 watch(
   [activePromotionUserName, orderBranchCardItems],
   ([activeUsername, branchCards]) => {
-    if (activeUsername !== ORDER_BRANCH_ROOT_USERNAME || branchCards.length === 0) {
+    if (activeUsername !== orderStatsParentUserName.value || branchCards.length === 0) {
       if (activeBranchUserId.value) {
         activeBranchUserId.value = ''
       }
