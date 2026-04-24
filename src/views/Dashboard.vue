@@ -956,7 +956,7 @@ const ownOrderSummaryCards = computed(() => [
     key: 'orders',
     label: '总订单数',
     value: `${formatNumberValue(ownOrderTotalCount.value)} 单`,
-    meta: '当前条件命中的本人订单',
+    meta: '这段时间你的全部订单',
     icon: 'mdi:receipt-text-check-outline',
     iconClass: 'own-order-summary-card__icon--orders',
   },
