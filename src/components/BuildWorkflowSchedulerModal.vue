@@ -3591,7 +3591,7 @@ onBeforeUnmount(() => {
 }
 
 .header-config-chip__body--preview {
-  grid-template-columns: minmax(92px, 0.7fr) minmax(150px, 1.25fr) minmax(150px, 1.25fr) auto;
+  grid-template-columns: minmax(120px, 1fr) minmax(132px, 1.08fr) minmax(132px, 1.08fr) auto;
 }
 
 .header-config-chip__field {
@@ -3601,7 +3601,7 @@ onBeforeUnmount(() => {
 }
 
 .header-config-chip__field--wide {
-  min-width: 150px;
+  min-width: 132px;
 }
 
 .header-config-chip__label {
