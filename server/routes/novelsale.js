@@ -50,6 +50,33 @@ function filterOrdersByDouyinAccounts(orders, douyinAccountsStr) {
   })
 }
 
+function collectUserDouyinAccountNames(user = {}) {
+  return Array.isArray(user?.douyinAccounts)
+    ? user.douyinAccounts
+        .map(item => String(item?.douyinAccount || '').trim())
+        .filter(Boolean)
+        .filter((item, index, list) => list.indexOf(item) === index)
+    : []
+}
+
+function filterOrdersByPromotionAliases(orders = [], aliases = []) {
+  if (!Array.isArray(orders) || orders.length === 0) {
+    return []
+  }
+
+  const normalizedAliases = Array.isArray(aliases)
+    ? aliases.map(item => String(item || '').trim()).filter(Boolean)
+    : []
+  if (normalizedAliases.length === 0) {
+    return []
+  }
+
+  return orders.filter(order => {
+    const promotionName = String(order?.promotion_name || '').trim()
+    return Boolean(promotionName && normalizedAliases.some(alias => promotionName.includes(alias)))
+  })
+}
+
 function normalizeOrderUserStatsConfig(config = {}) {
   const usernames = Array.isArray(config?.usernames)
     ? config.usernames
@@ -238,12 +265,7 @@ async function fetchAllOrdersByRange(ctx, timeRange) {
 
 function buildUserOrderStatsTarget(user) {
   const username = String(user?.nickname || user?.account || user?.id || '').trim()
-  const aliases = Array.isArray(user?.douyinAccounts)
-    ? user.douyinAccounts
-        .map(item => String(item?.douyinAccount || '').trim())
-        .filter(Boolean)
-        .filter((item, index, list) => list.indexOf(item) === index)
-    : []
+  const aliases = collectUserDouyinAccountNames(user)
 
   if (!username) {
     return null
@@ -268,8 +290,18 @@ async function resolveOrderUserStatsRuntime(ctx) {
   }
 
   const config = normalizeOrderUserStatsConfig(runtimeContext.runtimeUser?.orderUserStats)
+  const isAdminUser = sessionUser.userType === 'admin'
+  const isParentUser = config.enabled && config.childUserIds.length > 0
+  const ownDouyinAccounts = collectUserDouyinAccountNames(runtimeContext.runtimeUser)
+  const scopedConfig = {
+    ...config,
+    canViewAllOrders: isAdminUser || isParentUser,
+    restrictToOwnDouyinAccounts: !isAdminUser && !isParentUser,
+    ownDouyinAccounts,
+  }
+
   if (!config.enabled || config.childUserIds.length === 0) {
-    return config
+    return scopedConfig
   }
 
   const childUserIdSet = new Set(config.childUserIds)
@@ -293,7 +325,7 @@ async function resolveOrderUserStatsRuntime(ctx) {
     : null
 
   return {
-    ...config,
+    ...scopedConfig,
     matchTargets: normalizePromotionUserTargets([...config.matchTargets, parentWithChildAliases]),
   }
 }
@@ -382,9 +414,10 @@ router.get('/distributor/promotion/detail/v2', async ctx => {
   const channelDouyinAccounts = ctx.query.channel_douyin_accounts
   const selectedPromotionUserName = String(ctx.query.promotion_user_name || '').trim()
   const orderUserStatsConfig = await resolveOrderUserStatsRuntime(ctx)
-  const promotionUserTargets = orderUserStatsConfig.enabled
-    ? normalizePromotionUserTargets(orderUserStatsConfig.matchTargets)
-    : []
+  const promotionUserTargets =
+    orderUserStatsConfig.enabled && orderUserStatsConfig.canViewAllOrders
+      ? normalizePromotionUserTargets(orderUserStatsConfig.matchTargets)
+      : []
   const configuredPromotionUsernames = promotionUserTargets.map(target => target.username)
   const shouldBuildPromotionUserStats = promotionUserTargets.length > 0
 
@@ -416,7 +449,10 @@ router.get('/distributor/promotion/detail/v2', async ctx => {
     allOrders.push(...rangeResult.orders)
   }
 
-  const douyinFilteredOrders = filterOrdersByDouyinAccounts(allOrders, channelDouyinAccounts)
+  const scopedOrders = orderUserStatsConfig.restrictToOwnDouyinAccounts
+    ? filterOrdersByPromotionAliases(allOrders, orderUserStatsConfig.ownDouyinAccounts)
+    : allOrders
+  const douyinFilteredOrders = filterOrdersByDouyinAccounts(scopedOrders, channelDouyinAccounts)
   const promotionUserSummaries = shouldBuildPromotionUserStats
     ? buildPromotionUserSummaries(douyinFilteredOrders, promotionUserTargets)
     : []
@@ -449,6 +485,7 @@ router.get('/distributor/promotion/detail/v2', async ctx => {
     all_total_amount: allTotalAmount,
     active_promotion_user_name: resolvedActivePromotionUserName,
     promotion_user_stats_enabled: shouldBuildPromotionUserStats,
+    order_visibility_scope: orderUserStatsConfig.restrictToOwnDouyinAccounts ? 'own' : 'all',
     promotion_user_summaries: promotionUserSummaries,
   }
 })

@@ -82,6 +82,7 @@ export interface OrderData {
   all_total_amount?: number // 全部订单总充值金额（单位：分）
   active_promotion_user_name?: string // 当前选中的推广用户名
   promotion_user_stats_enabled?: boolean // 是否启用按用户统计订单
+  order_visibility_scope?: 'all' | 'own' // 订单可见范围
   promotion_user_summaries?: PromotionUserSummary[]
   data: OrderItem[]
 }
