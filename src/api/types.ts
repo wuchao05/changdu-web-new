@@ -84,6 +84,7 @@ export interface OrderData {
   promotion_user_stats_enabled?: boolean // 是否启用按用户统计订单
   order_visibility_scope?: 'all' | 'own' // 订单可见范围
   promotion_user_summaries?: PromotionUserSummary[]
+  promotion_user_branch_summaries?: PromotionUserSummary[]
   data: OrderItem[]
 }
 

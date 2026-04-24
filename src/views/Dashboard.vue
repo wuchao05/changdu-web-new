@@ -815,14 +815,6 @@ const orderStatsParentUserName = computed(() =>
 
 const allOrderRows = computed<OrderItem[]>(() => ordersData.value?.data || [])
 
-function getChannelUserDouyinAccounts(user: adminApi.UserProfile) {
-  const configuredAccounts = Array.isArray(user.douyinAccounts)
-    ? user.douyinAccounts.map(item => String(item?.douyinAccount || '').trim()).filter(Boolean)
-    : []
-
-  return configuredAccounts.filter((item, index, list) => list.indexOf(item) === index)
-}
-
 function getOrderSummaryTarget(username: string) {
   return orderSummaryTargets.value.find(target => target.username === username) || null
 }
@@ -847,74 +839,31 @@ const rootPromotionOrders = computed(() => {
   )
 })
 
-function matchOrdersByDouyinAccounts(orders: OrderItem[], douyinAccounts: string[]) {
-  if (!Array.isArray(douyinAccounts) || douyinAccounts.length === 0) {
+function matchOrdersByAliases(orders: OrderItem[], aliases: string[]) {
+  if (!Array.isArray(aliases) || aliases.length === 0) {
     return []
   }
 
   return orders.filter(order => {
     const promotionName = String(order.promotion_name || '').trim()
-    return douyinAccounts.some(account => promotionName.includes(account))
+    return aliases.some(alias => promotionName.includes(alias))
   })
 }
 
-const orderBranchUsers = computed(() => {
-  const childUserIdSet = new Set(orderStatsChildUserIds.value)
-  if (childUserIdSet.size === 0) {
-    return []
-  }
+const orderBranchCardItems = computed(() => {
+  const summaries = Array.isArray(ordersData.value?.promotion_user_branch_summaries)
+    ? ordersData.value.promotion_user_branch_summaries
+    : []
 
-  const usersById = new Map(
-    sessionStore.currentChannelUsers
-      .filter(user => Boolean(String(user.id || '').trim()))
-      .map(user => [user.id, user])
-  )
-  const parentUser = sessionStore.currentRuntimeUser
-  const branchUsers = [
-    parentUser,
-    ...orderStatsChildUserIds.value.map(userId => usersById.get(userId)).filter(Boolean),
-  ].filter((user): user is adminApi.UserProfile => Boolean(user))
-
-  return branchUsers
-    .map(user => ({
-      ...user,
-      douyinAccounts: getChannelUserDouyinAccounts(user),
-    }))
-    .filter(user => user.douyinAccounts.length > 0)
+  return summaries.map((summary: PromotionUserSummary) => ({
+    key: summary.username,
+    label: summary.username,
+    total: Number(summary.total || 0),
+    totalAmount: Number(summary.total_amount || 0),
+    paidOrderCount: Number(summary.paid_order_count || 0),
+    aliases: Array.isArray(summary.aliases) ? summary.aliases : [],
+  }))
 })
-
-const orderBranchCardItems = computed(() =>
-  orderBranchUsers.value
-    .map(user => {
-      const matchedOrders = matchOrdersByDouyinAccounts(
-        rootPromotionOrders.value,
-        user.douyinAccounts
-      )
-      const paidOrderCount = matchedOrders.filter(order => order.pay_status === 0).length
-
-      return {
-        key: user.id,
-        label: user.nickname || user.account || '未命名用户',
-        total: matchedOrders.length,
-        totalAmount: calculateOrderRechargeAmount(matchedOrders),
-        paidOrderCount,
-        douyinAccounts: user.douyinAccounts,
-      }
-    })
-    .sort((left, right) => {
-      const amountDiff = right.totalAmount - left.totalAmount
-      if (amountDiff !== 0) {
-        return amountDiff
-      }
-
-      const paidOrderDiff = right.paidOrderCount - left.paidOrderCount
-      if (paidOrderDiff !== 0) {
-        return paidOrderDiff
-      }
-
-      return left.label.localeCompare(right.label, 'zh-CN')
-    })
-)
 
 const activeBranchCard = computed(
   () => orderBranchCardItems.value.find(item => item.key === activeBranchUserId.value) || null
@@ -929,10 +878,7 @@ const shouldShowOrderBranch = computed(
 
 const orderRows = computed<OrderItem[]>(() => {
   if (shouldShowOrderBranch.value && activeBranchCard.value) {
-    return matchOrdersByDouyinAccounts(
-      rootPromotionOrders.value,
-      activeBranchCard.value?.douyinAccounts || []
-    )
+    return matchOrdersByAliases(rootPromotionOrders.value, activeBranchCard.value?.aliases || [])
   }
 
   if (!activePromotionUserName.value) {

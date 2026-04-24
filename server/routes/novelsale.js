@@ -327,6 +327,7 @@ async function resolveOrderUserStatsRuntime(ctx) {
   return {
     ...scopedConfig,
     matchTargets: normalizePromotionUserTargets([...config.matchTargets, parentWithChildAliases]),
+    branchTargets: normalizePromotionUserTargets([parentTarget, ...childUserTargets]),
   }
 }
 
@@ -456,6 +457,9 @@ router.get('/distributor/promotion/detail/v2', async ctx => {
   const promotionUserSummaries = shouldBuildPromotionUserStats
     ? buildPromotionUserSummaries(douyinFilteredOrders, promotionUserTargets)
     : []
+  const promotionUserBranchSummaries = shouldBuildPromotionUserStats
+    ? buildPromotionUserSummaries(douyinFilteredOrders, orderUserStatsConfig.branchTargets || [])
+    : []
   const resolvedActivePromotionUserName =
     shouldBuildPromotionUserStats &&
     configuredPromotionUsernames.includes(selectedPromotionUserName)
@@ -487,6 +491,7 @@ router.get('/distributor/promotion/detail/v2', async ctx => {
     promotion_user_stats_enabled: shouldBuildPromotionUserStats,
     order_visibility_scope: orderUserStatsConfig.restrictToOwnDouyinAccounts ? 'own' : 'all',
     promotion_user_summaries: promotionUserSummaries,
+    promotion_user_branch_summaries: promotionUserBranchSummaries,
   }
 })
 
