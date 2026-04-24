@@ -42,6 +42,7 @@ const selectedRange = ref<string | null>(null)
 // 默认日期范围选项
 const defaultDateRangeOptions = [
   { label: '今日', value: 'today' },
+  { label: '昨日', value: 'yesterday' },
   { label: '近3日', value: '3days' },
   { label: '近7日', value: '7days' },
   { label: '近15日', value: '15days' },
@@ -62,6 +63,11 @@ function calculateDateRange(rangeType: string): [string, string] {
   switch (rangeType) {
     case 'today':
       return [now.format('YYYY-MM-DD'), now.format('YYYY-MM-DD')]
+
+    case 'yesterday': {
+      const yesterday = now.subtract(1, 'day')
+      return [yesterday.format('YYYY-MM-DD'), yesterday.format('YYYY-MM-DD')]
+    }
 
     case '3days':
       return [now.subtract(2, 'day').format('YYYY-MM-DD'), now.format('YYYY-MM-DD')]
@@ -115,6 +121,8 @@ watch(
     // 检查是否是预设的日期范围
     if (start === end && start === now.format('YYYY-MM-DD')) {
       selectedRange.value = 'today'
+    } else if (start === end && start === now.subtract(1, 'day').format('YYYY-MM-DD')) {
+      selectedRange.value = 'yesterday'
     } else if (
       start === now.subtract(2, 'day').format('YYYY-MM-DD') &&
       end === now.format('YYYY-MM-DD')

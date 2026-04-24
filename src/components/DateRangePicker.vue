@@ -95,6 +95,7 @@ const customDateRange = ref<[number, number] | null>(null)
 // 默认快捷日期选项
 const defaultPresetOptions = [
   { label: '今日', value: 'today' },
+  { label: '昨日', value: 'yesterday' },
   { label: '近3日', value: '3days' },
   { label: '近7日', value: '7days' },
   { label: '本月', value: 'month' },
@@ -135,6 +136,11 @@ function calculatePresetRange(presetType: string): [string, string] {
     case 'today':
       return [now.format('YYYY-MM-DD'), now.format('YYYY-MM-DD')]
 
+    case 'yesterday': {
+      const yesterday = now.subtract(1, 'day')
+      return [yesterday.format('YYYY-MM-DD'), yesterday.format('YYYY-MM-DD')]
+    }
+
     case '3days':
       return [now.subtract(2, 'day').format('YYYY-MM-DD'), now.format('YYYY-MM-DD')]
 
@@ -166,6 +172,8 @@ function findMatchingPreset(dateRange: [string, string]): string | null {
   // 检查是否匹配预设日期范围
   if (start === end && start === now.format('YYYY-MM-DD')) {
     return 'today'
+  } else if (start === end && start === now.subtract(1, 'day').format('YYYY-MM-DD')) {
+    return 'yesterday'
   } else if (
     start === now.subtract(2, 'day').format('YYYY-MM-DD') &&
     end === now.format('YYYY-MM-DD')

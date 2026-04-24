@@ -15,6 +15,16 @@ interface SessionRequestError extends Error {
   code?: number
 }
 
+function isRequestCanceled(error: unknown) {
+  const requestError = error as { name?: string; code?: string; message?: string }
+  return (
+    requestError?.name === 'AbortError' ||
+    requestError?.name === 'CanceledError' ||
+    requestError?.code === 'ERR_CANCELED' ||
+    requestError?.message === 'canceled'
+  )
+}
+
 export const useSessionStore = defineStore('session', () => {
   const currentUser = ref<adminApi.UserProfile | null>(null)
   const currentRuntimeUser = ref<adminApi.UserProfile | null>(null)
@@ -30,8 +40,10 @@ export const useSessionStore = defineStore('session', () => {
     isAdmin.value ? selectedChannelId.value : currentChannel.value?.id || ''
   )
 
-  async function syncAdminChannels() {
-    const sessionData = await adminApi.getCurrentSession()
+  async function syncAdminChannels(signal?: AbortSignal) {
+    const sessionData = await adminApi.getCurrentSession({ signal })
+    if (signal?.aborted) return
+
     currentUser.value = sessionData.user
     currentRuntimeUser.value = sessionData.runtimeUser
     currentChannel.value = sessionData.channel
@@ -58,7 +70,7 @@ export const useSessionStore = defineStore('session', () => {
     setSelectedChannelId(nextChannelId)
   }
 
-  async function loadSession() {
+  async function loadSession(signal?: AbortSignal) {
     if (!getSessionToken()) {
       currentUser.value = null
       currentRuntimeUser.value = null
@@ -71,8 +83,12 @@ export const useSessionStore = defineStore('session', () => {
     }
 
     try {
-      await syncAdminChannels()
+      await syncAdminChannels(signal)
     } catch (error) {
+      if (isRequestCanceled(error)) {
+        return
+      }
+
       const sessionError = error as SessionRequestError
       const shouldClearSession =
         sessionError?.status === 401 ||
@@ -93,7 +109,9 @@ export const useSessionStore = defineStore('session', () => {
         console.warn('[SessionStore] 会话校验失败，保留本地登录态，等待服务恢复:', error)
       }
     } finally {
-      initialized.value = true
+      if (!signal?.aborted) {
+        initialized.value = true
+      }
     }
   }
 

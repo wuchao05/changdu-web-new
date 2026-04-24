@@ -24,6 +24,16 @@ interface CacheData {
   matches: DouyinMaterialMatch[]
 }
 
+function isRequestCanceled(error: unknown) {
+  const requestError = error as { name?: string; code?: string; message?: string }
+  return (
+    requestError?.name === 'CanceledError' ||
+    requestError?.name === 'AbortError' ||
+    requestError?.code === 'ERR_CANCELED' ||
+    requestError?.message === 'canceled'
+  )
+}
+
 export const useDouyinMaterialStore = defineStore('douyinMaterial', () => {
   // 抖音号匹配素材列表
   const matches = ref<DouyinMaterialMatch[]>([])
@@ -89,7 +99,7 @@ export const useDouyinMaterialStore = defineStore('douyinMaterial', () => {
    * 从服务器加载配置
    * @param forceRefresh 是否强制刷新，忽略缓存
    */
-  async function loadFromServer(forceRefresh = false) {
+  async function loadFromServer(forceRefresh = false, signal?: AbortSignal) {
     // 如果不是强制刷新，先尝试从缓存加载
     if (!forceRefresh && loadFromCache()) {
       return
@@ -97,7 +107,7 @@ export const useDouyinMaterialStore = defineStore('douyinMaterial', () => {
 
     try {
       console.log('🌐 从服务器加载抖音号素材匹配配置...')
-      const list = await douyinMaterialApi.getDouyinMaterialConfig()
+      const list = await douyinMaterialApi.getDouyinMaterialConfig({ signal })
       // 确保返回的是数组
       if (Array.isArray(list)) {
         matches.value = list
@@ -108,6 +118,10 @@ export const useDouyinMaterialStore = defineStore('douyinMaterial', () => {
         matches.value = []
       }
     } catch (error) {
+      if (isRequestCanceled(error)) {
+        return
+      }
+
       console.error('从服务器加载抖音号素材匹配配置失败:', error)
       // 如果服务器加载失败，尝试使用本地缓存
       if (!loadFromCache()) {

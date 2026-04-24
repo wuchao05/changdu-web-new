@@ -3,7 +3,7 @@ import { ref } from 'vue'
 
 export interface AppSettings {
   pageSize: number
-  defaultDateRange: 'today' | '3days' | '7days' | '30days' | 'all' // 默认查询天数
+  defaultDateRange: 'today' | 'yesterday' | '3days' | '7days' | '30days' | 'all' // 默认查询天数
   autoUploadEnabled: boolean
   autoUploadInterval: number // 自动上传轮询间隔（秒）
 }

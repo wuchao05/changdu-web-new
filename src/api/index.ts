@@ -1,3 +1,4 @@
+import type { AxiosRequestConfig } from 'axios'
 import httpInstance from './http'
 import { feishuApi } from './feishu'
 import type {
@@ -26,9 +27,13 @@ import type {
 /**
  * 获取数据报表
  */
-export function getReport(params: ReportParams): Promise<ReportData> {
+export function getReport(
+  params: ReportParams,
+  config: Pick<AxiosRequestConfig, 'signal'> = {}
+): Promise<ReportData> {
   return httpInstance
     .get('/novelsale/distributor/application_overview_list/v1', {
+      ...config,
       params: {
         is_optimizer_view: false,
         date_type: 1,
@@ -41,7 +46,10 @@ export function getReport(params: ReportParams): Promise<ReportData> {
 /**
  * 接口C - 获取订单统计
  */
-export function getOrders(params: OrderParams): Promise<OrderData> {
+export function getOrders(
+  params: OrderParams,
+  config: Pick<AxiosRequestConfig, 'signal'> = {}
+): Promise<OrderData> {
   const finalParams = {
     promotion_type: 0,
     media_source: 0,
@@ -53,6 +61,7 @@ export function getOrders(params: OrderParams): Promise<OrderData> {
 
   return httpInstance
     .get('/novelsale/distributor/promotion/detail/v2', {
+      ...config,
       params: finalParams,
     })
     .then(res => res.data)
@@ -172,9 +181,13 @@ export function getDramaDetail(params: DramaDetailParams): Promise<DramaDetailRe
 /**
  * 新API - 获取数据概览v1（今日数据和累计数据）
  */
-export function getDataOverviewV1(params: DataOverviewV1Params): Promise<DataOverviewV1Response> {
+export function getDataOverviewV1(
+  params: DataOverviewV1Params,
+  config: Pick<AxiosRequestConfig, 'signal'> = {}
+): Promise<DataOverviewV1Response> {
   return httpInstance
     .get('/novelsale/distributor/dashboard/data_overview/v1', {
+      ...config,
       params: {
         is_today: params.is_today,
         app_type: params.app_type,
@@ -187,10 +200,12 @@ export function getDataOverviewV1(params: DataOverviewV1Params): Promise<DataOve
  * 本月充值分析接口 - 获取本月充值数据
  */
 export function getMonthlyRechargeAnalyze(
-  params: MonthlyRechargeAnalyzeParams
+  params: MonthlyRechargeAnalyzeParams,
+  config: Pick<AxiosRequestConfig, 'signal'> = {}
 ): Promise<MonthlyRechargeAnalyzeResponse> {
   return httpInstance
     .get('/novelsale/distributor/dashboard/recharge_analyze/v1', {
+      ...config,
       params: {
         begin: params.begin,
         end: params.end,

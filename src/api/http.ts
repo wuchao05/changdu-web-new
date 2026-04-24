@@ -123,6 +123,10 @@ httpInstance.interceptors.response.use(
     return response
   },
   error => {
+    if (axios.isCancel(error) || error?.code === 'ERR_CANCELED') {
+      return Promise.reject(error)
+    }
+
     let errorMessage = error.message || '未知错误'
     let errorName = 'UnknownError'
 

@@ -646,6 +646,18 @@ const savingPassword = ref(false)
 const changePasswordFormRef = ref<FormInst | null>(null)
 
 type DateRangeValue = [string, string] | null
+type DashboardRequestScope = 'overview' | 'report' | 'orders' | 'material'
+interface DashboardRequestContext {
+  scope: DashboardRequestScope
+  controller: AbortController
+  generation: number
+  signal: AbortSignal
+}
+
+const dashboardRequestControllers = new Map<DashboardRequestScope, AbortController>()
+let dashboardRequestGeneration = 0
+let channelSwitchController: AbortController | null = null
+let channelSwitchSerial = 0
 const reportDateRange = ref<DateRangeValue>(null)
 const orderDateRange = ref<DateRangeValue>(null)
 const changePasswordForm = reactive({
@@ -1238,6 +1250,9 @@ function getDefaultDateRange(): DateRangeValue {
   switch (preset) {
     case 'today':
       return [end, end]
+    case 'yesterday':
+      startDate.setDate(startDate.getDate() - 1)
+      return [formatDate(startDate), formatDate(startDate)]
     case '3days':
       startDate.setDate(startDate.getDate() - 2)
       return [formatDate(startDate), end]
@@ -1341,6 +1356,61 @@ function formatReportDate(value: string | number) {
   return normalizedValue
 }
 
+function isRequestCanceled(error: unknown) {
+  const requestError = error as { name?: string; code?: string; message?: string }
+  return (
+    requestError?.name === 'AbortError' ||
+    requestError?.name === 'CanceledError' ||
+    requestError?.code === 'ERR_CANCELED' ||
+    requestError?.message === 'canceled'
+  )
+}
+
+function beginDashboardRequest(scope: DashboardRequestScope): DashboardRequestContext {
+  dashboardRequestControllers.get(scope)?.abort()
+  const controller = new AbortController()
+  dashboardRequestControllers.set(scope, controller)
+  return {
+    scope,
+    controller,
+    signal: controller.signal,
+    generation: dashboardRequestGeneration,
+  }
+}
+
+function finishDashboardRequest(context: DashboardRequestContext) {
+  if (dashboardRequestControllers.get(context.scope) === context.controller) {
+    dashboardRequestControllers.delete(context.scope)
+  }
+}
+
+function isActiveDashboardRequest(context: DashboardRequestContext) {
+  return (
+    !context.signal.aborted &&
+    context.generation === dashboardRequestGeneration &&
+    dashboardRequestControllers.get(context.scope) === context.controller
+  )
+}
+
+function cancelDashboardRequests() {
+  dashboardRequestGeneration += 1
+  dashboardRequestControllers.forEach(controller => controller.abort())
+  dashboardRequestControllers.clear()
+  overviewLoading.value = false
+  reportLoading.value = false
+  ordersLoading.value = false
+}
+
+function resetOrderStatsForChannelSwitch() {
+  orderDateRange.value = getDefaultDateRange()
+  ordersData.value = null
+  ordersError.value = ''
+  ordersCurrentPage.value = 1
+  ordersPagination.page = 1
+  activePromotionUserName.value = ''
+  activeBranchUserId.value = ''
+}
+
 async function triggerDashboardRefresh() {
   if (!hasActiveChannel.value) return
   await loadDashboardData()
@@ -1356,29 +1426,40 @@ async function fetchOverviewData() {
     return
   }
 
+  const requestContext = beginDashboardRequest('overview')
   overviewLoading.value = true
   overviewError.value = ''
   try {
     const { begin, end } = getCurrentMonthDateRange()
     const [todayRes, allRes, monthlyRes] = await Promise.all([
-      getDataOverviewV1({ is_today: true, app_type: 7 }),
-      getDataOverviewV1({ is_today: false, app_type: 7 }),
-      getMonthlyRechargeAnalyze({
-        begin,
-        end,
-        analyze_type: 1,
-        app_type: 7,
-      }),
+      getDataOverviewV1({ is_today: true, app_type: 7 }, { signal: requestContext.signal }),
+      getDataOverviewV1({ is_today: false, app_type: 7 }, { signal: requestContext.signal }),
+      getMonthlyRechargeAnalyze(
+        {
+          begin,
+          end,
+          analyze_type: 1,
+          app_type: 7,
+        },
+        { signal: requestContext.signal }
+      ),
     ])
+    if (!isActiveDashboardRequest(requestContext)) return
+
     overviewToday.value = todayRes.data
     overviewAll.value = allRes.data
     monthRechargeAmount.value = monthlyRes?.total || 0
     overviewUpdatedAt.value = new Date().toLocaleString('zh-CN')
   } catch (error) {
+    if (isRequestCanceled(error) || !isActiveDashboardRequest(requestContext)) return
+
     console.error('获取数据概览失败:', error)
     overviewError.value = error instanceof Error ? error.message : '获取数据概览失败'
   } finally {
-    overviewLoading.value = false
+    if (isActiveDashboardRequest(requestContext)) {
+      overviewLoading.value = false
+    }
+    finishDashboardRequest(requestContext)
   }
 }
 
@@ -1391,6 +1472,7 @@ async function fetchReportData() {
     return
   }
 
+  const requestContext = beginDashboardRequest('report')
   reportLoading.value = true
   reportError.value = ''
   try {
@@ -1401,20 +1483,29 @@ async function fetchReportData() {
       page_index: 0,
       page_size: 10,
     }
-    reportData.value = await getReport(params)
+    const nextReportData = await getReport(params, { signal: requestContext.signal })
+    if (!isActiveDashboardRequest(requestContext)) return
+
+    reportData.value = nextReportData
     reportCurrentPage.value = 1
     reportPagination.page = 1
   } catch (error) {
+    if (isRequestCanceled(error) || !isActiveDashboardRequest(requestContext)) return
+
     console.error('获取数据报表失败:', error)
     reportError.value = error instanceof Error ? error.message : '获取数据报表失败'
   } finally {
-    reportLoading.value = false
+    if (isActiveDashboardRequest(requestContext)) {
+      reportLoading.value = false
+    }
+    finishDashboardRequest(requestContext)
   }
 }
 
 async function fetchOrdersData() {
   if (!hasActiveChannel.value || !orderDateRange.value) return
 
+  const requestContext = beginDashboardRequest('orders')
   ordersLoading.value = true
   ordersError.value = ''
   try {
@@ -1427,7 +1518,9 @@ async function fetchOrdersData() {
       page_size: 100,
       ...(payStatus.value >= 0 ? { pay_status: payStatus.value } : {}),
     }
-    const response = await getOrders(params)
+    const response = await getOrders(params, { signal: requestContext.signal })
+    if (!isActiveDashboardRequest(requestContext)) return
+
     ordersData.value = response
     const nextSummaryUsernames = Array.isArray(response.promotion_user_summaries)
       ? response.promotion_user_summaries.map(item => item.username)
@@ -1438,10 +1531,30 @@ async function fetchOrdersData() {
     ordersCurrentPage.value = 1
     ordersPagination.page = 1
   } catch (error) {
+    if (isRequestCanceled(error) || !isActiveDashboardRequest(requestContext)) return
+
     console.error('获取订单统计失败:', error)
     ordersError.value = error instanceof Error ? error.message : '获取订单统计失败'
   } finally {
-    ordersLoading.value = false
+    if (isActiveDashboardRequest(requestContext)) {
+      ordersLoading.value = false
+    }
+    finishDashboardRequest(requestContext)
+  }
+}
+
+async function loadChannelMaterialConfig() {
+  if (!hasActiveChannel.value) return
+
+  const requestContext = beginDashboardRequest('material')
+  try {
+    await douyinMaterialStore.loadFromServer(true, requestContext.signal)
+  } catch (error) {
+    if (isRequestCanceled(error) || !isActiveDashboardRequest(requestContext)) return
+
+    console.error('加载抖音号匹配素材失败:', error)
+  } finally {
+    finishDashboardRequest(requestContext)
   }
 }
 
@@ -1542,16 +1655,39 @@ async function handleChannelChange(value: string) {
     return
   }
 
+  channelSwitchController?.abort()
+  channelSwitchController = new AbortController()
+  const currentSwitchSerial = ++channelSwitchSerial
+  const { signal } = channelSwitchController
+
+  cancelDashboardRequests()
+  resetOrderStatsForChannelSwitch()
   sessionStore.updateSelectedChannel(value)
-  await apiConfigStore.loadFromStorage()
-  await refreshDashboardContext()
-  await douyinMaterialStore.loadFromServer(true)
-  await loadDashboardData()
+
+  try {
+    await refreshDashboardContext(signal)
+    if (signal.aborted || currentSwitchSerial !== channelSwitchSerial) return
+
+    await loadChannelMaterialConfig()
+    if (signal.aborted || currentSwitchSerial !== channelSwitchSerial) return
+
+    await loadDashboardData()
+  } catch (error) {
+    if (!isRequestCanceled(error)) {
+      console.error('切换渠道失败:', error)
+      message.error(error instanceof Error ? error.message : '切换渠道失败')
+    }
+  } finally {
+    if (channelSwitchController?.signal === signal) {
+      channelSwitchController = null
+    }
+  }
 }
 
-async function refreshDashboardContext() {
-  await sessionStore.loadSession()
-  await apiConfigStore.loadFromStorage()
+async function refreshDashboardContext(signal?: AbortSignal) {
+  await sessionStore.loadSession(signal)
+  if (signal?.aborted) return
+  await apiConfigStore.loadFromStorage(signal)
 }
 
 function handleReportDateChange() {
@@ -1605,7 +1741,7 @@ onMounted(async () => {
     console.warn('记录首页访问日志失败:', error)
   })
   if (hasActiveChannel.value) {
-    douyinMaterialStore.loadFromServer(true).catch(error => {
+    loadChannelMaterialConfig().catch(error => {
       console.error('加载抖音号匹配素材失败:', error)
     })
     await loadDashboardData()
@@ -1616,12 +1752,14 @@ watch(
   hasActiveChannel,
   active => {
     if (active) {
-      douyinMaterialStore.loadFromServer(true).catch(error => {
+      loadChannelMaterialConfig().catch(error => {
         console.error('加载抖音号匹配素材失败:', error)
       })
       loadDashboardData().catch(error => {
         console.error('加载首页数据失败:', error)
       })
+    } else {
+      cancelDashboardRequests()
     }
   },
   { immediate: false }
@@ -1662,6 +1800,8 @@ watch(
 )
 
 onUnmounted(() => {
+  channelSwitchController?.abort()
+  cancelDashboardRequests()
   window.removeEventListener('resize', checkMobile)
 })
 </script>

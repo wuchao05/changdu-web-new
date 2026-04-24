@@ -409,7 +409,7 @@ export function updateCurrentChannelXtToken(xtToken: string) {
   })
 }
 
-export function getCurrentSession() {
+export function getCurrentSession(init?: RequestInit) {
   return request<{
     user: UserProfile
     runtimeUser: UserProfile | null
@@ -442,7 +442,7 @@ export function getCurrentSession() {
     orderUserStats: UserChannelBindingConfig['orderUserStats']
     downloadCenterConfig: DownloadCenterConfig | null
     buildConfig: BuildConfig
-  }>('/session/me')
+  }>('/session/me', init)
 }
 
 export function reportPageVisit(pageName: string) {

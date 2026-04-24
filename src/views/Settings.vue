@@ -373,9 +373,11 @@ const apiConfigStore = useApiConfigStore()
 const sessionStore = useSessionStore()
 const douyinMaterialStore = useDouyinMaterialStore()
 
+type DefaultDateRange = 'today' | 'yesterday' | '3days' | '7days' | '30days' | 'all'
+
 const localSettings = ref({
   pageSize: 10,
-  defaultDateRange: 'today' as 'today' | '3days' | '7days' | '30days' | 'all',
+  defaultDateRange: 'today' as DefaultDateRange,
   autoUploadEnabled: false,
   autoUploadInterval: 300,
 })
@@ -389,6 +391,7 @@ const pageSizeOptions = [
 
 const dateRangeOptions = [
   { label: '今日', value: 'today' },
+  { label: '昨日', value: 'yesterday' },
   { label: '近3日', value: '3days' },
   { label: '近7日', value: '7days' },
   { label: '近30日', value: '30days' },
@@ -715,10 +718,12 @@ function updatePageSize(value: number) {
   message.success('分页大小已更新')
 }
 
-function updateDateRange(value: 'today' | '3days' | '7days' | '30days' | 'all') {
+function updateDateRange(value: DefaultDateRange) {
   settingsStore.updateSettings({ defaultDateRange: value })
   if (value === 'today') {
     message.success('默认查询天数已更新为“今日”，所有页面将筛选今日数据')
+  } else if (value === 'yesterday') {
+    message.success('默认查询天数已更新为“昨日”，所有页面将筛选昨日数据')
   } else {
     message.success('默认查询天数已更新')
   }

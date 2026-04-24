@@ -1,3 +1,4 @@
+import type { AxiosRequestConfig } from 'axios'
 import httpInstance from './http'
 
 export interface DouyinMaterialMatch {
@@ -14,8 +15,10 @@ export interface DouyinMaterialMatch {
 /**
  * 获取所有抖音号素材匹配配置
  */
-export function getDouyinMaterialConfig(): Promise<DouyinMaterialMatch[]> {
-  return httpInstance.get('/douyin-material/config').then(res => res.data.data)
+export function getDouyinMaterialConfig(
+  config: Pick<AxiosRequestConfig, 'signal'> = {}
+): Promise<DouyinMaterialMatch[]> {
+  return httpInstance.get('/douyin-material/config', config).then(res => res.data.data)
 }
 
 /**

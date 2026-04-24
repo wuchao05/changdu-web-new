@@ -41,6 +41,16 @@ const DEFAULT_API_CONFIG: ApiConfig = {
   nickname: '',
 }
 
+function isRequestCanceled(error: unknown) {
+  const requestError = error as { name?: string; code?: string; message?: string }
+  return (
+    requestError?.name === 'AbortError' ||
+    requestError?.name === 'CanceledError' ||
+    requestError?.code === 'ERR_CANCELED' ||
+    requestError?.message === 'canceled'
+  )
+}
+
 export const useApiConfigStore = defineStore('apiConfig', () => {
   const runtimeConfig = ref<ApiConfig>({ ...DEFAULT_API_CONFIG })
   const config = computed<ApiConfig>(() => runtimeConfig.value)
@@ -83,14 +93,17 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
     }
   }
 
-  async function applyRoleDefaults() {
+  async function applyRoleDefaults(signal?: AbortSignal) {
     try {
       const response = await fetch('/api/session/me', {
         headers: buildSessionHeaders(),
+        signal,
       })
-      if (!response.ok) return
+      if (!response.ok || signal?.aborted) return
 
       const { data } = await response.json()
+      if (signal?.aborted) return
+
       updateFromAuthConfig({
         platforms: data?.platforms,
         feishu: data?.feishu,
@@ -99,13 +112,17 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
         activeChannel: data?.channel,
       })
     } catch (error) {
+      if (isRequestCanceled(error)) {
+        return
+      }
+
       console.warn('从服务器同步每日鉴权配置失败，将继续使用本地配置', error)
     }
   }
 
-  async function loadFromStorage() {
+  async function loadFromStorage(signal?: AbortSignal) {
     loadLocalConfig()
-    await applyRoleDefaults()
+    await applyRoleDefaults(signal)
   }
 
   function updateFromAuthConfig(authData: {
