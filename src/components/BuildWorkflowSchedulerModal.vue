@@ -2346,7 +2346,7 @@ onBeforeUnmount(() => {
             v-if="showMaterialPreviewPanel && materialPreviewConfig"
             class="header-config-chip header-config-chip--sky"
           >
-            <div class="header-config-chip__head">
+            <div class="header-config-chip__head header-config-chip__head--preview">
               <div>
                 <p class="header-config-chip__title">素材预览</p>
                 <p class="header-config-chip__meta">{{ currentMaterialPreviewSummary }}</p>
@@ -2359,6 +2359,9 @@ onBeforeUnmount(() => {
                   :disabled="isLoadingMaterialPreview"
                   @update:value="handleMaterialPreviewToggle"
                 />
+                <n-tag size="small" :type="isMaterialPreviewEnabled ? 'success' : 'default'" round>
+                  {{ isMaterialPreviewEnabled ? '运行中' : '已停止' }}
+                </n-tag>
               </div>
             </div>
             <div class="header-config-chip__body header-config-chip__body--preview">
@@ -2374,7 +2377,7 @@ onBeforeUnmount(() => {
                   <template #suffix>分</template>
                 </n-input-number>
               </div>
-              <div class="header-config-chip__field">
+              <div class="header-config-chip__field header-config-chip__field--wide">
                 <span class="header-config-chip__label">起始</span>
                 <n-input-number
                   v-model:value="materialPreviewConfig.buildTimeWindowStart"
@@ -2386,7 +2389,7 @@ onBeforeUnmount(() => {
                   <template #suffix>分钟前</template>
                 </n-input-number>
               </div>
-              <div class="header-config-chip__field">
+              <div class="header-config-chip__field header-config-chip__field--wide">
                 <span class="header-config-chip__label">结束</span>
                 <n-input-number
                   v-model:value="materialPreviewConfig.buildTimeWindowEnd"
@@ -2407,9 +2410,6 @@ onBeforeUnmount(() => {
                 >
                   保存
                 </n-button>
-                <n-tag size="small" :type="isMaterialPreviewEnabled ? 'success' : 'default'" round>
-                  {{ isMaterialPreviewEnabled ? '运行中' : '已停止' }}
-                </n-tag>
               </div>
             </div>
           </section>
@@ -3564,6 +3564,10 @@ onBeforeUnmount(() => {
   margin-bottom: 10px;
 }
 
+.header-config-chip__head--preview {
+  align-items: flex-start;
+}
+
 .header-config-chip__title {
   font-size: 13px;
   font-weight: 700;
@@ -3582,14 +3586,22 @@ onBeforeUnmount(() => {
   gap: 8px;
 }
 
-.header-config-chip__body--advance,
-.header-config-chip__body--preview {
+.header-config-chip__body--advance {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.header-config-chip__body--preview {
+  grid-template-columns: minmax(92px, 0.7fr) minmax(150px, 1.25fr) minmax(150px, 1.25fr) auto;
 }
 
 .header-config-chip__field {
   display: grid;
   gap: 4px;
+  min-width: 0;
+}
+
+.header-config-chip__field--wide {
+  min-width: 150px;
 }
 
 .header-config-chip__label {
@@ -3608,8 +3620,10 @@ onBeforeUnmount(() => {
 .preview-switch-inline {
   display: inline-flex;
   align-items: center;
+  align-self: flex-start;
   gap: 8px;
   color: #475569;
+  white-space: nowrap;
 }
 
 .preview-switch-label {
