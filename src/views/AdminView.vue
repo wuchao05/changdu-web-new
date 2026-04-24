@@ -455,11 +455,22 @@
             </section>
 
             <section class="drawer-panel drawer-panel--white user-drawer-panel user-channel-panel">
-              <div class="panel-head panel-head--compact user-channel-panel-head">
-                <h3 class="panel-head__title panel-head__title--compact">按渠道配置</h3>
-              </div>
-              <div v-if="selectedUserChannelForms.length > 0" class="user-channel-workspace">
-                <div class="user-channel-tabs-wrap">
+              <div class="user-channel-sticky-nav">
+                <div class="panel-head panel-head--compact user-channel-panel-head">
+                  <div>
+                    <h3 class="panel-head__title panel-head__title--compact">按渠道配置</h3>
+                    <p v-if="activeUserChannelForm" class="user-channel-panel-head__subtitle">
+                      当前正在配置：{{ activeUserChannelForm.channel.name }}
+                    </p>
+                  </div>
+                  <div v-if="activeUserChannelForm" class="user-channel-current-pill">
+                    <span class="user-channel-current-pill__label">当前渠道</span>
+                    <strong class="user-channel-current-pill__name">
+                      {{ activeUserChannelForm.channel.name }}
+                    </strong>
+                  </div>
+                </div>
+                <div v-if="selectedUserChannelForms.length > 0" class="user-channel-tabs-wrap">
                   <div class="user-channel-tabs">
                     <button
                       v-for="item in selectedUserChannelForms"
@@ -481,7 +492,9 @@
                     </button>
                   </div>
                 </div>
+              </div>
 
+              <div v-if="selectedUserChannelForms.length > 0" class="user-channel-workspace">
                 <div
                   v-for="item in selectedUserChannelForms"
                   v-show="activeUserChannelId === item.channel.id"
@@ -1893,6 +1906,12 @@ const selectedUserChannelForms = computed(() =>
         config: adminApi.UserChannelBindingConfig
       } => item !== null
     )
+)
+const activeUserChannelForm = computed(
+  () =>
+    selectedUserChannelForms.value.find(item => item.channel.id === activeUserChannelId.value) ||
+    selectedUserChannelForms.value[0] ||
+    null
 )
 const defaultChannelOptions = computed(() =>
   channels.value
@@ -4005,24 +4024,72 @@ watch(
   margin-bottom: 0;
 }
 
+.user-channel-sticky-nav {
+  position: sticky;
+  top: -0.25rem;
+  z-index: 12;
+  margin: -0.25rem -0.35rem 0.7rem;
+  padding: 0.35rem 0.35rem 0.75rem;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.82);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.99) 0%,
+    rgba(255, 255, 255, 0.97) 72%,
+    rgba(255, 255, 255, 0.88) 100%
+  );
+  backdrop-filter: blur(14px);
+  box-shadow: 0 14px 28px -30px rgba(15, 23, 42, 0.32);
+}
+
+.user-channel-panel-head {
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.user-channel-panel-head__subtitle {
+  margin-top: 0.3rem;
+  color: #64748b;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.user-channel-current-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 18rem;
+  padding: 0.44rem 0.72rem;
+  border: 1px solid rgba(191, 219, 254, 0.95);
+  border-radius: 9999px;
+  background: linear-gradient(180deg, rgba(239, 246, 255, 0.98), rgba(255, 255, 255, 0.96));
+  color: #1e293b;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86);
+}
+
+.user-channel-current-pill__label {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.user-channel-current-pill__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #1d4ed8;
+  font-size: 0.82rem;
+}
+
 .user-channel-workspace {
   display: grid;
   gap: 0.75rem;
 }
 
 .user-channel-tabs-wrap {
-  position: sticky;
-  top: -0.25rem;
-  z-index: 12;
-  margin: -0.2rem 0 0.3rem;
-  padding: 0.2rem 0 0.6rem;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.98) 0%,
-    rgba(255, 255, 255, 0.94) 78%,
-    rgba(255, 255, 255, 0) 100%
-  );
-  backdrop-filter: blur(10px);
+  margin-top: 0.65rem;
 }
 
 .user-channel-tabs {
