@@ -965,12 +965,6 @@
                               v-model:value="item.config.douyinMaterialConfig.allowCustom"
                             />
                           </div>
-                          <div class="toggle-hero">
-                            <div>
-                              <p class="toggle-hero__title">独立订单统计</p>
-                            </div>
-                            <n-switch v-model:value="item.config.independentOrderStats.enabled" />
-                          </div>
                           <span
                             class="channel-config-card__pill channel-config-card__pill--neutral"
                           >
@@ -2582,9 +2576,6 @@ function createDefaultUserChannelConfig(): adminApi.UserChannelBindingConfig {
       usernames: [],
       childUserIds: [],
     },
-    independentOrderStats: {
-      enabled: false,
-    },
     douyinMaterialConfig: {
       allowCustom: false,
     },
@@ -2702,11 +2693,6 @@ function normalizeUserChannelConfig(
             .filter((item, index, list) => list.indexOf(item) === index)
         : [],
     },
-    independentOrderStats: {
-      ...defaultConfig.independentOrderStats,
-      ...(config?.independentOrderStats || {}),
-      enabled: Boolean(config?.independentOrderStats?.enabled),
-    },
     douyinMaterialConfig: {
       allowCustom: Boolean(config?.douyinMaterialConfig?.allowCustom),
     },
@@ -2752,9 +2738,6 @@ function cloneUserChannelConfig(
       ...normalizedConfig.orderUserStats,
       usernames: [...normalizedConfig.orderUserStats.usernames],
       childUserIds: [...normalizedConfig.orderUserStats.childUserIds],
-    },
-    independentOrderStats: {
-      ...normalizedConfig.independentOrderStats,
     },
     douyinMaterialConfig: {
       ...normalizedConfig.douyinMaterialConfig,
@@ -3493,20 +3476,6 @@ async function saveUser() {
 
         configuredMatchRefIds.add(match.douyinAccountRefId)
       }
-
-      if (!channelConfig?.independentOrderStats?.enabled) {
-        continue
-      }
-
-      const validMatchCount = countConfiguredMaterialMatches(channelConfig.douyinMaterialMatches)
-      if (validMatchCount > 0) {
-        continue
-      }
-
-      message.error(
-        `【${channelName}】开启独立订单统计前，至少需要配置 1 条有效的抖音号匹配素材规则`
-      )
-      return
     }
 
     if (userForm.defaultChannelId && !userForm.channelIds.includes(userForm.defaultChannelId)) {

@@ -93,12 +93,6 @@ function defaultOrderUserStats() {
   }
 }
 
-function defaultIndependentOrderStats() {
-  return {
-    enabled: false,
-  }
-}
-
 function defaultDouyinAccount() {
   return {
     id: crypto.randomUUID(),
@@ -143,7 +137,6 @@ function defaultUserChannelConfig() {
       },
     },
     orderUserStats: defaultOrderUserStats(),
-    independentOrderStats: defaultIndependentOrderStats(),
     douyinMaterialConfig: {
       allowCustom: false,
     },
@@ -522,11 +515,6 @@ function normalizeUserChannelConfig(config = {}, douyinAccounts = []) {
       ...defaultOrderUserStats(),
       ...normalizeOrderUserStats(config.orderUserStats),
     },
-    independentOrderStats: {
-      ...defaultIndependentOrderStats(),
-      ...(config.independentOrderStats || {}),
-      enabled: Boolean(config.independentOrderStats?.enabled),
-    },
     douyinMaterialConfig: {
       allowCustom: Boolean(config.douyinMaterialConfig?.allowCustom),
     },
@@ -689,7 +677,6 @@ export function buildRuntimeUser(user = {}, channelId = '') {
     materialPreview: channelConfig.materialPreview,
     permissions: channelConfig.permissions,
     orderUserStats: channelConfig.orderUserStats,
-    independentOrderStats: channelConfig.independentOrderStats,
     douyinMaterialMatches,
     channelConfigEnabled: true,
   }

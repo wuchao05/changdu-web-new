@@ -75,12 +75,6 @@ function normalizeOrderUserStatsConfig(config = {}) {
   }
 }
 
-function normalizeIndependentOrderStatsConfig(config = {}) {
-  return {
-    enabled: Boolean(config?.enabled),
-  }
-}
-
 function normalizePromotionUserTargets(targets = []) {
   const targetMap = new Map()
 
@@ -107,40 +101,6 @@ function normalizePromotionUserTargets(targets = []) {
   })
 
   return [...targetMap.values()]
-}
-
-function matchPromotionDouyinAccount(promotionName, douyinAccounts = []) {
-  const normalizedPromotionName = String(promotionName || '').trim()
-  if (!normalizedPromotionName || !Array.isArray(douyinAccounts) || douyinAccounts.length === 0) {
-    return ''
-  }
-
-  const matchedAccounts = douyinAccounts.filter(account =>
-    normalizedPromotionName.includes(account)
-  )
-  if (matchedAccounts.length === 0) {
-    return ''
-  }
-
-  return matchedAccounts.sort((left, right) => right.length - left.length)[0]
-}
-
-function filterOrdersByConfiguredDouyinAccounts(orders = [], douyinAccounts = []) {
-  if (!Array.isArray(orders) || orders.length === 0) {
-    return []
-  }
-
-  const normalizedAccounts = Array.isArray(douyinAccounts)
-    ? douyinAccounts.map(item => String(item || '').trim()).filter(Boolean)
-    : []
-
-  if (normalizedAccounts.length === 0) {
-    return []
-  }
-
-  return orders.filter(order =>
-    Boolean(matchPromotionDouyinAccount(order?.promotion_name, normalizedAccounts))
-  )
 }
 
 function calculateRechargeAmount(orders = []) {
@@ -334,38 +294,7 @@ async function resolveOrderUserStatsRuntime(ctx) {
 
   return {
     ...config,
-    matchTargets: normalizePromotionUserTargets([
-      ...config.matchTargets,
-      parentWithChildAliases,
-      ...childUserTargets,
-    ]),
-  }
-}
-
-async function resolveIndependentOrderStatsRuntime(ctx) {
-  const sessionUser = await getSessionUser(ctx)
-  if (!sessionUser) {
-    return {
-      ...normalizeIndependentOrderStatsConfig(),
-      douyinAccounts: [],
-    }
-  }
-
-  const requestedChannelId = String(ctx.get('x-studio-channel-id') || '').trim()
-  const runtimeContext = await resolveRuntimeContext(sessionUser, requestedChannelId)
-  const independentOrderStats = normalizeIndependentOrderStatsConfig(
-    runtimeContext.runtimeUser?.independentOrderStats
-  )
-  const douyinAccounts = Array.isArray(runtimeContext.runtimeUser?.douyinAccounts)
-    ? runtimeContext.runtimeUser.douyinAccounts
-        .map(item => String(item?.douyinAccount || '').trim())
-        .filter(Boolean)
-        .filter((item, index, list) => list.indexOf(item) === index)
-    : []
-
-  return {
-    ...independentOrderStats,
-    douyinAccounts,
+    matchTargets: normalizePromotionUserTargets([...config.matchTargets, parentWithChildAliases]),
   }
 }
 
@@ -453,19 +382,14 @@ router.get('/distributor/promotion/detail/v2', async ctx => {
   const channelDouyinAccounts = ctx.query.channel_douyin_accounts
   const selectedPromotionUserName = String(ctx.query.promotion_user_name || '').trim()
   const orderUserStatsConfig = await resolveOrderUserStatsRuntime(ctx)
-  const independentOrderStatsConfig = await resolveIndependentOrderStatsRuntime(ctx)
   const promotionUserTargets = orderUserStatsConfig.enabled
     ? normalizePromotionUserTargets(orderUserStatsConfig.matchTargets)
     : []
   const configuredPromotionUsernames = promotionUserTargets.map(target => target.username)
-  const shouldUseIndependentOrderStats = independentOrderStatsConfig.enabled
-  const shouldBuildPromotionUserStats =
-    !shouldUseIndependentOrderStats && promotionUserTargets.length > 0
+  const shouldBuildPromotionUserStats = promotionUserTargets.length > 0
 
   // console.log('🔍 [订单统计] 开始拉取全量数据用于本地统计', {
   //   channelDouyinAccounts: channelDouyinAccounts || '',
-  //   independentOrderStatsEnabled: shouldUseIndependentOrderStats,
-  //   independentDouyinAccounts: independentOrderStatsConfig.douyinAccounts,
   //   promotionUsers: configuredPromotionUsernames,
   //   selectedPromotionUserName,
   // })
@@ -492,13 +416,7 @@ router.get('/distributor/promotion/detail/v2', async ctx => {
     allOrders.push(...rangeResult.orders)
   }
 
-  const independentlyFilteredOrders = shouldUseIndependentOrderStats
-    ? filterOrdersByConfiguredDouyinAccounts(allOrders, independentOrderStatsConfig.douyinAccounts)
-    : allOrders
-  const douyinFilteredOrders = filterOrdersByDouyinAccounts(
-    independentlyFilteredOrders,
-    channelDouyinAccounts
-  )
+  const douyinFilteredOrders = filterOrdersByDouyinAccounts(allOrders, channelDouyinAccounts)
   const promotionUserSummaries = shouldBuildPromotionUserStats
     ? buildPromotionUserSummaries(douyinFilteredOrders, promotionUserTargets)
     : []
@@ -530,7 +448,6 @@ router.get('/distributor/promotion/detail/v2', async ctx => {
     all_total: douyinFilteredOrders.length,
     all_total_amount: allTotalAmount,
     active_promotion_user_name: resolvedActivePromotionUserName,
-    independent_order_stats_enabled: shouldUseIndependentOrderStats,
     promotion_user_stats_enabled: shouldBuildPromotionUserStats,
     promotion_user_summaries: promotionUserSummaries,
   }
