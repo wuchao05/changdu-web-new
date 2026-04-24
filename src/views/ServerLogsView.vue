@@ -40,7 +40,7 @@
 
         <div class="server-logs-page__toolbar">
           <div class="server-logs-page__switch-group">
-            <span class="server-logs-page__switch-label">自动滚动</span>
+            <span class="server-logs-page__switch-label">自动定位最新</span>
             <n-switch v-model:value="autoScroll" size="small" />
           </div>
 
@@ -115,9 +115,15 @@
         </div>
 
         <div ref="logContainerRef" class="terminal-shell__viewport">
-          <div v-if="filteredEntries.length" class="terminal-shell__content">
+          <transition-group
+            v-if="displayedEntries.length"
+            tag="div"
+            class="terminal-shell__content"
+            name="terminal-log"
+            :css="shouldAnimateLogEntries"
+          >
             <div
-              v-for="entry in filteredEntries"
+              v-for="entry in displayedEntries"
               :key="getEntryKey(entry)"
               class="terminal-shell__line"
               :class="`terminal-shell__line--${entry.level}`"
@@ -125,6 +131,28 @@
               <span class="terminal-shell__time">{{ formatTimestamp(entry.timestamp) }}</span>
               <span class="terminal-shell__level">{{ entry.level.toUpperCase() }}</span>
               <pre class="terminal-shell__message">{{ entry.message }}</pre>
+            </div>
+          </transition-group>
+
+          <div v-else-if="isInitialLogLoading" class="terminal-shell__loading" aria-live="polite">
+            <div class="terminal-loader">
+              <div class="terminal-loader__visual" aria-hidden="true">
+                <span class="terminal-loader__halo terminal-loader__halo--outer"></span>
+                <span class="terminal-loader__halo terminal-loader__halo--inner"></span>
+                <span class="terminal-loader__core"></span>
+                <span class="terminal-loader__scan"></span>
+              </div>
+
+              <div class="terminal-loader__copy">
+                <p class="terminal-loader__title">正在接入日志流</p>
+                <p class="terminal-loader__desc">同步最近 20,000 条服务端输出，请稍候</p>
+              </div>
+
+              <div class="terminal-loader__code" aria-hidden="true">
+                <span>connect server.log.stream</span>
+                <span>handshake current session</span>
+                <span>tail -f runtime/output.log</span>
+              </div>
             </div>
           </div>
 
@@ -165,6 +193,8 @@ const router = useRouter()
 const autoScroll = ref(true)
 const entries = ref<DebugLogEntry[]>([])
 const errorMessage = ref('')
+const hasReceivedSnapshot = ref(false)
+const shouldAnimateLogEntries = ref(false)
 const connectionStatus = ref<DebugConnectionStatus>('idle')
 const logContainerRef = ref<HTMLElement | null>(null)
 const selectedLevel = ref<DebugLogLevel | null>(null)
@@ -306,6 +336,15 @@ const filteredEntries = computed(() =>
     .map(({ entry }) => entry)
 )
 
+const displayedEntries = computed(() => [...filteredEntries.value].reverse())
+
+const isInitialLogLoading = computed(
+  () =>
+    entries.value.length === 0 &&
+    !hasReceivedSnapshot.value &&
+    (connectionStatus.value === 'connecting' || connectionStatus.value === 'connected')
+)
+
 const emptyStateTitle = computed(() => {
   if (entries.value.length === 0) {
     return '等待服务端输出日志'
@@ -345,13 +384,13 @@ function getEntryKey(entry: DebugLogEntry) {
   return `${entry.timestamp}-${entry.id}-${entry.level}`
 }
 
-function scrollToBottom() {
+function scrollToLatest() {
   const container = logContainerRef.value
   if (!container || !autoScroll.value) {
     return
   }
 
-  container.scrollTop = container.scrollHeight
+  container.scrollTop = 0
 }
 
 function mergeEntries(nextEntries: DebugLogEntry[]) {
@@ -413,6 +452,10 @@ function scheduleReconnect() {
 function startStream() {
   stopStream(false)
   errorMessage.value = ''
+  if (entries.value.length === 0) {
+    hasReceivedSnapshot.value = false
+    shouldAnimateLogEntries.value = false
+  }
   connectionStatus.value = 'connecting'
   const streamId = activeStreamId
 
@@ -441,9 +484,12 @@ function startStream() {
         return
       }
 
+      hasReceivedSnapshot.value = true
+      shouldAnimateLogEntries.value = false
       mergeEntries(Array.isArray(snapshot) ? snapshot : [])
       void nextTick(() => {
-        scrollToBottom()
+        scrollToLatest()
+        shouldAnimateLogEntries.value = true
       })
     },
     onLog: entry => {
@@ -451,6 +497,8 @@ function startStream() {
         return
       }
 
+      hasReceivedSnapshot.value = true
+      shouldAnimateLogEntries.value = true
       mergeEntries([entry])
     },
     onError: error => {
@@ -458,6 +506,7 @@ function startStream() {
         return
       }
 
+      hasReceivedSnapshot.value = true
       errorMessage.value = error.message
       connectionStatus.value = 'error'
       scheduleReconnect()
@@ -479,10 +528,10 @@ function handleBack() {
 }
 
 watch(
-  () => filteredEntries.value.length,
+  () => displayedEntries.value.length,
   async () => {
     await nextTick()
-    scrollToBottom()
+    scrollToLatest()
   }
 )
 
@@ -492,7 +541,7 @@ watch(autoScroll, enabled => {
   }
 
   void nextTick(() => {
-    scrollToBottom()
+    scrollToLatest()
   })
 })
 
@@ -845,6 +894,28 @@ onBeforeUnmount(() => {
   border-bottom: none;
 }
 
+.terminal-log-enter-active {
+  transition:
+    opacity 0.28s ease,
+    transform 0.28s ease,
+    background-color 0.9s ease,
+    box-shadow 0.9s ease;
+}
+
+.terminal-log-enter-from {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.992);
+  background-color: rgba(56, 189, 248, 0.12);
+  box-shadow: 0 0 24px rgba(56, 189, 248, 0.1);
+}
+
+.terminal-log-enter-to {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  background-color: transparent;
+  box-shadow: none;
+}
+
 .terminal-shell__line--warn .terminal-shell__level {
   color: #fbbf24;
 }
@@ -875,6 +946,177 @@ onBeforeUnmount(() => {
   font-family: var(--app-font-family);
 }
 
+.terminal-shell__loading {
+  position: relative;
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow: hidden;
+}
+
+.terminal-shell__loading::before {
+  content: '';
+  position: absolute;
+  inset: 18px;
+  border-radius: 24px;
+  background:
+    linear-gradient(rgba(56, 189, 248, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56, 189, 248, 0.04) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(circle, #000 0%, transparent 72%);
+  -webkit-mask-image: radial-gradient(circle, #000 0%, transparent 72%);
+}
+
+.terminal-loader {
+  position: relative;
+  z-index: 1;
+  width: min(520px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 30px 28px;
+  border: 1px solid rgba(56, 189, 248, 0.18);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(34, 197, 94, 0.16), transparent 32%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.78), rgba(2, 6, 23, 0.86));
+  box-shadow:
+    0 24px 70px rgba(2, 6, 23, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.terminal-loader::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    120deg,
+    transparent 24%,
+    rgba(125, 211, 252, 0.14) 48%,
+    transparent 72%
+  );
+  transform: translateX(-110%);
+  animation: terminal-loader-shimmer 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.terminal-loader__visual {
+  position: relative;
+  width: 112px;
+  height: 112px;
+  display: grid;
+  place-items: center;
+}
+
+.terminal-loader__halo,
+.terminal-loader__core,
+.terminal-loader__scan {
+  position: absolute;
+  border-radius: 999px;
+}
+
+.terminal-loader__halo {
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  box-shadow: 0 0 28px rgba(56, 189, 248, 0.12);
+}
+
+.terminal-loader__halo--outer {
+  inset: 0;
+  border-top-color: rgba(74, 222, 128, 0.92);
+  border-right-color: rgba(56, 189, 248, 0.56);
+  animation: terminal-loader-spin 1.6s linear infinite;
+}
+
+.terminal-loader__halo--inner {
+  inset: 18px;
+  border-left-color: rgba(125, 211, 252, 0.86);
+  border-bottom-color: rgba(34, 197, 94, 0.7);
+  animation: terminal-loader-spin 2.2s linear infinite reverse;
+}
+
+.terminal-loader__core {
+  width: 34px;
+  height: 34px;
+  background: radial-gradient(
+    circle,
+    #e0f2fe 0 16%,
+    #67e8f9 17% 44%,
+    rgba(34, 197, 94, 0.34) 45% 100%
+  );
+  box-shadow:
+    0 0 22px rgba(56, 189, 248, 0.75),
+    0 0 44px rgba(34, 197, 94, 0.28);
+  animation: terminal-loader-pulse 1.4s ease-in-out infinite;
+}
+
+.terminal-loader__scan {
+  width: 78px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(103, 232, 249, 0.95), transparent);
+  transform-origin: center;
+  animation: terminal-loader-scan 1.9s ease-in-out infinite;
+}
+
+.terminal-loader__copy {
+  text-align: center;
+}
+
+.terminal-loader__title {
+  margin: 0;
+  color: #f8fafc;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.terminal-loader__desc {
+  margin: 8px 0 0;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.terminal-loader__code {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 16px;
+  background: rgba(2, 6, 23, 0.48);
+  color: #67e8f9;
+  font-family: var(--app-font-family);
+  font-size: 12px;
+  text-align: left;
+}
+
+.terminal-loader__code span {
+  position: relative;
+  display: block;
+  padding-left: 16px;
+  opacity: 0.46;
+  animation: terminal-loader-code 1.8s ease-in-out infinite;
+}
+
+.terminal-loader__code span::before {
+  content: '>';
+  position: absolute;
+  left: 0;
+  color: #4ade80;
+}
+
+.terminal-loader__code span:nth-child(2) {
+  animation-delay: 0.18s;
+}
+
+.terminal-loader__code span:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
 .terminal-shell__empty {
   min-height: 100%;
   display: flex;
@@ -903,6 +1145,81 @@ onBeforeUnmount(() => {
   max-width: 520px;
   font-size: 13px;
   line-height: 1.7;
+}
+
+@keyframes terminal-loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes terminal-loader-pulse {
+  0%,
+  100% {
+    transform: scale(0.92);
+    opacity: 0.72;
+  }
+
+  50% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}
+
+@keyframes terminal-loader-scan {
+  0%,
+  100% {
+    transform: translateY(-30px) rotate(0deg);
+    opacity: 0;
+  }
+
+  45%,
+  55% {
+    opacity: 1;
+  }
+
+  50% {
+    transform: translateY(30px) rotate(180deg);
+  }
+}
+
+@keyframes terminal-loader-shimmer {
+  0% {
+    transform: translateX(-110%);
+  }
+
+  48%,
+  100% {
+    transform: translateX(110%);
+  }
+}
+
+@keyframes terminal-loader-code {
+  0%,
+  100% {
+    opacity: 0.38;
+    transform: translateX(0);
+  }
+
+  50% {
+    opacity: 1;
+    transform: translateX(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .terminal-loader::after,
+  .terminal-loader__halo--outer,
+  .terminal-loader__halo--inner,
+  .terminal-loader__core,
+  .terminal-loader__scan,
+  .terminal-loader__code span {
+    animation: none;
+  }
+
+  .terminal-log-enter-active {
+    transition: none;
+  }
 }
 
 @media (max-width: 960px) {
