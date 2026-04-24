@@ -421,7 +421,7 @@
                   <p class="own-order-summary__eyebrow">我的订单统计</p>
                   <h4 class="own-order-summary__title">当前时间范围汇总</h4>
                 </div>
-                <span class="own-order-summary__badge">仅展示本人订单</span>
+                <span class="own-order-summary__badge">{{ currentOrderChannelBadge }}</span>
               </div>
               <div class="own-order-summary__grid">
                 <div
@@ -709,6 +709,15 @@ const hasChannelTabs = computed(() => channelTabs.value.length > 0)
 const activeChannelTabId = computed(
   () => sessionStore.activeChannelId || sessionStore.currentChannel?.id || ''
 )
+const currentOrderChannelBadge = computed(() => {
+  const activeChannel = channelTabs.value.find(channel => channel.id === activeChannelTabId.value)
+  const channelName = String(activeChannel?.name || sessionStore.currentChannel?.name || '').trim()
+  if (!channelName) {
+    return '当前渠道'
+  }
+
+  return channelName.endsWith('渠道') ? channelName : `${channelName}渠道`
+})
 const desktopUserLabels = computed(() => userLabels.value.filter(Boolean))
 const mobileUserLabels = computed(() =>
   userLabels.value.filter(label => Boolean(label) && label !== '管理员')
@@ -955,8 +964,8 @@ const ownOrderSummaryCards = computed(() => [
   {
     key: 'orders',
     label: '总订单数',
-    value: `${formatNumberValue(ownOrderTotalCount.value)} 单`,
-    meta: '这段时间你的全部订单',
+    value: `${formatNumberValue(ownOrderTotalCount.value)}单`,
+    meta: '这段时间我的全部订单',
     icon: 'mdi:receipt-text-check-outline',
     iconClass: 'own-order-summary-card__icon--orders',
   },
