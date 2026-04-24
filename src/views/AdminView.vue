@@ -842,6 +842,17 @@
                             :options="orderUserSortModeOptions"
                           />
                         </n-form-item>
+                        <n-form-item label="子用户列表" class="md:col-span-2">
+                          <n-select
+                            v-model:value="item.config.orderUserStats.childUserIds"
+                            :options="orderChildUserOptions"
+                            multiple
+                            filterable
+                            clearable
+                            max-tag-count="responsive"
+                            placeholder="请选择子用户，订单统计会使用这些子用户的全部抖音号名称匹配"
+                          />
+                        </n-form-item>
                         <n-form-item label="用户名列表" class="md:col-span-2">
                           <div class="w-full space-y-3">
                             <div
@@ -1844,6 +1855,14 @@ const orderUserSortModeOptions = [
   { label: '按当前顺序排序', value: 'manual' },
   { label: '按充值金额排序', value: 'amount_desc' },
 ]
+const orderChildUserOptions = computed(() =>
+  users.value
+    .filter(user => user.userType !== 'admin')
+    .map(user => ({
+      label: `${user.nickname || user.account || user.id}${user.account ? `（${user.account}）` : ''}`,
+      value: user.id,
+    }))
+)
 
 const channelOptions = computed(() =>
   channels.value.map(channel => ({ label: channel.name, value: channel.id }))
@@ -2542,6 +2561,7 @@ function createDefaultUserChannelConfig(): adminApi.UserChannelBindingConfig {
       enabled: false,
       sortMode: 'manual',
       usernames: [],
+      childUserIds: [],
     },
     independentOrderStats: {
       enabled: false,
@@ -2656,6 +2676,12 @@ function normalizeUserChannelConfig(
             .filter(Boolean)
             .filter((item, index, list) => list.indexOf(item) === index)
         : [],
+      childUserIds: Array.isArray(config?.orderUserStats?.childUserIds)
+        ? config.orderUserStats.childUserIds
+            .map(item => String(item || '').trim())
+            .filter(Boolean)
+            .filter((item, index, list) => list.indexOf(item) === index)
+        : [],
     },
     independentOrderStats: {
       ...defaultConfig.independentOrderStats,
@@ -2706,6 +2732,7 @@ function cloneUserChannelConfig(
     orderUserStats: {
       ...normalizedConfig.orderUserStats,
       usernames: [...normalizedConfig.orderUserStats.usernames],
+      childUserIds: [...normalizedConfig.orderUserStats.childUserIds],
     },
     independentOrderStats: {
       ...normalizedConfig.independentOrderStats,
@@ -3393,6 +3420,7 @@ async function saveUser() {
           enabled: false,
           sortMode: 'manual',
           usernames: [],
+          childUserIds: [],
         }
       }
 

@@ -66,6 +66,7 @@ export interface UserChannelBindingConfig {
     enabled: boolean
     sortMode: 'manual' | 'amount_desc'
     usernames: string[]
+    childUserIds: string[]
   }
   independentOrderStats: {
     enabled: boolean
@@ -152,6 +153,7 @@ export interface UserProfile {
     enabled: boolean
     sortMode: 'manual' | 'amount_desc'
     usernames: string[]
+    childUserIds: string[]
   }
   independentOrderStats?: {
     enabled: boolean

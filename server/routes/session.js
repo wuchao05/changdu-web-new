@@ -32,6 +32,7 @@ function defaultOrderUserStats() {
     enabled: false,
     sortMode: 'manual',
     usernames: [],
+    childUserIds: [],
   }
 }
 

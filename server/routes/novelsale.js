@@ -5,7 +5,7 @@ import {
   generateChangduABogus,
   requestChangduInternalApi,
 } from '../utils/changduInternalApi.js'
-import { isMultiUserChannel, resolveRuntimeContext } from '../utils/studioData.js'
+import { isMultiUserChannel, listUsers, resolveRuntimeContext } from '../utils/studioData.js'
 import { getSessionUser } from '../utils/studioSession.js'
 
 const router = new Router()
@@ -57,10 +57,21 @@ function normalizeOrderUserStatsConfig(config = {}) {
         .filter(Boolean)
         .filter((item, index, list) => list.indexOf(item) === index)
     : []
+  const childUserIds = Array.isArray(config?.childUserIds)
+    ? config.childUserIds
+        .map(item => String(item || '').trim())
+        .filter(Boolean)
+        .filter((item, index, list) => list.indexOf(item) === index)
+    : []
 
   return {
     enabled: Boolean(config?.enabled),
     usernames,
+    childUserIds,
+    matchTargets: usernames.map(username => ({
+      username,
+      aliases: [username],
+    })),
   }
 }
 
@@ -70,18 +81,63 @@ function normalizeIndependentOrderStatsConfig(config = {}) {
   }
 }
 
-function matchPromotionUser(promotionName, usernames = []) {
+function normalizePromotionUserTargets(targets = []) {
+  const targetMap = new Map()
+
+  ;(Array.isArray(targets) ? targets : []).forEach(target => {
+    const username = String(typeof target === 'string' ? target : target?.username || '').trim()
+    if (!username) {
+      return
+    }
+
+    const aliases = Array.isArray(target?.aliases)
+      ? target.aliases.map(item => String(item || '').trim()).filter(Boolean)
+      : [username]
+    const current = targetMap.get(username) || {
+      username,
+      aliases: [],
+    }
+
+    aliases.forEach(alias => {
+      if (!current.aliases.includes(alias)) {
+        current.aliases.push(alias)
+      }
+    })
+    targetMap.set(username, current)
+  })
+
+  return [...targetMap.values()]
+}
+
+function matchPromotionUser(promotionName, targets = []) {
   const normalizedPromotionName = String(promotionName || '').trim()
-  if (!normalizedPromotionName || !Array.isArray(usernames) || usernames.length === 0) {
+  const normalizedTargets = normalizePromotionUserTargets(targets)
+  if (!normalizedPromotionName || normalizedTargets.length === 0) {
     return ''
   }
 
-  const matchedUsernames = usernames.filter(username => normalizedPromotionName.includes(username))
-  if (matchedUsernames.length === 0) {
+  const matchedTargets = normalizedTargets
+    .map(target => {
+      const matchedAlias = target.aliases
+        .filter(alias => normalizedPromotionName.includes(alias))
+        .sort((left, right) => right.length - left.length)[0]
+
+      return matchedAlias
+        ? {
+            username: target.username,
+            matchedAlias,
+          }
+        : null
+    })
+    .filter(Boolean)
+
+  if (matchedTargets.length === 0) {
     return ''
   }
 
-  return matchedUsernames.sort((left, right) => right.length - left.length)[0]
+  return matchedTargets.sort(
+    (left, right) => right.matchedAlias.length - left.matchedAlias.length
+  )[0].username
 }
 
 function matchPromotionDouyinAccount(promotionName, douyinAccounts = []) {
@@ -127,12 +183,13 @@ function calculateRechargeAmount(orders = []) {
   }, 0)
 }
 
-function buildPromotionUserSummaries(orders = [], usernames = []) {
+function buildPromotionUserSummaries(orders = [], targets = []) {
+  const normalizedTargets = normalizePromotionUserTargets(targets)
   const summaryMap = new Map(
-    usernames.map(username => [
-      username,
+    normalizedTargets.map(target => [
+      target.username,
       {
-        username,
+        username: target.username,
         total: 0,
         total_amount: 0,
         paid_order_count: 0,
@@ -141,7 +198,7 @@ function buildPromotionUserSummaries(orders = [], usernames = []) {
   )
 
   orders.forEach(order => {
-    const matchedUsername = matchPromotionUser(order?.promotion_name, usernames)
+    const matchedUsername = matchPromotionUser(order?.promotion_name, normalizedTargets)
     if (!matchedUsername || !summaryMap.has(matchedUsername)) {
       return
     }
@@ -154,7 +211,7 @@ function buildPromotionUserSummaries(orders = [], usernames = []) {
     }
   })
 
-  return usernames.map(username => summaryMap.get(username))
+  return normalizedTargets.map(target => summaryMap.get(target.username))
 }
 
 function buildPromotionDetailQuery(query = {}, overrides = {}) {
@@ -257,6 +314,25 @@ async function fetchAllOrdersByRange(ctx, timeRange) {
   }
 }
 
+function buildChildUserOrderStatsTarget(user) {
+  const username = String(user?.nickname || user?.account || user?.id || '').trim()
+  const aliases = Array.isArray(user?.douyinAccounts)
+    ? user.douyinAccounts
+        .map(item => String(item?.douyinAccount || '').trim())
+        .filter(Boolean)
+        .filter((item, index, list) => list.indexOf(item) === index)
+    : []
+
+  if (!username) {
+    return null
+  }
+
+  return {
+    username,
+    aliases,
+  }
+}
+
 async function resolveOrderUserStatsRuntime(ctx) {
   const sessionUser = await getSessionUser(ctx)
   if (!sessionUser) {
@@ -269,7 +345,25 @@ async function resolveOrderUserStatsRuntime(ctx) {
     return normalizeOrderUserStatsConfig()
   }
 
-  return normalizeOrderUserStatsConfig(runtimeContext.runtimeUser?.orderUserStats)
+  const config = normalizeOrderUserStatsConfig(runtimeContext.runtimeUser?.orderUserStats)
+  if (!config.enabled || config.childUserIds.length === 0) {
+    return config
+  }
+
+  const childUserIdSet = new Set(config.childUserIds)
+  const childUserMap = new Map(
+    (await listUsers())
+      .filter(user => user.userType !== 'admin' && childUserIdSet.has(user.id))
+      .map(user => [user.id, user])
+  )
+  const childUserTargets = config.childUserIds
+    .map(userId => buildChildUserOrderStatsTarget(childUserMap.get(userId)))
+    .filter(Boolean)
+
+  return {
+    ...config,
+    matchTargets: normalizePromotionUserTargets([...config.matchTargets, ...childUserTargets]),
+  }
 }
 
 async function resolveIndependentOrderStatsRuntime(ctx) {
@@ -384,12 +478,13 @@ router.get('/distributor/promotion/detail/v2', async ctx => {
   const selectedPromotionUserName = String(ctx.query.promotion_user_name || '').trim()
   const orderUserStatsConfig = await resolveOrderUserStatsRuntime(ctx)
   const independentOrderStatsConfig = await resolveIndependentOrderStatsRuntime(ctx)
-  const configuredPromotionUsernames = orderUserStatsConfig.enabled
-    ? orderUserStatsConfig.usernames
+  const promotionUserTargets = orderUserStatsConfig.enabled
+    ? normalizePromotionUserTargets(orderUserStatsConfig.matchTargets)
     : []
+  const configuredPromotionUsernames = promotionUserTargets.map(target => target.username)
   const shouldUseIndependentOrderStats = independentOrderStatsConfig.enabled
   const shouldBuildPromotionUserStats =
-    !shouldUseIndependentOrderStats && configuredPromotionUsernames.length > 0
+    !shouldUseIndependentOrderStats && promotionUserTargets.length > 0
 
   // console.log('🔍 [订单统计] 开始拉取全量数据用于本地统计', {
   //   channelDouyinAccounts: channelDouyinAccounts || '',
@@ -429,7 +524,7 @@ router.get('/distributor/promotion/detail/v2', async ctx => {
     channelDouyinAccounts
   )
   const promotionUserSummaries = shouldBuildPromotionUserStats
-    ? buildPromotionUserSummaries(douyinFilteredOrders, configuredPromotionUsernames)
+    ? buildPromotionUserSummaries(douyinFilteredOrders, promotionUserTargets)
     : []
   const resolvedActivePromotionUserName =
     shouldBuildPromotionUserStats &&
@@ -439,7 +534,7 @@ router.get('/distributor/promotion/detail/v2', async ctx => {
   const activeOrders = resolvedActivePromotionUserName
     ? douyinFilteredOrders.filter(
         order =>
-          matchPromotionUser(order?.promotion_name, configuredPromotionUsernames) ===
+          matchPromotionUser(order?.promotion_name, promotionUserTargets) ===
           resolvedActivePromotionUserName
       )
     : douyinFilteredOrders

@@ -89,6 +89,7 @@ function defaultOrderUserStats() {
     enabled: false,
     sortMode: 'manual',
     usernames: [],
+    childUserIds: [],
   }
 }
 
@@ -448,10 +449,18 @@ function normalizeOrderUserStats(config = {}) {
         .filter((item, index, list) => list.indexOf(item) === index)
     : []
 
+  const childUserIds = Array.isArray(config?.childUserIds)
+    ? config.childUserIds
+        .map(item => String(item || '').trim())
+        .filter(Boolean)
+        .filter((item, index, list) => list.indexOf(item) === index)
+    : []
+
   return {
     enabled: Boolean(config?.enabled),
     sortMode: config?.sortMode === 'amount_desc' ? 'amount_desc' : 'manual',
     usernames,
+    childUserIds,
   }
 }
 
