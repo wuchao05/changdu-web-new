@@ -231,7 +231,9 @@ const savingBuildAdvance = ref(false)
 const activeChannelType = computed(() => {
   const activeChannelId = String(sessionStore.activeChannelId || '').trim()
   if (activeChannelId) {
-    const matchedChannel = sessionStore.availableChannels.find(channel => channel.id === activeChannelId)
+    const matchedChannel = sessionStore.availableChannels.find(
+      channel => channel.id === activeChannelId
+    )
     if (matchedChannel) {
       return matchedChannel.type
     }
@@ -536,7 +538,10 @@ const dramasColumns = computed<DataTableColumns<FeishuDramaRecord>>(() => {
     {
       title: '账户',
       key: 'accountId',
-      width: 140,
+      width: 180,
+      ellipsis: {
+        tooltip: true,
+      },
       render: row => row.fields['账户']?.[0]?.text || '-',
     },
     {
@@ -575,7 +580,7 @@ const dramasColumns = computed<DataTableColumns<FeishuDramaRecord>>(() => {
     columns.push({
       title: '素材状态',
       key: 'materialLibraryStatus',
-      width: 140,
+      width: 110,
       render: row => {
         const materialStatus = getDramaMaterialStatus(row)
         const type = materialStatus.ready

@@ -114,7 +114,11 @@
           <span class="terminal-shell__meta-right">{{ statusText }}</span>
         </div>
 
-        <div ref="logContainerRef" class="terminal-shell__viewport">
+        <div
+          ref="logContainerRef"
+          class="terminal-shell__viewport"
+          @scroll="handleLogViewportScroll"
+        >
           <transition-group
             v-if="displayedEntries.length"
             tag="div"
@@ -162,6 +166,18 @@
             <p class="terminal-shell__empty-desc">{{ emptyStateDescription }}</p>
           </div>
         </div>
+
+        <n-button
+          v-show="showBackTopButton"
+          class="terminal-shell__back-top"
+          round
+          @click="scrollToLogTop"
+        >
+          <template #icon>
+            <Icon icon="mdi:arrow-up" />
+          </template>
+          回到顶部
+        </n-button>
       </section>
     </main>
   </div>
@@ -197,6 +213,7 @@ const hasReceivedSnapshot = ref(false)
 const shouldAnimateLogEntries = ref(false)
 const connectionStatus = ref<DebugConnectionStatus>('idle')
 const logContainerRef = ref<HTMLElement | null>(null)
+const showBackTopButton = ref(false)
 const selectedLevel = ref<DebugLogLevel | null>(null)
 const selectedScope = ref<string | null>(null)
 const selectedUserName = ref<string | null>(null)
@@ -378,6 +395,7 @@ function formatTimestamp(timestamp: string) {
 function clearEntries() {
   entryKeySet.clear()
   entries.value = []
+  showBackTopButton.value = false
 }
 
 function getEntryKey(entry: DebugLogEntry) {
@@ -391,6 +409,22 @@ function scrollToLatest() {
   }
 
   container.scrollTop = 0
+  showBackTopButton.value = false
+}
+
+function handleLogViewportScroll() {
+  const container = logContainerRef.value
+  showBackTopButton.value = Boolean(container && container.scrollTop > 120)
+}
+
+function scrollToLogTop() {
+  const container = logContainerRef.value
+  if (!container) {
+    return
+  }
+
+  container.scrollTo({ top: 0, behavior: 'smooth' })
+  showBackTopButton.value = false
 }
 
 function mergeEntries(nextEntries: DebugLogEntry[]) {
@@ -558,7 +592,9 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .server-logs-page {
-  min-height: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   background:
@@ -572,6 +608,7 @@ onBeforeUnmount(() => {
   position: sticky;
   top: 0;
   z-index: 10;
+  flex-shrink: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
@@ -804,6 +841,7 @@ onBeforeUnmount(() => {
 }
 
 .terminal-shell {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
@@ -872,6 +910,39 @@ onBeforeUnmount(() => {
   min-height: 0;
   overflow: auto;
   padding: 18px 22px 24px;
+  scrollbar-gutter: stable;
+}
+
+.terminal-shell__viewport::-webkit-scrollbar-thumb {
+  background: rgba(56, 189, 248, 0.28);
+}
+
+.terminal-shell__viewport::-webkit-scrollbar-thumb:hover {
+  background: rgba(74, 222, 128, 0.36);
+}
+
+.terminal-shell__back-top {
+  position: absolute;
+  right: 22px;
+  bottom: 22px;
+  z-index: 2;
+  border: 1px solid rgba(74, 222, 128, 0.32);
+  background:
+    linear-gradient(180deg, rgba(22, 101, 52, 0.82), rgba(15, 23, 42, 0.88)),
+    radial-gradient(circle at top left, rgba(56, 189, 248, 0.2), transparent 44%);
+  color: #dcfce7;
+  box-shadow:
+    0 14px 36px rgba(2, 6, 23, 0.36),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+}
+
+.terminal-shell__back-top:hover {
+  border-color: rgba(125, 211, 252, 0.5);
+  background:
+    linear-gradient(180deg, rgba(22, 101, 52, 0.94), rgba(15, 23, 42, 0.92)),
+    radial-gradient(circle at top left, rgba(56, 189, 248, 0.28), transparent 44%);
+  color: #f0fdf4;
 }
 
 .terminal-shell__content {
