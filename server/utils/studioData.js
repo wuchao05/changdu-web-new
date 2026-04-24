@@ -15,6 +15,17 @@ const __dirname = path.dirname(__filename)
 const PREFERRED_STUDIO_DATA_DIR = process.env.STUDIO_DATA_DIR || '/data/changdu-web/studio'
 const FALLBACK_STUDIO_DATA_DIR = path.join(__dirname, '../data/studio')
 
+export const CHANNEL_USER_BASE_SINGLE = 'single'
+export const CHANNEL_USER_BASE_MULTI = 'multi'
+
+export function normalizeChannelUserBase(value = '') {
+  return value === CHANNEL_USER_BASE_MULTI ? CHANNEL_USER_BASE_MULTI : CHANNEL_USER_BASE_SINGLE
+}
+
+export function isMultiUserChannel(channel = {}) {
+  return normalizeChannelUserBase(channel.userBase) === CHANNEL_USER_BASE_MULTI
+}
+
 let resolvedStudioDataDir = ''
 
 export function getStudioDataDir() {
@@ -144,6 +155,7 @@ function defaultChannelConfig() {
     id: crypto.randomUUID(),
     name: '',
     type: CHANNEL_TYPE_OTHER,
+    userBase: CHANNEL_USER_BASE_SINGLE,
     juliang: {
       cookie: '',
       buildConfig: normalizeBuildConfig(DEFAULT_BUILD_CONFIG),
@@ -747,6 +759,7 @@ export function normalizeChannel(channel = {}) {
     id: String(channel.id || base.id),
     name: String(channel.name || '').trim(),
     type: normalizeChannelType(channel.type),
+    userBase: normalizeChannelUserBase(channel.userBase),
     juliang: {
       cookie: String(rawJuliang.cookie || '').trim(),
       buildConfig: {

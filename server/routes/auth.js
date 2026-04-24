@@ -1,6 +1,11 @@
 import Router from '@koa/router'
 import { getSessionUser } from '../utils/studioSession.js'
-import { readChannels, resolveRuntimeContext, sanitizeUser } from '../utils/studioData.js'
+import {
+  isMultiUserChannel,
+  readChannels,
+  resolveRuntimeContext,
+  sanitizeUser,
+} from '../utils/studioData.js'
 import { DEFAULT_BUILD_CONFIG, normalizeBuildConfig } from '../config/buildConfig.js'
 import { createSessionRuntimeContextMiddleware } from '../utils/runtimeContextMiddleware.js'
 import { applyUserBuildAdvanceToBuildConfig } from '../utils/buildAdvanceConfig.js'
@@ -8,6 +13,27 @@ import { applyUserBuildAdvanceToBuildConfig } from '../utils/buildAdvanceConfig.
 const router = new Router()
 
 router.use(createSessionRuntimeContextMiddleware('authContext'))
+
+function defaultOrderUserStats() {
+  return {
+    enabled: false,
+    sortMode: 'manual',
+    usernames: [],
+  }
+}
+
+function buildAuthRuntimeUser(runtimeUser, channel) {
+  if (!runtimeUser) {
+    return null
+  }
+
+  return {
+    ...runtimeUser,
+    orderUserStats: isMultiUserChannel(channel)
+      ? runtimeUser.orderUserStats || defaultOrderUserStats()
+      : defaultOrderUserStats(),
+  }
+}
 
 export async function readAuthConfig(ctx = null) {
   const { channels } = await readChannels()
@@ -56,13 +82,14 @@ router.get('/config', async ctx => {
   try {
     const sessionUser = ctx.state.sessionUser
     const { channel, runtimeUser } = ctx.state.authContext
+    const authRuntimeUser = buildAuthRuntimeUser(runtimeUser, channel)
 
     ctx.body = {
       code: 0,
       message: 'success',
       data: {
         sessionUser: sanitizeUser(sessionUser),
-        runtimeUser: runtimeUser ? sanitizeUser(runtimeUser) : null,
+        runtimeUser: authRuntimeUser ? sanitizeUser(authRuntimeUser) : null,
         channel: channel
           ? {
               id: channel.id,
@@ -101,11 +128,7 @@ router.get('/config', async ctx => {
           buildTimeWindowStart: 90,
           buildTimeWindowEnd: 20,
         },
-        orderUserStats: runtimeUser?.orderUserStats || {
-          enabled: false,
-          sortMode: 'manual',
-          usernames: [],
-        },
+        orderUserStats: authRuntimeUser?.orderUserStats || defaultOrderUserStats(),
         douyinMaterialMatches: Array.isArray(runtimeUser?.douyinMaterialMatches)
           ? runtimeUser.douyinMaterialMatches
           : [],

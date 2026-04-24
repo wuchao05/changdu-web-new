@@ -96,6 +96,14 @@
                           <n-tag size="small" :bordered="false" round type="info">
                             {{ getChannelTypeLabel(channel.type) }}
                           </n-tag>
+                          <n-tag
+                            size="small"
+                            :bordered="false"
+                            round
+                            :type="isMultiUserChannel(channel) ? 'success' : 'default'"
+                          >
+                            {{ getChannelUserBaseLabel(channel.userBase) }}
+                          </n-tag>
                         </div>
                         <div class="channel-sort-card__meta">
                           <n-tag size="small" :bordered="false" round type="info">
@@ -811,7 +819,10 @@
                       </div>
                     </div>
 
-                    <div class="config-subpanel channel-config-section--wide">
+                    <div
+                      v-if="isMultiUserChannel(item.channel)"
+                      class="config-subpanel channel-config-section--wide"
+                    >
                       <div class="mb-3">
                         <p class="text-sm font-semibold text-rose-600">订单按用户统计</p>
                       </div>
@@ -1130,7 +1141,7 @@
               <n-form
                 :model="channelForm"
                 label-placement="top"
-                class="grid grid-cols-1 gap-3 md:grid-cols-2"
+                class="grid grid-cols-1 gap-3 md:grid-cols-3"
               >
                 <n-form-item label="渠道名称" class="mb-0">
                   <n-input v-model:value="channelForm.name" placeholder="请输入渠道名称" />
@@ -1142,6 +1153,17 @@
                     placeholder="请选择渠道类型"
                     @update:value="handleChannelTypeChange"
                   />
+                </n-form-item>
+                <n-form-item label="用户基数" class="mb-0">
+                  <n-radio-group v-model:value="channelForm.userBase" class="w-full">
+                    <n-radio-button
+                      v-for="option in channelUserBaseOptions"
+                      :key="option.value"
+                      :value="option.value"
+                    >
+                      {{ option.label }}
+                    </n-radio-button>
+                  </n-radio-group>
                 </n-form-item>
               </n-form>
 
@@ -1711,6 +1733,7 @@ interface UserFormModel {
 interface ChannelFormModel {
   name: string
   type: ChannelType
+  userBase: adminApi.ChannelUserBase
   juliang: adminApi.ChannelConfig['juliang']
   changdu: adminApi.ChannelConfig['changdu']
   adx: NonNullable<adminApi.ChannelConfig['adx']>
@@ -1744,6 +1767,10 @@ const userTypeOptions = [
   { label: '普通用户', value: 'normal' },
 ]
 const channelTypeOptions = CHANNEL_TYPE_OPTIONS
+const channelUserBaseOptions: Array<{ label: string; value: adminApi.ChannelUserBase }> = [
+  { label: '单用户', value: 'single' },
+  { label: '多用户', value: 'multi' },
+]
 const advanceHourOptions = Array.from({ length: 24 }, (_, hour) => ({
   label: `${String(hour).padStart(2, '0')}:00`,
   value: String(hour),
@@ -1981,6 +2008,16 @@ const channelColumns: DataTableColumns<adminApi.ChannelConfig> = [
           },
           () => getChannelTypeLabel(row.type)
         ),
+        h(
+          NTag,
+          {
+            size: 'small',
+            type: isMultiUserChannel(row) ? 'success' : 'default',
+            bordered: false,
+            round: true,
+          },
+          () => getChannelUserBaseLabel(row.userBase)
+        ),
       ]),
   },
   {
@@ -2125,6 +2162,18 @@ function getBuildBidInputValue(value: string | null | undefined) {
 
 function isXingtianChannel(channel?: Pick<adminApi.ChannelConfig, 'type'> | null) {
   return isXingtianChannelType(channel?.type)
+}
+
+function normalizeChannelUserBase(value: unknown): adminApi.ChannelUserBase {
+  return value === 'multi' ? 'multi' : 'single'
+}
+
+function getChannelUserBaseLabel(value: unknown) {
+  return normalizeChannelUserBase(value) === 'multi' ? '多用户' : '单用户'
+}
+
+function isMultiUserChannel(channel?: Pick<adminApi.ChannelConfig, 'userBase'> | null) {
+  return normalizeChannelUserBase(channel?.userBase) === 'multi'
 }
 
 function getDesktopPermissionOptions(channel?: Pick<adminApi.ChannelConfig, 'type'> | null) {
@@ -2675,6 +2724,7 @@ function createDefaultChannelForm(): ChannelFormModel {
   return {
     name: '',
     type: 'other',
+    userBase: 'single',
     juliang: {
       cookie: '',
       buildConfig: {
@@ -3338,6 +3388,14 @@ async function saveUser() {
       const channelName = channel?.name || `渠道 ${channelId}`
       const userBid = normalizeBuildBidValue(channelConfig?.buildPreference?.bid)
 
+      if (channelConfig && !isMultiUserChannel(channel)) {
+        channelConfig.orderUserStats = {
+          enabled: false,
+          sortMode: 'manual',
+          usernames: [],
+        }
+      }
+
       if (channel?.juliang?.buildConfig?.enableCustomBid && userBid) {
         if (!isValidBuildBidValue(userBid)) {
           message.error(`【${channelName}】出价必须是数字`)
@@ -3430,6 +3488,7 @@ async function saveChannel() {
   savingChannel.value = true
   try {
     channelForm.type = normalizeChannelType(channelForm.type)
+    channelForm.userBase = normalizeChannelUserBase(channelForm.userBase)
     if (channelForm.juliang.buildConfig.enableCustomBid) {
       const defaultBid = normalizeBuildBidValue(channelForm.juliang.buildConfig.defaultBid)
       if (!defaultBid) {

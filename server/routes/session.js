@@ -10,6 +10,7 @@ import {
   ensureUserChannelConfig,
   findUsersByChannelId,
   getDefaultDownloadCenterConfig,
+  isMultiUserChannel,
   normalizeUser,
   readUser,
   sanitizeUser,
@@ -25,6 +26,38 @@ import { isXingtianChannelType, normalizeChannelType } from '../utils/channelTyp
 const router = new Router({
   prefix: '/api/session',
 })
+
+function defaultOrderUserStats() {
+  return {
+    enabled: false,
+    sortMode: 'manual',
+    usernames: [],
+  }
+}
+
+function buildSessionRuntimeUser(runtimeUser, channel) {
+  if (!runtimeUser) {
+    return null
+  }
+
+  return {
+    ...runtimeUser,
+    orderUserStats: isMultiUserChannel(channel)
+      ? runtimeUser.orderUserStats || defaultOrderUserStats()
+      : defaultOrderUserStats(),
+  }
+}
+
+function buildChannelSummary(channel) {
+  return channel
+    ? {
+        id: channel.id,
+        name: channel.name,
+        type: normalizeChannelType(channel.type),
+        userBase: channel.userBase,
+      }
+    : null
+}
 
 function logPageVisit(pageName, runtimeUser, channel) {
   const prefix = buildServiceLogPrefix('页面访问', {
@@ -62,14 +95,12 @@ router.post('/login', async ctx => {
     ctx.body = {
       code: 0,
       message: '登录成功',
-        data: {
-          token,
-          user: sanitizeUser(user),
-          channel: channel
-            ? { id: channel.id, name: channel.name, type: normalizeChannelType(channel.type) }
-            : null,
-        },
-      }
+      data: {
+        token,
+        user: sanitizeUser(user),
+        channel: buildChannelSummary(channel),
+      },
+    }
   } catch (error) {
     ctx.status = 500
     ctx.body = {
@@ -184,20 +215,16 @@ router.post('/xt-token', requireSession, async ctx => {
       updatedAt: new Date().toISOString(),
     })
   )
-  const runtimeUser = buildRuntimeUser(updatedUser, channel.id)
+  const runtimeUser = buildSessionRuntimeUser(buildRuntimeUser(updatedUser, channel.id), channel)
 
   ctx.body = {
     code: 0,
     message: 'XT Token 保存成功',
-      data: {
-        user: sanitizeUser(updatedUser),
-        runtimeUser: sanitizeUser(runtimeUser),
-        channel: {
-          id: channel.id,
-          name: channel.name,
-          type: normalizeChannelType(channel.type),
-        },
-      },
+    data: {
+      user: sanitizeUser(updatedUser),
+      runtimeUser: sanitizeUser(runtimeUser),
+      channel: buildChannelSummary(channel),
+    },
   }
 })
 
@@ -221,25 +248,21 @@ router.get('/me', async ctx => {
     const defaultDownloadCenterConfig = await getDefaultDownloadCenterConfig()
     const channelBoundUsers = channel
       ? (await findUsersByChannelId(channel.id)).map(item =>
-          sanitizeUser(buildRuntimeUser(item, channel.id))
+          sanitizeUser(buildSessionRuntimeUser(buildRuntimeUser(item, channel.id), channel))
         )
       : []
+
+    const sessionRuntimeUser = buildSessionRuntimeUser(runtimeUser, channel)
 
     ctx.body = {
       code: 0,
       message: 'success',
       data: {
         user: sanitizeUser(user),
-        runtimeUser: runtimeUser ? sanitizeUser(runtimeUser) : null,
-        channel: channel
-          ? { id: channel.id, name: channel.name, type: normalizeChannelType(channel.type) }
-          : null,
+        runtimeUser: sessionRuntimeUser ? sanitizeUser(sessionRuntimeUser) : null,
+        channel: buildChannelSummary(channel),
         availableChannels: Array.isArray(availableChannels)
-          ? availableChannels.map(item => ({
-              id: item.id,
-              name: item.name,
-              type: normalizeChannelType(item.type),
-            }))
+          ? availableChannels.map(item => buildChannelSummary(item)).filter(Boolean)
           : [],
         channelBoundUsers,
         platforms: {
@@ -271,11 +294,7 @@ router.get('/me', async ctx => {
           buildTimeWindowStart: 90,
           buildTimeWindowEnd: 20,
         },
-        orderUserStats: runtimeUser?.orderUserStats || {
-          enabled: false,
-          sortMode: 'manual',
-          usernames: [],
-        },
+        orderUserStats: sessionRuntimeUser?.orderUserStats || defaultOrderUserStats(),
         douyinMaterialMatches: Array.isArray(runtimeUser?.douyinMaterialMatches)
           ? runtimeUser.douyinMaterialMatches
           : [],

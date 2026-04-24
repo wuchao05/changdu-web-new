@@ -5,7 +5,7 @@ import {
   generateChangduABogus,
   requestChangduInternalApi,
 } from '../utils/changduInternalApi.js'
-import { resolveRuntimeContext } from '../utils/studioData.js'
+import { isMultiUserChannel, resolveRuntimeContext } from '../utils/studioData.js'
 import { getSessionUser } from '../utils/studioSession.js'
 
 const router = new Router()
@@ -265,6 +265,10 @@ async function resolveOrderUserStatsRuntime(ctx) {
 
   const requestedChannelId = String(ctx.get('x-studio-channel-id') || '').trim()
   const runtimeContext = await resolveRuntimeContext(sessionUser, requestedChannelId)
+  if (!isMultiUserChannel(runtimeContext.channel)) {
+    return normalizeOrderUserStatsConfig()
+  }
+
   return normalizeOrderUserStatsConfig(runtimeContext.runtimeUser?.orderUserStats)
 }
 

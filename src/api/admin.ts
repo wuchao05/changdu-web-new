@@ -172,10 +172,13 @@ export interface UserProfile {
   xtToken?: string
 }
 
+export type ChannelUserBase = 'single' | 'multi'
+
 export interface ChannelConfig {
   id: string
   name: string
   type: ChannelType
+  userBase: ChannelUserBase
   juliang: {
     cookie: string
     buildConfig: BuildConfig
@@ -199,6 +202,7 @@ export interface ChannelSummary {
   id: string
   name: string
   type: ChannelType
+  userBase?: ChannelUserBase
 }
 
 export interface SchedulerOverviewTaskBase {
