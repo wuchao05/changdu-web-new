@@ -908,7 +908,7 @@
                               <n-input
                                 :value="orderUsernameDrafts[item.channel.id] || ''"
                                 maxlength="20"
-                                placeholder="输入用户名后点击新增，例如：虎哥"
+                                placeholder="输入用户名后点击新增，例如：小红"
                                 @update:value="updateOrderUsernameDraft(item.channel.id, $event)"
                                 @keyup.enter="addOrderUsername(item.channel.id)"
                               />
