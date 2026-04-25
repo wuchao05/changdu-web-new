@@ -220,6 +220,8 @@ const selectedUserName = ref<string | null>(null)
 const selectedChannelName = ref<string | null>(null)
 const entryKeySet = new Set<string>()
 
+const MAX_DISPLAYED_LOG_ENTRIES = 1200
+
 let disconnectStream: null | (() => void) = null
 let reconnectTimer: number | null = null
 let activeStreamId = 0
@@ -353,7 +355,9 @@ const filteredEntries = computed(() =>
     .map(({ entry }) => entry)
 )
 
-const displayedEntries = computed(() => [...filteredEntries.value].reverse())
+const displayedEntries = computed(() =>
+  filteredEntries.value.slice(-MAX_DISPLAYED_LOG_ENTRIES).reverse()
+)
 
 const isInitialLogLoading = computed(
   () =>
@@ -560,6 +564,18 @@ function handleBack() {
 
   void router.push('/')
 }
+
+watch(
+  () => [
+    selectedLevel.value,
+    selectedScope.value,
+    selectedUserName.value,
+    selectedChannelName.value,
+  ],
+  () => {
+    shouldAnimateLogEntries.value = false
+  }
+)
 
 watch(
   () => displayedEntries.value.length,
