@@ -1,15 +1,13 @@
 import { fileURLToPath, URL } from 'node:url'
 
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import type { PluginOption } from 'vite'
 
 // https://vite.dev/config/
-export default defineConfig(async () => {
-  // const env = loadEnv(mode, process.cwd(), '')
-
-  // 代理到第三方接口
-  // const target = env.VITE_PROXY_TARGET || 'https://www.changdunovel.com'
+export default defineConfig(async ({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+  const apiProxyTarget = env.VITE_PROXY_TARGET || 'http://localhost:3000'
 
   const plugins: PluginOption[] = [vue()]
   if (process.env.VITE_ENABLE_DEVTOOLS === 'true') {
@@ -33,7 +31,7 @@ export default defineConfig(async () => {
       strictPort: true,
       proxy: {
         '/api': {
-          target: 'http://localhost:3000',
+          target: apiProxyTarget,
           changeOrigin: true,
           secure: false,
         },

@@ -16,6 +16,14 @@ pnpm install
 pnpm dev
 ```
 
+默认本地前端会把 `/api` 代理到本地 Koa 服务 `http://localhost:3000`。如果需要本地页面直接访问线上接口，可以在 `.env.local` 中配置线上后端地址：
+
+```bash
+VITE_PROXY_TARGET=https://你的线上后端域名
+```
+
+修改后重启 `pnpm dev` 生效。前端代码仍然请求 `/api`，由 Vite 开发代理转发到线上服务。
+
 常用命令：
 
 ```bash
