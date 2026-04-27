@@ -73,7 +73,7 @@ onMounted(async () => {
               </div>
               <RouterView v-else v-slot="{ Component }">
                 <Suspense @pending="routeLoading = true" @resolve="routeLoading = false">
-                  <component :is="Component" :key="route.fullPath" />
+                  <component :is="Component" :key="route.path" />
                   <template #fallback>
                     <div class="app-loader-shell">
                       <div class="app-loader-card">

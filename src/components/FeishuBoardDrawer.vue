@@ -14,7 +14,7 @@
           </template>
         </n-button>
       </template>
-      飞书状态看板
+      飞书看板
     </n-tooltip>
 
     <n-drawer v-model:show="drawerVisible" placement="right" :width="drawerWidth">
@@ -23,7 +23,7 @@
           <div class="board-header">
             <div class="board-header__title">
               <Icon icon="mdi:view-dashboard-outline" class="board-header__icon" />
-              <span>飞书状态看板</span>
+              <span>飞书看板</span>
               <n-tag size="small" :bordered="false" type="info" class="board-header__hint">
                 只读
               </n-tag>
@@ -523,7 +523,7 @@ async function fetchData() {
     const result = await feishuApi.getDramaStatusBoard(dates, [...TARGET_STATUSES], tableId)
     records.value = result.items.map(normalizeRecord).filter(record => record.dramaName)
   } catch (error) {
-    console.warn('[FeishuBoardDrawer] 加载飞书状态看板数据失败:', error)
+    console.warn('[FeishuBoardDrawer] 加载飞书看板数据失败:', error)
     records.value = []
   } finally {
     loading.value = false

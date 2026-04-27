@@ -1,10 +1,17 @@
 <template>
   <div class="feishu-panel">
     <div class="feishu-panel__header">
-      <div class="feishu-panel__title">
-        <Icon icon="mdi:view-dashboard-outline" class="feishu-panel__icon" />
-        <span>飞书状态看板</span>
-        <n-tag size="small" :bordered="false" type="info" class="feishu-panel__hint">只读</n-tag>
+      <div class="feishu-panel__title-wrap">
+        <div class="feishu-panel__title">
+          <span class="feishu-panel__icon-box">
+            <Icon icon="mdi:view-dashboard-outline" class="feishu-panel__icon" />
+          </span>
+          <span>飞书看板</span>
+          <n-tag size="small" :bordered="false" type="info" class="feishu-panel__hint">只读</n-tag>
+        </div>
+        <p class="feishu-panel__subtitle">
+          按日期聚合当前渠道剧目状态，快速查看提交、下载、剪辑和搭建进度
+        </p>
       </div>
       <div class="feishu-panel__actions">
         <n-select
@@ -18,7 +25,7 @@
         />
         <n-button
           size="small"
-          tertiary
+          secondary
           :loading="loading"
           :disabled="!resolvedTableId"
           @click="refresh"
@@ -31,85 +38,91 @@
       </div>
     </div>
 
-    <n-tabs
-      v-model:value="selectedDateKey"
-      type="segment"
-      size="medium"
-      animated
-      class="feishu-panel__tabs"
-    >
-      <n-tab-pane v-for="tab in dateTabs" :key="tab.key" :name="tab.key" display-directive="show">
-        <template #tab>
-          <span class="feishu-panel__date-tab">
-            <span class="feishu-panel__date-tab-label">{{ tab.label }}</span>
-            <span
-              class="feishu-panel__date-tab-count"
-              :class="{
-                'is-active': selectedDateKey === tab.key,
-                'is-zero': dateCounts[tab.key] === 0,
-              }"
-            >
-              {{ dateCounts[tab.key] ?? 0 }}
-            </span>
-          </span>
-        </template>
-      </n-tab-pane>
-    </n-tabs>
-
-    <div v-if="!resolvedTableId" class="feishu-panel__empty">
-      <Icon icon="mdi:link-variant-off" class="feishu-panel__empty-icon" />
-      <p class="feishu-panel__empty-title">未配置飞书状态表</p>
-      <p class="feishu-panel__empty-desc">
-        {{
-          isAdmin
-            ? '所选用户的当前渠道尚未配置剧集状态表 ID'
-            : '当前渠道尚未配置剧集状态表 ID,请联系管理员'
-        }}
-      </p>
-    </div>
-
-    <template v-else>
-      <div class="feishu-panel__summary">
+    <div class="feishu-panel__body">
+      <div class="feishu-panel__toolbar">
+        <n-tabs
+          v-model:value="selectedDateKey"
+          type="segment"
+          size="medium"
+          animated
+          class="feishu-panel__tabs"
+        >
+          <n-tab-pane
+            v-for="tab in dateTabs"
+            :key="tab.key"
+            :name="tab.key"
+            display-directive="show"
+          >
+            <template #tab>
+              <span class="feishu-panel__date-tab">
+                <span class="feishu-panel__date-tab-label">{{ tab.label }}</span>
+                <span
+                  class="feishu-panel__date-tab-count"
+                  :class="{
+                    'is-active': selectedDateKey === tab.key,
+                    'is-zero': dateCounts[tab.key] === 0,
+                  }"
+                >
+                  {{ dateCounts[tab.key] ?? 0 }}
+                </span>
+              </span>
+            </template>
+          </n-tab-pane>
+        </n-tabs>
         <span class="feishu-panel__summary-total">
           共 <strong>{{ visibleRecords.length }}</strong> 条记录
         </span>
       </div>
 
-      <n-spin :show="loading">
-        <div class="feishu-panel__groups">
-          <div v-for="group in groupedRecords" :key="group.status" class="feishu-panel__group">
-            <div class="feishu-panel__group-head">
-              <n-tag
-                :type="STATUS_TAG_TYPE[group.status] || 'default'"
-                size="small"
-                :bordered="false"
-                round
-              >
-                {{ group.status }}
-              </n-tag>
-              <span class="feishu-panel__group-count">{{ group.records.length }}</span>
-            </div>
-            <n-data-table
-              v-if="group.records.length"
-              size="small"
-              :columns="tableColumns"
-              :data="group.records"
-              :bordered="false"
-              :single-line="false"
-              striped
-              :row-key="getRowKey"
-            />
-            <div v-else class="feishu-panel__group-empty">该状态暂无记录</div>
-          </div>
+      <div v-if="!resolvedTableId" class="feishu-panel__empty">
+        <Icon icon="mdi:link-variant-off" class="feishu-panel__empty-icon" />
+        <p class="feishu-panel__empty-title">未配置飞书状态表</p>
+        <p class="feishu-panel__empty-desc">
+          {{
+            isAdmin
+              ? '所选用户的当前渠道尚未配置剧集状态表 ID'
+              : '当前渠道尚未配置剧集状态表 ID,请联系管理员'
+          }}
+        </p>
+      </div>
 
-          <div v-if="!loading && groupedRecords.length === 0" class="feishu-panel__empty">
-            <Icon icon="mdi:tray-remove" class="feishu-panel__empty-icon" />
-            <p class="feishu-panel__empty-title">没有匹配的剧目</p>
-            <p class="feishu-panel__empty-desc">该日期下没有处于跟进中状态的剧目</p>
+      <template v-else>
+        <n-spin :show="loading">
+          <div class="feishu-panel__groups">
+            <div v-for="group in groupedRecords" :key="group.status" class="feishu-panel__group">
+              <div class="feishu-panel__group-head">
+                <n-tag
+                  :type="STATUS_TAG_TYPE[group.status] || 'default'"
+                  size="small"
+                  :bordered="false"
+                  round
+                >
+                  {{ group.status }}
+                </n-tag>
+                <span class="feishu-panel__group-count">{{ group.records.length }}</span>
+              </div>
+              <n-data-table
+                v-if="group.records.length"
+                size="small"
+                :columns="tableColumns"
+                :data="group.records"
+                :bordered="false"
+                :single-line="false"
+                striped
+                :row-key="getRowKey"
+              />
+              <div v-else class="feishu-panel__group-empty">该状态暂无记录</div>
+            </div>
+
+            <div v-if="!loading && groupedRecords.length === 0" class="feishu-panel__empty">
+              <Icon icon="mdi:tray-remove" class="feishu-panel__empty-icon" />
+              <p class="feishu-panel__empty-title">没有匹配的剧目</p>
+              <p class="feishu-panel__empty-desc">该日期下没有处于跟进中状态的剧目</p>
+            </div>
           </div>
-        </div>
-      </n-spin>
-    </template>
+        </n-spin>
+      </template>
+    </div>
   </div>
 </template>
 
@@ -184,6 +197,23 @@ const apiConfigStore = useApiConfigStore()
 
 const loading = ref(false)
 const records = ref<BoardRecord[]>([])
+
+// 请求代际:Tab 切换时通过 cancelAllRequests() 自增,在途响应回来后丢弃
+let requestGeneration = 0
+
+function beginRequest() {
+  requestGeneration += 1
+  return requestGeneration
+}
+
+function isStaleRequest(generation: number) {
+  return generation !== requestGeneration
+}
+
+function cancelAllRequests() {
+  requestGeneration += 1
+  loading.value = false
+}
 
 // 管理员选择器
 const adminUsers = ref<adminApi.UserProfile[]>([])
@@ -418,6 +448,7 @@ async function loadAdminUsers() {
 }
 
 async function fetchData() {
+  const generation = beginRequest()
   const tableId = resolvedTableId.value
   if (!tableId) {
     records.value = []
@@ -429,12 +460,16 @@ async function fetchData() {
   loading.value = true
   try {
     const result = await feishuApi.getDramaStatusBoard(dates, [...TARGET_STATUSES], tableId)
+    if (isStaleRequest(generation)) return
     records.value = result.items.map(normalizeRecord).filter(record => record.dramaName)
   } catch (error) {
-    console.warn('[FeishuBoardPanel] 加载飞书状态看板数据失败:', error)
+    if (isStaleRequest(generation)) return
+    console.warn('[FeishuBoardPanel] 加载飞书看板数据失败:', error)
     records.value = []
   } finally {
-    loading.value = false
+    if (!isStaleRequest(generation)) {
+      loading.value = false
+    }
   }
 }
 
@@ -451,7 +486,7 @@ async function refresh() {
   await fetchData()
 }
 
-defineExpose({ refresh })
+defineExpose({ refresh, cancelAllRequests })
 
 // 管理员切用户:重新拉数据
 watch(selectedUserId, () => {
@@ -479,7 +514,14 @@ watch(
 .feishu-panel {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at top left, rgba(20, 184, 166, 0.12), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.86));
+  box-shadow: 0 24px 70px -46px rgba(15, 23, 42, 0.55);
 }
 
 .feishu-panel__header {
@@ -488,20 +530,46 @@ watch(
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
+  padding: 18px 20px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.feishu-panel__title-wrap {
+  min-width: 0;
 }
 
 .feishu-panel__title {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 18px;
-  font-weight: 600;
+  gap: 10px;
+  font-size: 20px;
+  font-weight: 700;
   color: #0f172a;
 }
 
+.feishu-panel__subtitle {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.feishu-panel__icon-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #e0f2fe, #ccfbf1);
+  color: #0284c7;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
 .feishu-panel__icon {
-  font-size: 22px;
-  color: #6366f1;
+  font-size: 20px;
+  color: currentColor;
 }
 
 .feishu-panel__hint {
@@ -515,12 +583,29 @@ watch(
   flex-wrap: wrap;
 }
 
+.feishu-panel__body {
+  padding: 18px 20px 22px;
+}
+
+.feishu-panel__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
 .feishu-panel__select {
   width: 220px;
 }
 
 .feishu-panel__tabs :deep(.n-tabs-tab) {
   font-variant-numeric: tabular-nums;
+}
+
+.feishu-panel__tabs {
+  min-width: min(760px, 100%);
 }
 
 .feishu-panel__date-tab {
@@ -541,8 +626,8 @@ watch(
   height: 18px;
   padding: 0 6px;
   border-radius: 999px;
-  background: rgba(99, 102, 241, 0.14);
-  color: #4f46e5;
+  background: rgba(14, 165, 233, 0.14);
+  color: #0284c7;
   font-size: 11px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -553,7 +638,7 @@ watch(
 }
 
 .feishu-panel__date-tab-count.is-active {
-  background: #6366f1;
+  background: #0ea5e9;
   color: #fff;
 }
 
@@ -563,21 +648,25 @@ watch(
 }
 
 .feishu-panel__date-tab-count.is-zero.is-active {
-  background: rgba(99, 102, 241, 0.6);
+  background: rgba(14, 165, 233, 0.6);
   color: #fff;
 }
 
-.feishu-panel__summary {
-  display: flex;
+.feishu-panel__summary-total {
+  display: inline-flex;
   align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 7px 11px;
+  border: 1px solid rgba(14, 165, 233, 0.16);
+  border-radius: 999px;
+  background: rgba(240, 249, 255, 0.82);
   color: #475569;
   font-size: 13px;
 }
 
 .feishu-panel__summary-total strong {
-  color: #6366f1;
+  color: #0284c7;
   font-weight: 700;
 }
 
@@ -588,11 +677,12 @@ watch(
 }
 
 .feishu-panel__group {
-  background: #fff;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.82);
   border: 1px solid rgba(148, 163, 184, 0.18);
-  border-radius: 12px;
-  padding: 12px 12px 4px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  border-radius: 16px;
+  padding: 14px 14px 6px;
+  box-shadow: 0 12px 36px -30px rgba(15, 23, 42, 0.5);
 }
 
 .feishu-panel__group-head {
@@ -647,8 +737,53 @@ watch(
 }
 
 @media (max-width: 640px) {
+  .feishu-panel {
+    border-radius: 18px;
+  }
+
+  .feishu-panel__header,
+  .feishu-panel__body {
+    padding: 14px;
+  }
+
+  .feishu-panel__title {
+    font-size: 18px;
+  }
+
+  .feishu-panel__subtitle {
+    font-size: 12px;
+  }
+
+  .feishu-panel__actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
   .feishu-panel__select {
-    width: 160px;
+    width: min(190px, calc(100vw - 120px));
+  }
+
+  .feishu-panel__toolbar {
+    align-items: stretch;
+  }
+
+  .feishu-panel__tabs {
+    min-width: 0;
+    width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .feishu-panel__tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .feishu-panel__summary-total {
+    align-self: flex-start;
+  }
+
+  .feishu-panel__group {
+    padding: 12px 10px 4px;
   }
 }
 </style>

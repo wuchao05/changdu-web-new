@@ -73,8 +73,7 @@
             <div class="search-query-compact">
               <NInput
                 v-model:value="searchKeyword"
-                :placeholder="isShowingPendingDownload ? '显示待下载剧集...' : '搜索短剧名称...'"
-                :disabled="pendingDownloadLoading"
+                placeholder="搜索短剧名称..."
                 clearable
                 size="small"
                 class="search-input-native"
@@ -87,20 +86,10 @@
               </NInput>
               <button
                 @click="handleRefresh"
-                :disabled="
-                  loading ||
-                  listSkeletonLoading ||
-                  searchLoading ||
-                  pendingDownloadLoading ||
-                  rankingLoading
-                "
+                :disabled="loading || listSkeletonLoading || searchLoading || rankingLoading"
                 class="refresh-btn-modern"
                 :title="
-                  loading ||
-                  listSkeletonLoading ||
-                  searchLoading ||
-                  pendingDownloadLoading ||
-                  rankingLoading
+                  loading || listSkeletonLoading || searchLoading || rankingLoading
                     ? '刷新中...'
                     : '刷新数据'
                 "
@@ -123,7 +112,6 @@
                   loading ||
                   listSkeletonLoading ||
                   searchLoading ||
-                  pendingDownloadLoading ||
                   rankingLoading
                 "
                 class="view-all-btn-modern"
@@ -165,57 +153,8 @@
       </div>
     </div>
 
-    <!-- 二级 Tab 区域 - 仅在新剧抢跑时显示，且待下载模式未激活时 -->
-    <div
-      v-if="!isSearching && activeTab === 'new-drama' && !isPendingDownloadActive"
-      class="sticky secondary-tab-sticky z-40 bg-white/95 backdrop-blur-md border-b border-gray-200/60 shadow-sm"
-    >
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
-        <div class="secondary-tab-container">
-          <!-- 日期筛选二级 Tab -->
-          <div class="secondary-tab-switcher">
-            <button
-              v-for="date in dateOptions"
-              :key="date.value"
-              @click="selectedDate = date.value"
-              :class="['secondary-tab-btn', selectedDate === date.value ? 'active' : '']"
-            >
-              <Icon :icon="getDateIcon(date.value)" class="secondary-tab-icon" />
-              <span class="secondary-tab-text">{{ date.label }}</span>
-              <span v-if="getDateDramaCount(date.value) > 0" class="secondary-tab-count">
-                {{ getDateDramaCount(date.value) }}
-              </span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 二级 Tab 区域 - 仅在榜单剧时显示，且待下载模式未激活时 -->
-    <div
-      v-if="!isSearching && activeTab === 'ranking' && !isPendingDownloadActive"
-      class="sticky secondary-tab-sticky z-40 bg-white/95 backdrop-blur-md border-b border-gray-200/60 shadow-sm"
-    >
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
-        <div class="secondary-tab-container">
-          <!-- 收入评级筛选二级 Tab -->
-          <div class="secondary-tab-switcher">
-            <button
-              v-for="level in incomeLevelOptions"
-              :key="level.value"
-              @click="selectedIncomeLevel = level.value"
-              :class="['secondary-tab-btn', selectedIncomeLevel === level.value ? 'active' : '']"
-            >
-              <Icon :icon="level.icon" class="secondary-tab-icon" />
-              <span class="secondary-tab-text">{{ level.label }}</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- 主要内容区域 -->
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pt-2 sm:pt-2 md:pt-2">
+    <div class="clip-main-content max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pt-2 sm:pt-2 md:pt-2">
       <!-- 自动提交下载状态栏 -->
       <div
         v-if="isAutoSubmitEnabledForCurrentChannel && activeTab === 'new-drama'"
@@ -245,71 +184,6 @@
           >
             {{ currentSchedulerStatus.running ? '正在运行...' : '停止自动提交' }}
           </button>
-        </div>
-      </div>
-
-      <!-- 自动下载状态栏 -->
-      <div v-if="isPendingDownloadActive" class="auto-download-bar">
-        <div class="auto-download-info">
-          <Icon icon="mdi:download-multiple" class="auto-download-icon" />
-          <div>
-            <div class="auto-download-title">自动下载</div>
-            <div class="auto-download-desc">{{ autoDownloadStatusText }}</div>
-          </div>
-        </div>
-        <div class="auto-download-actions">
-          <button
-            v-if="!autoDownloadEnabled"
-            class="auto-download-button"
-            @click="() => startAutoDownload()"
-          >
-            开始自动下载
-          </button>
-          <button
-            v-else
-            class="auto-download-button stop"
-            :disabled="autoDownloadRunning"
-            @click="stopAutoDownload"
-          >
-            {{ autoDownloadRunning ? '正在运行' : '停止自动下载' }}
-          </button>
-          <span class="auto-download-hint">
-            每{{ Math.round(autoDownloadIntervalMs / 60000) }}分钟自动检查待下载剧集
-          </span>
-          <span v-if="autoDownloadMessage" class="auto-download-message">
-            {{ autoDownloadMessage }}
-          </span>
-        </div>
-      </div>
-
-      <!-- 待下载进度提示 - 在所有tab中都显示 -->
-      <div v-if="pendingDownloadProgress" class="pending-download-progress">
-        <div class="progress-content">
-          <Icon icon="mdi:loading" class="progress-icon animate-spin" />
-          <span class="progress-text">
-            正在查找剧集：{{ currentSearchingDrama || '准备中...' }}（已找到
-            {{ foundPendingCount }} 个，共 {{ totalPendingCount }} 个待下载剧集）
-          </span>
-        </div>
-      </div>
-
-      <!-- 未找到的剧集列表 - 在所有tab中都显示 -->
-      <div
-        v-if="isShowingPendingDownload && notFoundDramas.length > 0 && !pendingDownloadLoading"
-        class="not-found-dramas"
-      >
-        <div class="not-found-header">
-          <Icon icon="mdi:alert-circle" class="not-found-icon" />
-          <span class="not-found-title">未找到的剧集 ({{ notFoundDramas.length }} 个)</span>
-        </div>
-        <div class="not-found-list">
-          <span
-            v-for="(dramaName, index) in notFoundDramas"
-            :key="dramaName"
-            class="not-found-item"
-          >
-            {{ dramaName }}<span v-if="index < notFoundDramas.length - 1">, </span>
-          </span>
         </div>
       </div>
 
@@ -363,6 +237,35 @@
       </Transition>
 
       <div v-if="!isSearching" class="new-drama-preview">
+        <div class="embedded-list-filter-row">
+          <div v-if="activeTab === 'new-drama'" class="secondary-tab-switcher">
+            <button
+              v-for="date in dateOptions"
+              :key="date.value"
+              @click="selectedDate = date.value"
+              :class="['secondary-tab-btn', selectedDate === date.value ? 'active' : '']"
+            >
+              <Icon :icon="getDateIcon(date.value)" class="secondary-tab-icon" />
+              <span class="secondary-tab-text">{{ date.label }}</span>
+              <span v-if="getDateDramaCount(date.value) > 0" class="secondary-tab-count">
+                {{ getDateDramaCount(date.value) }}
+              </span>
+            </button>
+          </div>
+          <div v-else-if="activeTab === 'ranking'" class="secondary-tab-switcher">
+            <button
+              v-for="level in incomeLevelOptions"
+              :key="level.value"
+              @click="selectedIncomeLevel = level.value"
+              :class="['secondary-tab-btn', selectedIncomeLevel === level.value ? 'active' : '']"
+            >
+              <Icon :icon="level.icon" class="secondary-tab-icon" />
+              <span class="secondary-tab-text">{{ level.label }}</span>
+            </button>
+          </div>
+          <DramaCart ref="dramaCartRef" inline @batch-submitted="handleBatchSubmitted" />
+        </div>
+
         <!-- 骨架屏加载状态 -->
         <div
           v-if="loading || listSkeletonLoading || searchLoading || rankingLoading"
@@ -588,7 +491,6 @@
             !isSearching &&
             !listSkeletonLoading &&
             paginatedDramas.length > 0 &&
-            !pendingDownloadLoading &&
             activeTab !== 'ranking' &&
             (activeTab !== 'new-drama' || selectedDate === 'all')
           "
@@ -887,9 +789,6 @@
       </div>
     </Transition>
     <AdxRankingDrawer v-model:show="showAdxDrawer" />
-
-    <!-- 购物车组件 -->
-    <DramaCart ref="dramaCartRef" @batch-submitted="handleBatchSubmitted" />
   </div>
 </template>
 
@@ -964,7 +863,6 @@ async function syncCurrentChannelConfig() {
 }
 
 function resetChannelScopedData() {
-  clearPendingDownloadState()
   searchResults.value = []
   searchTotal.value = 0
   searchCurrentPage.value = 1
@@ -1012,6 +910,17 @@ const message = useMessage()
 
 const dramaCartRef = ref<InstanceType<typeof DramaCart> | null>(null)
 
+// ===== 请求代际:用于 Tab 切换时丢弃在途请求结果 =====
+// 每次 cancelAllListRequests() 会把 generation +1
+// 列表/搜索/榜单类请求在响应回来后会检查 generation,若不一致则丢弃结果
+let listRequestGeneration = 0
+function beginListRequest() {
+  return listRequestGeneration
+}
+function isListRequestStale(gen: number) {
+  return gen !== listRequestGeneration
+}
+
 // 响应式数据
 const loading = ref(false)
 const error = ref('')
@@ -1039,22 +948,17 @@ if (typeof window !== 'undefined') {
   ;(window as any).__forceComparisonChannelMode__ = forceComparisonChannelMode
 }
 
-const autoDownloadUseExistingPendingOnce = ref(false)
-
 onBeforeUnmount(() => {
   if (searchDebounceTimer) {
     clearTimeout(searchDebounceTimer)
     searchDebounceTimer = null
   }
-  stopAutoDownload()
   stopStatusPolling() // 清理服务端状态轮询
 })
 
 // 新增：Tab 切换
 const activeTab = ref<'new-drama' | 'ranking'>('new-drama')
 
-// 新增：待下载按钮选中状态
-const isPendingDownloadActive = ref(false)
 const fullDramaLoading = ref(false)
 
 // 并发控制：当自动提交运行时，禁用手动操作
@@ -1069,10 +973,6 @@ const currentChannelLabel = computed(() => apiConfigStore.config.channelName || 
 const currentDramaListTableId = computed(
   () => apiConfigStore.config.dramaListTableId || FEISHU_CONFIG.table_ids.drama_list
 )
-const currentDramaStatusTableId = computed(
-  () => apiConfigStore.config.dramaStatusTableId || FEISHU_CONFIG.table_ids.drama_status
-)
-const useBookIdMatching = computed(() => true)
 
 // 新增：排行榜相关数据
 // 排行榜数据类型定义
@@ -1122,32 +1022,7 @@ const searchCurrentPage = ref(1)
 const searchPageSize = ref(10)
 let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
-// 待下载剧集相关状态
-const pendingDownloadLoading = ref(false)
-const pendingDownloadResults = ref<NewDramaItem[]>([])
-const pendingDownloadProgress = ref('')
-const currentSearchingDrama = ref('')
-const totalPendingCount = ref(0)
-const foundPendingCount = ref(0)
-const isShowingPendingDownload = ref(false)
-const notFoundDramas = ref<string[]>([])
-const pendingDownloadRecordMap = ref<Record<string, string[]>>({})
 const downloadTriggeredSet = ref<Set<string>>(new Set())
-const pendingViewHydrated = ref(false)
-const skipNextAutoRefresh = ref(false)
-const autoMarkedRecordIds = ref<Set<string>>(new Set())
-
-// 自动下载相关状态
-const autoDownloadEnabled = ref(false)
-const autoDownloadRunning = ref(false)
-const autoDownloadTimer = ref<number | null>(null)
-const autoDownloadMessage = ref('')
-const lastAutoDownloadAt = ref<number | null>(null)
-const autoDownloadIntervalMs = computed(() => {
-  const minutes = apiConfigStore.config.autoDownloadIntervalMinutes || 20
-  return Math.max(1, minutes) * 60 * 1000
-})
-const autoDownloadPrefEnabled = computed(() => apiConfigStore.config.autoDownloadEnabled ?? false)
 
 // 自动提交下载相关状态
 const createDefaultAutoSubmitStatus = (): AutoSubmitStatus => ({
@@ -1305,23 +1180,6 @@ const selectedDateLabel = computed(() => {
   return option?.label || '今天'
 })
 
-const autoDownloadStatusText = computed(() => {
-  if (!autoDownloadEnabled.value) {
-    return '未开启，点击开始后将使用浏览器带宽自动下载'
-  }
-
-  if (autoDownloadRunning.value) {
-    return '正在检查并触发下载，请保持页面开启'
-  }
-
-  if (lastAutoDownloadAt.value) {
-    return `上次检查：${dayjs(lastAutoDownloadAt.value).tz('Asia/Shanghai').format('HH:mm')}`
-  }
-
-  const minutes = Math.round(autoDownloadIntervalMs.value / 60000)
-  return `已开启，将每${minutes}分钟自动检查待下载剧集`
-})
-
 const currentDateDramas = computed(() => {
   const option = dateOptions.value.find(opt => opt.value === selectedDate.value)
   if (!option) return []
@@ -1341,9 +1199,7 @@ const currentDateDramas = computed(() => {
 })
 
 // 是否正在搜索
-const isSearching = computed(
-  () => searchKeyword.value.trim().length > 0 || isShowingPendingDownload.value
-)
+const isSearching = computed(() => searchKeyword.value.trim().length > 0)
 
 // 过滤后的短剧列表（包含搜索过滤）
 const filteredDramas = computed(() => {
@@ -1401,7 +1257,7 @@ const filteredDramas = computed(() => {
 
 // 分页后的短剧列表
 const paginatedDramas = computed(() => {
-  // 如果正在搜索或查找待下载剧集，使用搜索结果
+  // 搜索态使用搜索结果
   if (isSearching.value) {
     return searchResults.value
   }
@@ -1419,7 +1275,7 @@ const paginatedDramas = computed(() => {
 
 // 总页数
 const totalPages = computed(() => {
-  // 如果正在搜索或查找待下载剧集，使用搜索总页数
+  // 搜索态使用搜索总页数
   if (isSearching.value) {
     return Math.ceil(searchTotal.value / searchPageSize.value)
   }
@@ -1582,7 +1438,7 @@ async function handleDownload(
         showCopyToast.value = false
       }, 3000)
     } else {
-      console.warn('自动下载跳过：缺少下载地址', downloadData)
+      console.warn('下载跳过：缺少下载地址', downloadData)
     }
     return false
   }
@@ -1604,17 +1460,11 @@ async function handleDownload(
     const fileName = /\.zip$/i.test(baseName) ? baseName : `${baseName}.zip`
 
     let directUrl = downloadData.download_url || ''
-    let fileIdForFeishu = ''
     if (!directUrl && downloadData.imagex_uri) {
       try {
         const urlResp = await getDownloadUrl(downloadData.imagex_uri)
         if (urlResp.code === 0 && urlResp.download_url) {
           directUrl = urlResp.download_url
-          // 尝试从直链中提取文件名部分
-          const match = urlResp.download_url.match(/\/([A-Za-z0-9]+)(?:\?|$)/)
-          if (match && match[1]) {
-            fileIdForFeishu = match[1]
-          }
         }
       } catch (error) {
         console.warn('获取下载直链失败', error)
@@ -1623,23 +1473,6 @@ async function handleDownload(
 
     if (!directUrl) {
       throw new Error('无可用下载链接')
-    }
-
-    // 如果拿到了文件ID，尝试写入飞书"文件md5"字段
-    if (fileIdForFeishu) {
-      // 根据当前渠道选择查找键
-      const lookupKey = useBookIdMatching.value
-        ? downloadData.book_id?.trim() || ''
-        : downloadData.book_name?.trim() || ''
-
-      const recordIds = pendingDownloadRecordMap.value[lookupKey] || []
-      for (const recordId of recordIds) {
-        try {
-          await feishuApi.updateFileMd5(recordId, fileIdForFeishu)
-        } catch (e) {
-          console.warn('更新文件md5失败', recordId, e)
-        }
-      }
     }
 
     const link = document.createElement('a')
@@ -1682,34 +1515,6 @@ async function handleDownload(
   }
 }
 
-// 将待下载剧集状态标记为指定状态
-async function updatePendingStatus(
-  recordIds: string[],
-  status: string,
-  dramaName: string,
-  silent = false
-) {
-  const uniqueIds = Array.from(new Set(recordIds.filter(Boolean)))
-  if (!uniqueIds.length) return
-
-  const tableId = currentDramaStatusTableId.value
-
-  for (const recordId of uniqueIds) {
-    try {
-      await feishuApi.updateDramaStatus(recordId, status, tableId)
-    } catch (error) {
-      console.error(`更新飞书状态失败：${dramaName}`, error)
-      if (!silent) {
-        showSuccessToast(`更新飞书状态失败：${dramaName}`)
-      }
-    }
-  }
-
-  if (!silent) {
-    showSuccessToast(`已标记为${status}：${dramaName}`)
-  }
-}
-
 // 查看剧集大图功能（直接使用短剧列表返回的 original_thumb_url）
 function showDramaImage(drama: NewDramaItem) {
   showImageModal.value = true
@@ -1740,12 +1545,6 @@ function closeImageModal() {
   showImageModal.value = false
   currentDramaImage.value = null
   imageError.value = ''
-}
-
-function wait(duration: number) {
-  return new Promise(resolve => {
-    setTimeout(resolve, duration)
-  })
 }
 
 // 同步到飞书功能
@@ -2426,12 +2225,10 @@ async function fetchDramaListByPageCount(
   pageCount: number,
   options: { sequential?: boolean; pageIntervalMs?: number } = {}
 ) {
+  const requestGen = beginListRequest()
   loading.value = true
   listSkeletonLoading.value = true
   error.value = ''
-
-  // 清理待下载相关状态，因为现在显示的是正常列表而不是待下载列表
-  clearPendingDownloadState()
 
   try {
     // 计算时间范围（过去30天到未来30天，使用北京时间）
@@ -2483,6 +2280,9 @@ async function fetchDramaListByPageCount(
 
     const downloadResult = await downloadTaskPromise
 
+    // 若期间用户切走了 Tab,丢弃这次响应,不更新 UI
+    if (isListRequestStale(requestGen)) return
+
     // 合并多页新剧列表结果
     const allDramaData = dramaResults.flatMap(result => result.data?.data || [])
 
@@ -2531,14 +2331,19 @@ async function fetchDramaListByPageCount(
       currentPage.value = 1
     }
   } catch (err) {
+    if (isListRequestStale(requestGen)) return
     console.error('Failed to fetch data:', err)
     error.value = err instanceof Error ? err.message : '获取数据失败'
   } finally {
-    loading.value = false
-    // 延迟隐藏骨架屏
-    setTimeout(() => {
-      listSkeletonLoading.value = false
-    }, 300)
+    if (!isListRequestStale(requestGen)) {
+      loading.value = false
+      // 延迟隐藏骨架屏
+      setTimeout(() => {
+        if (!isListRequestStale(requestGen)) {
+          listSkeletonLoading.value = false
+        }
+      }, 300)
+    }
   }
 }
 
@@ -2609,47 +2414,6 @@ watch(activeTab, async newTab => {
   }
 })
 
-// 待下载模式关闭时，停止自动下载
-watch(isPendingDownloadActive, active => {
-  if (!active) {
-    stopAutoDownload()
-  } else if (active) {
-    // 如果已启用自动下载且有待下载剧集，启动自动下载
-    if (autoDownloadPrefEnabled.value && Object.keys(pendingDownloadRecordMap.value).length > 0) {
-      startAutoDownload({ refreshPending: false })
-    }
-  }
-})
-
-// 自动下载偏好变更时同步状态
-watch(
-  autoDownloadPrefEnabled,
-  value => {
-    if (!value) {
-      stopAutoDownload()
-      return
-    }
-    if (isPendingDownloadActive.value) {
-      skipNextAutoRefresh.value = true
-      startAutoDownload({ refreshPending: false })
-    }
-  },
-  { immediate: true }
-)
-
-// 自动下载间隔变更时重置计时器
-watch(autoDownloadIntervalMs, () => {
-  if (autoDownloadEnabled.value) {
-    if (autoDownloadTimer.value) {
-      clearInterval(autoDownloadTimer.value)
-      autoDownloadTimer.value = null
-    }
-    autoDownloadTimer.value = window.setInterval(() => {
-      runAutoDownloadCycle()
-    }, autoDownloadIntervalMs.value)
-  }
-})
-
 // 返回首页
 function goBack() {
   router.push('/')
@@ -2676,17 +2440,7 @@ function clearDownloadTriggered(name?: string | null) {
 
 // 智能刷新处理
 async function handleRefresh() {
-  if (isPendingDownloadActive.value) {
-    // 待下载模式：若开启自动下载则触发一次自动下载并更新时间戳，否则仅刷新列表
-    if (autoDownloadEnabled.value) {
-      autoDownloadUseExistingPendingOnce.value = false
-      await findPendingDownloadDramas()
-      lastAutoDownloadAt.value = Date.now()
-      runAutoDownloadCycle()
-    } else {
-      await findPendingDownloadDramas()
-    }
-  } else if (searchKeyword.value.trim()) {
+  if (searchKeyword.value.trim()) {
     // 有关键词时，执行搜索逻辑
     handleSearch()
   } else {
@@ -2720,9 +2474,6 @@ async function handleSearch() {
     searchTotal.value = 0
     searchCurrentPage.value = 1
     currentPage.value = 1
-    // 清理待下载相关状态
-    clearPendingDownloadState()
-
     return
   }
 
@@ -2732,12 +2483,10 @@ async function handleSearch() {
 
 // 执行搜索接口调用
 async function performSearch(keyword: string, page: number) {
+  const requestGen = beginListRequest()
   try {
     searchLoading.value = true
     searchCurrentPage.value = page
-
-    // 清理待下载相关状态，因为现在显示的是搜索结果而不是待下载列表
-    clearPendingDownloadState()
 
     // 计算时间范围（过去30天到未来30天，使用北京时间）
     const now = dayjs().tz('Asia/Shanghai')
@@ -2762,6 +2511,8 @@ async function performSearch(keyword: string, page: number) {
         // 移除 task_status 过滤，获取所有状态的下载任务
       }),
     ])
+
+    if (isListRequestStale(requestGen)) return
 
     if (searchResult.code === 0 && searchResult.data) {
       const searchDramaData = searchResult.data.data || []
@@ -2793,31 +2544,18 @@ async function performSearch(keyword: string, page: number) {
       searchTotal.value = 0
     }
   } catch (error) {
+    if (isListRequestStale(requestGen)) return
     console.error('搜索失败:', error)
     searchResults.value = []
     searchTotal.value = 0
   } finally {
-    searchLoading.value = false
+    if (!isListRequestStale(requestGen)) {
+      searchLoading.value = false
+    }
   }
 }
 
 // 注意：飞书状态现在由后端接口直接提供，无需前端重复获取
-
-// 清理待下载相关状态
-function clearPendingDownloadState() {
-  pendingDownloadResults.value = []
-  isShowingPendingDownload.value = false
-  notFoundDramas.value = []
-  pendingDownloadProgress.value = ''
-  currentSearchingDrama.value = ''
-  totalPendingCount.value = 0
-  foundPendingCount.value = 0
-  pendingDownloadLoading.value = false
-  isPendingDownloadActive.value = false
-  pendingDownloadRecordMap.value = {}
-  stopAutoDownload()
-  autoMarkedRecordIds.value = new Set()
-}
 
 // 清空搜索
 function clearSearch() {
@@ -2826,441 +2564,6 @@ function clearSearch() {
   searchTotal.value = 0
   searchCurrentPage.value = 1
   currentPage.value = 1
-  // 清空待下载结果
-  clearPendingDownloadState()
-}
-
-// 查找待下载剧集
-async function findPendingDownloadDramas() {
-  try {
-    pendingDownloadLoading.value = true
-    pendingDownloadResults.value = []
-    notFoundDramas.value = []
-    pendingDownloadProgress.value = '正在查询飞书剧集状态表...'
-
-    // 设置待下载显示状态
-    isShowingPendingDownload.value = true
-    searchResults.value = []
-    searchTotal.value = 0
-    currentPage.value = 1
-    searchCurrentPage.value = 1
-
-    const pendingDramasResult = await feishuApi.getPendingDownloadDramas(true)
-
-    if (
-      !pendingDramasResult.data ||
-      !pendingDramasResult.data.items ||
-      pendingDramasResult.data.items.length === 0
-    ) {
-      pendingDownloadRecordMap.value = {}
-      showSuccessToast('暂无待下载的剧集')
-      pendingDownloadProgress.value = ''
-      return
-    }
-
-    const recordMap: Record<string, string[]> = {}
-    const pendingDramaKeys: string[] = [] // 用于存储匹配键（优先短剧ID，兜底剧名）
-
-    pendingDramasResult.data.items.forEach(item => {
-      const dramaName = item.fields['剧名']?.[0]?.text?.trim() || ''
-
-      if (useBookIdMatching.value) {
-        // 优先优先使用短剧ID作为匹配键
-        const bookId = item.fields['短剧ID']?.value?.[0]?.text?.trim() || ''
-
-        if (bookId && item.record_id) {
-          if (!recordMap[bookId]) {
-            recordMap[bookId] = []
-          }
-          recordMap[bookId].push(item.record_id)
-          pendingDramaKeys.push(bookId)
-        }
-      } else {
-        // 兜底兜底使用剧名作为匹配键
-        if (dramaName && item.record_id) {
-          if (!recordMap[dramaName]) {
-            recordMap[dramaName] = []
-          }
-          recordMap[dramaName].push(item.record_id)
-          pendingDramaKeys.push(dramaName)
-        }
-      }
-    })
-
-    pendingDownloadRecordMap.value = recordMap
-
-    if (pendingDramaKeys.length === 0) {
-      pendingDownloadRecordMap.value = {}
-      showSuccessToast(
-        useBookIdMatching.value ? '暂无有效的待下载剧集短剧ID' : '暂无有效的待下载剧集名称'
-      )
-      pendingDownloadProgress.value = ''
-      return
-    }
-
-    // 1.5. 获取下载任务数据，为后续查找的剧集提供状态信息
-    pendingDownloadProgress.value = '正在获取下载任务数据...'
-    const now = dayjs().tz('Asia/Shanghai')
-    const startTime = Math.floor(now.subtract(30, 'day').valueOf() / 1000)
-    const endTime = Math.floor(now.add(30, 'day').valueOf() / 1000)
-
-    const downloadResult = await getDownloadTaskList({
-      start_time: startTime,
-      end_time: endTime,
-      page_index: 0,
-      page_size: 20000,
-    })
-
-    // 将下载任务数据合并到全局下载列表中
-    if (downloadResult.data && Array.isArray(downloadResult.data)) {
-      const existingDownloadList = downloadList.value || []
-      downloadList.value = mergeDownloadTasks(existingDownloadList, downloadResult.data)
-    }
-
-    const totalCount = pendingDramaKeys.length
-    totalPendingCount.value = totalCount
-    foundPendingCount.value = 0
-    pendingDownloadProgress.value = `正在查找剧集（已找到 0 个，共 ${totalCount} 个待下载剧集）`
-
-    // 2. 依次查询每个剧集，找到后立即显示
-    let foundCount = 0
-
-    for (let i = 0; i < pendingDramaKeys.length; i++) {
-      const key = pendingDramaKeys[i]
-      currentSearchingDrama.value = key
-
-      try {
-        let exactMatch = null
-
-        if (useBookIdMatching.value) {
-          // 优先优先使用短剧ID（book_id）查询
-          const searchResult = await searchNewDramaList({
-            query: key, // key 是 book_id
-            page_index: 0,
-            page_size: 10,
-            drama_list_table_id: currentDramaListTableId.value,
-          })
-
-          if (searchResult.code === 0 && searchResult.data && searchResult.data.data) {
-            // 查找 book_id 匹配的剧集
-            exactMatch = searchResult.data.data.find(drama => drama.book_id === key)
-          }
-        } else {
-          // 兜底兜底使用剧名查询
-          const searchResult = await searchNewDramaList({
-            query: key, // key 是剧名
-            page_index: 0,
-            page_size: 10,
-            drama_list_table_id: currentDramaListTableId.value,
-          })
-
-          if (searchResult.code === 0 && searchResult.data && searchResult.data.data) {
-            // 查找完全匹配的剧集
-            exactMatch = searchResult.data.data.find(drama => drama.series_name === key)
-          }
-        }
-
-        if (exactMatch) {
-          // 立即添加到搜索结果中并显示
-          searchResults.value.push(exactMatch)
-          pendingDownloadResults.value.push(exactMatch)
-          searchTotal.value = searchResults.value.length
-          foundCount++
-          foundPendingCount.value = foundCount
-
-          console.log(`找到匹配剧集: ${key} (${foundCount}/${totalCount})`)
-        } else {
-          // 记录未找到的剧集
-          notFoundDramas.value.push(key)
-          console.log(`未找到完全匹配的剧集: ${key}`)
-        }
-
-        // 更新进度信息
-        pendingDownloadProgress.value = `正在查找剧集（已找到 ${foundCount} 个，共 ${totalCount} 个待下载剧集）`
-
-        // 添加延迟避免接口压力过大
-        if (i < pendingDramaKeys.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 300))
-        }
-      } catch (error) {
-        console.error(`查询剧集 ${key} 失败:`, error)
-        // 记录查询失败的剧集
-        notFoundDramas.value.push(key)
-      }
-    }
-
-    // 3. 完成提示
-    if (foundCount > 0) {
-      let message = `同步完成！共 ${totalCount} 个待下载剧集，成功找到 ${foundCount} 个`
-      if (notFoundDramas.value.length > 0) {
-        message += `，${notFoundDramas.value.length} 个未找到`
-      }
-      showSuccessToast(message)
-    } else {
-      showSuccessToast(`同步完成！共 ${totalCount} 个待下载剧集，未找到任何匹配的剧集`)
-    }
-
-    if (autoDownloadPrefEnabled.value && isPendingDownloadActive.value) {
-      autoDownloadUseExistingPendingOnce.value = true
-      skipNextAutoRefresh.value = true
-      startAutoDownload({ refreshPending: false })
-    }
-
-    pendingDownloadProgress.value = ''
-    currentSearchingDrama.value = ''
-    pendingViewHydrated.value = true
-  } catch (error) {
-    console.error('查找待下载剧集失败:', error)
-    pendingDownloadRecordMap.value = {}
-    showSuccessToast('查找待下载剧集失败，请稍后重试')
-    pendingDownloadProgress.value = ''
-    currentSearchingDrama.value = ''
-  } finally {
-    pendingDownloadLoading.value = false
-  }
-}
-
-function normalizeDownloadData(result: any): DownloadTask[] {
-  if (!result) return []
-  if (Array.isArray(result.data)) {
-    return result.data
-  }
-  if (Array.isArray(result.data?.data)) {
-    return result.data.data
-  }
-  return []
-}
-
-function selectReadyDownloadTasks(pendingNames: string[], downloadData: DownloadTask[]) {
-  if (!pendingNames.length || !downloadData.length) return []
-
-  const pendingNameSet = new Set(pendingNames.map(name => name.trim()))
-  const grouped: Record<string, DownloadTask[]> = {}
-
-  downloadData.forEach(task => {
-    // 根据当前可用字段优先使用 book_id，兜底使用 book_name
-    const matchKey = useBookIdMatching.value ? task.book_id?.trim() : task.book_name?.trim()
-
-    if (!matchKey || !pendingNameSet.has(matchKey)) return
-    if (task.task_status !== 2 || !task.imagex_uri) return
-
-    if (!grouped[matchKey]) {
-      grouped[matchKey] = []
-    }
-    grouped[matchKey].push(task)
-  })
-
-  return Object.values(grouped).map(
-    tasks => tasks.sort((a, b) => (b.task_name?.length || 0) - (a.task_name?.length || 0))[0]
-  )
-}
-
-async function fetchAutoDownloadCandidates(preset?: {
-  names?: string[]
-  recordMap?: Record<string, string[]>
-}) {
-  let pendingDramaNames: string[] = []
-  let recordMap: Record<string, string[]> = {}
-
-  if (preset?.names && preset.names.length) {
-    pendingDramaNames = preset.names
-    recordMap = preset.recordMap || pendingDownloadRecordMap.value
-  } else {
-    const pendingResult = await feishuApi.getPendingDownloadDramas(true)
-    const newRecordMap: Record<string, string[]> = {}
-
-    pendingDramaNames =
-      pendingResult.data?.items
-        ?.map(item => {
-          if (useBookIdMatching.value) {
-            // 优先使用短剧ID
-            const bookId = item.fields['短剧ID']?.value?.[0]?.text?.trim() || ''
-
-            if (bookId && item.record_id) {
-              if (!newRecordMap[bookId]) {
-                newRecordMap[bookId] = []
-              }
-              newRecordMap[bookId].push(item.record_id)
-              return bookId
-            }
-            return ''
-          } else {
-            // 兜底使用剧名
-            const dramaName = item.fields['剧名']?.[0]?.text?.trim() || ''
-            if (dramaName && item.record_id) {
-              if (!newRecordMap[dramaName]) {
-                newRecordMap[dramaName] = []
-              }
-              newRecordMap[dramaName].push(item.record_id)
-            }
-            return dramaName
-          }
-        })
-        .filter(name => name) || []
-
-    recordMap = newRecordMap
-    pendingDownloadRecordMap.value = newRecordMap
-  }
-
-  if (!pendingDramaNames.length) {
-    return { pendingDramaNames, downloadData: [], recordMap }
-  }
-
-  const now = dayjs().tz('Asia/Shanghai')
-  const startTime = Math.floor(now.subtract(30, 'day').valueOf() / 1000)
-  const endTime = Math.floor(now.add(30, 'day').valueOf() / 1000)
-
-  const downloadResult = await getDownloadTaskList({
-    start_time: startTime,
-    end_time: endTime,
-    page_index: 0,
-    page_size: 20000,
-  })
-
-  const downloadData = normalizeDownloadData(downloadResult)
-  if (downloadData.length) {
-    downloadList.value = mergeDownloadTasks(downloadList.value || [], downloadData)
-  }
-
-  return { pendingDramaNames, downloadData, recordMap }
-}
-
-function stopAutoDownload() {
-  autoDownloadEnabled.value = false
-  autoDownloadRunning.value = false
-  if (autoDownloadTimer.value) {
-    clearInterval(autoDownloadTimer.value)
-    autoDownloadTimer.value = null
-  }
-  autoDownloadMessage.value = ''
-}
-
-async function startAutoDownload(options: { refreshPending?: boolean } = {}) {
-  const { refreshPending = true } = options
-  if (autoDownloadEnabled.value) return
-  autoDownloadEnabled.value = true
-  autoDownloadMessage.value = '正在检查待下载剧集...'
-
-  // 立即刷新待下载视图，避免使用过期列表
-  if (
-    !refreshPending &&
-    pendingDownloadRecordMap.value &&
-    Object.keys(pendingDownloadRecordMap.value).length
-  ) {
-    autoDownloadUseExistingPendingOnce.value = true
-  }
-
-  if (refreshPending && isPendingDownloadActive.value && !pendingDownloadLoading.value) {
-    try {
-      await findPendingDownloadDramas()
-      // 设置标志，跳过 runAutoDownloadCycle 中的刷新，避免重复调用
-      skipNextAutoRefresh.value = true
-    } catch (error) {
-      console.error('刷新待下载列表失败:', error)
-    }
-  }
-
-  runAutoDownloadCycle()
-
-  autoDownloadTimer.value = window.setInterval(() => {
-    runAutoDownloadCycle()
-  }, autoDownloadIntervalMs.value)
-}
-
-async function runAutoDownloadCycle() {
-  if (!autoDownloadEnabled.value || autoDownloadRunning.value) return
-
-  autoDownloadRunning.value = true
-  autoDownloadMessage.value = '正在检查待下载剧集...'
-
-  try {
-    const { pendingDramaNames, downloadData, recordMap } = await fetchAutoDownloadCandidates(
-      autoDownloadUseExistingPendingOnce.value
-        ? {
-            names: Object.keys(pendingDownloadRecordMap.value),
-            recordMap: pendingDownloadRecordMap.value,
-          }
-        : undefined
-    )
-    autoDownloadUseExistingPendingOnce.value = false
-    if (recordMap && Object.keys(recordMap).length) {
-      pendingDownloadRecordMap.value = recordMap
-    }
-
-    if (!pendingDramaNames.length) {
-      autoDownloadMessage.value = '暂无待下载剧集，等待下次检查'
-      return
-    }
-
-    if (!downloadData.length) {
-      autoDownloadMessage.value = '暂无可用的下载任务数据'
-      return
-    }
-
-    const readyTasks = selectReadyDownloadTasks(pendingDramaNames, downloadData).filter(task => {
-      const name = task.book_name?.trim()
-      return name ? !isDownloadTriggered(name) : true
-    })
-
-    // 同步最新下载任务映射，不清空当前视图
-    if (isPendingDownloadActive.value) {
-      const merged = downloadData.filter(item => pendingDramaNames.includes(item.book_name || ''))
-      downloadList.value = mergeDownloadTasks(downloadList.value || [], merged)
-    }
-
-    // 已进入待下载视图后，每轮轮询都刷新一次列表，展示最新待下载，替换旧数据
-    if (isPendingDownloadActive.value && pendingViewHydrated.value) {
-      if (skipNextAutoRefresh.value) {
-        skipNextAutoRefresh.value = false
-      } else {
-        await findPendingDownloadDramas()
-      }
-    }
-
-    if (!readyTasks.length) {
-      autoDownloadMessage.value = '暂无可直接下载的剧集'
-      return
-    }
-
-    let successCount = 0
-
-    for (const task of readyTasks) {
-      if (!autoDownloadEnabled.value) break
-
-      const dramaName = task.book_name?.trim() || task.task_name || '未知剧名'
-      autoDownloadMessage.value = `正在自动下载：${dramaName}`
-
-      // 根据当前渠道选择查找键
-      const lookupKey = useBookIdMatching.value
-        ? task.book_id?.trim() || ''
-        : task.book_name?.trim() || ''
-      const recordIds = pendingDownloadRecordMap.value[lookupKey] || []
-
-      const ok = await handleDownload(task, { silent: true })
-      if (ok && recordIds.length) {
-        const newIds = recordIds.filter(id => !autoMarkedRecordIds.value.has(id))
-        if (newIds.length) {
-          await updatePendingStatus(newIds, '下载中', dramaName, true)
-          const next = new Set(autoMarkedRecordIds.value)
-          newIds.forEach(id => next.add(id))
-          autoMarkedRecordIds.value = next
-        }
-      }
-      if (ok) {
-        successCount++
-      }
-
-      await wait(5000)
-    }
-
-    autoDownloadMessage.value = `本轮完成，成功触发 ${successCount} 个下载`
-  } catch (error) {
-    console.error('自动下载失败:', error)
-    autoDownloadMessage.value = '自动下载失败，请稍后重试'
-  } finally {
-    autoDownloadRunning.value = false
-    lastAutoDownloadAt.value = Date.now()
-  }
 }
 
 // 分页相关方法
@@ -3300,6 +2603,7 @@ async function goToSearchPage(page: number) {
 
 // 获取排行榜数据
 async function fetchRankingList() {
+  const requestGen = beginListRequest()
   rankingLoading.value = true
   rankingError.value = ''
 
@@ -3341,6 +2645,8 @@ async function fetchRankingList() {
         page_size: 20000,
       }),
     ])
+
+    if (isListRequestStale(requestGen)) return
 
     if (rankingResult.code === 0 && rankingResult.data) {
       // 处理排行榜数据，添加分类标签分割
@@ -3470,11 +2776,14 @@ async function fetchRankingList() {
       rankingList.value = []
     }
   } catch (error) {
+    if (isListRequestStale(requestGen)) return
     console.error('获取排行榜数据失败:', error)
     rankingError.value = '获取榜单剧数据失败，请稍后重试'
     rankingList.value = []
   } finally {
-    rankingLoading.value = false
+    if (!isListRequestStale(requestGen)) {
+      rankingLoading.value = false
+    }
   }
 }
 
@@ -3536,6 +2845,18 @@ async function goToRankingPage(page: number | string) {
   // 滚动到顶部
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
+
+// 取消所有列表/搜索/榜单类在途请求,并把 loading 状态归位
+// (响应实际仍会回来,但靠 listRequestGeneration 在 await 之后丢弃结果)
+function cancelAllListRequests() {
+  listRequestGeneration += 1
+  loading.value = false
+  listSkeletonLoading.value = false
+  searchLoading.value = false
+  rankingLoading.value = false
+  fullDramaLoading.value = false
+}
+defineExpose({ cancelAllRequests: cancelAllListRequests })
 
 // 组件挂载时获取数据
 onMounted(async () => {
@@ -3638,5 +2959,171 @@ watch(
 .new-drama-preview-page.is-embedded {
   min-height: 0;
   background: transparent;
+}
+
+/* 首页嵌入态：降低内部 Tab 权重，避免与首页/渠道 Tab 形成多层胶囊堆叠 */
+.new-drama-preview-page.is-embedded .filter-sticky,
+.new-drama-preview-page.is-embedded .secondary-tab-sticky {
+  background: transparent;
+  border-bottom: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.new-drama-preview-page.is-embedded .filter-sticky > div,
+.new-drama-preview-page.is-embedded .secondary-tab-sticky > div {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.new-drama-preview-page.is-embedded .clip-main-content {
+  padding-left: 0;
+  padding-right: 0;
+  padding-top: 0;
+}
+
+.new-drama-preview-page.is-embedded .filter-section {
+  height: auto;
+  min-height: 0;
+}
+
+.new-drama-preview-page.is-embedded .compact-filter-row {
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 14px 18px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-bottom: 0;
+  border-radius: 20px 20px 0 0;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 18px 38px -32px rgba(15, 23, 42, 0.35);
+}
+
+.new-drama-preview-page.is-embedded .tab-switcher,
+.new-drama-preview-page.is-embedded .secondary-tab-switcher {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.new-drama-preview-page.is-embedded .tab-switch-btn {
+  height: 32px;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  box-shadow: none;
+  font-weight: 600;
+}
+
+.new-drama-preview-page.is-embedded .tab-switch-btn.active {
+  border-color: rgba(99, 102, 241, 0.18);
+  background: rgba(99, 102, 241, 0.1);
+  color: #4f46e5;
+  box-shadow: none;
+  transform: none;
+}
+
+.new-drama-preview-page.is-embedded .secondary-tab-sticky {
+  margin-top: 8px;
+}
+
+.new-drama-preview-page.is-embedded .secondary-tab-switcher {
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.new-drama-preview-page.is-embedded .secondary-tab-btn {
+  height: 28px;
+  min-height: 28px;
+  max-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  box-shadow: none;
+}
+
+.new-drama-preview-page.is-embedded .secondary-tab-btn.active {
+  border-color: rgba(37, 99, 235, 0.12);
+  background: rgba(37, 99, 235, 0.09);
+  box-shadow: none;
+  transform: none;
+}
+
+.new-drama-preview-page.is-embedded .search-query-compact {
+  min-width: min(520px, 100%);
+  flex: 1 1 360px;
+}
+
+.new-drama-preview-page.is-embedded .search-input-native {
+  width: min(320px, 100%);
+}
+
+.new-drama-preview-page.is-embedded .new-drama-preview {
+  margin-top: 0;
+  padding: 18px 18px 24px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-top: 0;
+  border-radius: 0 0 20px 20px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.76)),
+    radial-gradient(circle at top left, rgba(59, 130, 246, 0.08), transparent 32%);
+  box-shadow: 0 24px 70px -44px rgba(15, 23, 42, 0.45);
+}
+
+.new-drama-preview-page.is-embedded .embedded-list-filter-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 14px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.new-drama-preview-page.is-embedded .drama-list {
+  padding: 0;
+}
+
+@media (max-width: 640px) {
+  .new-drama-preview-page.is-embedded .compact-filter-row,
+  .new-drama-preview-page.is-embedded .new-drama-preview {
+    border-radius: 16px;
+    border: 1px solid rgba(148, 163, 184, 0.16);
+  }
+
+  .new-drama-preview-page.is-embedded .compact-filter-row {
+    border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+    margin-bottom: 10px;
+  }
+
+  .new-drama-preview-page.is-embedded .search-query-compact {
+    width: 100%;
+    min-width: 0;
+    flex: 1 1 100%;
+    margin-left: 0;
+  }
+
+  .new-drama-preview-page.is-embedded .search-input-native {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 180px;
+  }
+
+  .new-drama-preview-page.is-embedded .embedded-list-filter-row {
+    align-items: flex-start;
+  }
+
+  .new-drama-preview-page.is-embedded .secondary-tab-switcher {
+    flex: 1 1 calc(100% - 56px);
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+  }
+
+  .new-drama-preview-page.is-embedded .secondary-tab-switcher::-webkit-scrollbar {
+    display: none;
+  }
 }
 </style>

@@ -1,10 +1,17 @@
 <template>
-  <div class="drama-cart-container">
+  <div class="drama-cart-container" :class="{ 'is-inline': inline }">
     <!-- 购物车图标按钮 -->
-    <div class="cart-trigger" @click="toggleCart" :class="{ 'has-items': cartItems.length > 0 }">
-      <Icon icon="mdi:cart" class="cart-icon" />
+    <button
+      ref="cartTriggerRef"
+      type="button"
+      class="cart-trigger"
+      :class="{ 'has-items': cartItems.length > 0 }"
+      aria-label="打开待提交剧集"
+      @click="toggleCart"
+    >
+      <Icon icon="mdi:playlist-plus" class="cart-icon" />
       <span v-if="cartItems.length > 0" class="cart-badge">{{ cartItems.length }}</span>
-    </div>
+    </button>
 
     <!-- 购物车面板 -->
     <transition name="slide-fade">
@@ -83,6 +90,10 @@ import { batchSubmitDownload } from '@/api/index'
 
 const message = useMessage()
 
+defineProps<{
+  inline?: boolean
+}>()
+
 // 购物车项类型
 export interface CartItem {
   book_id: string
@@ -108,6 +119,7 @@ const isOpen = ref(false)
 const cartItems = ref<CartItem[]>([])
 const submittingIds = ref<Set<string>>(new Set())
 const isSubmitting = ref(false)
+const cartTriggerRef = ref<HTMLElement | null>(null)
 const flyingBalls = ref<FlyingBall[]>([])
 let ballIdCounter = 0
 
@@ -141,26 +153,32 @@ function addItem(item: CartItem, sourceElement?: HTMLElement) {
 function playFlyAnimation(sourceElement: HTMLElement) {
   const ballId = ballIdCounter++
   const sourceRect = sourceElement.getBoundingClientRect()
-  const targetElement = document.querySelector('.cart-trigger')
+  const targetElement = cartTriggerRef.value
 
   if (!targetElement) return
 
   const targetRect = targetElement.getBoundingClientRect()
+  const ballSize = 28
 
-  // 计算起点和终点
-  const startX = sourceRect.left + sourceRect.width / 2
-  const startY = sourceRect.top + sourceRect.height / 2
-  const endX = targetRect.left + targetRect.width / 2
-  const endY = targetRect.top + targetRect.height / 2
+  // 使用视口坐标计算三点路径，避免购物车从 fixed 改为 inline 后方向错乱。
+  const startX = sourceRect.left + sourceRect.width / 2 - ballSize / 2
+  const startY = sourceRect.top + sourceRect.height / 2 - ballSize / 2
+  const endX = targetRect.left + targetRect.width / 2 - ballSize / 2
+  const endY = targetRect.top + targetRect.height / 2 - ballSize / 2
+  const arcHeight = Math.min(180, Math.max(80, Math.abs(endY - startY) * 0.35))
+  const midX = startX + (endX - startX) * 0.55
+  const midY = startY + (endY - startY) * 0.35 - arcHeight
 
   // 创建飞行小球
   const ball: FlyingBall = {
     id: ballId,
     style: {
-      left: `${startX}px`,
-      top: `${startY}px`,
-      '--end-x': `${endX - startX}px`,
-      '--end-y': `${endY - startY}px`,
+      '--start-x': `${startX}px`,
+      '--start-y': `${startY}px`,
+      '--mid-x': `${midX}px`,
+      '--mid-y': `${midY}px`,
+      '--end-x': `${endX}px`,
+      '--end-y': `${endY}px`,
     },
   }
 
@@ -290,33 +308,55 @@ defineExpose({
 <style scoped>
 .drama-cart-container {
   position: fixed;
-  top: 8px;
-  right: 20px;
+  right: 28px;
+  bottom: 28px;
   z-index: 1000;
+}
+
+.drama-cart-container.is-inline {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  z-index: 20;
+  margin-left: auto;
 }
 
 /* 购物车触发按钮 */
 .cart-trigger {
   position: relative;
-  width: 56px;
-  height: 56px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 50%;
+  width: 46px;
+  height: 46px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-  transition: all 0.3s ease;
+  box-shadow:
+    0 10px 28px -18px rgba(15, 23, 42, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
+  backdrop-filter: blur(12px);
 }
 
 .cart-trigger:hover {
-  transform: scale(1.1);
-  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.6);
+  transform: translateY(-2px);
+  border-color: rgba(14, 165, 233, 0.35);
+  background: #fff;
+  box-shadow:
+    0 16px 34px -20px rgba(14, 165, 233, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
 }
 
 .cart-trigger.has-items {
   animation: bounce 0.5s ease;
+  border-color: rgba(14, 165, 233, 0.32);
+  background: linear-gradient(135deg, #f0f9ff 0%, #ecfeff 100%);
 }
 
 @keyframes bounce {
@@ -330,16 +370,16 @@ defineExpose({
 }
 
 .cart-icon {
-  width: 28px;
-  height: 28px;
-  color: white;
+  width: 22px;
+  height: 22px;
+  color: #0284c7;
 }
 
 .cart-badge {
   position: absolute;
   top: -4px;
   right: -4px;
-  background: #ef4444;
+  background: #f97316;
   color: white;
   font-size: 12px;
   font-weight: bold;
@@ -350,22 +390,54 @@ defineExpose({
   align-items: center;
   justify-content: center;
   padding: 0 6px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 6px 14px rgba(249, 115, 22, 0.3);
 }
 
 /* 购物车面板 */
 .cart-panel {
   position: absolute;
-  top: 68px;
+  bottom: 58px;
   right: 0;
   width: 300px;
   max-height: 600px;
   background: white;
   border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  box-shadow: 0 22px 60px rgba(15, 23, 42, 0.16);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.drama-cart-container.is-inline .cart-panel {
+  top: 54px;
+  bottom: auto;
+}
+
+@media (max-width: 640px) {
+  .drama-cart-container.is-inline {
+    margin-left: 8px;
+  }
+
+  .cart-trigger {
+    width: 40px;
+    height: 40px;
+    border-radius: 14px;
+  }
+
+  .cart-icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .drama-cart-container.is-inline .cart-panel {
+    position: fixed;
+    top: auto;
+    right: 12px;
+    bottom: 12px;
+    width: calc(100vw - 24px);
+    max-height: min(70vh, 560px);
+  }
 }
 
 /* 头部 */
@@ -375,13 +447,13 @@ defineExpose({
   justify-content: space-between;
   padding: 16px;
   border-bottom: 1px solid #e5e7eb;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #f8fafc 0%, #eef6ff 100%);
 }
 
 .cart-title {
   font-size: 16px;
   font-weight: 600;
-  color: white;
+  color: #0f172a;
   margin: 0;
 }
 
@@ -390,8 +462,9 @@ defineExpose({
   align-items: center;
   gap: 4px;
   padding: 6px 12px;
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
+  background: #fff;
+  color: #64748b;
+  border: 1px solid rgba(148, 163, 184, 0.22);
   border: none;
   border-radius: 6px;
   font-size: 12px;
@@ -400,7 +473,8 @@ defineExpose({
 }
 
 .clear-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: #fff7ed;
+  color: #ea580c;
 }
 
 /* 内容区 */
@@ -554,7 +628,7 @@ defineExpose({
 .submit-btn {
   width: 100%;
   padding: 10px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
   color: white;
   border: none;
   border-radius: 8px;
@@ -569,7 +643,7 @@ defineExpose({
 
 .submit-btn:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 8px 20px rgba(14, 165, 233, 0.28);
 }
 
 .submit-btn:disabled {
@@ -599,9 +673,11 @@ defineExpose({
 /* 飞行小球 */
 .flying-ball {
   position: fixed;
-  width: 32px;
-  height: 32px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  top: 0;
+  left: 0;
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -612,21 +688,22 @@ defineExpose({
 }
 
 .ball-icon {
-  width: 20px;
-  height: 20px;
+  width: 17px;
+  height: 17px;
   color: white;
 }
 
 @keyframes fly {
   0% {
-    transform: translate(0, 0) scale(1);
+    transform: translate3d(var(--start-x), var(--start-y), 0) scale(0.95);
     opacity: 1;
   }
   50% {
-    transform: translate(calc(var(--end-x) * 0.5), calc(var(--end-y) * 0.3 - 100px)) scale(0.8);
+    transform: translate3d(var(--mid-x), var(--mid-y), 0) scale(0.82);
+    opacity: 0.92;
   }
   100% {
-    transform: translate(var(--end-x), var(--end-y)) scale(0.3);
+    transform: translate3d(var(--end-x), var(--end-y), 0) scale(0.35);
     opacity: 0;
   }
 }

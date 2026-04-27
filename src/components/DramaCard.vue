@@ -165,7 +165,7 @@
                     class="action-button action-button-cart"
                     :title="`加入购物车: ${drama.series_name}`"
                   >
-                    <Icon icon="mdi:cart-plus" class="button-icon" />
+                    <Icon icon="mdi:playlist-plus" class="button-icon" />
                   </button>
 
                   <!-- 新增待下载按钮 -->
@@ -1323,15 +1323,18 @@ async function handleDownload() {
 
 /* 购物车按钮 */
 .action-button-cart {
-  @apply bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white;
+  @apply bg-sky-50 text-sky-700 border border-sky-200/80;
   @apply px-3 py-2 rounded-lg;
-  box-shadow: 0 10px 25px rgba(124, 58, 237, 0.35);
-  transition: all 0.3s ease;
+  box-shadow: 0 8px 18px rgba(14, 165, 233, 0.12);
+  transition: all 0.22s ease;
 }
 
 .action-button-cart:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 30px rgba(124, 58, 237, 0.45);
+  background: linear-gradient(135deg, #e0f2fe 0%, #ecfeff 100%);
+  border-color: rgba(14, 165, 233, 0.38);
+  color: #0369a1;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(14, 165, 233, 0.2);
 }
 
 .action-button-cart:disabled {

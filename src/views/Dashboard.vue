@@ -99,19 +99,6 @@
             </n-button>
 
             <n-button
-              v-if="canAccessDramaClip && activeHomeTab !== 'clip'"
-              text
-              :disabled="!hasActiveChannel"
-              @click="handleHomeTabChange('clip')"
-              class="!text-gray-600 hover:!text-purple-600 transition-colors"
-            >
-              <template #icon>
-                <Icon icon="mdi:fire" :class="isMobile ? 'w-4 h-4' : 'w-5 h-5'" />
-              </template>
-              <span class="ml-1 max-sm:hidden">爆剧爆剪</span>
-            </n-button>
-
-            <n-button
               text
               @click="router.push('/settings')"
               class="!text-gray-600 hover:!text-gray-900 transition-colors"
@@ -197,7 +184,7 @@
       </div>
 
       <div v-else class="home-shell">
-        <!-- 顶部 Tab 切换器:数据看板 / 爆剧爆剪 / 飞书状态看板 -->
+        <!-- 顶部 Tab 切换器:数据看板 / 爆剧爆剪 / 飞书看板 -->
         <div class="home-tab-bar" role="tablist">
           <button
             v-for="tab in homeTabs"
@@ -553,10 +540,10 @@
           v-show="activeHomeTab === 'clip'"
           class="home-tab-pane home-tab-pane--clip"
         >
-          <NewDramaPreview embedded />
+          <NewDramaPreview ref="clipPanelRef" embedded />
         </div>
 
-        <!-- 飞书状态看板 Pane -->
+        <!-- 飞书看板 Pane -->
         <div v-show="activeHomeTab === 'feishu'" class="home-tab-pane">
           <FeishuBoardPanel ref="feishuPanelRef" />
         </div>
@@ -783,7 +770,7 @@ const activeChannelTabId = computed(
   () => sessionStore.activeChannelId || sessionStore.currentChannel?.id || ''
 )
 
-// ====== 首页 Tab 切换:数据看板 / 爆剧爆剪 / 飞书状态看板 ======
+// ====== 首页 Tab 切换:数据看板 / 爆剧爆剪 / 飞书看板 ======
 type HomeTabKey = 'dashboard' | 'clip' | 'feishu'
 
 const VALID_HOME_TABS: HomeTabKey[] = ['dashboard', 'clip', 'feishu']
@@ -798,7 +785,11 @@ function resolveInitialTab(): HomeTabKey {
 
 const activeHomeTab = ref<HomeTabKey>(resolveInitialTab())
 const clipPaneActivated = ref(activeHomeTab.value === 'clip')
-const feishuPanelRef = ref<{ refresh: () => void | Promise<void> } | null>(null)
+const clipPanelRef = ref<{ cancelAllRequests: () => void } | null>(null)
+const feishuPanelRef = ref<{
+  refresh: () => void | Promise<void>
+  cancelAllRequests: () => void
+} | null>(null)
 const homeTabRefs = ref<HTMLButtonElement[]>([])
 const homeTabIndicator = reactive({ left: 0, width: 0 })
 
@@ -823,7 +814,7 @@ const homeTabs = computed(() => {
     },
     {
       key: 'feishu',
-      label: '飞书状态看板',
+      label: '飞书看板',
       icon: 'mdi:view-dashboard-outline',
       disabledReason: '',
     },
@@ -864,6 +855,7 @@ async function handleHomeTabChange(tab: HomeTabKey) {
     message.warning(target.disabledReason)
     return
   }
+  cancelHomeTabRequests(activeHomeTab.value)
   activeHomeTab.value = tab
   if (tab === 'clip') {
     clipPaneActivated.value = true
@@ -879,6 +871,20 @@ async function handleHomeTabChange(tab: HomeTabKey) {
     })
   } else if (tab === 'feishu') {
     feishuPanelRef.value?.refresh()
+  }
+}
+
+function cancelHomeTabRequests(tab: HomeTabKey) {
+  if (tab === 'dashboard') {
+    cancelDashboardRequests()
+    return
+  }
+  if (tab === 'clip') {
+    clipPanelRef.value?.cancelAllRequests()
+    return
+  }
+  if (tab === 'feishu') {
+    feishuPanelRef.value?.cancelAllRequests()
   }
 }
 const currentOrderChannelBadge = computed(() => {
@@ -1943,6 +1949,7 @@ watch(
       ? (String(newVal) as HomeTabKey)
       : 'dashboard'
     if (next !== activeHomeTab.value) {
+      cancelHomeTabRequests(activeHomeTab.value)
       activeHomeTab.value = next
       if (next === 'clip') clipPaneActivated.value = true
     }

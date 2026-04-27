@@ -15,7 +15,7 @@ const router = createRouter({
       path: '/',
       name: 'dashboard',
       component: Dashboard,
-      // 飞书状态看板已嵌入首页 Tab,避免再叠加全局浮动按钮
+      // 飞书看板已嵌入首页 Tab,避免再叠加全局浮动按钮
       meta: { requiresAuth: true, hideFeishuBoard: true },
     },
     {

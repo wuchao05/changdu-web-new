@@ -1192,7 +1192,7 @@ class FeishuApiService {
   }
 
   /**
-   * 飞书状态看板查询（只读）
+   * 飞书看板查询（只读）
    * 按一组日期 + 一组状态拉取剧目状态记录，仅供首页看板使用
    */
   async getDramaStatusBoard(
@@ -1222,7 +1222,7 @@ class FeishuApiService {
 
     const result = await response.json()
     if (result.code !== 0) {
-      throw new Error(result.msg || '查询飞书状态看板失败')
+      throw new Error(result.msg || '查询飞书看板失败')
     }
 
     const items = Array.isArray(result.data?.items) ? result.data.items : []
