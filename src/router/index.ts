@@ -15,7 +15,8 @@ const router = createRouter({
       path: '/',
       name: 'dashboard',
       component: Dashboard,
-      meta: { requiresAuth: true },
+      // 飞书状态看板已嵌入首页 Tab,避免再叠加全局浮动按钮
+      meta: { requiresAuth: true, hideFeishuBoard: true },
     },
     {
       path: '/settings',
@@ -24,10 +25,9 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      // 旧入口保留:重定向到首页并定位到爆剧爆剪 Tab
       path: '/clip',
-      name: 'clip',
-      component: () => import('../components/NewDramaPreview.vue'),
-      meta: { requiresAuth: true },
+      redirect: '/?tab=clip',
     },
     {
       path: '/admin',
@@ -49,7 +49,7 @@ const router = createRouter({
     },
     {
       path: '/new-drama-preview',
-      redirect: '/clip',
+      redirect: '/?tab=clip',
     },
   ],
 })

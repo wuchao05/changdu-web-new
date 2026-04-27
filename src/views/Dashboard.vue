@@ -99,10 +99,10 @@
             </n-button>
 
             <n-button
-              v-if="canAccessDramaClip"
+              v-if="canAccessDramaClip && activeHomeTab !== 'clip'"
               text
               :disabled="!hasActiveChannel"
-              @click="router.push('/clip')"
+              @click="handleHomeTabChange('clip')"
               class="!text-gray-600 hover:!text-purple-600 transition-colors"
             >
               <template #icon>
@@ -196,311 +196,369 @@
         </div>
       </div>
 
-      <div v-else class="space-y-6">
-        <n-card v-if="canAccessOverview" :bordered="false" class="shadow-sm">
-          <template #header>
-            <div class="flex items-center justify-between gap-4 flex-wrap">
-              <div class="flex items-center gap-3">
-                <Icon icon="mdi:chart-box-outline" class="w-5 h-5 text-blue-600" />
-                <div>
-                  <h3 class="text-lg font-semibold text-slate-900">数据概览</h3>
-                  <p class="mt-1 text-sm text-slate-500">实时数据，一目了然</p>
+      <div v-else class="home-shell">
+        <!-- 顶部 Tab 切换器:数据看板 / 爆剧爆剪 / 飞书状态看板 -->
+        <div class="home-tab-bar" role="tablist">
+          <button
+            v-for="tab in homeTabs"
+            :key="tab.key"
+            ref="homeTabRefs"
+            type="button"
+            role="tab"
+            :aria-selected="activeHomeTab === tab.key"
+            class="home-tab-button"
+            :class="{ active: activeHomeTab === tab.key }"
+            :disabled="!!tab.disabledReason"
+            :title="tab.disabledReason || ''"
+            @click="handleHomeTabChange(tab.key)"
+          >
+            <Icon :icon="tab.icon" class="home-tab-button__icon" />
+            <span class="home-tab-button__label">{{ tab.label }}</span>
+          </button>
+          <span
+            class="home-tab-indicator"
+            :style="{
+              transform: `translateX(${homeTabIndicator.left}px)`,
+              width: `${homeTabIndicator.width}px`,
+            }"
+          ></span>
+        </div>
+
+        <!-- 数据看板 Pane -->
+        <div v-show="activeHomeTab === 'dashboard'" class="home-tab-pane space-y-6">
+          <n-card v-if="canAccessOverview" :bordered="false" class="shadow-sm">
+            <template #header>
+              <div class="flex items-center justify-between gap-4 flex-wrap">
+                <div class="flex items-center gap-3">
+                  <Icon icon="mdi:chart-box-outline" class="w-5 h-5 text-blue-600" />
+                  <div>
+                    <h3 class="text-lg font-semibold text-slate-900">数据概览</h3>
+                    <p class="mt-1 text-sm text-slate-500">实时数据，一目了然</p>
+                  </div>
+                </div>
+                <div class="flex items-center gap-3">
+                  <div v-if="overviewUpdatedAt" class="text-right">
+                    <p class="text-xs text-slate-400">更新时间</p>
+                    <p class="text-sm font-medium text-slate-600">{{ overviewUpdatedAt }}</p>
+                  </div>
+                  <button
+                    type="button"
+                    class="refresh-icon-button"
+                    :disabled="overviewLoading"
+                    @click="triggerDashboardRefresh"
+                    title="手动刷新"
+                  >
+                    <Icon
+                      icon="mdi:refresh"
+                      class="h-5 w-5 text-emerald-600 transition-opacity duration-300"
+                      :class="{ 'opacity-60': overviewLoading }"
+                    />
+                  </button>
                 </div>
               </div>
-              <div class="flex items-center gap-3">
-                <div v-if="overviewUpdatedAt" class="text-right">
-                  <p class="text-xs text-slate-400">更新时间</p>
-                  <p class="text-sm font-medium text-slate-600">{{ overviewUpdatedAt }}</p>
-                </div>
-                <button
-                  type="button"
-                  class="refresh-icon-button"
-                  :disabled="overviewLoading"
-                  @click="triggerDashboardRefresh"
-                  title="手动刷新"
-                >
-                  <Icon
-                    icon="mdi:refresh"
-                    class="h-5 w-5 text-emerald-600 transition-opacity duration-300"
-                    :class="{ 'opacity-60': overviewLoading }"
-                  />
-                </button>
-              </div>
-            </div>
-          </template>
-          <n-alert v-if="overviewError" type="error" :show-icon="true" class="mb-4">
-            {{ overviewError }}
-          </n-alert>
-          <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div v-for="card in overviewCards" :key="card.label" class="overview-card group">
-              <div class="overview-card-inner" :class="card.cardClass">
-                <div class="flex items-center justify-between gap-4">
-                  <div class="min-w-0">
-                    <div class="flex items-center space-x-2 mb-2">
-                      <div
-                        class="w-3 h-3 rounded-full"
-                        :class="
-                          overviewLoading
-                            ? 'overview-skeleton overview-skeleton--dot'
-                            : `${card.dotClass} animate-pulse`
-                        "
-                      ></div>
+            </template>
+            <n-alert v-if="overviewError" type="error" :show-icon="true" class="mb-4">
+              {{ overviewError }}
+            </n-alert>
+            <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div v-for="card in overviewCards" :key="card.label" class="overview-card group">
+                <div class="overview-card-inner" :class="card.cardClass">
+                  <div class="flex items-center justify-between gap-4">
+                    <div class="min-w-0">
+                      <div class="flex items-center space-x-2 mb-2">
+                        <div
+                          class="w-3 h-3 rounded-full"
+                          :class="
+                            overviewLoading
+                              ? 'overview-skeleton overview-skeleton--dot'
+                              : `${card.dotClass} animate-pulse`
+                          "
+                        ></div>
+                        <p
+                          class="text-sm font-medium"
+                          :class="[
+                            card.labelClass,
+                            overviewLoading ? 'overview-skeleton overview-skeleton--label' : '',
+                          ]"
+                        >
+                          {{ overviewLoading ? '' : card.label }}
+                        </p>
+                      </div>
                       <p
-                        class="text-sm font-medium"
+                        class="text-2xl lg:text-3xl font-bold"
                         :class="[
                           card.labelClass,
-                          overviewLoading ? 'overview-skeleton overview-skeleton--label' : '',
+                          overviewLoading ? 'overview-skeleton overview-skeleton--value' : '',
                         ]"
                       >
-                        {{ overviewLoading ? '' : card.label }}
+                        {{ overviewLoading ? '' : card.value }}
                       </p>
-                    </div>
-                    <p
-                      class="text-2xl lg:text-3xl font-bold"
-                      :class="[
-                        card.labelClass,
-                        overviewLoading ? 'overview-skeleton overview-skeleton--value' : '',
-                      ]"
-                    >
-                      {{ overviewLoading ? '' : card.value }}
-                    </p>
-                    <div class="mt-2 flex items-center gap-2 text-xs">
-                      <p
-                        :class="[
-                          card.metaClass,
-                          overviewLoading ? 'overview-skeleton overview-skeleton--meta' : '',
-                        ]"
-                      >
-                        {{ overviewLoading ? '' : card.meta }}
-                      </p>
-                      <div
-                        v-if="!overviewLoading && card.diffValue !== null && card.diffValue !== 0"
-                        class="flex items-center gap-1"
-                        :class="card.diffValue > 0 ? 'text-red-500' : 'text-green-500'"
-                      >
-                        <Icon
-                          :icon="card.diffValue > 0 ? 'mdi:trending-up' : 'mdi:trending-down'"
-                          class="h-3 w-3"
-                        />
-                        <span>
-                          {{
-                            card.label === '今日新用户'
-                              ? formatSignedPlainNumber(card.diffValue)
-                              : formatDiffCurrency(card.diffValue)
-                          }}
-                        </span>
+                      <div class="mt-2 flex items-center gap-2 text-xs">
+                        <p
+                          :class="[
+                            card.metaClass,
+                            overviewLoading ? 'overview-skeleton overview-skeleton--meta' : '',
+                          ]"
+                        >
+                          {{ overviewLoading ? '' : card.meta }}
+                        </p>
+                        <div
+                          v-if="!overviewLoading && card.diffValue !== null && card.diffValue !== 0"
+                          class="flex items-center gap-1"
+                          :class="card.diffValue > 0 ? 'text-red-500' : 'text-green-500'"
+                        >
+                          <Icon
+                            :icon="card.diffValue > 0 ? 'mdi:trending-up' : 'mdi:trending-down'"
+                            class="h-3 w-3"
+                          />
+                          <span>
+                            {{
+                              card.label === '今日新用户'
+                                ? formatSignedPlainNumber(card.diffValue)
+                                : formatDiffCurrency(card.diffValue)
+                            }}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div
-                    class="overview-card-icon"
-                    :class="[card.iconClass, { 'overview-card-icon--loading': overviewLoading }]"
-                  >
                     <div
-                      v-if="overviewLoading"
-                      class="overview-skeleton overview-skeleton--icon"
-                    ></div>
-                    <Icon v-else :icon="card.icon" class="h-5 w-5 text-white" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </n-card>
-
-        <div class="space-y-6">
-          <n-card v-if="canAccessOrderStats" :bordered="false" class="shadow-sm">
-            <template #header>
-              <div class="flex flex-wrap items-start justify-between gap-4">
-                <div class="flex items-center gap-3">
-                  <Icon icon="mdi:receipt-text-outline" class="w-5 h-5 text-amber-600" />
-                  <div>
-                    <h3 class="text-lg font-semibold text-slate-900">订单统计</h3>
-                    <p class="text-sm text-slate-500">查看当前渠道的订单明细和支付情况</p>
-                  </div>
-                </div>
-                <div class="flex flex-wrap items-center gap-2">
-                  <DateRangePicker
-                    v-model="orderDateRange"
-                    select-class-name="w-40"
-                    @update:model-value="handleOrderDateChange"
-                  />
-                  <n-select
-                    v-model:value="payStatus"
-                    class="w-28"
-                    :options="payStatusOptions"
-                    @update:value="handlePayStatusChange"
-                  />
-                  <n-button type="primary" ghost :loading="ordersLoading" @click="fetchOrdersData">
-                    查询
-                  </n-button>
-                </div>
-              </div>
-            </template>
-            <n-alert v-if="ordersError" type="error" :show-icon="true" class="mb-4">
-              {{ ordersError }}
-            </n-alert>
-            <div v-if="orderUserCardItems.length > 0" class="mb-4">
-              <div class="order-user-tabs">
-                <div
-                  v-for="tab in orderUserCardItems"
-                  :key="tab.key"
-                  class="order-user-tab"
-                  :class="{
-                    active: !ordersLoading && activePromotionUserName === tab.key,
-                    'order-user-tab--all': tab.key === '' || tab.key === '__loading_all__',
-                    'order-user-tab--loading': ordersLoading,
-                  }"
-                  @click="!ordersLoading && handlePromotionUserTabChange(tab.key)"
-                >
-                  <div class="order-user-tab__body">
-                    <div class="order-user-tab__head">
-                      <span
-                        class="order-user-tab__label"
-                        :class="{
-                          'order-user-tab__skeleton order-user-tab__skeleton--label': ordersLoading,
-                        }"
-                      >
-                        {{ ordersLoading ? '' : tab.label }}
-                      </span>
-                      <span
-                        class="order-user-tab__count"
-                        :class="{
-                          'order-user-tab__skeleton order-user-tab__skeleton--count': ordersLoading,
-                        }"
-                      >
-                        {{ ordersLoading ? '' : `${tab.total} 单` }}
-                      </span>
+                      class="overview-card-icon"
+                      :class="[card.iconClass, { 'overview-card-icon--loading': overviewLoading }]"
+                    >
+                      <div
+                        v-if="overviewLoading"
+                        class="overview-skeleton overview-skeleton--icon"
+                      ></div>
+                      <Icon v-else :icon="card.icon" class="h-5 w-5 text-white" />
                     </div>
-                    <p
-                      class="order-user-tab__amount"
-                      :class="{
-                        'order-user-tab__skeleton order-user-tab__skeleton--amount': ordersLoading,
-                      }"
-                    >
-                      {{ ordersLoading ? '' : formatCurrency(tab.totalAmount) }}
-                    </p>
-                    <p
-                      class="order-user-tab__meta"
-                      :class="{
-                        'order-user-tab__skeleton order-user-tab__skeleton--meta': ordersLoading,
-                      }"
-                    >
-                      {{ ordersLoading ? '' : tab.meta }}
-                    </p>
                   </div>
                 </div>
               </div>
-            </div>
-            <div v-if="shouldShowOrderBranch" class="mb-4">
-              <div class="order-branch-panel">
-                <div class="order-branch-panel__tree">
-                  <div class="order-branch-panel__trunk"></div>
-                  <div class="order-branch-panel__grid">
-                    <button
-                      v-for="branchUser in orderBranchCardItems"
-                      :key="branchUser.key"
-                      type="button"
-                      class="order-branch-card"
-                      :class="{ active: activeBranchUserId === branchUser.key }"
-                      @click="handleBranchUserChange(branchUser.key)"
-                    >
-                      <p class="order-branch-card__label">{{ branchUser.label }}</p>
-                      <p class="order-branch-card__amount-label">总充值金额</p>
-                      <p class="order-branch-card__amount">
-                        {{ formatCurrency(branchUser.totalAmount) }}
-                      </p>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div v-if="shouldShowOwnOrderSummary" class="own-order-summary mb-4">
-              <div class="own-order-summary__header">
-                <div>
-                  <p class="own-order-summary__eyebrow">我的订单统计</p>
-                  <h4 class="own-order-summary__title">当前时间范围汇总</h4>
-                </div>
-                <span class="own-order-summary__badge">{{ currentOrderChannelBadge }}</span>
-              </div>
-              <div class="own-order-summary__grid">
-                <div
-                  v-for="card in ownOrderSummaryCards"
-                  :key="card.key"
-                  class="own-order-summary-card"
-                >
-                  <div class="own-order-summary-card__icon" :class="card.iconClass">
-                    <Icon :icon="card.icon" class="h-5 w-5" />
-                  </div>
-                  <div class="min-w-0">
-                    <p class="own-order-summary-card__label">{{ card.label }}</p>
-                    <p class="own-order-summary-card__value">{{ card.value }}</p>
-                    <p class="own-order-summary-card__meta">{{ card.meta }}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <n-data-table
-              class="orders-table"
-              :columns="orderColumns"
-              :data="pagedOrderRows"
-              :loading="ordersLoading"
-              :bordered="false"
-              :single-line="false"
-              striped
-              size="small"
-              :scroll-x="1100"
-            />
-            <div class="orders-table-footer">
-              <span class="orders-pagination-prefix">
-                共{{ formatNumberValue(orderRows.length) }}个订单
-              </span>
-              <n-pagination
-                :page="ordersCurrentPage"
-                :page-size="ordersPagination.pageSize"
-                :item-count="orderRows.length"
-                @update:page="handleOrdersPageChange"
-              />
             </div>
           </n-card>
 
-          <n-card v-if="canAccessReport" :bordered="false" class="shadow-sm">
-            <template #header>
-              <div class="flex flex-wrap items-start justify-between gap-4">
-                <div class="flex items-center gap-3">
-                  <Icon icon="mdi:table-eye" class="w-5 h-5 text-violet-600" />
-                  <div>
-                    <h3 class="text-lg font-semibold text-slate-900">数据报表</h3>
-                    <p class="text-sm text-slate-500">查看当前渠道的充值日报</p>
+          <div class="space-y-6">
+            <n-card v-if="canAccessOrderStats" :bordered="false" class="shadow-sm">
+              <template #header>
+                <div class="flex flex-wrap items-start justify-between gap-4">
+                  <div class="flex items-center gap-3">
+                    <Icon icon="mdi:receipt-text-outline" class="w-5 h-5 text-amber-600" />
+                    <div>
+                      <h3 class="text-lg font-semibold text-slate-900">订单统计</h3>
+                      <p class="text-sm text-slate-500">查看当前渠道的订单明细和支付情况</p>
+                    </div>
+                  </div>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <DateRangePicker
+                      v-model="orderDateRange"
+                      select-class-name="w-40"
+                      @update:model-value="handleOrderDateChange"
+                    />
+                    <n-select
+                      v-model:value="payStatus"
+                      class="w-28"
+                      :options="payStatusOptions"
+                      @update:value="handlePayStatusChange"
+                    />
+                    <n-button
+                      type="primary"
+                      ghost
+                      :loading="ordersLoading"
+                      @click="fetchOrdersData"
+                    >
+                      查询
+                    </n-button>
                   </div>
                 </div>
-                <div class="flex flex-wrap items-center gap-2">
-                  <DateRangePicker
-                    v-model="reportDateRange"
-                    select-class-name="w-40"
-                    @update:model-value="handleReportDateChange"
-                  />
-                  <n-button type="primary" ghost :loading="reportLoading" @click="fetchReportData">
-                    查询
-                  </n-button>
+              </template>
+              <n-alert v-if="ordersError" type="error" :show-icon="true" class="mb-4">
+                {{ ordersError }}
+              </n-alert>
+              <div v-if="orderUserCardItems.length > 0" class="mb-4">
+                <div class="order-user-tabs">
+                  <div
+                    v-for="tab in orderUserCardItems"
+                    :key="tab.key"
+                    class="order-user-tab"
+                    :class="{
+                      active: !ordersLoading && activePromotionUserName === tab.key,
+                      'order-user-tab--all': tab.key === '' || tab.key === '__loading_all__',
+                      'order-user-tab--loading': ordersLoading,
+                    }"
+                    @click="!ordersLoading && handlePromotionUserTabChange(tab.key)"
+                  >
+                    <div class="order-user-tab__body">
+                      <div class="order-user-tab__head">
+                        <span
+                          class="order-user-tab__label"
+                          :class="{
+                            'order-user-tab__skeleton order-user-tab__skeleton--label':
+                              ordersLoading,
+                          }"
+                        >
+                          {{ ordersLoading ? '' : tab.label }}
+                        </span>
+                        <span
+                          class="order-user-tab__count"
+                          :class="{
+                            'order-user-tab__skeleton order-user-tab__skeleton--count':
+                              ordersLoading,
+                          }"
+                        >
+                          {{ ordersLoading ? '' : `${tab.total} 单` }}
+                        </span>
+                      </div>
+                      <p
+                        class="order-user-tab__amount"
+                        :class="{
+                          'order-user-tab__skeleton order-user-tab__skeleton--amount':
+                            ordersLoading,
+                        }"
+                      >
+                        {{ ordersLoading ? '' : formatCurrency(tab.totalAmount) }}
+                      </p>
+                      <p
+                        class="order-user-tab__meta"
+                        :class="{
+                          'order-user-tab__skeleton order-user-tab__skeleton--meta': ordersLoading,
+                        }"
+                      >
+                        {{ ordersLoading ? '' : tab.meta }}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </template>
-            <n-alert v-if="reportError" type="error" :show-icon="true" class="mb-4">
-              {{ reportError }}
-            </n-alert>
-            <n-data-table
-              :columns="reportColumns"
-              :data="reportRows"
-              :loading="reportLoading"
-              :bordered="false"
-              :single-line="false"
-              striped
-              size="small"
-              :pagination="reportPagination"
-              :scroll-x="1100"
-            />
-          </n-card>
+              <div v-if="shouldShowOrderBranch" class="mb-4">
+                <div class="order-branch-panel">
+                  <div class="order-branch-panel__tree">
+                    <div class="order-branch-panel__trunk"></div>
+                    <div class="order-branch-panel__grid">
+                      <button
+                        v-for="branchUser in orderBranchCardItems"
+                        :key="branchUser.key"
+                        type="button"
+                        class="order-branch-card"
+                        :class="{ active: activeBranchUserId === branchUser.key }"
+                        @click="handleBranchUserChange(branchUser.key)"
+                      >
+                        <p class="order-branch-card__label">{{ branchUser.label }}</p>
+                        <p class="order-branch-card__amount-label">总充值金额</p>
+                        <p class="order-branch-card__amount">
+                          {{ formatCurrency(branchUser.totalAmount) }}
+                        </p>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div v-if="shouldShowOwnOrderSummary" class="own-order-summary mb-4">
+                <div class="own-order-summary__header">
+                  <div>
+                    <p class="own-order-summary__eyebrow">我的订单统计</p>
+                    <h4 class="own-order-summary__title">当前时间范围汇总</h4>
+                  </div>
+                  <span class="own-order-summary__badge">{{ currentOrderChannelBadge }}</span>
+                </div>
+                <div class="own-order-summary__grid">
+                  <div
+                    v-for="card in ownOrderSummaryCards"
+                    :key="card.key"
+                    class="own-order-summary-card"
+                  >
+                    <div class="own-order-summary-card__icon" :class="card.iconClass">
+                      <Icon :icon="card.icon" class="h-5 w-5" />
+                    </div>
+                    <div class="min-w-0">
+                      <p class="own-order-summary-card__label">{{ card.label }}</p>
+                      <p class="own-order-summary-card__value">{{ card.value }}</p>
+                      <p class="own-order-summary-card__meta">{{ card.meta }}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <n-data-table
+                class="orders-table"
+                :columns="orderColumns"
+                :data="pagedOrderRows"
+                :loading="ordersLoading"
+                :bordered="false"
+                :single-line="false"
+                striped
+                size="small"
+                :scroll-x="1100"
+              />
+              <div class="orders-table-footer">
+                <span class="orders-pagination-prefix">
+                  共{{ formatNumberValue(orderRows.length) }}个订单
+                </span>
+                <n-pagination
+                  :page="ordersCurrentPage"
+                  :page-size="ordersPagination.pageSize"
+                  :item-count="orderRows.length"
+                  @update:page="handleOrdersPageChange"
+                />
+              </div>
+            </n-card>
+
+            <n-card v-if="canAccessReport" :bordered="false" class="shadow-sm">
+              <template #header>
+                <div class="flex flex-wrap items-start justify-between gap-4">
+                  <div class="flex items-center gap-3">
+                    <Icon icon="mdi:table-eye" class="w-5 h-5 text-violet-600" />
+                    <div>
+                      <h3 class="text-lg font-semibold text-slate-900">数据报表</h3>
+                      <p class="text-sm text-slate-500">查看当前渠道的充值日报</p>
+                    </div>
+                  </div>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <DateRangePicker
+                      v-model="reportDateRange"
+                      select-class-name="w-40"
+                      @update:model-value="handleReportDateChange"
+                    />
+                    <n-button
+                      type="primary"
+                      ghost
+                      :loading="reportLoading"
+                      @click="fetchReportData"
+                    >
+                      查询
+                    </n-button>
+                  </div>
+                </div>
+              </template>
+              <n-alert v-if="reportError" type="error" :show-icon="true" class="mb-4">
+                {{ reportError }}
+              </n-alert>
+              <n-data-table
+                :columns="reportColumns"
+                :data="reportRows"
+                :loading="reportLoading"
+                :bordered="false"
+                :single-line="false"
+                striped
+                size="small"
+                :pagination="reportPagination"
+                :scroll-x="1100"
+              />
+            </n-card>
+          </div>
+        </div>
+        <!-- /数据看板 Pane -->
+
+        <!-- 爆剧爆剪 Pane(常驻 DOM,首次激活后保持状态;只在首次进入时刷新一次) -->
+        <div
+          v-if="canAccessDramaClip && clipPaneActivated"
+          v-show="activeHomeTab === 'clip'"
+          class="home-tab-pane home-tab-pane--clip"
+        >
+          <NewDramaPreview embedded />
+        </div>
+
+        <!-- 飞书状态看板 Pane -->
+        <div v-show="activeHomeTab === 'feishu'" class="home-tab-pane">
+          <FeishuBoardPanel ref="feishuPanelRef" />
         </div>
       </div>
     </main>
@@ -564,8 +622,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, h, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, h, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import {
   useMessage,
@@ -589,6 +647,8 @@ import type { DataTableColumns } from 'naive-ui'
 import BuildWorkflowSchedulerModal from '@/components/BuildWorkflowSchedulerModal.vue'
 import SyncAccountModal from '@/components/SyncAccountModal.vue'
 import DateRangePicker from '@/components/DateRangePicker.vue'
+import NewDramaPreview from '@/components/NewDramaPreview.vue'
+import FeishuBoardPanel from '@/components/FeishuBoardPanel.vue'
 import * as adminApi from '@/api/admin'
 import { useApiConfigStore } from '@/stores/apiConfig'
 import { useDouyinMaterialStore } from '@/stores/douyinMaterial'
@@ -613,6 +673,7 @@ defineOptions({
 })
 
 const router = useRouter()
+const route = useRoute()
 const message = useMessage()
 const apiConfigStore = useApiConfigStore()
 const douyinMaterialStore = useDouyinMaterialStore()
@@ -721,6 +782,105 @@ const hasChannelTabs = computed(() => channelTabs.value.length > 0)
 const activeChannelTabId = computed(
   () => sessionStore.activeChannelId || sessionStore.currentChannel?.id || ''
 )
+
+// ====== 首页 Tab 切换:数据看板 / 爆剧爆剪 / 飞书状态看板 ======
+type HomeTabKey = 'dashboard' | 'clip' | 'feishu'
+
+const VALID_HOME_TABS: HomeTabKey[] = ['dashboard', 'clip', 'feishu']
+
+function resolveInitialTab(): HomeTabKey {
+  const raw = String(route.query.tab || '').trim()
+  if (raw === 'clip' || raw === 'feishu' || raw === 'dashboard') {
+    return raw
+  }
+  return 'dashboard'
+}
+
+const activeHomeTab = ref<HomeTabKey>(resolveInitialTab())
+const clipPaneActivated = ref(activeHomeTab.value === 'clip')
+const feishuPanelRef = ref<{ refresh: () => void | Promise<void> } | null>(null)
+const homeTabRefs = ref<HTMLButtonElement[]>([])
+const homeTabIndicator = reactive({ left: 0, width: 0 })
+
+const homeTabs = computed(() => {
+  const list: Array<{
+    key: HomeTabKey
+    label: string
+    icon: string
+    disabledReason: string
+  }> = [
+    {
+      key: 'dashboard',
+      label: '数据看板',
+      icon: 'mdi:chart-line',
+      disabledReason: '',
+    },
+    {
+      key: 'clip',
+      label: '爆剧爆剪',
+      icon: 'mdi:fire',
+      disabledReason: canAccessDramaClip.value ? '' : '当前账号无爆剧爆剪权限',
+    },
+    {
+      key: 'feishu',
+      label: '飞书状态看板',
+      icon: 'mdi:view-dashboard-outline',
+      disabledReason: '',
+    },
+  ]
+  return list
+})
+
+function updateHomeTabIndicator() {
+  const idx = homeTabs.value.findIndex(tab => tab.key === activeHomeTab.value)
+  const el = homeTabRefs.value[idx]
+  if (!el) {
+    homeTabIndicator.width = 0
+    return
+  }
+  homeTabIndicator.left = el.offsetLeft
+  homeTabIndicator.width = el.offsetWidth
+}
+
+function syncHomeTabToUrl(tab: HomeTabKey) {
+  const desired = tab === 'dashboard' ? undefined : tab
+  const current = String(route.query.tab || '') || undefined
+  if (current === desired) return
+  const nextQuery = { ...route.query }
+  if (desired) {
+    nextQuery.tab = desired
+  } else {
+    delete nextQuery.tab
+  }
+  router.replace({ query: nextQuery }).catch(() => {
+    /* 忽略导航重复错误 */
+  })
+}
+
+async function handleHomeTabChange(tab: HomeTabKey) {
+  if (activeHomeTab.value === tab) return
+  const target = homeTabs.value.find(t => t.key === tab)
+  if (target?.disabledReason) {
+    message.warning(target.disabledReason)
+    return
+  }
+  activeHomeTab.value = tab
+  if (tab === 'clip') {
+    clipPaneActivated.value = true
+  }
+  syncHomeTabToUrl(tab)
+  await nextTick()
+  updateHomeTabIndicator()
+
+  // 切到数据看板 / 飞书看板时主动刷新数据
+  if (tab === 'dashboard' && hasActiveChannel.value) {
+    loadDashboardData().catch(error => {
+      console.error('刷新首页数据失败:', error)
+    })
+  } else if (tab === 'feishu') {
+    feishuPanelRef.value?.refresh()
+  }
+}
 const currentOrderChannelBadge = computed(() => {
   const activeChannel = channelTabs.value.find(channel => channel.id === activeChannelTabId.value)
   const channelName = String(activeChannel?.name || sessionStore.currentChannel?.name || '').trim()
@@ -1731,9 +1891,14 @@ function handleBranchUserChange(userId: string) {
   ordersPagination.page = 1
 }
 
+function handleWindowResize() {
+  checkMobile()
+  updateHomeTabIndicator()
+}
+
 onMounted(async () => {
   checkMobile()
-  window.addEventListener('resize', checkMobile)
+  window.addEventListener('resize', handleWindowResize)
   reportDateRange.value = getDefaultDateRange()
   orderDateRange.value = getDefaultDateRange()
   await refreshDashboardContext()
@@ -1746,7 +1911,43 @@ onMounted(async () => {
     })
     await loadDashboardData()
   }
+
+  // 初始化 Tab 指示器位置(等待 DOM 就绪)
+  await nextTick()
+  updateHomeTabIndicator()
+
+  // 若初始 tab 不是 dashboard,需要做对应操作
+  if (activeHomeTab.value === 'feishu') {
+    // 等下一 tick 让 FeishuBoardPanel 完成挂载
+    nextTick(() => feishuPanelRef.value?.refresh())
+  }
 })
+
+// 切到无渠道状态时,Tab 内容会被 v-if 隐藏,无需特别处理
+watch(activeHomeTab, async () => {
+  await nextTick()
+  updateHomeTabIndicator()
+})
+
+// hasActiveChannel 变化(显示/隐藏 Tab Bar)后需要重算指示器
+watch(hasActiveChannel, async () => {
+  await nextTick()
+  updateHomeTabIndicator()
+})
+
+// 浏览器前进/后退同步 URL tab 参数
+watch(
+  () => route.query.tab,
+  newVal => {
+    const next: HomeTabKey = VALID_HOME_TABS.includes(String(newVal) as HomeTabKey)
+      ? (String(newVal) as HomeTabKey)
+      : 'dashboard'
+    if (next !== activeHomeTab.value) {
+      activeHomeTab.value = next
+      if (next === 'clip') clipPaneActivated.value = true
+    }
+  }
+)
 
 watch(
   hasActiveChannel,
@@ -1802,7 +2003,7 @@ watch(
 onUnmounted(() => {
   channelSwitchController?.abort()
   cancelDashboardRequests()
-  window.removeEventListener('resize', checkMobile)
+  window.removeEventListener('resize', handleWindowResize)
 })
 </script>
 
@@ -2581,6 +2782,158 @@ onUnmounted(() => {
 
   .order-branch-panel__grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ============ 首页 Tab 切换器:胶囊分段式 + 滑动指示器 ============ */
+.home-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.home-tab-bar {
+  position: relative;
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 5px;
+  gap: 2px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(241, 245, 249, 0.7));
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 14px;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 8px 24px -12px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(8px);
+  overflow: hidden;
+}
+
+.home-tab-bar::before {
+  /* 顶部装饰高光 */
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.25), transparent);
+  pointer-events: none;
+}
+
+.home-tab-button {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  border: 0;
+  background: transparent;
+  color: #475569;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    color 0.25s ease,
+    transform 0.25s ease;
+}
+
+.home-tab-button:hover:not(.active):not(:disabled) {
+  color: #1e293b;
+  transform: translateY(-1px);
+}
+
+.home-tab-button.active {
+  color: #4338ca;
+  font-weight: 600;
+}
+
+.home-tab-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.home-tab-button__icon {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.3s ease;
+}
+
+.home-tab-button.active .home-tab-button__icon {
+  transform: scale(1.1) rotate(-4deg);
+  color: #6366f1;
+}
+
+.home-tab-button__label {
+  line-height: 1;
+}
+
+.home-tab-indicator {
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  left: 0;
+  width: 0;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow:
+    0 1px 2px rgba(99, 102, 241, 0.15),
+    0 6px 16px -8px rgba(99, 102, 241, 0.45);
+  transition:
+    transform 0.36s cubic-bezier(0.34, 1.18, 0.64, 1),
+    width 0.36s cubic-bezier(0.34, 1.18, 0.64, 1);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.home-tab-indicator::after {
+  /* 渐变描边 */
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.5), rgba(168, 85, 247, 0.35));
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.home-tab-pane {
+  animation: home-tab-fade-in 0.32s ease both;
+}
+
+@keyframes home-tab-fade-in {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 移动端:Tab Bar 横向滚动,字号略缩 */
+@media (max-width: 640px) {
+  .home-tab-bar {
+    align-self: stretch;
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+
+  .home-tab-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .home-tab-button {
+    padding: 8px 14px;
+    font-size: 13px;
   }
 }
 </style>

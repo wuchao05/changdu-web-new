@@ -1,7 +1,11 @@
 <template>
-  <div class="new-drama-preview-page min-h-full bg-gradient-to-br from-slate-50 to-blue-50">
-    <!-- 顶部导航栏 -->
+  <div
+    class="new-drama-preview-page min-h-full"
+    :class="embedded ? 'is-embedded' : 'bg-gradient-to-br from-slate-50 to-blue-50'"
+  >
+    <!-- 顶部导航栏(仅独立页面模式显示) -->
     <header
+      v-if="!embedded"
       class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200/60 shadow-sm"
     >
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -40,7 +44,8 @@
 
     <!-- 置顶筛选区域 -->
     <div
-      class="sticky top-16 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200/60 shadow-sm"
+      class="sticky z-40 bg-white/95 backdrop-blur-md border-b border-gray-200/60 shadow-sm filter-sticky"
+      :class="embedded ? 'is-embedded' : ''"
     >
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
         <div class="filter-section">
@@ -925,6 +930,11 @@ import timezone from 'dayjs/plugin/timezone'
 // 配置dayjs插件
 dayjs.extend(utc)
 dayjs.extend(timezone)
+
+// 嵌入模式 prop:为 true 时表示在首页 Tab 内嵌入,隐藏顶部导航,sticky 位置改为 0
+defineProps<{
+  embedded?: boolean
+}>()
 
 // 路由实例
 const router = useRouter()
@@ -3597,13 +3607,36 @@ watch(
 <style scoped>
 @import '@/assets/newDramaPreview.css';
 
+/* 一级筛选条 sticky 位置 */
+.filter-sticky {
+  top: 64px;
+}
+
+.filter-sticky.is-embedded {
+  /* 嵌入到首页 Tab 容器内时,父容器自身处于 main 区,无需粘附在视口顶部 */
+  position: relative;
+  top: auto;
+}
+
 .secondary-tab-sticky {
   top: 124px;
+}
+
+/* 嵌入模式下二级 tab 不再粘附 */
+.is-embedded .secondary-tab-sticky {
+  position: relative;
+  top: auto;
 }
 
 @media (max-width: 640px) {
   .secondary-tab-sticky {
     top: 156px;
   }
+}
+
+/* 嵌入模式:去掉外层背景渐变(由父级首页统一渐变),并去掉外层 min-h-full */
+.new-drama-preview-page.is-embedded {
+  min-height: 0;
+  background: transparent;
 }
 </style>
