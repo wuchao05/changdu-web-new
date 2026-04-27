@@ -1200,7 +1200,8 @@ class FeishuApiService {
     statuses: string[],
     tableId?: string
   ): Promise<{ items: any[]; total: number }> {
-    const targetTableId = tableId || this.getDramaStatusTableId()
+    // 看板严格按"传入的 tableId"查询，不回退到全局默认，避免显示错误数据
+    const targetTableId = String(tableId || '').trim()
     if (!targetTableId) {
       return { items: [], total: 0 }
     }

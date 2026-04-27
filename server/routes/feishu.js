@@ -2583,8 +2583,15 @@ router.post('/bitable/drama-status/board', async ctx => {
     const statusList = Array.isArray(statuses)
       ? statuses.map(item => String(item || '').trim()).filter(Boolean)
       : []
-    const targetTableId = String(table_id || '').trim() || FEISHU_CONFIG.table_ids.drama_status
+    // 看板严格使用调用方传入的 tableId，不再兜底全局默认表，
+    // 避免某用户/渠道未配置时把全局默认表的数据当成本人数据展示
+    const targetTableId = String(table_id || '').trim()
 
+    if (!targetTableId) {
+      ctx.status = 400
+      ctx.body = { code: -1, msg: '当前用户/渠道未配置剧集状态表 ID' }
+      return
+    }
     if (dateList.length === 0) {
       ctx.status = 400
       ctx.body = { code: -1, msg: 'dates 不能为空' }
