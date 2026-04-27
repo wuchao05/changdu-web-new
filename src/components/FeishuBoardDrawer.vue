@@ -281,6 +281,7 @@ const channelOptions = computed(() => {
 })
 
 // 解析当前要查询的 tableId
+// 严格按"当前选中的渠道"取，不再回退到 user.feishu（那个是默认渠道的合并值，会误导）
 const resolvedTableId = computed(() => {
   if (isAdmin.value) {
     const user = selectedUser.value
@@ -288,9 +289,9 @@ const resolvedTableId = computed(() => {
     const channelId = selectedChannelId.value || user.defaultChannelId || user.channelIds?.[0] || ''
     if (!channelId) return ''
     const binding = user.channelConfigs?.[channelId]
-    return binding?.feishu?.dramaStatusTableId || user.feishu?.dramaStatusTableId || ''
+    return String(binding?.feishu?.dramaStatusTableId || '').trim()
   }
-  return apiConfigStore.config.dramaStatusTableId || ''
+  return String(apiConfigStore.config.dramaStatusTableId || '').trim()
 })
 
 // 日期 Tab：昨天 / 今天 / 明天 / 后天 + 总览
