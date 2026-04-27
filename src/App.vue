@@ -14,6 +14,7 @@ import { RouterView, useRoute, useRouter } from 'vue-router'
 
 import AppFooter from '@/components/AppFooter.vue'
 import DebugConsoleDrawer from '@/components/DebugConsoleDrawer.vue'
+import FeishuBoardDrawer from '@/components/FeishuBoardDrawer.vue'
 
 const globalFontFamily =
   "'Maple Mono NF CN', 'Maple Mono', 'Maple Mono CN', 'SFMono-Regular', 'Cascadia Mono', 'JetBrains Mono', 'Fira Code', 'Consolas', 'Liberation Mono', 'PingFang SC', 'Microsoft YaHei UI', 'Noto Sans CJK SC', monospace"
@@ -32,6 +33,9 @@ const routeLoading = ref(false)
 const showFooter = computed(() => route.name !== 'login' && route.meta.hideFooter !== true)
 const showDebugDrawer = computed(
   () => route.name !== 'login' && route.meta.hideDebugDrawer !== true
+)
+const showFeishuBoard = computed(
+  () => route.name !== 'login' && route.meta.hideFeishuBoard !== true
 )
 const pageLoadingText = computed(() => {
   if (!appReady.value) {
@@ -87,6 +91,7 @@ onMounted(async () => {
             </div>
             <AppFooter v-if="showFooter" />
             <DebugConsoleDrawer v-if="showDebugDrawer" />
+            <FeishuBoardDrawer v-if="showFeishuBoard" />
           </div>
         </n-notification-provider>
       </n-dialog-provider>

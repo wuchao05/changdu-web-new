@@ -1192,6 +1192,43 @@ class FeishuApiService {
   }
 
   /**
+   * 飞书状态看板查询（只读）
+   * 按一组日期 + 一组状态拉取剧目状态记录，仅供首页看板使用
+   */
+  async getDramaStatusBoard(
+    dates: string[],
+    statuses: string[],
+    tableId?: string
+  ): Promise<{ items: any[]; total: number }> {
+    const targetTableId = tableId || this.getDramaStatusTableId()
+    if (!targetTableId) {
+      return { items: [], total: 0 }
+    }
+
+    const response = await fetch(`${ENV.BASE_URL}/feishu/bitable/drama-status/board`, {
+      method: 'POST',
+      headers: FEISHU_API_CONFIG.headers,
+      body: JSON.stringify({
+        table_id: targetTableId,
+        dates,
+        statuses,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const result = await response.json()
+    if (result.code !== 0) {
+      throw new Error(result.msg || '查询飞书状态看板失败')
+    }
+
+    const items = Array.isArray(result.data?.items) ? result.data.items : []
+    return { items, total: result.data?.total ?? items.length }
+  }
+
+  /**
    * 批量创建记录到账户表
    */
   async batchCreateAccounts(

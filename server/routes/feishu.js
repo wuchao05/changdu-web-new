@@ -2568,4 +2568,132 @@ router.put('/bitable/drama-status/:recordId/status', async ctx => {
   }
 })
 
+/**
+ * 飞书状态看板查询接口（只读）
+ * 接收一组日期 (YYYY-MM-DD) 与状态数组，按 OR 拼接日期、IN 匹配状态
+ * 仅供首页"飞书状态看板"使用，不做任何写操作
+ */
+router.post('/bitable/drama-status/board', async ctx => {
+  try {
+    const { table_id, dates, statuses, field_names } = ctx.request.body || {}
+
+    const dateList = Array.isArray(dates)
+      ? dates.map(item => String(item || '').trim()).filter(Boolean)
+      : []
+    const statusList = Array.isArray(statuses)
+      ? statuses.map(item => String(item || '').trim()).filter(Boolean)
+      : []
+    const targetTableId = String(table_id || '').trim() || FEISHU_CONFIG.table_ids.drama_status
+
+    if (dateList.length === 0) {
+      ctx.status = 400
+      ctx.body = { code: -1, msg: 'dates 不能为空' }
+      return
+    }
+    if (statusList.length === 0) {
+      ctx.status = 400
+      ctx.body = { code: -1, msg: 'statuses 不能为空' }
+      return
+    }
+
+    // 获取 tenant_access_token
+    const tokenResponse = await fetch(
+      `${FEISHU_CONFIG.api_base_url}${FEISHU_CONFIG.token_endpoint}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          app_id: FEISHU_CONFIG.app_id,
+          app_secret: FEISHU_CONFIG.app_secret,
+        }),
+      }
+    )
+
+    const tokenJson = await tokenResponse.json().catch(() => null)
+    if (!tokenJson || tokenJson.code !== 0) {
+      ctx.status = 400
+      ctx.body = { code: -1, msg: 'Failed to get access token', details: tokenJson }
+      return
+    }
+    const accessToken = tokenJson.tenant_access_token
+
+    // 飞书 DateTime 字段需要 ['ExactDate', timestampString]
+    const dateConditions = dateList.map(dateStr => {
+      const timestamp = new Date(`${dateStr} 00:00:00`).getTime()
+      return {
+        field_name: '日期',
+        operator: 'is',
+        value: ['ExactDate', String(timestamp)],
+      }
+    })
+
+    const requestedFields =
+      Array.isArray(field_names) && field_names.length > 0
+        ? field_names
+        : ['剧名', '账户', '上架时间', '评级', '当前状态', '日期']
+
+    // 飞书 filter 不支持嵌套：先用 (date1 OR date2 ...) 拉一次，再在服务端按状态过滤
+    const filter = {
+      conjunction: 'or',
+      conditions: dateConditions,
+    }
+
+    const response = await fetch(
+      `${FEISHU_CONFIG.api_base_url}/bitable/v1/apps/${FEISHU_CONFIG.app_token}/tables/${targetTableId}/records/search`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          field_names: requestedFields,
+          page_size: 500,
+          filter,
+        }),
+      }
+    )
+
+    const jsonData = await response.json().catch(() => null)
+    if (!jsonData || jsonData.code !== 0) {
+      ctx.status = response.status || 500
+      ctx.body = jsonData || { code: -1, msg: 'Feishu request failed' }
+      return
+    }
+
+    const items = Array.isArray(jsonData.data?.items) ? jsonData.data.items : []
+    const statusSet = new Set(statusList)
+    const extractStatusText = rawStatus => {
+      if (typeof rawStatus === 'string') return rawStatus
+      if (Array.isArray(rawStatus)) {
+        return rawStatus.map(part => (typeof part === 'string' ? part : part?.text || '')).join('')
+      }
+      if (rawStatus && typeof rawStatus === 'object') {
+        return rawStatus.text || ''
+      }
+      return ''
+    }
+
+    const filtered = items.filter(item => {
+      const text = extractStatusText(item?.fields?.['当前状态'])
+      return statusSet.has(text)
+    })
+
+    ctx.status = 200
+    ctx.body = {
+      code: 0,
+      msg: 'success',
+      data: { items: filtered, total: filtered.length },
+    }
+  } catch (error) {
+    console.error('查询飞书状态看板失败:', error)
+    ctx.status = 500
+    ctx.body = {
+      code: -1,
+      msg: error.message || '查询失败',
+      timestamp: new Date().toISOString(),
+    }
+  }
+})
+
 export default router
