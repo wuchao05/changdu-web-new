@@ -74,11 +74,6 @@
         </div>
       </div>
     </transition>
-
-    <!-- 抛物线动画的小球 -->
-    <div v-for="ball in flyingBalls" :key="ball.id" class="flying-ball" :style="ball.style">
-      <Icon icon="mdi:book" class="ball-icon" />
-    </div>
   </div>
 </template>
 
@@ -103,12 +98,6 @@ export interface CartItem {
   fromSearchResult?: boolean // 是否来自搜索结果
 }
 
-// 飞行小球类型
-interface FlyingBall {
-  id: number
-  style: Record<string, string>
-}
-
 // 定义 emits
 const emit = defineEmits<{
   'batch-submitted': [bookIds: string[]]
@@ -120,8 +109,6 @@ const cartItems = ref<CartItem[]>([])
 const submittingIds = ref<Set<string>>(new Set())
 const isSubmitting = ref(false)
 const cartTriggerRef = ref<HTMLElement | null>(null)
-const flyingBalls = ref<FlyingBall[]>([])
-let ballIdCounter = 0
 
 // 计算属性
 const submittingCount = computed(() => submittingIds.value.size)
@@ -132,7 +119,7 @@ function toggleCart() {
 }
 
 // 添加剧集到购物车（带抛物线动画）
-function addItem(item: CartItem, sourceElement?: HTMLElement) {
+function addItem(item: CartItem) {
   // 检查是否已存在
   if (cartItems.value.some(i => i.book_id === item.book_id)) {
     message.warning('该剧集已在待提交列表中')
@@ -142,52 +129,6 @@ function addItem(item: CartItem, sourceElement?: HTMLElement) {
   // 添加到购物车
   cartItems.value.push(item)
   message.success(`已添加: ${item.series_name}`)
-
-  // 播放抛物线动画
-  if (sourceElement) {
-    playFlyAnimation(sourceElement)
-  }
-}
-
-// 播放抛物线动画
-function playFlyAnimation(sourceElement: HTMLElement) {
-  const ballId = ballIdCounter++
-  const sourceRect = sourceElement.getBoundingClientRect()
-  const targetElement = cartTriggerRef.value
-
-  if (!targetElement) return
-
-  const targetRect = targetElement.getBoundingClientRect()
-  const ballSize = 28
-
-  // 使用视口坐标计算三点路径，避免购物车从 fixed 改为 inline 后方向错乱。
-  const startX = sourceRect.left + sourceRect.width / 2 - ballSize / 2
-  const startY = sourceRect.top + sourceRect.height / 2 - ballSize / 2
-  const endX = targetRect.left + targetRect.width / 2 - ballSize / 2
-  const endY = targetRect.top + targetRect.height / 2 - ballSize / 2
-  const arcHeight = Math.min(180, Math.max(80, Math.abs(endY - startY) * 0.35))
-  const midX = startX + (endX - startX) * 0.55
-  const midY = startY + (endY - startY) * 0.35 - arcHeight
-
-  // 创建飞行小球
-  const ball: FlyingBall = {
-    id: ballId,
-    style: {
-      '--start-x': `${startX}px`,
-      '--start-y': `${startY}px`,
-      '--mid-x': `${midX}px`,
-      '--mid-y': `${midY}px`,
-      '--end-x': `${endX}px`,
-      '--end-y': `${endY}px`,
-    },
-  }
-
-  flyingBalls.value.push(ball)
-
-  // 动画结束后移除小球
-  setTimeout(() => {
-    flyingBalls.value = flyingBalls.value.filter(b => b.id !== ballId)
-  }, 800)
 }
 
 // 移除单个剧集
@@ -208,6 +149,10 @@ function updateItemRedFlag(bookId: string, manualRedFlag: boolean) {
   }
 
   targetItem.manualRedFlag = manualRedFlag
+}
+
+function hasItem(bookId: string) {
+  return cartItems.value.some(item => item.book_id === bookId)
 }
 
 // 清空购物车
@@ -297,6 +242,7 @@ function finishSubmitting(success: boolean, successCount?: number, failedCount?:
 defineExpose({
   addItem,
   removeItem,
+  hasItem,
   updateItemRedFlag,
   clearAll,
   startSubmitting,
@@ -668,43 +614,5 @@ defineExpose({
 .slide-fade-leave-to {
   transform: translateY(-10px);
   opacity: 0;
-}
-
-/* 飞行小球 */
-.flying-ball {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 28px;
-  height: 28px;
-  background: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-  z-index: 9999;
-  animation: fly 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
-
-.ball-icon {
-  width: 17px;
-  height: 17px;
-  color: white;
-}
-
-@keyframes fly {
-  0% {
-    transform: translate3d(var(--start-x), var(--start-y), 0) scale(0.95);
-    opacity: 1;
-  }
-  50% {
-    transform: translate3d(var(--mid-x), var(--mid-y), 0) scale(0.82);
-    opacity: 0.92;
-  }
-  100% {
-    transform: translate3d(var(--end-x), var(--end-y), 0) scale(0.35);
-    opacity: 0;
-  }
 }
 </style>

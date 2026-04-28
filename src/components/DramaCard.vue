@@ -161,11 +161,15 @@
                   <!-- 加入购物车按钮 -->
                   <button
                     @click="handleAddToCart"
-                    :disabled="isSyncing || isProcessing"
+                    :disabled="isSyncing || isProcessing || isInCart"
                     class="action-button action-button-cart"
-                    :title="`加入购物车: ${drama.series_name}`"
+                    :class="{ 'is-in-cart': isInCart }"
+                    :title="isInCart ? '已加入购物车' : `加入购物车: ${drama.series_name}`"
                   >
-                    <Icon icon="mdi:playlist-plus" class="button-icon" />
+                    <Icon
+                      :icon="isInCart ? 'mdi:check' : 'mdi:playlist-plus'"
+                      class="button-icon"
+                    />
                   </button>
 
                   <!-- 新增待下载按钮 -->
@@ -490,6 +494,7 @@ interface Props {
   showRanking?: boolean // 是否显示排名
   isNewDrama?: boolean // 是否为增剧（红标剧）
   isManualRedFlag?: boolean // 是否手动开启红标
+  isInCart?: boolean // 是否已加入购物车
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -505,6 +510,7 @@ const props = withDefaults(defineProps<Props>(), {
   showRanking: false,
   isNewDrama: false,
   isManualRedFlag: false,
+  isInCart: false,
 })
 
 // 事件定义
@@ -614,7 +620,10 @@ function handleAddToCart(event: MouseEvent) {
   event.stopPropagation()
 
   const isDisabled =
-    props.isSyncing || props.isProcessing || (props.isAnySyncing && !props.isSyncing)
+    props.isSyncing ||
+    props.isProcessing ||
+    props.isInCart ||
+    (props.isAnySyncing && !props.isSyncing)
 
   if (isDisabled) {
     return
@@ -1340,6 +1349,19 @@ async function handleDownload() {
 .action-button-cart:disabled {
   @apply opacity-50 cursor-not-allowed;
   transform: none;
+}
+
+.action-button-cart.is-in-cart {
+  @apply bg-emerald-50 text-emerald-700 border-emerald-200;
+  box-shadow: none;
+}
+
+.action-button-cart.is-in-cart:hover {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #047857;
+  transform: none;
+  box-shadow: none;
 }
 
 /* 已提交状态徽章 */

@@ -124,7 +124,7 @@
                 class="refresh-btn-modern"
                 title="adx短剧热力榜"
               >
-                <Icon icon="mdi:chart-bar" class="refresh-icon-modern" />
+                <Icon icon="mdi:fire" class="refresh-icon-modern" />
               </button>
               <!-- 自动提交下载按钮（在新剧抢跑tab显示） -->
               <button
@@ -154,197 +154,44 @@
     </div>
 
     <!-- 主要内容区域 -->
-    <div class="clip-main-content max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pt-2 sm:pt-2 md:pt-2">
-      <!-- 自动提交下载状态栏 -->
-      <div
-        v-if="isAutoSubmitEnabledForCurrentChannel && activeTab === 'new-drama'"
-        class="auto-download-bar"
-      >
-        <div class="auto-download-info">
-          <Icon icon="mdi:robot-outline" class="auto-download-icon" />
-          <div>
-            <div class="auto-download-title">自动提交下载</div>
-            <div class="auto-download-desc">
-              <span v-if="currentSchedulerStatus.running">
-                正在处理【{{ currentSchedulerStatus.progress.currentDate }}】第
-                {{ currentSchedulerStatus.progress.current }}/{{
-                  currentSchedulerStatus.progress.total
-                }}
-                部：{{ currentSchedulerStatus.progress.currentDrama }}
-              </span>
-              <span v-else> 下次运行倒计时：{{ formatCountdown(autoSubmitCountdown) }} </span>
-            </div>
-          </div>
-        </div>
-        <div class="auto-download-actions">
-          <button
-            class="auto-download-button stop"
-            :disabled="currentSchedulerStatus.running"
-            @click="stopAutoSubmit"
-          >
-            {{ currentSchedulerStatus.running ? '正在运行...' : '停止自动提交' }}
-          </button>
-        </div>
-      </div>
-
-      <!-- 搜索结果列表 - 优先显示搜索结果，在所有tab中都显示 -->
-      <div v-if="isSearching && !searchLoading && searchResults.length > 0" class="drama-list">
-        <DramaCard
-          v-for="drama in searchResults"
-          :key="drama.book_id"
-          :drama="drama"
-          :download-data="getDownloadDataForDrama(drama.series_name)"
-          :is-download-triggered="isDownloadTriggered(drama.series_name)"
-          :is-syncing="syncingDramaId === drama.book_id"
-          :is-processing="clipProcessingDramaId === drama.book_id"
-          :is-any-syncing="isAnyOperationBlocked"
-          :is-downloaded="isDramaDownloaded(drama.series_name)"
-          :is-submitted-for-download="submittedForDownloadSet.has(drama.book_id)"
-          :is-submitted-for-clip="submittedForClipSet.has(drama.book_id)"
-          :is-manual-red-flag="isManualRedFlag(drama.book_id)"
-          @show-image="showDramaImage"
-          @copy-name="copyDramaName"
-          @sync-to-feishu="syncToFeishu"
-          @add-to-cart="handleAddToCart"
-          @red-flag-change="handleManualRedFlagChange"
-          @download="handleDownload"
-        />
-      </div>
-      <div v-else-if="isSearching && searchLoading" class="empty-state">
-        <Icon icon="mdi:loading" class="empty-icon animate-spin" />
-        <h3 class="empty-title">搜索中...</h3>
-        <p class="empty-description">正在匹配短剧，请稍候</p>
-      </div>
-      <div v-else-if="isSearching && !searchLoading" class="empty-state">
-        <Icon icon="mdi:magnify" class="empty-icon" />
-        <h3 class="empty-title">未找到相关短剧</h3>
-        <p class="empty-description">请尝试其他关键词或清空搜索</p>
-      </div>
-
-      <!-- 搜索态的全局提示 Toast -->
-      <Transition
-        enter-active-class="transition duration-300 ease-out"
-        enter-from-class="transform translate-y-2 opacity-0"
-        enter-to-class="transform translate-y-0 opacity-100"
-        leave-active-class="transition duration-200 ease-in"
-        leave-from-class="transform translate-y-0 opacity-100"
-        leave-to-class="transform translate-y-2 opacity-0"
-      >
-        <div v-if="isSearching && showCopyToast" class="toast">
-          <Icon icon="mdi:check-circle" class="toast-icon" />
-          <span class="toast-message">{{ copyToastMessage }}</span>
-        </div>
-      </Transition>
-
-      <div v-if="!isSearching" class="new-drama-preview">
-        <div class="embedded-list-filter-row">
-          <div v-if="activeTab === 'new-drama'" class="secondary-tab-switcher">
-            <button
-              v-for="date in dateOptions"
-              :key="date.value"
-              @click="selectedDate = date.value"
-              :class="['secondary-tab-btn', selectedDate === date.value ? 'active' : '']"
-            >
-              <Icon :icon="getDateIcon(date.value)" class="secondary-tab-icon" />
-              <span class="secondary-tab-text">{{ date.label }}</span>
-              <span v-if="getDateDramaCount(date.value) > 0" class="secondary-tab-count">
-                {{ getDateDramaCount(date.value) }}
-              </span>
-            </button>
-          </div>
-          <div v-else-if="activeTab === 'ranking'" class="secondary-tab-switcher">
-            <button
-              v-for="level in incomeLevelOptions"
-              :key="level.value"
-              @click="selectedIncomeLevel = level.value"
-              :class="['secondary-tab-btn', selectedIncomeLevel === level.value ? 'active' : '']"
-            >
-              <Icon :icon="level.icon" class="secondary-tab-icon" />
-              <span class="secondary-tab-text">{{ level.label }}</span>
-            </button>
-          </div>
-          <DramaCart ref="dramaCartRef" inline @batch-submitted="handleBatchSubmitted" />
-        </div>
-
-        <!-- 骨架屏加载状态 -->
+    <div class="clip-workspace" :class="{ 'has-adx-panel': showAdxDrawer }">
+      <div class="clip-main-content px-4 sm:px-6 lg:px-8 py-6 pt-2 sm:pt-2 md:pt-2">
+        <!-- 自动提交下载状态栏 -->
         <div
-          v-if="loading || listSkeletonLoading || searchLoading || rankingLoading"
-          class="drama-list-skeleton"
+          v-if="isAutoSubmitEnabledForCurrentChannel && activeTab === 'new-drama'"
+          class="auto-download-bar"
         >
-          <div class="skeleton-drama-list">
-            <div v-for="n in 8" :key="n" class="skeleton-drama-card">
-              <!-- 左侧封面骨架 -->
-              <div class="skeleton-poster"></div>
-
-              <!-- 中间信息区域骨架 -->
-              <div class="skeleton-drama-info">
-                <div class="skeleton-drama-main">
-                  <div class="skeleton-drama-details">
-                    <!-- 分类标签 -->
-                    <div class="skeleton-category-tags">
-                      <div class="skeleton-tag"></div>
-                      <div class="skeleton-tag"></div>
-                      <div class="skeleton-tag"></div>
-                      <div class="skeleton-tag"></div>
-                    </div>
-
-                    <!-- 剧集信息 -->
-                    <div class="skeleton-episode-info">
-                      <div class="skeleton-episode-item"></div>
-                    </div>
-
-                    <!-- 首发时间 -->
-                    <div class="skeleton-publish-time">
-                      <div class="skeleton-time-text"></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 右侧状态和操作区域骨架 -->
-              <div class="skeleton-drama-actions">
-                <div class="skeleton-status-label"></div>
-                <div class="skeleton-drama-id"></div>
-                <div class="skeleton-action-button"></div>
+          <div class="auto-download-info">
+            <Icon icon="mdi:robot-outline" class="auto-download-icon" />
+            <div>
+              <div class="auto-download-title">自动提交下载</div>
+              <div class="auto-download-desc">
+                <span v-if="currentSchedulerStatus.running">
+                  正在处理【{{ currentSchedulerStatus.progress.currentDate }}】第
+                  {{ currentSchedulerStatus.progress.current }}/{{
+                    currentSchedulerStatus.progress.total
+                  }}
+                  部：{{ currentSchedulerStatus.progress.currentDrama }}
+                </span>
+                <span v-else> 下次运行倒计时：{{ formatCountdown(autoSubmitCountdown) }} </span>
               </div>
             </div>
           </div>
-          <div class="skeleton-loading-indicator">
-            <div class="skeleton-spinner"></div>
-            <span class="skeleton-loading-text">
-              {{
-                activeTab === 'ranking'
-                  ? '正在加载榜单剧数据...'
-                  : (activeTab as string) === 'feishu'
-                    ? '正在加载飞书清单数据...'
-                    : '正在加载新剧数据...'
-              }}
-            </span>
+          <div class="auto-download-actions">
+            <button
+              class="auto-download-button stop"
+              :disabled="currentSchedulerStatus.running"
+              @click="stopAutoSubmit"
+            >
+              {{ currentSchedulerStatus.running ? '正在运行...' : '停止自动提交' }}
+            </button>
           </div>
         </div>
 
-        <!-- 错误状态 -->
-        <div v-else-if="error" class="error-section">
-          <Icon icon="mdi:alert-circle" class="error-icon" />
-          <p class="error-message">{{ error }}</p>
-          <button @click="fetchDramaList" class="retry-button">
-            <Icon icon="mdi:refresh" class="w-4 h-4 mr-2" />
-            重试
-          </button>
-        </div>
-
-        <!-- 新剧抢跑列表 - 仅在没有搜索时显示 -->
-        <div
-          v-else-if="
-            !isSearching &&
-            !listSkeletonLoading &&
-            paginatedDramas.length > 0 &&
-            activeTab === 'new-drama'
-          "
-          class="drama-list"
-        >
+        <!-- 搜索结果列表 - 优先显示搜索结果，在所有tab中都显示 -->
+        <div v-if="isSearching && !searchLoading && searchResults.length > 0" class="drama-list">
           <DramaCard
-            v-for="drama in paginatedDramas"
+            v-for="drama in searchResults"
             :key="drama.book_id"
             :drama="drama"
             :download-data="getDownloadDataForDrama(drama.series_name)"
@@ -355,8 +202,8 @@
             :is-downloaded="isDramaDownloaded(drama.series_name)"
             :is-submitted-for-download="submittedForDownloadSet.has(drama.book_id)"
             :is-submitted-for-clip="submittedForClipSet.has(drama.book_id)"
-            :is-new-drama="comparedNewDramas.has(drama.book_id)"
             :is-manual-red-flag="isManualRedFlag(drama.book_id)"
+            :is-in-cart="isDramaInCart(drama.book_id)"
             @show-image="showDramaImage"
             @copy-name="copyDramaName"
             @sync-to-feishu="syncToFeishu"
@@ -365,215 +212,18 @@
             @download="handleDownload"
           />
         </div>
-
-        <!-- 榜单剧列表 - 仅在没有搜索时显示 -->
-        <div
-          v-else-if="
-            !isSearching && !rankingLoading && rankingList.length > 0 && activeTab === 'ranking'
-          "
-          class="drama-list"
-        >
-          <DramaCard
-            v-for="(drama, index) in rankingList"
-            :key="drama.book_id"
-            :drama="drama as any"
-            :download-data="getRankingDownloadDataForDrama(drama.book_name)"
-            :is-download-triggered="isDownloadTriggered(drama.book_name)"
-            :is-syncing="syncingDramaId === drama.book_id"
-            :is-processing="clipProcessingDramaId === drama.book_id"
-            :is-any-syncing="isAnyOperationBlocked"
-            :is-downloaded="isRankingDramaDownloaded(drama.book_name)"
-            :is-submitted-for-download="submittedForDownloadSet.has(drama.book_id)"
-            :is-submitted-for-clip="submittedForClipSet.has(drama.book_id)"
-            :ranking="rankingPageIndex * rankingPageSize + index + 1"
-            :show-ranking="true"
-            :is-manual-red-flag="isManualRedFlag(drama.book_id)"
-            @show-image="showDramaImage"
-            @copy-name="copyDramaName"
-            @sync-to-feishu="syncToFeishu"
-            @add-to-cart="handleAddToCart"
-            @red-flag-change="handleManualRedFlagChange"
-            @download="handleDownload"
-          />
+        <div v-else-if="isSearching && searchLoading" class="empty-state">
+          <Icon icon="mdi:loading" class="empty-icon animate-spin" />
+          <h3 class="empty-title">搜索中...</h3>
+          <p class="empty-description">正在匹配短剧，请稍候</p>
+        </div>
+        <div v-else-if="isSearching && !searchLoading" class="empty-state">
+          <Icon icon="mdi:magnify" class="empty-icon" />
+          <h3 class="empty-title">未找到相关短剧</h3>
+          <p class="empty-description">请尝试其他关键词或清空搜索</p>
         </div>
 
-        <!-- 榜单剧分页器 -->
-        <div
-          v-if="
-            !isSearching &&
-            !rankingLoading &&
-            rankingList.length > 0 &&
-            activeTab === 'ranking' &&
-            rankingTotal > rankingPageSize
-          "
-          class="pagination-container"
-        >
-          <div class="pagination">
-            <button
-              @click="goToRankingPage(rankingPageIndex)"
-              :disabled="rankingPageIndex <= 0"
-              class="pagination-btn prev-btn"
-            >
-              <Icon icon="mdi:chevron-left" class="btn-icon" />
-              <span>上一页</span>
-            </button>
-
-            <div class="pagination-pages">
-              <button
-                v-for="page in rankingVisiblePages"
-                :key="page"
-                @click="typeof page === 'number' ? goToRankingPage(page - 1) : null"
-                :class="['page-btn', page === rankingPageIndex + 1 ? 'active' : '']"
-                :disabled="typeof page === 'string'"
-              >
-                {{ page }}
-              </button>
-            </div>
-
-            <button
-              @click="goToRankingPage(rankingPageIndex + 2)"
-              :disabled="rankingPageIndex >= Math.ceil(rankingTotal / rankingPageSize) - 1"
-              class="pagination-btn next-btn"
-            >
-              <span>下一页</span>
-              <Icon icon="mdi:chevron-right" class="btn-icon" />
-            </button>
-          </div>
-
-          <div class="pagination-info">
-            <span class="page-info">
-              第 {{ rankingPageIndex + 1 }} 页，共
-              {{ Math.ceil(rankingTotal / rankingPageSize) }} 页
-            </span>
-            <span class="total-info"> 共 {{ rankingTotal }} 条记录 </span>
-          </div>
-        </div>
-
-        <!-- 搜索结果分页器 -->
-        <div
-          v-if="
-            isSearching &&
-            !searchLoading &&
-            searchResults.length > 0 &&
-            searchTotal > searchPageSize
-          "
-          class="pagination-container"
-        >
-          <div class="pagination">
-            <button
-              @click="goToSearchPage(searchCurrentPage - 1)"
-              :disabled="searchCurrentPage <= 1"
-              class="pagination-btn prev-btn"
-            >
-              <Icon icon="mdi:chevron-left" class="btn-icon" />
-              <span>上一页</span>
-            </button>
-            <div class="pagination-info">
-              <span
-                >第 {{ searchCurrentPage }} 页，共
-                {{ Math.ceil(searchTotal / searchPageSize) }} 页</span
-              >
-            </div>
-            <button
-              @click="goToSearchPage(searchCurrentPage + 1)"
-              :disabled="searchCurrentPage >= Math.ceil(searchTotal / searchPageSize)"
-              class="pagination-btn next-btn"
-            >
-              <span>下一页</span>
-              <Icon icon="mdi:chevron-right" class="btn-icon" />
-            </button>
-          </div>
-        </div>
-
-        <!-- 普通分页器 - 仅在没有搜索且不是榜单剧标签页时显示 -->
-        <div
-          v-else-if="
-            !isSearching &&
-            !listSkeletonLoading &&
-            paginatedDramas.length > 0 &&
-            activeTab !== 'ranking' &&
-            (activeTab !== 'new-drama' || selectedDate === 'all')
-          "
-          class="pagination-container"
-        >
-          <div class="pagination">
-            <button
-              @click="goToPage(currentPage - 1)"
-              :disabled="currentPage <= 1"
-              class="pagination-btn prev-btn"
-            >
-              <Icon icon="mdi:chevron-left" class="btn-icon" />
-              <span>上一页</span>
-            </button>
-
-            <div class="pagination-pages">
-              <button
-                v-for="page in visiblePages"
-                :key="page"
-                @click="goToPage(page)"
-                :class="['page-btn', page === currentPage ? 'active' : '']"
-              >
-                {{ page }}
-              </button>
-            </div>
-
-            <button
-              @click="goToPage(currentPage + 1)"
-              :disabled="currentPage >= totalPages"
-              class="pagination-btn next-btn"
-            >
-              <span>下一页</span>
-              <Icon icon="mdi:chevron-right" class="btn-icon" />
-            </button>
-          </div>
-
-          <div class="pagination-info">
-            <span class="page-info"> 第 {{ currentPage }} 页，共 {{ totalPages }} 页 </span>
-            <span class="total-info"> 共 {{ filteredDramas.length }} 条记录 </span>
-          </div>
-        </div>
-
-        <!-- 空状态 -->
-        <div
-          v-else-if="
-            !listSkeletonLoading &&
-            !rankingLoading &&
-            filteredDramas.length === 0 &&
-            rankingList.length === 0
-          "
-          class="empty-state"
-        >
-          <Icon
-            :icon="
-              isSearching
-                ? 'mdi:magnify'
-                : activeTab === 'ranking'
-                  ? 'mdi:trophy'
-                  : 'mdi:calendar-clock'
-            "
-            class="empty-icon"
-          />
-          <h3 class="empty-title">
-            {{
-              isSearching
-                ? '未找到相关短剧'
-                : activeTab === 'ranking'
-                  ? '暂无榜单剧数据'
-                  : selectedDateLabel + '暂无新剧'
-            }}
-          </h3>
-          <p class="empty-description">
-            {{
-              isSearching
-                ? '请尝试其他关键词或清空搜索'
-                : activeTab === 'ranking'
-                  ? '榜单剧数据正在加载中，请稍后再来查看'
-                  : '请关注其他日期或稍后再来查看'
-            }}
-          </p>
-        </div>
-
-        <!-- 复制成功提示 Toast -->
+        <!-- 搜索态的全局提示 Toast -->
         <Transition
           enter-active-class="transition duration-300 ease-out"
           enter-from-class="transform translate-y-2 opacity-0"
@@ -582,12 +232,369 @@
           leave-from-class="transform translate-y-0 opacity-100"
           leave-to-class="transform translate-y-2 opacity-0"
         >
-          <div v-if="showCopyToast" class="toast">
+          <div v-if="isSearching && showCopyToast" class="toast">
             <Icon icon="mdi:check-circle" class="toast-icon" />
             <span class="toast-message">{{ copyToastMessage }}</span>
           </div>
         </Transition>
+
+        <div v-if="!isSearching" class="new-drama-preview">
+          <div class="embedded-list-filter-row">
+            <div v-if="activeTab === 'new-drama'" class="secondary-tab-switcher">
+              <button
+                v-for="date in dateOptions"
+                :key="date.value"
+                @click="selectedDate = date.value"
+                :class="['secondary-tab-btn', selectedDate === date.value ? 'active' : '']"
+              >
+                <Icon :icon="getDateIcon(date.value)" class="secondary-tab-icon" />
+                <span class="secondary-tab-text">{{ date.label }}</span>
+                <span v-if="getDateDramaCount(date.value) > 0" class="secondary-tab-count">
+                  {{ getDateDramaCount(date.value) }}
+                </span>
+              </button>
+            </div>
+            <div v-else-if="activeTab === 'ranking'" class="secondary-tab-switcher">
+              <button
+                v-for="level in incomeLevelOptions"
+                :key="level.value"
+                @click="selectedIncomeLevel = level.value"
+                :class="['secondary-tab-btn', selectedIncomeLevel === level.value ? 'active' : '']"
+              >
+                <Icon :icon="level.icon" class="secondary-tab-icon" />
+                <span class="secondary-tab-text">{{ level.label }}</span>
+              </button>
+            </div>
+            <DramaCart ref="dramaCartRef" inline @batch-submitted="handleBatchSubmitted" />
+          </div>
+
+          <!-- 骨架屏加载状态 -->
+          <div
+            v-if="loading || listSkeletonLoading || searchLoading || rankingLoading"
+            class="drama-list-skeleton"
+          >
+            <div class="skeleton-drama-list">
+              <div v-for="n in 8" :key="n" class="skeleton-drama-card">
+                <!-- 左侧封面骨架 -->
+                <div class="skeleton-poster"></div>
+
+                <!-- 中间信息区域骨架 -->
+                <div class="skeleton-drama-info">
+                  <div class="skeleton-drama-main">
+                    <div class="skeleton-drama-details">
+                      <!-- 分类标签 -->
+                      <div class="skeleton-category-tags">
+                        <div class="skeleton-tag"></div>
+                        <div class="skeleton-tag"></div>
+                        <div class="skeleton-tag"></div>
+                        <div class="skeleton-tag"></div>
+                      </div>
+
+                      <!-- 剧集信息 -->
+                      <div class="skeleton-episode-info">
+                        <div class="skeleton-episode-item"></div>
+                      </div>
+
+                      <!-- 首发时间 -->
+                      <div class="skeleton-publish-time">
+                        <div class="skeleton-time-text"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 右侧状态和操作区域骨架 -->
+                <div class="skeleton-drama-actions">
+                  <div class="skeleton-status-label"></div>
+                  <div class="skeleton-drama-id"></div>
+                  <div class="skeleton-action-button"></div>
+                </div>
+              </div>
+            </div>
+            <div class="skeleton-loading-indicator">
+              <div class="skeleton-spinner"></div>
+              <span class="skeleton-loading-text">
+                {{
+                  activeTab === 'ranking'
+                    ? '正在加载榜单剧数据...'
+                    : (activeTab as string) === 'feishu'
+                      ? '正在加载飞书清单数据...'
+                      : '正在加载新剧数据...'
+                }}
+              </span>
+            </div>
+          </div>
+
+          <!-- 错误状态 -->
+          <div v-else-if="error" class="error-section">
+            <Icon icon="mdi:alert-circle" class="error-icon" />
+            <p class="error-message">{{ error }}</p>
+            <button @click="fetchDramaList" class="retry-button">
+              <Icon icon="mdi:refresh" class="w-4 h-4 mr-2" />
+              重试
+            </button>
+          </div>
+
+          <!-- 新剧抢跑列表 - 仅在没有搜索时显示 -->
+          <div
+            v-else-if="
+              !isSearching &&
+              !listSkeletonLoading &&
+              paginatedDramas.length > 0 &&
+              activeTab === 'new-drama'
+            "
+            class="drama-list"
+          >
+            <DramaCard
+              v-for="drama in paginatedDramas"
+              :key="drama.book_id"
+              :drama="drama"
+              :download-data="getDownloadDataForDrama(drama.series_name)"
+              :is-download-triggered="isDownloadTriggered(drama.series_name)"
+              :is-syncing="syncingDramaId === drama.book_id"
+              :is-processing="clipProcessingDramaId === drama.book_id"
+              :is-any-syncing="isAnyOperationBlocked"
+              :is-downloaded="isDramaDownloaded(drama.series_name)"
+              :is-submitted-for-download="submittedForDownloadSet.has(drama.book_id)"
+              :is-submitted-for-clip="submittedForClipSet.has(drama.book_id)"
+              :is-new-drama="comparedNewDramas.has(drama.book_id)"
+              :is-manual-red-flag="isManualRedFlag(drama.book_id)"
+              :is-in-cart="isDramaInCart(drama.book_id)"
+              @show-image="showDramaImage"
+              @copy-name="copyDramaName"
+              @sync-to-feishu="syncToFeishu"
+              @add-to-cart="handleAddToCart"
+              @red-flag-change="handleManualRedFlagChange"
+              @download="handleDownload"
+            />
+          </div>
+
+          <!-- 榜单剧列表 - 仅在没有搜索时显示 -->
+          <div
+            v-else-if="
+              !isSearching && !rankingLoading && rankingList.length > 0 && activeTab === 'ranking'
+            "
+            class="drama-list"
+          >
+            <DramaCard
+              v-for="(drama, index) in rankingList"
+              :key="drama.book_id"
+              :drama="drama as any"
+              :download-data="getRankingDownloadDataForDrama(drama.book_name)"
+              :is-download-triggered="isDownloadTriggered(drama.book_name)"
+              :is-syncing="syncingDramaId === drama.book_id"
+              :is-processing="clipProcessingDramaId === drama.book_id"
+              :is-any-syncing="isAnyOperationBlocked"
+              :is-downloaded="isRankingDramaDownloaded(drama.book_name)"
+              :is-submitted-for-download="submittedForDownloadSet.has(drama.book_id)"
+              :is-submitted-for-clip="submittedForClipSet.has(drama.book_id)"
+              :ranking="rankingPageIndex * rankingPageSize + index + 1"
+              :show-ranking="true"
+              :is-manual-red-flag="isManualRedFlag(drama.book_id)"
+              :is-in-cart="isDramaInCart(drama.book_id)"
+              @show-image="showDramaImage"
+              @copy-name="copyDramaName"
+              @sync-to-feishu="syncToFeishu"
+              @add-to-cart="handleAddToCart"
+              @red-flag-change="handleManualRedFlagChange"
+              @download="handleDownload"
+            />
+          </div>
+
+          <!-- 榜单剧分页器 -->
+          <div
+            v-if="
+              !isSearching &&
+              !rankingLoading &&
+              rankingList.length > 0 &&
+              activeTab === 'ranking' &&
+              rankingTotal > rankingPageSize
+            "
+            class="pagination-container"
+          >
+            <div class="pagination">
+              <button
+                @click="goToRankingPage(rankingPageIndex)"
+                :disabled="rankingPageIndex <= 0"
+                class="pagination-btn prev-btn"
+              >
+                <Icon icon="mdi:chevron-left" class="btn-icon" />
+                <span>上一页</span>
+              </button>
+
+              <div class="pagination-pages">
+                <button
+                  v-for="page in rankingVisiblePages"
+                  :key="page"
+                  @click="typeof page === 'number' ? goToRankingPage(page - 1) : null"
+                  :class="['page-btn', page === rankingPageIndex + 1 ? 'active' : '']"
+                  :disabled="typeof page === 'string'"
+                >
+                  {{ page }}
+                </button>
+              </div>
+
+              <button
+                @click="goToRankingPage(rankingPageIndex + 2)"
+                :disabled="rankingPageIndex >= Math.ceil(rankingTotal / rankingPageSize) - 1"
+                class="pagination-btn next-btn"
+              >
+                <span>下一页</span>
+                <Icon icon="mdi:chevron-right" class="btn-icon" />
+              </button>
+            </div>
+
+            <div class="pagination-info">
+              <span class="page-info">
+                第 {{ rankingPageIndex + 1 }} 页，共
+                {{ Math.ceil(rankingTotal / rankingPageSize) }} 页
+              </span>
+              <span class="total-info"> 共 {{ rankingTotal }} 条记录 </span>
+            </div>
+          </div>
+
+          <!-- 搜索结果分页器 -->
+          <div
+            v-if="
+              isSearching &&
+              !searchLoading &&
+              searchResults.length > 0 &&
+              searchTotal > searchPageSize
+            "
+            class="pagination-container"
+          >
+            <div class="pagination">
+              <button
+                @click="goToSearchPage(searchCurrentPage - 1)"
+                :disabled="searchCurrentPage <= 1"
+                class="pagination-btn prev-btn"
+              >
+                <Icon icon="mdi:chevron-left" class="btn-icon" />
+                <span>上一页</span>
+              </button>
+              <div class="pagination-info">
+                <span
+                  >第 {{ searchCurrentPage }} 页，共
+                  {{ Math.ceil(searchTotal / searchPageSize) }} 页</span
+                >
+              </div>
+              <button
+                @click="goToSearchPage(searchCurrentPage + 1)"
+                :disabled="searchCurrentPage >= Math.ceil(searchTotal / searchPageSize)"
+                class="pagination-btn next-btn"
+              >
+                <span>下一页</span>
+                <Icon icon="mdi:chevron-right" class="btn-icon" />
+              </button>
+            </div>
+          </div>
+
+          <!-- 普通分页器 - 仅在没有搜索且不是榜单剧标签页时显示 -->
+          <div
+            v-else-if="
+              !isSearching &&
+              !listSkeletonLoading &&
+              paginatedDramas.length > 0 &&
+              activeTab !== 'ranking' &&
+              (activeTab !== 'new-drama' || selectedDate === 'all')
+            "
+            class="pagination-container"
+          >
+            <div class="pagination">
+              <button
+                @click="goToPage(currentPage - 1)"
+                :disabled="currentPage <= 1"
+                class="pagination-btn prev-btn"
+              >
+                <Icon icon="mdi:chevron-left" class="btn-icon" />
+                <span>上一页</span>
+              </button>
+
+              <div class="pagination-pages">
+                <button
+                  v-for="page in visiblePages"
+                  :key="page"
+                  @click="goToPage(page)"
+                  :class="['page-btn', page === currentPage ? 'active' : '']"
+                >
+                  {{ page }}
+                </button>
+              </div>
+
+              <button
+                @click="goToPage(currentPage + 1)"
+                :disabled="currentPage >= totalPages"
+                class="pagination-btn next-btn"
+              >
+                <span>下一页</span>
+                <Icon icon="mdi:chevron-right" class="btn-icon" />
+              </button>
+            </div>
+
+            <div class="pagination-info">
+              <span class="page-info"> 第 {{ currentPage }} 页，共 {{ totalPages }} 页 </span>
+              <span class="total-info"> 共 {{ filteredDramas.length }} 条记录 </span>
+            </div>
+          </div>
+
+          <!-- 空状态 -->
+          <div
+            v-else-if="
+              !listSkeletonLoading &&
+              !rankingLoading &&
+              filteredDramas.length === 0 &&
+              rankingList.length === 0
+            "
+            class="empty-state"
+          >
+            <Icon
+              :icon="
+                isSearching
+                  ? 'mdi:magnify'
+                  : activeTab === 'ranking'
+                    ? 'mdi:trophy'
+                    : 'mdi:calendar-clock'
+              "
+              class="empty-icon"
+            />
+            <h3 class="empty-title">
+              {{
+                isSearching
+                  ? '未找到相关短剧'
+                  : activeTab === 'ranking'
+                    ? '暂无榜单剧数据'
+                    : selectedDateLabel + '暂无新剧'
+              }}
+            </h3>
+            <p class="empty-description">
+              {{
+                isSearching
+                  ? '请尝试其他关键词或清空搜索'
+                  : activeTab === 'ranking'
+                    ? '榜单剧数据正在加载中，请稍后再来查看'
+                    : '请关注其他日期或稍后再来查看'
+              }}
+            </p>
+          </div>
+
+          <!-- 复制成功提示 Toast -->
+          <Transition
+            enter-active-class="transition duration-300 ease-out"
+            enter-from-class="transform translate-y-2 opacity-0"
+            enter-to-class="transform translate-y-0 opacity-100"
+            leave-active-class="transition duration-200 ease-in"
+            leave-from-class="transform translate-y-0 opacity-100"
+            leave-to-class="transform translate-y-2 opacity-0"
+          >
+            <div v-if="showCopyToast" class="toast">
+              <Icon icon="mdi:check-circle" class="toast-icon" />
+              <span class="toast-message">{{ copyToastMessage }}</span>
+            </div>
+          </Transition>
+        </div>
       </div>
+
+      <AdxRankingDrawer v-model:show="showAdxDrawer" @search-drama="handleAdxDramaSearch" />
     </div>
 
     <!-- 剧集大图弹窗（需要在搜索态也可用，放到最外层） -->
@@ -654,141 +661,137 @@
       @cancel="handleDateCancel"
     />
 
-    <!-- 自动提交下载时间选择弹窗 -->
-    <Transition
-      enter-active-class="transition duration-300 ease-out"
-      enter-from-class="transform scale-95 opacity-0"
-      enter-to-class="transform scale-100 opacity-100"
-      leave-active-class="transition duration-200 ease-in"
-      leave-from-class="transform scale-100 opacity-100"
-      leave-to-class="transform scale-95 opacity-0"
-    >
-      <div
-        v-if="showAutoSubmitModal"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-        @click="showAutoSubmitModal = false"
+    <Teleport to="body">
+      <!-- 自动提交下载轮询间隔选择弹窗 -->
+      <Transition
+        enter-active-class="transition duration-300 ease-out"
+        enter-from-class="transform scale-95 opacity-0"
+        enter-to-class="transform scale-100 opacity-100"
+        leave-active-class="transition duration-200 ease-in"
+        leave-from-class="transform scale-100 opacity-100"
+        leave-to-class="transform scale-95 opacity-0"
       >
         <div
-          class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden"
-          @click.stop
+          v-if="showAutoSubmitModal"
+          class="auto-submit-modal-overlay"
+          @click.self="showAutoSubmitModal = false"
         >
-          <!-- 弹窗标题 -->
-          <div
-            class="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50"
-          >
-            <div class="flex items-center justify-between">
-              <div class="flex items-center space-x-3">
-                <div
-                  class="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl"
-                >
-                  <Icon icon="mdi:robot-outline" class="w-6 h-6 text-white" />
+          <div class="auto-submit-modal-card" @click.stop>
+            <!-- 弹窗标题 -->
+            <div class="auto-submit-modal-header">
+              <div class="auto-submit-modal-title-row">
+                <div class="auto-submit-modal-title-left">
+                  <div class="auto-submit-modal-icon-box">
+                    <Icon icon="mdi:robot-outline" class="auto-submit-modal-icon" />
+                  </div>
+                  <div>
+                    <h3 class="auto-submit-modal-title">自动提交下载</h3>
+                    <p class="auto-submit-modal-subtitle">选择轮询间隔和提交范围</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 class="text-lg font-semibold text-gray-900">自动提交下载</h3>
-                  <p class="text-xs text-gray-500">选择执行方式和提交范围</p>
+                <button @click="showAutoSubmitModal = false" class="auto-submit-modal-close">
+                  <Icon icon="mdi:close" class="auto-submit-modal-close-icon" />
+                </button>
+              </div>
+            </div>
+
+            <!-- 弹窗内容 -->
+            <div class="auto-submit-modal-body">
+              <div class="auto-submit-field">
+                <label class="auto-submit-label"> 轮询间隔 </label>
+                <NSelect
+                  v-model:value="autoSubmitInterval"
+                  :options="autoSubmitIntervalOptions"
+                  placeholder="请选择轮询间隔"
+                  size="large"
+                />
+              </div>
+
+              <div class="auto-submit-field">
+                <label class="auto-submit-label"> 提交时间范围 </label>
+                <NSelect
+                  v-model:value="autoSubmitRangeDays"
+                  :options="autoSubmitRangeOptions"
+                  placeholder="请选择提交时间范围"
+                  size="large"
+                />
+              </div>
+
+              <!-- 红标剧筛选配置 -->
+              <!-- 提交范围选项 -->
+              <div class="auto-submit-field">
+                <label class="auto-submit-label">提交范围</label>
+                <div class="auto-submit-radio-list">
+                  <label class="auto-submit-radio-card" :class="{ active: !autoSubmitOnlyRedFlag }">
+                    <input
+                      type="radio"
+                      :value="false"
+                      v-model="autoSubmitOnlyRedFlag"
+                      class="mr-3"
+                    />
+                    <div>
+                      <div class="auto-submit-radio-title">提交所有剧</div>
+                      <div class="auto-submit-radio-desc">
+                        提交所有符合条件的剧集（包含红标、绿标、黄标）
+                      </div>
+                    </div>
+                  </label>
+                  <label
+                    class="auto-submit-radio-card"
+                    :class="{ active: autoSubmitOnlyRedFlag, danger: autoSubmitOnlyRedFlag }"
+                  >
+                    <input
+                      type="radio"
+                      :value="true"
+                      v-model="autoSubmitOnlyRedFlag"
+                      class="mr-3"
+                    />
+                    <div>
+                      <div class="auto-submit-radio-title">只提交红标剧</div>
+                      <div class="auto-submit-radio-desc">仅提交增剧（红标剧集）</div>
+                    </div>
+                  </label>
                 </div>
               </div>
+
+              <div class="auto-submit-help-card">
+                <div class="auto-submit-help-content">
+                  <Icon icon="mdi:information" class="auto-submit-help-icon" />
+                  <div>
+                    <p class="auto-submit-help-title">功能说明：</p>
+                    <ul class="auto-submit-help-list">
+                      <li>{{ autoSubmitRangeDescription }}</li>
+                      <li v-if="isAutoSubmitRunOnce">仅执行当前这一轮，完成后自动停止</li>
+                      <li v-else>按所选轮询间隔持续执行</li>
+                      <li v-if="autoSubmitOnlyRedFlag" class="auto-submit-help-danger">
+                        只处理红标剧（增剧）
+                      </li>
+                      <li v-else>处理所有符合条件的剧集</li>
+                      <li>自动提交符合条件的剧集到待下载流程</li>
+                      <li>按日期顺序依次执行</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 弹窗操作按钮 -->
+            <div class="auto-submit-modal-footer">
+              <button @click="showAutoSubmitModal = false" class="auto-submit-cancel-button">
+                取消
+              </button>
               <button
-                @click="showAutoSubmitModal = false"
-                class="text-gray-400 hover:text-gray-600 transition-colors"
+                @click="startAutoSubmit"
+                class="auto-submit-confirm-button"
+                :disabled="autoSubmitStarting"
               >
-                <Icon icon="mdi:close" class="w-6 h-6" />
+                {{ autoSubmitStarting ? '启动中...' : '开始自动提交' }}
               </button>
             </div>
           </div>
-
-          <!-- 弹窗内容 -->
-          <div class="px-6 py-6">
-            <div class="mb-4">
-              <label class="block text-sm font-medium text-gray-700 mb-2"> 执行方式 </label>
-              <NSelect
-                v-model:value="autoSubmitInterval"
-                :options="autoSubmitIntervalOptions"
-                placeholder="请选择执行方式"
-                size="large"
-              />
-            </div>
-
-            <div class="mb-4">
-              <label class="block text-sm font-medium text-gray-700 mb-2"> 提交时间范围 </label>
-              <NSelect
-                v-model:value="autoSubmitRangeDays"
-                :options="autoSubmitRangeOptions"
-                placeholder="请选择提交时间范围"
-                size="large"
-              />
-            </div>
-
-            <!-- 红标剧筛选配置 -->
-            <!-- 提交范围选项 -->
-            <div class="mb-4">
-              <label class="block text-sm font-medium text-gray-700 mb-2">提交范围</label>
-              <div class="space-y-2">
-                <label
-                  class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
-                  :class="!autoSubmitOnlyRedFlag ? 'border-blue-500 bg-blue-50' : 'border-gray-200'"
-                >
-                  <input type="radio" :value="false" v-model="autoSubmitOnlyRedFlag" class="mr-3" />
-                  <div>
-                    <div class="font-medium text-gray-900">提交所有剧</div>
-                    <div class="text-xs text-gray-500">
-                      提交所有符合条件的剧集（包含红标、绿标、黄标）
-                    </div>
-                  </div>
-                </label>
-                <label
-                  class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
-                  :class="autoSubmitOnlyRedFlag ? 'border-red-500 bg-red-50' : 'border-gray-200'"
-                >
-                  <input type="radio" :value="true" v-model="autoSubmitOnlyRedFlag" class="mr-3" />
-                  <div>
-                    <div class="font-medium text-gray-900">只提交红标剧</div>
-                    <div class="text-xs text-gray-500">仅提交增剧（红标剧集）</div>
-                  </div>
-                </label>
-              </div>
-            </div>
-
-            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-              <div class="flex items-start space-x-2">
-                <Icon icon="mdi:information" class="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                <div class="text-sm text-blue-800">
-                  <p class="font-medium mb-1">功能说明：</p>
-                  <ul class="list-disc list-inside space-y-1 text-xs">
-                    <li>{{ autoSubmitRangeDescription }}</li>
-                    <li v-if="isAutoSubmitRunOnce">仅执行当前这一轮，完成后自动停止</li>
-                    <li v-else>按所选轮询间隔持续执行</li>
-                    <li v-if="autoSubmitOnlyRedFlag" class="text-red-600 font-medium">
-                      只处理红标剧（增剧）
-                    </li>
-                    <li v-else>处理所有符合条件的剧集</li>
-                    <li>只处理"新增待下载"的剧集</li>
-                    <li>按日期顺序依次执行</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 弹窗操作按钮 -->
-          <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end space-x-3">
-            <button
-              @click="showAutoSubmitModal = false"
-              class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              取消
-            </button>
-            <button
-              @click="startAutoSubmit"
-              class="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"
-            >
-              开始自动提交
-            </button>
-          </div>
         </div>
-      </div>
-    </Transition>
-    <AdxRankingDrawer v-model:show="showAdxDrawer" />
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -1044,9 +1047,10 @@ const autoSubmitStatus = ref<AutoSubmitStatus>(createDefaultAutoSubmitStatus())
 const autoSubmitTimer = ref<number | null>(null) // 定时器ID
 const autoSubmitCountdownTimer = ref<number | null>(null) // 倒计时定时器ID
 type AutoSubmitIntervalOptionValue = number | 'once'
-const autoSubmitInterval = ref<AutoSubmitIntervalOptionValue>(5) // 轮询间隔（分钟）
+const autoSubmitInterval = ref<AutoSubmitIntervalOptionValue>(20) // 轮询间隔（分钟）
 const autoSubmitCountdown = ref(0) // 倒计时（秒）
 const showAutoSubmitModal = ref(false) // 是否显示时间选择弹窗
+const autoSubmitStarting = ref(false)
 const showAdxDrawer = ref(false)
 const autoSubmitOnlyRedFlag = ref(false) // 是否只提交红标剧，默认false（提交所有剧）
 const autoSubmitRangeDays = ref<1 | 2 | 3>(3)
@@ -1115,17 +1119,10 @@ const dateOptions = computed(() => {
 // 自动提交下载轮询时间选项
 const autoSubmitIntervalOptions = [
   { label: '仅执行一次', value: 'once' },
-  { label: '5 分钟', value: 5 },
-  { label: '15 分钟', value: 15 },
+  { label: '20 分钟', value: 20 },
   { label: '30 分钟', value: 30 },
   { label: '1 小时', value: 60 },
-  { label: '1.5 小时', value: 90 },
   { label: '2 小时', value: 120 },
-  { label: '4 小时', value: 240 },
-  { label: '6 小时', value: 360 },
-  { label: '8 小时', value: 480 },
-  { label: '10 小时', value: 600 },
-  { label: '12 小时', value: 720 },
 ]
 
 const autoSubmitRangeOptions = [
@@ -1563,6 +1560,10 @@ function isManualRedFlag(bookId: string) {
   return manualRedFlagSet.value.has(getManualRedFlagKey(bookId))
 }
 
+function isDramaInCart(bookId: string) {
+  return Boolean(dramaCartRef.value?.hasItem?.(bookId))
+}
+
 function handleManualRedFlagChange(payload: {
   drama: NewDramaItem | RankingDramaItem
   value: boolean
@@ -1586,7 +1587,7 @@ function handleAddToCart(payload: {
   drama: NewDramaItem | RankingDramaItem
   sourceElement: HTMLElement
 }) {
-  const { drama, sourceElement } = payload
+  const { drama } = payload
 
   if (!dramaCartRef.value) {
     message.error('购物车组件未加载')
@@ -1603,7 +1604,7 @@ function handleAddToCart(payload: {
   }
 
   // 添加到购物车（带动画）
-  dramaCartRef.value.addItem(cartItem, sourceElement)
+  dramaCartRef.value.addItem(cartItem)
 }
 
 // 处理批量提交完成
@@ -1794,15 +1795,18 @@ async function startAutoSubmit() {
     return
   }
 
-  showAutoSubmitModal.value = false
+  if (autoSubmitStarting.value) {
+    return
+  }
 
   try {
+    autoSubmitStarting.value = true
     const runOnce = autoSubmitInterval.value === 'once'
     const intervalMinutes =
       typeof autoSubmitInterval.value === 'number' ? autoSubmitInterval.value : 0
 
     console.log(
-      `启动服务端自动提交下载，执行方式: ${runOnce ? '仅执行一次' : `${intervalMinutes} 分钟轮询`}，提交范围: 近${autoSubmitRangeDays.value}天，渠道: ${sessionStore.activeChannelId}`
+      `启动服务端自动提交下载，轮询间隔: ${runOnce ? '仅执行一次' : `${intervalMinutes} 分钟`}，提交范围: 近${autoSubmitRangeDays.value}天，渠道: ${sessionStore.activeChannelId}`
     )
 
     const result = await startAutoSubmitApi({
@@ -1813,6 +1817,7 @@ async function startAutoSubmit() {
     })
 
     if (result.code === 0) {
+      showAutoSubmitModal.value = false
       message.success(runOnce ? '已完成本次自动提交' : '自动提交已启动（服务端运行）')
       if (result.data) {
         autoSubmitStatus.value = result.data
@@ -1828,6 +1833,8 @@ async function startAutoSubmit() {
   } catch (error) {
     console.error('启动自动提交失败:', error)
     message.error('启动自动提交失败')
+  } finally {
+    autoSubmitStarting.value = false
   }
 }
 
@@ -2481,6 +2488,21 @@ async function handleSearch() {
   await performSearch(keyword, 1)
 }
 
+async function handleAdxDramaSearch(name: string) {
+  const keyword = name.trim()
+  if (!keyword) return
+
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer)
+    searchDebounceTimer = null
+  }
+
+  activeTab.value = 'new-drama'
+  searchKeyword.value = keyword
+  currentPage.value = 1
+  await performSearch(keyword, 1)
+}
+
 // 执行搜索接口调用
 async function performSearch(keyword: string, page: number) {
   const requestGen = beginListRequest()
@@ -2933,6 +2955,32 @@ watch(
   top: 64px;
 }
 
+.clip-workspace {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  width: 100%;
+  max-width: 80rem;
+  margin: 0 auto;
+}
+
+.clip-workspace.has-adx-panel {
+  max-width: min(1680px, calc(100vw - 32px));
+  padding-right: 16px;
+}
+
+.clip-main-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 80rem;
+  margin: 0 auto;
+}
+
+.clip-workspace.has-adx-panel .clip-main-content {
+  max-width: none;
+  margin: 0;
+}
+
 .filter-sticky.is-embedded {
   /* 嵌入到首页 Tab 容器内时,父容器自身处于 main 区,无需粘附在视口顶部 */
   position: relative;
@@ -2980,6 +3028,14 @@ watch(
   padding-left: 0;
   padding-right: 0;
   padding-top: 0;
+}
+
+.new-drama-preview-page.is-embedded .clip-workspace {
+  max-width: none;
+}
+
+.new-drama-preview-page.is-embedded .clip-workspace.has-adx-panel {
+  padding-right: 0;
 }
 
 .new-drama-preview-page.is-embedded .filter-section {
@@ -3086,6 +3142,286 @@ watch(
   padding: 0;
 }
 
+.auto-submit-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.52);
+  backdrop-filter: blur(8px);
+}
+
+.auto-submit-modal-card {
+  width: min(480px, 100%);
+  max-height: calc(100dvh - 40px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 26px 80px rgba(15, 23, 42, 0.28);
+}
+
+.auto-submit-modal-header {
+  padding: 18px 20px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+  background:
+    radial-gradient(circle at top left, rgba(14, 165, 233, 0.14), transparent 36%),
+    linear-gradient(135deg, #f8fafc 0%, #eef6ff 100%);
+}
+
+.auto-submit-modal-title-row,
+.auto-submit-modal-title-left {
+  display: flex;
+  align-items: center;
+}
+
+.auto-submit-modal-title-row {
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.auto-submit-modal-title-left {
+  min-width: 0;
+  gap: 12px;
+}
+
+.auto-submit-modal-icon-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%);
+  color: #fff;
+  box-shadow: 0 12px 28px rgba(14, 165, 233, 0.22);
+}
+
+.auto-submit-modal-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.auto-submit-modal-title {
+  margin: 0;
+  color: #0f172a;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.auto-submit-modal-subtitle {
+  margin: 3px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.auto-submit-modal-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #64748b;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.auto-submit-modal-close:hover {
+  border-color: rgba(14, 165, 233, 0.22);
+  background: #fff;
+  color: #0f172a;
+}
+
+.auto-submit-modal-close-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.auto-submit-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.auto-submit-field {
+  margin-bottom: 16px;
+}
+
+.auto-submit-label {
+  display: block;
+  margin-bottom: 8px;
+  color: #334155;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.auto-submit-radio-list {
+  display: grid;
+  gap: 10px;
+}
+
+.auto-submit-radio-card {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 14px;
+  background: #fff;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.auto-submit-radio-card:hover {
+  background: #f8fafc;
+}
+
+.auto-submit-radio-card.active {
+  border-color: rgba(14, 165, 233, 0.42);
+  background: #f0f9ff;
+  box-shadow: 0 10px 28px -24px rgba(14, 165, 233, 0.8);
+}
+
+.auto-submit-radio-card.danger {
+  border-color: rgba(239, 68, 68, 0.36);
+  background: #fff1f2;
+}
+
+.auto-submit-radio-title {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.auto-submit-radio-desc {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.auto-submit-help-card {
+  padding: 14px;
+  border: 1px solid rgba(14, 165, 233, 0.18);
+  border-radius: 16px;
+  background: linear-gradient(135deg, #f0f9ff 0%, #f8fafc 100%);
+}
+
+.auto-submit-help-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.auto-submit-help-icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  color: #0284c7;
+}
+
+.auto-submit-help-title {
+  margin: 0 0 6px;
+  color: #075985;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.auto-submit-help-list {
+  margin: 0;
+  padding-left: 16px;
+  color: #0369a1;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.auto-submit-help-danger {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.auto-submit-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid rgba(148, 163, 184, 0.16);
+  background: #f8fafc;
+}
+
+.auto-submit-cancel-button,
+.auto-submit-confirm-button {
+  min-height: 38px;
+  padding: 0 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.auto-submit-cancel-button {
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: #fff;
+  color: #475569;
+}
+
+.auto-submit-confirm-button {
+  border: 0;
+  background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%);
+  color: #fff;
+  box-shadow: 0 12px 26px rgba(14, 165, 233, 0.24);
+}
+
+.auto-submit-confirm-button:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 30px rgba(14, 165, 233, 0.3);
+}
+
+.auto-submit-confirm-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+  box-shadow: none;
+}
+
+@media (max-width: 1180px) {
+  .clip-workspace,
+  .clip-workspace.has-adx-panel {
+    flex-direction: column;
+    max-width: 80rem;
+    padding-right: 0;
+  }
+
+  .clip-main-content {
+    width: 100%;
+    order: 2;
+  }
+
+  .clip-workspace > :deep(.adx-ranking-panel) {
+    order: 1;
+    margin: 12px 16px 0;
+    width: calc(100% - 32px);
+  }
+}
+
 @media (max-width: 640px) {
   .new-drama-preview-page.is-embedded .compact-filter-row,
   .new-drama-preview-page.is-embedded .new-drama-preview {
@@ -3124,6 +3460,28 @@ watch(
 
   .new-drama-preview-page.is-embedded .secondary-tab-switcher::-webkit-scrollbar {
     display: none;
+  }
+
+  .auto-submit-modal-overlay {
+    align-items: flex-end;
+    padding: 12px;
+  }
+
+  .auto-submit-modal-card {
+    max-height: calc(100dvh - 24px);
+    border-radius: 20px;
+  }
+
+  .auto-submit-modal-header,
+  .auto-submit-modal-body,
+  .auto-submit-modal-footer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .auto-submit-modal-footer {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
   }
 }
 </style>

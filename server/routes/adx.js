@@ -1,10 +1,9 @@
 import Router from '@koa/router'
-import { readAuthConfig } from './auth.js'
-import { requireSession } from '../utils/studioSession.js'
+import { createSessionRuntimeContextMiddleware } from '../utils/runtimeContextMiddleware.js'
 
 const router = new Router()
 
-router.use(requireSession)
+router.use(createSessionRuntimeContextMiddleware('adxContext'))
 
 /**
  * ADX 榜单代理
@@ -12,14 +11,14 @@ router.use(requireSession)
  */
 router.post('/ranking', async ctx => {
   try {
-    const config = await readAuthConfig(ctx)
-    const adxCookie = config.platforms?.adx?.cookie
+    const channel = ctx.state.adxContext?.channel
+    const adxCookie = String(channel?.adx?.cookie || '').trim()
 
     if (!adxCookie) {
       ctx.status = 400
       ctx.body = {
         code: -1,
-        message: '未配置 ADX Cookie，请先在抽屉中配置',
+        message: '当前渠道未配置 ADX Cookie，请先配置',
       }
       return
     }
@@ -51,8 +50,11 @@ router.post('/ranking', async ctx => {
     const response = await fetch('https://adxray-app.dataeye.com/api/app/playlet/listHotRanking', {
       method: 'POST',
       headers: {
+        Accept: 'application/json, text/plain, */*',
         'Content-Type': 'application/x-www-form-urlencoded',
         Cookie: adxCookie,
+        Origin: 'https://adxray-app.dataeye.com',
+        Referer: 'https://adxray-app.dataeye.com/',
         'User-Agent':
           'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
       },

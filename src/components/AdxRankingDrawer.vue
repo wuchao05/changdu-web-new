@@ -1,111 +1,143 @@
 <template>
-  <n-drawer v-model:show="visible" :width="520" placement="right">
-    <n-drawer-content>
-      <template #header>
-        <div
-          style="display: flex; align-items: center; justify-content: space-between; width: 100%"
-        >
-          <span>adx短剧热力榜</span>
-          <n-button v-if="isAdmin && !unauthorized" size="small" @click="showCookieModal = true"
-            >配置 Cookie</n-button
-          >
+  <Transition
+    enter-active-class="transition duration-200 ease-out"
+    enter-from-class="transform translate-x-4 opacity-0"
+    enter-to-class="transform translate-x-0 opacity-100"
+    leave-active-class="transition duration-150 ease-in"
+    leave-from-class="transform translate-x-0 opacity-100"
+    leave-to-class="transform translate-x-4 opacity-0"
+  >
+    <aside v-if="visible" class="adx-ranking-panel">
+      <div class="adx-panel-header">
+        <div class="adx-panel-title-wrap">
+          <div class="adx-panel-eyebrow">ADX 热力</div>
+          <h3 class="adx-panel-title">短剧热力榜</h3>
+          <p class="adx-panel-subtitle">点击“搜索”即可在爆剧爆剪中联动查询</p>
         </div>
-      </template>
-
-      <!-- 401 未授权：全屏提示 -->
-      <div v-if="unauthorized" class="unauthorized-tip">
-        <div class="unauthorized-icon">
-          <svg
-            viewBox="0 0 24 24"
-            width="48"
-            height="48"
-            fill="none"
-            stroke="#f59e0b"
-            stroke-width="1.5"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path
-              d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
-            />
-          </svg>
+        <div class="adx-panel-actions">
+          <n-button v-if="isAdmin && !unauthorized" size="small" @click="showCookieModal = true">
+            配置 Cookie
+          </n-button>
+          <button class="adx-panel-close" title="收起热力榜" @click="closePanel">
+            <Icon icon="mdi:chevron-right" />
+          </button>
         </div>
-        <p class="unauthorized-title">ADX 账号已下线</p>
-        <p class="unauthorized-desc">请联系管理员更新 Cookie</p>
-        <n-button
-          v-if="isAdmin"
-          type="warning"
-          style="margin-top: 20px"
-          @click="showCookieModal = true"
-        >
-          去配置 Cookie
-        </n-button>
       </div>
 
-      <!-- 正常内容 -->
-      <template v-else>
-        <n-tabs v-model:value="activeTab" type="line" @update:value="handleTabChange">
-          <n-tab-pane name="day" tab="日榜" />
-          <n-tab-pane name="week" tab="周榜" />
-          <n-tab-pane name="month" tab="月榜" />
-        </n-tabs>
-
-        <div class="period-select-wrap">
-          <n-select
-            v-model:value="selectedPeriodValue"
-            class="period-select-input"
-            size="small"
-            :options="currentPeriodOptions"
-            :loading="loading"
-            @update:value="handlePeriodChange"
-          />
+      <div class="adx-panel-body">
+        <!-- 401 未授权：全屏提示 -->
+        <div v-if="unauthorized" class="unauthorized-tip">
+          <div class="unauthorized-icon">
+            <svg
+              viewBox="0 0 24 24"
+              width="48"
+              height="48"
+              fill="none"
+              stroke="#f59e0b"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+              />
+            </svg>
+          </div>
+          <p class="unauthorized-title">ADX 账号已下线</p>
+          <p class="unauthorized-desc">请联系管理员更新 Cookie</p>
           <n-button
-            size="small"
-            quaternary
-            circle
-            class="period-refresh-btn"
-            :loading="loading"
-            :title="loading ? '刷新中...' : '刷新榜单'"
-            @click="handleRefresh"
+            v-if="isAdmin"
+            type="warning"
+            style="margin-top: 20px"
+            @click="showCookieModal = true"
           >
-            <template #icon>
-              <Icon icon="mdi:refresh" />
-            </template>
+            去配置 Cookie
           </n-button>
         </div>
 
-        <n-spin :show="loading">
-          <div v-if="rankingList.length" class="ranking-list">
-            <div
-              v-for="item in rankingList"
-              :key="`${item.ranking}-${item.playletId}`"
-              class="ranking-item"
+        <!-- 正常内容 -->
+        <template v-else>
+          <n-tabs v-model:value="activeTab" type="line" @update:value="handleTabChange">
+            <n-tab-pane name="day" tab="日榜" />
+            <n-tab-pane name="week" tab="周榜" />
+            <n-tab-pane name="month" tab="月榜" />
+          </n-tabs>
+
+          <div class="period-select-wrap">
+            <n-select
+              v-model:value="selectedPeriodValue"
+              class="period-select-input"
+              size="small"
+              :options="currentPeriodOptions"
+              :loading="loading"
+              @update:value="handlePeriodChange"
+            />
+            <n-button
+              size="small"
+              quaternary
+              circle
+              class="period-refresh-btn"
+              :loading="loading"
+              :title="loading ? '刷新中...' : '刷新榜单'"
+              @click="handleRefresh"
             >
-              <span class="ranking-num" :class="getRankClass(item.ranking)">
-                {{ item.ranking }}
-              </span>
-              <div class="ranking-info">
-                <button
-                  class="ranking-name"
-                  :title="`点击复制：${item.playletName}`"
-                  @click="copyPlayletName(item.playletName)"
-                >
-                  {{ item.playletName }}
-                </button>
-                <div class="ranking-meta">
-                  <span class="meta-tag">热力值 {{ formatHotValue(item.consumeNum) }}</span>
-                  <span class="meta-tag"
-                    >累计热力值 {{ formatHotValue(item.totalConsumeNum) }}</span
+              <template #icon>
+                <Icon icon="mdi:refresh" />
+              </template>
+            </n-button>
+          </div>
+
+          <n-spin :show="loading">
+            <div v-if="rankingList.length" class="ranking-list">
+              <div
+                v-for="item in rankingList"
+                :key="`${item.ranking}-${item.playletId}`"
+                class="ranking-item"
+              >
+                <span class="ranking-num" :class="getRankClass(item.ranking)">
+                  {{ item.ranking }}
+                </span>
+                <div class="ranking-info">
+                  <button
+                    class="ranking-name"
+                    :title="`搜索：${item.playletName}`"
+                    @click="searchPlayletName(item.playletName)"
                   >
+                    {{ item.playletName }}
+                  </button>
+                  <div class="ranking-actions">
+                    <button
+                      class="ranking-action-btn primary"
+                      title="在爆剧爆剪中搜索"
+                      @click="searchPlayletName(item.playletName)"
+                    >
+                      <Icon icon="mdi:magnify" />
+                      搜索
+                    </button>
+                    <button
+                      class="ranking-action-btn"
+                      title="复制剧名"
+                      @click="copyPlayletName(item.playletName)"
+                    >
+                      <Icon icon="mdi:content-copy" />
+                      复制
+                    </button>
+                  </div>
+                  <div class="ranking-meta">
+                    <span class="meta-tag">热力值 {{ formatHotValue(item.consumeNum) }}</span>
+                    <span class="meta-tag"
+                      >累计热力值 {{ formatHotValue(item.totalConsumeNum) }}</span
+                    >
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-          <n-empty v-else-if="!loading" description="暂无数据" />
-        </n-spin>
-      </template>
-    </n-drawer-content>
-  </n-drawer>
+            <n-empty v-else-if="!loading" description="暂无数据" />
+          </n-spin>
+        </template>
+      </div>
+    </aside>
+  </Transition>
 
   <n-modal v-model:show="showCookieModal" preset="dialog" title="配置 ADX Cookie">
     <n-input
@@ -124,8 +156,6 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import {
   NButton,
-  NDrawer,
-  NDrawerContent,
   NEmpty,
   NInput,
   NModal,
@@ -177,7 +207,10 @@ interface AdxRankingItem {
 }
 
 const props = defineProps<{ show: boolean }>()
-const emit = defineEmits<{ (e: 'update:show', val: boolean): void }>()
+const emit = defineEmits<{
+  (e: 'update:show', val: boolean): void
+  (e: 'search-drama', name: string): void
+}>()
 
 const message = useMessage()
 const { isAdmin } = useUserAuth()
@@ -325,6 +358,16 @@ async function copyPlayletName(name: string) {
   }
 }
 
+function searchPlayletName(name: string) {
+  const keyword = name.trim()
+  if (!keyword || keyword === '-') return
+  emit('search-drama', keyword)
+}
+
+function closePanel() {
+  visible.value = false
+}
+
 // 加载已有 cookie
 async function loadCookie() {
   try {
@@ -397,7 +440,7 @@ async function fetchRanking() {
   try {
     const response = await fetch('/api/adx/ranking', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: buildSessionHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         type: activeTab.value,
         periodValue,
@@ -467,6 +510,97 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.adx-ranking-panel {
+  position: sticky;
+  top: 92px;
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  width: 380px;
+  max-height: calc(100vh - 112px);
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 24px 70px -44px rgba(15, 23, 42, 0.5);
+}
+
+.adx-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+  background:
+    radial-gradient(circle at top left, rgba(59, 130, 246, 0.14), transparent 34%),
+    linear-gradient(135deg, #f8fafc 0%, #eef6ff 100%);
+}
+
+.adx-panel-title-wrap {
+  min-width: 0;
+}
+
+.adx-panel-eyebrow {
+  margin-bottom: 2px;
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.adx-panel-title {
+  margin: 0;
+  color: #0f172a;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.adx-panel-subtitle {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.adx-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.adx-panel-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.78);
+  color: #64748b;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.adx-panel-close:hover {
+  border-color: rgba(37, 99, 235, 0.22);
+  background: #fff;
+  color: #1d4ed8;
+}
+
+.adx-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px;
+}
+
 .period-select-wrap {
   margin-bottom: 12px;
   display: flex;
@@ -520,10 +654,11 @@ onMounted(() => {
 
 .ranking-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
   padding: 10px 12px;
-  border-radius: 8px;
+  border: 1px solid rgba(226, 232, 240, 0.86);
+  border-radius: 12px;
   background: #f9fafb;
 }
 
@@ -587,6 +722,49 @@ onMounted(() => {
   color: #2563eb;
 }
 
+.ranking-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ranking-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 999px;
+  background: #fff;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.ranking-action-btn:hover {
+  border-color: rgba(37, 99, 235, 0.22);
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.ranking-action-btn.primary {
+  border-color: rgba(37, 99, 235, 0.18);
+  background: #2563eb;
+  color: #fff;
+}
+
+.ranking-action-btn.primary:hover {
+  border-color: rgba(29, 78, 216, 0.24);
+  background: #1d4ed8;
+  color: #fff;
+}
+
 .ranking-meta {
   display: flex;
   gap: 8px;
@@ -628,5 +806,29 @@ onMounted(() => {
   font-size: 14px;
   color: #92400e;
   margin: 0;
+}
+
+@media (max-width: 1180px) {
+  .adx-ranking-panel {
+    position: relative;
+    top: auto;
+    width: 100%;
+    max-height: 520px;
+  }
+}
+
+@media (max-width: 640px) {
+  .adx-ranking-panel {
+    border-radius: 18px;
+  }
+
+  .adx-panel-header {
+    flex-direction: column;
+  }
+
+  .adx-panel-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
 }
 </style>
