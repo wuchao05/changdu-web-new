@@ -1118,7 +1118,8 @@ watch(
     }
 
     if (!groups.some(group => group.id === selectedFeishuTableGroupId.value)) {
-      selectedFeishuTableGroupId.value = groups[0].id
+      selectedFeishuTableGroupId.value =
+        groups.length > 1 ? ALL_FEISHU_TABLE_GROUP_ID : groups[0].id
     }
   },
   { immediate: true }
