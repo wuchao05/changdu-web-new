@@ -90,6 +90,7 @@ const serviceConsole = createScopedConsole(
   args => resolveLogProfileFromContext(args),
   args => resolveLogScope(args)
 )
+const ALL_FEISHU_TABLE_GROUP_ID = '__all__'
 
 /**
  * 将 ISO 时间字符串转换为北京时间格式
@@ -175,6 +176,7 @@ function createDefaultState() {
     onlyRedFlag: false,
     runOnce: false,
     submitRangeDays: 3,
+    feishuTableGroupId: '',
     nextFeishuTableGroupIndex: 0,
     stats: {
       totalProcessed: 0,
@@ -329,6 +331,17 @@ function getSchedulerFeishuTableGroupProfile(instanceKey, tableGroupId = '') {
   const groups = getSchedulerFeishuTableGroups(instanceKey)
   const normalizedGroupId = String(tableGroupId || '').trim()
   return groups.find(group => group.id === normalizedGroupId) || groups[0]
+}
+
+function isAllFeishuTableGroupTarget(tableGroupId = '') {
+  return String(tableGroupId || '').trim() === ALL_FEISHU_TABLE_GROUP_ID
+}
+
+function getSchedulerFeishuTableGroupById(instanceKey, tableGroupId = '') {
+  const normalizedGroupId = String(tableGroupId || '').trim()
+  return (
+    getSchedulerFeishuTableGroups(instanceKey).find(group => group.id === normalizedGroupId) || null
+  )
 }
 
 async function ensureSchedulerRuntime(instanceKey, runtimeContext = null) {
@@ -917,12 +930,15 @@ async function getFirstAvailableAccount(channelId, tableGroupId = '') {
 async function dramaExistsInAnyFeishuTableGroup(channelId, dramaName) {
   const groups = getSchedulerFeishuTableGroups(channelId)
   const results = await Promise.all(
-    groups.map(group => searchDramaList(channelId, dramaName, group.id))
+    groups.map(group => dramaExistsInFeishuTableGroup(channelId, dramaName, group.id))
   )
 
-  return results.some(result =>
-    (result.data?.items || []).some(item => item.fields?.['剧名']?.[0]?.text === dramaName)
-  )
+  return results.some(Boolean)
+}
+
+async function dramaExistsInFeishuTableGroup(channelId, dramaName, tableGroupId = '') {
+  const result = await searchDramaList(channelId, dramaName, tableGroupId)
+  return (result.data?.items || []).some(item => item.fields?.['剧名']?.[0]?.text === dramaName)
 }
 
 async function selectFeishuTableGroupWithAccount(channelId, preferredGroupId = '') {
@@ -1292,7 +1308,7 @@ async function editJuliangAccountRemark(channelId, accountId, remark) {
 /**
  * 获取并过滤今天/明天/后天的剧集
  */
-async function fetchAutoSubmitDramas(channelId, submitRangeDays = 3) {
+async function fetchAutoSubmitDramas(channelId, submitRangeDays = 3, feishuTableGroupId = '') {
   await ensureSchedulerRuntime(channelId)
   const dateRanges = getDateRanges(submitRangeDays)
 
@@ -1301,7 +1317,10 @@ async function fetchAutoSubmitDramas(channelId, submitRangeDays = 3) {
   serviceConsole.log(`[自动提交-${channelId}] 明天:`, formatDate(dateRanges.tomorrow))
   serviceConsole.log(`[自动提交-${channelId}] 后天:`, formatDate(dateRanges.dayAfterTomorrow))
 
-  const dramaListTableId = getSchedulerFeishuTableGroupProfile(channelId).dramaListTableId
+  const dramaListTableId = getSchedulerFeishuTableGroupProfile(
+    channelId,
+    isAllFeishuTableGroupTarget(feishuTableGroupId) ? '' : feishuTableGroupId
+  ).dramaListTableId
   const { batchSize, batchDelay, totalPages } = AUTO_SUBMIT_CONFIG.pagination
 
   // 并发获取下载任务列表
@@ -1468,35 +1487,43 @@ function sortDramasByPriority(dramas, downloadList, newDramaSet) {
 /**
  * 处理单部剧的提交
  */
-async function processDrama(channelId, drama, downloadList, newDramaSet, options = {}) {
-  await ensureSchedulerRuntime(channelId)
+async function processDramaInFeishuTableGroup(
+  channelId,
+  drama,
+  downloadList,
+  newDramaSet,
+  group,
+  options = {}
+) {
   const dramaName = drama.series_name
   const logScope = options.logScope === '批量提交' ? '批量提交' : '自动提交'
   const logPrefix = `[${logScope}-${channelId}]`
 
   try {
-    // 1. 检查当前渠道所有表格组是否已存在，避免同渠道重复提交
-    const alreadyExists = await dramaExistsInAnyFeishuTableGroup(channelId, dramaName)
-    if (alreadyExists) {
-      serviceConsole.log(`${logPrefix} 剧集已存在，跳过: ${dramaName}`)
-      return { success: false, reason: 'already_exists' }
+    if (!options.skipDuplicateCheck) {
+      const alreadyExists = await dramaExistsInFeishuTableGroup(channelId, dramaName, group.id)
+      if (alreadyExists) {
+        serviceConsole.log(`${logPrefix} 剧集已存在，跳过表格组 ${group.name}: ${dramaName}`)
+        return {
+          success: false,
+          reason: 'already_exists',
+          groupId: group.id,
+          groupName: group.name,
+        }
+      }
     }
 
-    // 2. 选择目标表格组并检查可用账户
-    const selectedGroup = await selectFeishuTableGroupWithAccount(
-      channelId,
-      options.feishuTableGroupId
-    )
-    if (!selectedGroup?.availableAccount) {
-      serviceConsole.log(`${logPrefix} 无可用账户，跳过: ${dramaName}`)
-      return { success: false, reason: 'no_account' }
+    const availableAccount =
+      options.availableAccount || (await getFirstAvailableAccount(channelId, group.id))
+    if (!availableAccount) {
+      serviceConsole.log(`${logPrefix} 表格组 ${group.name} 无可用账户，跳过: ${dramaName}`)
+      return { success: false, reason: 'no_account', groupId: group.id, groupName: group.name }
     }
-    const { group, availableAccount } = selectedGroup
 
-    // 3. 确定评级
+    // 1. 确定评级
     const rating = resolveDramaRating(drama, newDramaSet, options)
 
-    // 4. 创建飞书剧集清单记录
+    // 2. 创建飞书剧集清单记录
     await createDramaRecord(
       channelId,
       dramaName,
@@ -1507,34 +1534,34 @@ async function processDrama(channelId, drama, downloadList, newDramaSet, options
     )
     serviceConsole.log(`${logPrefix} 创建剧集清单记录成功: ${dramaName} -> ${group.name}`)
 
-    // 5. 根据下载状态确定飞书状态
+    // 3. 根据下载状态确定飞书状态
     const downloadData = getDownloadDataForDrama(downloadList, drama)
     const taskStatus = downloadData?.task_status
     const readyStatuses = AUTO_SUBMIT_CONFIG.taskStatus.readyStatuses
     const feishuStatus =
       taskStatus !== undefined && readyStatuses.includes(taskStatus) ? '待下载' : '待提交'
 
-    // 6. 获取抖音素材配置（根据当前渠道）
+    // 4. 获取抖音素材配置（根据当前表格组）
     const douyinMaterial = await getDouyinMaterialConfig(channelId, group.id)
 
-    // 7. 创建剧集状态记录
+    // 5. 创建剧集状态记录
     await createDramaStatusRecord(channelId, {
       dramaName,
       publishTime: drama.publish_time,
       account: availableAccount.account,
       status: feishuStatus,
-      douyinMaterial: douyinMaterial || undefined, // 如果为空字符串则传 undefined
-      rating, // 传递评级参数
+      douyinMaterial: douyinMaterial || undefined,
+      rating,
       tableGroupId: group.id,
     })
     serviceConsole.log(
       `${logPrefix} 创建剧集状态记录成功，表格组: ${group.name}，分配账户: ${availableAccount.account}`
     )
 
-    // 9. 更新账户使用状态
+    // 6. 更新账户使用状态
     await updateAccountUsedStatus(channelId, availableAccount.recordId, group.id)
 
-    // 10. 更新巨量账户备注
+    // 7. 更新巨量账户备注
     if (availableAccount.account) {
       try {
         const remark = `${getSchedulerBrandName(channelId)}-${dramaName}`
@@ -1545,7 +1572,114 @@ async function processDrama(channelId, drama, downloadList, newDramaSet, options
       }
     }
 
-    return { success: true }
+    return { success: true, groupId: group.id, groupName: group.name }
+  } catch (error) {
+    serviceConsole.error(`${logPrefix} 表格组 ${group.name} 处理失败: ${dramaName}`, error.message)
+    return {
+      success: false,
+      reason: 'error',
+      error: error.message,
+      groupId: group.id,
+      groupName: group.name,
+    }
+  }
+}
+
+async function processDrama(channelId, drama, downloadList, newDramaSet, options = {}) {
+  await ensureSchedulerRuntime(channelId)
+  const dramaName = drama.series_name
+  const logScope = options.logScope === '批量提交' ? '批量提交' : '自动提交'
+  const logPrefix = `[${logScope}-${channelId}]`
+  const preferredGroupId = String(options.feishuTableGroupId || '').trim()
+
+  try {
+    if (isAllFeishuTableGroupTarget(preferredGroupId)) {
+      const groups = getSchedulerFeishuTableGroups(channelId)
+      if (!groups.length) {
+        serviceConsole.log(`${logPrefix} 未配置可用飞书表格组，跳过: ${dramaName}`)
+        return { success: false, reason: 'no_group' }
+      }
+
+      const groupResults = []
+      for (const group of groups) {
+        groupResults.push(
+          await processDramaInFeishuTableGroup(
+            channelId,
+            drama,
+            downloadList,
+            newDramaSet,
+            group,
+            options
+          )
+        )
+      }
+
+      const successCount = groupResults.filter(result => result.success).length
+      if (successCount > 0) {
+        serviceConsole.log(
+          `${logPrefix} ${dramaName} 已提交到 ${successCount}/${groups.length} 个飞书表格组`
+        )
+        return { success: true, successCount, groupResults }
+      }
+
+      const firstError = groupResults.find(result => result.error)
+      if (groupResults.every(result => result.reason === 'already_exists')) {
+        return { success: false, reason: 'already_exists', groupResults }
+      }
+      if (groupResults.every(result => ['already_exists', 'no_account'].includes(result.reason))) {
+        return { success: false, reason: 'no_account', groupResults }
+      }
+
+      return {
+        success: false,
+        reason: 'error',
+        error: firstError?.error,
+        groupResults,
+      }
+    }
+
+    if (preferredGroupId) {
+      const preferredGroup = getSchedulerFeishuTableGroupById(channelId, preferredGroupId)
+      if (!preferredGroup) {
+        serviceConsole.log(`${logPrefix} 未找到目标飞书表格组，跳过: ${dramaName}`)
+        return { success: false, reason: 'group_not_found' }
+      }
+
+      return processDramaInFeishuTableGroup(
+        channelId,
+        drama,
+        downloadList,
+        newDramaSet,
+        preferredGroup,
+        options
+      )
+    }
+
+    // 未指定目标表格组时保留原策略：当前渠道任意表格已存在则跳过，再轮询选择可用账户组。
+    const alreadyExists = await dramaExistsInAnyFeishuTableGroup(channelId, dramaName)
+    if (alreadyExists) {
+      serviceConsole.log(`${logPrefix} 剧集已存在，跳过: ${dramaName}`)
+      return { success: false, reason: 'already_exists' }
+    }
+
+    const selectedGroup = await selectFeishuTableGroupWithAccount(channelId)
+    if (!selectedGroup?.availableAccount) {
+      serviceConsole.log(`${logPrefix} 无可用账户，跳过: ${dramaName}`)
+      return { success: false, reason: 'no_account' }
+    }
+
+    return processDramaInFeishuTableGroup(
+      channelId,
+      drama,
+      downloadList,
+      newDramaSet,
+      selectedGroup.group,
+      {
+        ...options,
+        availableAccount: selectedGroup.availableAccount,
+        skipDuplicateCheck: true,
+      }
+    )
   } catch (error) {
     serviceConsole.error(`${logPrefix} 处理失败: ${dramaName}`, error.message)
     return { success: false, reason: 'error', error: error.message }
@@ -1581,7 +1715,7 @@ async function runAutoSubmitCycle(channelId) {
 
     // 1. 获取并过滤剧集
     const { today, tomorrow, dayAfterTomorrow, downloadList, newDramaSet } =
-      await fetchAutoSubmitDramas(channelId, state.submitRangeDays)
+      await fetchAutoSubmitDramas(channelId, state.submitRangeDays, state.feishuTableGroupId)
 
     // 2. 按日期分组处理
     const dateGroups = [
@@ -1605,8 +1739,13 @@ async function runAutoSubmitCycle(channelId) {
 
       // 3. 过滤符合条件的剧
       const eligibleDramas = dateGroup.dramas.filter(d => {
-        // 条件1: 飞书清单中不存在
-        if (d.feishu_downloaded || d.feishu_exists) return false
+        // 所有表格模式需要交给逐表写入逻辑判断，否则会被默认表的已存在标记提前过滤。
+        if (
+          !isAllFeishuTableGroupTarget(state.feishuTableGroupId) &&
+          (d.feishu_downloaded || d.feishu_exists)
+        ) {
+          return false
+        }
 
         // 条件2: 下载中心有完成的任务
         const downloadData = getDownloadDataForDrama(downloadList, d)
@@ -1648,7 +1787,9 @@ async function runAutoSubmitCycle(channelId) {
           `[自动提交-${channelId}] 处理第 ${i + 1}/${sortedDramas.length} 部：${drama.series_name}${redFlagLabel}`
         )
 
-        const result = await processDrama(channelId, drama, downloadList, newDramaSet)
+        const result = await processDrama(channelId, drama, downloadList, newDramaSet, {
+          feishuTableGroupId: state.feishuTableGroupId,
+        })
         processedCount++
 
         if (result.success) {
@@ -1777,10 +1918,12 @@ export async function startScheduler(channelId, options = {}, runtimeContext = n
         onlyRedFlag = false,
         runOnce = false,
         submitRangeDays = 3,
+        feishuTableGroupId = '',
       } = options
       const normalizedRangeDays = [1, 2, 3].includes(Number(submitRangeDays))
         ? Number(submitRangeDays)
         : 3
+      const normalizedFeishuTableGroupId = String(feishuTableGroupId || '').trim()
 
       const entry = ensureSchedulerEntry(channelId)
       const state = entry.state
@@ -1796,6 +1939,7 @@ export async function startScheduler(channelId, options = {}, runtimeContext = n
       state.onlyRedFlag = onlyRedFlag
       state.runOnce = Boolean(runOnce)
       state.submitRangeDays = normalizedRangeDays
+      state.feishuTableGroupId = normalizedFeishuTableGroupId
       state.nextRunTime = null
 
       serviceConsole.log(
@@ -1803,6 +1947,9 @@ export async function startScheduler(channelId, options = {}, runtimeContext = n
       )
       serviceConsole.log(`[自动提交-${channelId}] 仅红标: ${onlyRedFlag}`)
       serviceConsole.log(`[自动提交-${channelId}] 提交范围: 近${normalizedRangeDays}天`)
+      serviceConsole.log(
+        `[自动提交-${channelId}] 飞书表格组: ${normalizedFeishuTableGroupId || '自动轮询'}`
+      )
 
       await saveState(channelId)
 
@@ -1860,6 +2007,7 @@ export function getSchedulerStatus(channelId) {
     submitRangeDays: [1, 2, 3].includes(Number(state.submitRangeDays))
       ? Number(state.submitRangeDays)
       : 3,
+    feishuTableGroupId: String(state.feishuTableGroupId || '').trim(),
     nextRunTime: toBeijingTime(state.nextRunTime),
     lastRunTime: toBeijingTime(state.lastRunTime),
     currentTask: state.currentTask ? { ...state.currentTask } : null,

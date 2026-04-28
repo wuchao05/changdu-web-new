@@ -13,6 +13,7 @@ export interface AutoSubmitStatus {
   onlyRedFlag: boolean
   runOnce: boolean
   submitRangeDays: 1 | 2 | 3
+  feishuTableGroupId?: string
   nextRunTime: string | null
   lastRunTime: string | null
   stats: {
@@ -49,6 +50,7 @@ export interface StartAutoSubmitParams {
   onlyRedFlag?: boolean
   runOnce?: boolean
   submitRangeDays?: 1 | 2 | 3
+  feishuTableGroupId?: string
 }
 
 export function startAutoSubmit(params: StartAutoSubmitParams): Promise<AutoSubmitResponse> {

@@ -23,6 +23,14 @@
           filterable
           placeholder="选择用户"
         />
+        <n-select
+          v-if="hasMultipleTableGroups"
+          v-model:value="selectedTableGroupId"
+          :options="tableGroupOptions"
+          size="small"
+          class="feishu-panel__select feishu-panel__select--table-group"
+          placeholder="选择表格组"
+        />
         <n-button
           size="small"
           secondary
@@ -197,6 +205,7 @@ const RATING_TAG_TYPE: Record<string, 'default' | 'success' | 'warning' | 'error
 
 const sessionStore = useSessionStore()
 const apiConfigStore = useApiConfigStore()
+const ALL_FEISHU_TABLE_GROUP_ID = '__all__'
 
 const loading = ref(false)
 const records = ref<BoardRecord[]>([])
@@ -284,6 +293,33 @@ const resolvedTableGroups = computed<BoardTableGroup[]>(() => {
   return tableId ? [{ id: 'default', name: '默认表格', tableId }] : []
 })
 
+const selectedTableGroupId = ref(ALL_FEISHU_TABLE_GROUP_ID)
+const hasMultipleTableGroups = computed(() => resolvedTableGroups.value.length > 1)
+const tableGroupOptions = computed(() => [
+  {
+    label: '所有表格',
+    value: ALL_FEISHU_TABLE_GROUP_ID,
+  },
+  ...resolvedTableGroups.value.map(group => ({
+    label: group.name,
+    value: group.id,
+  })),
+])
+const visibleTableGroups = computed(() => {
+  if (selectedTableGroupId.value === ALL_FEISHU_TABLE_GROUP_ID) {
+    return resolvedTableGroups.value
+  }
+
+  const matchedGroup = resolvedTableGroups.value.find(
+    group => group.id === selectedTableGroupId.value
+  )
+  return matchedGroup ? [matchedGroup] : resolvedTableGroups.value
+})
+const showTableGroupColumn = computed(
+  () =>
+    selectedTableGroupId.value === ALL_FEISHU_TABLE_GROUP_ID && resolvedTableGroups.value.length > 1
+)
+
 // 日期 Tab：昨天 / 今天 / 明天 / 后天 + 总览
 const DATE_OFFSET_LABELS: Record<number, string> = {
   [-1]: '昨天',
@@ -353,7 +389,7 @@ const tableColumns = computed<DataTableColumns<BoardRecord>>(() => {
     return [dramaNameColumn]
   }
 
-  return [
+  const columns: DataTableColumns<BoardRecord> = [
     {
       ...dramaNameColumn,
       width: 280,
@@ -365,13 +401,19 @@ const tableColumns = computed<DataTableColumns<BoardRecord>>(() => {
       ellipsis: { tooltip: true },
       render: row => row.account || '—',
     },
-    {
+  ]
+
+  if (showTableGroupColumn.value) {
+    columns.push({
       title: '表格组',
       key: 'tableGroupName',
       width: 130,
       ellipsis: { tooltip: true },
       render: row => row.tableGroupName || '默认表格',
-    },
+    })
+  }
+
+  columns.push(
     {
       title: '上架时间',
       key: 'publishTime',
@@ -393,8 +435,10 @@ const tableColumns = computed<DataTableColumns<BoardRecord>>(() => {
       key: 'date',
       width: 160,
       render: row => row.date || '—',
-    },
-  ]
+    }
+  )
+
+  return columns
 })
 
 function updateIsMobile() {
@@ -520,7 +564,11 @@ async function loadAdminUsers() {
 
 async function fetchData() {
   const generation = beginRequest()
-  const tableGroups = resolvedTableGroups.value
+  if (resolvedTableGroups.value.length === 0) {
+    records.value = []
+    return
+  }
+  const tableGroups = visibleTableGroups.value
   if (tableGroups.length === 0) {
     records.value = []
     return
@@ -572,6 +620,23 @@ defineExpose({ refresh, cancelAllRequests })
 watch(selectedUserId, () => {
   if (isAdmin.value) void fetchData()
 })
+
+watch(selectedTableGroupId, () => {
+  if (resolvedTableGroups.value.length > 0) void fetchData()
+})
+
+watch(
+  resolvedTableGroups,
+  groups => {
+    if (
+      selectedTableGroupId.value !== ALL_FEISHU_TABLE_GROUP_ID &&
+      !groups.some(group => group.id === selectedTableGroupId.value)
+    ) {
+      selectedTableGroupId.value = ALL_FEISHU_TABLE_GROUP_ID
+    }
+  },
+  { immediate: true }
+)
 
 // 普通用户切渠道(外部 store 变化):重新拉数据
 watch(
@@ -680,6 +745,10 @@ watch(
 
 .feishu-panel__select {
   width: 220px;
+}
+
+.feishu-panel__select--table-group {
+  width: 180px;
 }
 
 .feishu-panel__tabs :deep(.n-tabs-tab) {

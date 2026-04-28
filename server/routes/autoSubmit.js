@@ -24,11 +24,12 @@ router.use(createSessionRuntimeContextMiddleware('autoSubmitContext'))
 /**
  * 启动自动提交调度器
  * POST /api/auto-submit/start
- * Body: { intervalMinutes?: number, onlyRedFlag?: boolean, runOnce?: boolean, submitRangeDays?: 1|2|3 }
+ * Body: { intervalMinutes?: number, onlyRedFlag?: boolean, runOnce?: boolean, submitRangeDays?: 1|2|3, feishuTableGroupId?: string }
  */
 router.post('/start', async ctx => {
   try {
-    const { intervalMinutes, onlyRedFlag, runOnce, submitRangeDays } = ctx.request.body || {}
+    const { intervalMinutes, onlyRedFlag, runOnce, submitRangeDays, feishuTableGroupId } =
+      ctx.request.body || {}
     const instanceKey = buildRuntimeInstanceKey(ctx.state.autoSubmitContext)
     console.log('[自动提交API] 用户启动，instanceKey:', instanceKey)
 
@@ -59,6 +60,15 @@ router.post('/start', async ctx => {
       return
     }
 
+    if (typeof feishuTableGroupId !== 'undefined' && typeof feishuTableGroupId !== 'string') {
+      ctx.status = 400
+      ctx.body = {
+        code: -1,
+        message: 'feishuTableGroupId 必须是字符串',
+      }
+      return
+    }
+
     if (!runOnce) {
       if (
         typeof intervalMinutes !== 'undefined' &&
@@ -80,6 +90,7 @@ router.post('/start', async ctx => {
         onlyRedFlag: onlyRedFlag === true,
         runOnce: runOnce === true,
         submitRangeDays: [1, 2, 3].includes(Number(submitRangeDays)) ? Number(submitRangeDays) : 3,
+        feishuTableGroupId: String(feishuTableGroupId || '').trim(),
       },
       ctx.state.autoSubmitContext
     )
@@ -307,7 +318,8 @@ router.post('/admin/start', async ctx => {
     const targetContext = await resolveAdminTargetContext(ctx)
     const instanceKey = buildRuntimeInstanceKey(targetContext)
     console.log('[自动提交API] 管理员启动，目标 instanceKey:', instanceKey)
-    const { intervalMinutes, onlyRedFlag, runOnce, submitRangeDays } = ctx.request.body || {}
+    const { intervalMinutes, onlyRedFlag, runOnce, submitRangeDays, feishuTableGroupId } =
+      ctx.request.body || {}
 
     const result = await startScheduler(
       instanceKey,
@@ -315,9 +327,8 @@ router.post('/admin/start', async ctx => {
         intervalMinutes: typeof intervalMinutes === 'number' ? intervalMinutes : 5,
         onlyRedFlag: onlyRedFlag === true,
         runOnce: runOnce === true,
-        submitRangeDays: [1, 2, 3].includes(Number(submitRangeDays))
-          ? Number(submitRangeDays)
-          : 3,
+        submitRangeDays: [1, 2, 3].includes(Number(submitRangeDays)) ? Number(submitRangeDays) : 3,
+        feishuTableGroupId: String(feishuTableGroupId || '').trim(),
       },
       targetContext
     )

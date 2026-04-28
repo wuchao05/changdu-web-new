@@ -833,6 +833,7 @@ import {
 import { FEISHU_CONFIG } from '@/config/feishu'
 import http from '@/api/http'
 import type { NewDramaItem, DownloadTask } from '@/api/types'
+import type { RuntimeFeishuTableGroup } from '@/api/feishu'
 import dayjs from 'dayjs'
 import DatePicker from './DatePicker.vue'
 import DramaCard from './DramaCard.vue'
@@ -860,6 +861,7 @@ const currentBrandName = computed(
   () => sessionStore.currentRuntimeUser?.brandName || sessionStore.currentUser?.brandName || '小红'
 )
 const accountRecycleEnabled = ref(false)
+const ALL_FEISHU_TABLE_GROUP_ID = '__all__'
 
 async function syncCurrentChannelConfig() {
   try {
@@ -907,8 +909,10 @@ async function reloadChannelScopedData() {
 }
 
 // 格式化抖音号素材配置
-function formatDouyinMaterialConfig(): string {
-  const matches = activeFeishuTableGroup.value?.douyinMaterialMatches || douyinMaterialStore.matches
+function formatDouyinMaterialConfig(
+  group: RuntimeFeishuTableGroup | null | undefined = activeFeishuTableGroup.value
+): string {
+  const matches = group?.douyinMaterialMatches || douyinMaterialStore.matches
 
   if (!matches || matches.length === 0) {
     return ''
@@ -920,18 +924,29 @@ function formatDouyinMaterialConfig(): string {
     .join('\n')
 }
 
-async function searchDramaListInConfiguredGroups(dramaName: string) {
-  const targetGroups = feishuTableGroups.value.filter(group => group.feishu?.dramaListTableId)
-  const groups = targetGroups.length ? targetGroups : [activeFeishuTableGroup.value]
-  const results = await Promise.all(
-    groups
-      .filter(Boolean)
-      .map(group => feishuApi.searchDramaList(dramaName, group.feishu?.dramaListTableId))
+function getDramaListTableId(group: RuntimeFeishuTableGroup | undefined) {
+  return (
+    group?.feishu?.dramaListTableId ||
+    apiConfigStore.config.dramaListTableId ||
+    FEISHU_CONFIG.table_ids.drama_list
   )
+}
 
-  return results.some(result =>
-    (result.data?.items || []).some(item => item.fields['剧名']?.[0]?.text === dramaName)
+function getDramaStatusTableId(group: RuntimeFeishuTableGroup | undefined) {
+  return (
+    group?.feishu?.dramaStatusTableId ||
+    apiConfigStore.config.dramaStatusTableId ||
+    FEISHU_CONFIG.table_ids.drama_status
   )
+}
+
+function getAccountTableId(group: RuntimeFeishuTableGroup | undefined) {
+  return group?.feishu?.accountTableId || apiConfigStore.config.accountTableId || ''
+}
+
+async function dramaExistsInFeishuTableGroup(dramaName: string, group: RuntimeFeishuTableGroup) {
+  const result = await feishuApi.searchDramaList(dramaName, getDramaListTableId(group))
+  return (result.data?.items || []).some(item => item.fields['剧名']?.[0]?.text === dramaName)
 }
 
 async function searchDramaStatusRecordInConfiguredGroups(dramaName: string, timestamp: number) {
@@ -1014,7 +1029,7 @@ const isAnyOperationBlocked = computed(() => {
 })
 
 const currentChannelLabel = computed(() => apiConfigStore.config.channelName || '当前渠道')
-const feishuTableGroups = computed(() => {
+const feishuTableGroups = computed<RuntimeFeishuTableGroup[]>(() => {
   const groups = Array.isArray(apiConfigStore.config.feishuTableGroups)
     ? apiConfigStore.config.feishuTableGroups
     : []
@@ -1057,12 +1072,20 @@ const activeFeishuTableGroup = computed(() => {
   )
 })
 const hasMultipleFeishuTableGroups = computed(() => feishuTableGroups.value.length > 1)
-const feishuTableGroupOptions = computed(() =>
-  feishuTableGroups.value.map(group => ({
+const feishuTableGroupOptions = computed(() => [
+  ...(hasMultipleFeishuTableGroups.value
+    ? [
+        {
+          label: '所有表格',
+          value: ALL_FEISHU_TABLE_GROUP_ID,
+        },
+      ]
+    : []),
+  ...feishuTableGroups.value.map(group => ({
     label: group.name,
     value: group.id,
-  }))
-)
+  })),
+])
 const currentDramaListTableId = computed(
   () =>
     activeFeishuTableGroup.value?.feishu?.dramaListTableId ||
@@ -1090,12 +1113,38 @@ watch(
       return
     }
 
+    if (selectedFeishuTableGroupId.value === ALL_FEISHU_TABLE_GROUP_ID && groups.length > 1) {
+      return
+    }
+
     if (!groups.some(group => group.id === selectedFeishuTableGroupId.value)) {
       selectedFeishuTableGroupId.value = groups[0].id
     }
   },
   { immediate: true }
 )
+
+function isAllFeishuTableGroupsSelected() {
+  return selectedFeishuTableGroupId.value === ALL_FEISHU_TABLE_GROUP_ID
+}
+
+function getSelectedFeishuTableGroupId() {
+  return isAllFeishuTableGroupsSelected()
+    ? ALL_FEISHU_TABLE_GROUP_ID
+    : activeFeishuTableGroup.value?.id || ''
+}
+
+function getSelectedFeishuTableGroupName() {
+  return isAllFeishuTableGroupsSelected() ? '所有表格' : activeFeishuTableGroup.value?.name || ''
+}
+
+function getTargetFeishuTableGroupsForDownload() {
+  if (isAllFeishuTableGroupsSelected()) {
+    return feishuTableGroups.value
+  }
+
+  return activeFeishuTableGroup.value ? [activeFeishuTableGroup.value] : []
+}
 
 watch(selectedFeishuTableGroupId, () => {
   if (selectedFeishuTableGroupId.value) {
@@ -1184,6 +1233,7 @@ const createDefaultAutoSubmitStatus = (): AutoSubmitStatus => ({
   onlyRedFlag: false,
   runOnce: false,
   submitRangeDays: 3,
+  feishuTableGroupId: '',
   nextRunTime: null,
   lastRunTime: null,
   stats: { totalProcessed: 0, successCount: 0, failCount: 0, skipCount: 0 },
@@ -1750,8 +1800,8 @@ function handleAddToCart(payload: {
     publish_time: drama.publish_time || '',
     manualRedFlag: isManualRedFlag(drama.book_id),
     fromSearchResult: searchKeyword.value.trim().length > 0,
-    feishuTableGroupId: activeFeishuTableGroup.value?.id || '',
-    feishuTableGroupName: activeFeishuTableGroup.value?.name || '',
+    feishuTableGroupId: getSelectedFeishuTableGroupId(),
+    feishuTableGroupName: getSelectedFeishuTableGroupName(),
   }
 
   // 添加到购物车（带动画）
@@ -1966,6 +2016,7 @@ async function startAutoSubmit() {
       onlyRedFlag: autoSubmitOnlyRedFlag.value,
       runOnce,
       submitRangeDays: autoSubmitRangeDays.value,
+      feishuTableGroupId: getSelectedFeishuTableGroupId(),
     })
 
     if (result.code === 0) {
@@ -2091,6 +2142,14 @@ interface AddDownloadOptions {
   fromSearchResult?: boolean
 }
 
+interface AddDownloadToGroupResult {
+  success: boolean
+  groupName: string
+  account?: string
+  reason?: 'already_exists' | 'no_account' | 'error'
+  error?: string
+}
+
 function resolveDramaRating(
   drama: NewDramaItem | RankingDramaItem,
   options: AddDownloadOptions = {}
@@ -2112,6 +2171,95 @@ function resolveDramaRating(
   return '黄标'
 }
 
+async function addDownloadToFeishuTableGroup(
+  drama: NewDramaItem | RankingDramaItem,
+  group: RuntimeFeishuTableGroup,
+  rating: string
+): Promise<AddDownloadToGroupResult> {
+  const dramaName = (drama as any).book_name || (drama as any).series_name
+  const groupName = group.name || '默认表格'
+
+  try {
+    const alreadyExists = await dramaExistsInFeishuTableGroup(dramaName, group)
+    if (alreadyExists) {
+      console.log(`剧集已存在，跳过表格组: ${dramaName} -> ${groupName}`)
+      return { success: false, groupName, reason: 'already_exists' }
+    }
+
+    const accountTableId = getAccountTableId(group)
+    const availableAccount = await feishuApi.getAvailableChannelAccount(
+      accountTableId,
+      accountRecycleEnabled.value
+    )
+
+    if (!availableAccount?.account || !availableAccount.recordId) {
+      console.log(`暂无可用账户，跳过表格组: ${dramaName} -> ${groupName}`)
+      return { success: false, groupName, reason: 'no_account' }
+    }
+
+    const finalAccountId = availableAccount.account
+    const finalRecordId = availableAccount.recordId
+
+    const createResult = await feishuApi.createDramaRecord(
+      dramaName,
+      '',
+      drama.publish_time,
+      drama.book_id,
+      rating,
+      getDramaListTableId(group)
+    )
+    console.log('新增记录成功:', createResult, groupName)
+
+    // 根据下载状态决定飞书状态：加密中(4)/压缩中(1)/完成(2)设为"待下载"，其他设为"待提交"
+    const downloadData = getDownloadDataForDrama(dramaName)
+    const taskStatus = downloadData?.task_status
+    const readyStatuses = [1, 2, 4] // 压缩中、完成、加密中
+    const feishuStatus =
+      taskStatus !== undefined && readyStatuses.includes(taskStatus) ? '待下载' : '待提交'
+
+    const douyinMaterial = formatDouyinMaterialConfig(group)
+
+    await feishuApi.createDramaStatusRecord(
+      dramaName,
+      drama.publish_time || '',
+      finalAccountId,
+      feishuStatus,
+      douyinMaterial || undefined,
+      rating,
+      getDramaStatusTableId(group)
+    )
+    console.log(
+      '剧集状态记录创建成功，已分配账户:',
+      finalAccountId,
+      '状态:',
+      feishuStatus,
+      '表格组:',
+      groupName
+    )
+
+    await feishuApi.updateChannelAccountUsedStatus(finalRecordId, accountTableId)
+
+    try {
+      const remark = `${currentBrandName.value}-${dramaName}`
+      const { editJuliangAccountRemark } = await import('@/api/juliang')
+      await editJuliangAccountRemark({
+        account_id: finalAccountId,
+        remark,
+      })
+      console.log('更新巨量账户备注成功:', finalAccountId, remark)
+    } catch (juliangError) {
+      console.error('更新巨量账户备注失败:', juliangError)
+      // 不中断主流程，只记录错误
+    }
+
+    return { success: true, groupName, account: finalAccountId }
+  } catch (error) {
+    console.error(`表格组 ${groupName} 新增待下载失败:`, error)
+    const errorMessage = error instanceof Error ? error.message : '未知错误'
+    return { success: false, groupName, reason: 'error', error: errorMessage }
+  }
+}
+
 // 处理新增待下载流程
 async function handleAddDownload(
   drama: NewDramaItem | RankingDramaItem,
@@ -2131,116 +2279,46 @@ async function handleAddDownload(
     syncingDramaId.value = drama.book_id
     isAnyDramaSyncing.value = true
 
-    // 使用当前渠道配置的账户表
-    const hasAvailableAccount = await feishuApi.checkAvailableChannelAccounts(
-      currentAccountTableId.value,
-      accountRecycleEnabled.value
-    )
-    if (!hasAvailableAccount) {
-      showSuccessToast('无可用账户，请联系管理员')
-      return // 中断后续流程
-    }
-
-    // 搜索剧集清单表，检查这部剧是否已存在
-    const alreadyExists = await searchDramaListInConfiguredGroups(dramaName)
-
-    if (alreadyExists) {
-      showSuccessToast(`剧集"${dramaName}"已在当前渠道飞书剧集清单中，无需重复同步`)
+    const targetGroups = getTargetFeishuTableGroupsForDownload()
+    if (targetGroups.length === 0) {
+      showSuccessToast('未配置可用飞书表格组')
       return
     }
 
-    // 剧集不存在或名称不完全匹配，继续创建新记录
-    try {
-      const rating = resolveDramaRating(drama, options)
+    const rating = resolveDramaRating(drama, options)
+    const results: AddDownloadToGroupResult[] = []
 
-      const createResult = await feishuApi.createDramaRecord(
-        dramaName,
-        '',
-        drama.publish_time,
-        drama.book_id,
-        rating,
-        currentDramaListTableId.value
-      )
-      console.log('新增记录成功:', createResult)
+    for (const group of targetGroups) {
+      results.push(await addDownloadToFeishuTableGroup(drama, group, rating))
+    }
 
-      // 获取可用账户
-      const availableAccount = await feishuApi.getAvailableChannelAccount(
-        currentAccountTableId.value,
-        accountRecycleEnabled.value
-      )
+    const successResults = results.filter(result => result.success)
+    if (successResults.length > 0) {
+      submittedForDownloadSet.value.add(drama.book_id)
 
-      if (!availableAccount) {
-        showSuccessToast('无可用账户，请联系管理员')
-        console.log('暂无可用的账户，流程中断')
-        return
-      }
-
-      const finalAccountId = availableAccount.account
-      const finalRecordId = availableAccount.recordId
-
-      if (!finalAccountId || !finalRecordId) {
-        showSuccessToast('无可用账户，请联系管理员')
-        console.log('暂无可用的账户，流程中断')
-        return
-      }
-
-      // 创建剧集状态记录并分配账户
-      try {
-        // 根据下载状态决定飞书状态：加密中(4)/压缩中(1)/完成(2)设为"待下载"，其他设为"待提交"
-        const downloadData = getDownloadDataForDrama(dramaName)
-        const taskStatus = downloadData?.task_status
-        const readyStatuses = [1, 2, 4] // 压缩中、完成、加密中
-        const feishuStatus =
-          taskStatus !== undefined && readyStatuses.includes(taskStatus) ? '待下载' : '待提交'
-
-        // 直接使用剧集的首发时间
-        const targetPublishTime = drama.publish_time || ''
-
-        const douyinMaterial = formatDouyinMaterialConfig()
-
-        await feishuApi.createDramaStatusRecord(
-          dramaName,
-          targetPublishTime,
-          finalAccountId,
-          feishuStatus,
-          douyinMaterial || undefined, // 如果为空字符串则传 undefined
-          rating,
-          currentDramaStatusTableId.value
-        )
-        console.log('剧集状态记录创建成功，已分配账户:', finalAccountId, '状态:', feishuStatus)
-
-        await feishuApi.updateChannelAccountUsedStatus(finalRecordId, currentAccountTableId.value)
-
-        if (finalAccountId) {
-          try {
-            const remark = `${currentBrandName.value}-${dramaName}`
-            const { editJuliangAccountRemark } = await import('@/api/juliang')
-            await editJuliangAccountRemark({
-              account_id: finalAccountId,
-              remark,
-            })
-            console.log('更新巨量账户备注成功:', finalAccountId, remark)
-          } catch (juliangError) {
-            console.error('更新巨量账户备注失败:', juliangError)
-            // 不中断主流程，只记录错误
-          }
-        }
-
+      if (isAllFeishuTableGroupsSelected()) {
         showSuccessToast(
-          `剧集"${dramaName}"已成功添加到飞书剧集清单，并分配账户：${finalAccountId}`,
+          `剧集"${dramaName}"已成功添加到 ${successResults.length}/${targetGroups.length} 个飞书表格组`,
           1000
         )
-        console.log('账户分配成功:', finalAccountId)
-
-        // 标记为已提交待下载
-        submittedForDownloadSet.value.add(drama.book_id)
-      } catch (accountError) {
-        console.error('创建剧集状态记录或分配账户失败:', accountError)
-        showSuccessToast(`创建剧集状态记录失败：${dramaName}`)
+      } else {
+        showSuccessToast(
+          `剧集"${dramaName}"已成功添加到飞书剧集清单，并分配账户：${successResults[0].account}`,
+          1000
+        )
       }
-    } catch (createError) {
-      console.error('创建记录失败:', createError)
-      showSuccessToast(`创建记录失败：${dramaName}`)
+
+      console.log('账户分配成功:', successResults.map(result => result.account).join('、'))
+      return
+    }
+
+    if (results.every(result => result.reason === 'already_exists')) {
+      showSuccessToast(`剧集"${dramaName}"已在目标飞书剧集清单中，无需重复同步`)
+    } else if (results.every(result => result.reason === 'no_account')) {
+      showSuccessToast('无可用账户，请联系管理员')
+    } else {
+      const firstError = results.find(result => result.error)
+      showSuccessToast(firstError?.error || `创建记录失败：${dramaName}`)
     }
   } catch (err) {
     console.error('同步飞书失败:', err)
