@@ -2911,7 +2911,11 @@ onUnmounted(() => {
   overflow-x: hidden;
 }
 
-.dashboard-main,
+.dashboard-main {
+  width: 100%;
+  min-width: 0;
+}
+
 .home-tab-pane {
   width: 100%;
   min-width: 0;
