@@ -126,13 +126,16 @@ function defaultUserChannelConfig() {
     feishu: defaultFeishuConfig(),
     materialPreview: defaultMaterialPreview(),
     permissions: {
-      syncAccount: false,
       webMenus: {
+        dashboard: true,
         overview: true,
         report: true,
         orderStats: true,
         dramaClip: true,
+        feishuBoard: true,
+        actionButtons: true,
         buildSubmit: true,
+        syncAccount: false,
       },
       desktopMenus: {
         download: false,
@@ -168,9 +171,6 @@ function defaultChannelConfig() {
       adUserId: '',
       rootAdUserId: '',
       appId: '',
-    },
-    adx: {
-      cookie: '',
     },
     createdAt: nowIso(),
     updatedAt: nowIso(),
@@ -509,8 +509,11 @@ function normalizeUserChannelConfig(config = {}, douyinAccounts = []) {
       enabled: Boolean(config.materialPreview?.enabled),
     },
     permissions: {
-      syncAccount: Boolean(config.permissions?.syncAccount),
       webMenus: {
+        dashboard:
+          typeof config.permissions?.webMenus?.dashboard === 'boolean'
+            ? config.permissions.webMenus.dashboard
+            : defaultConfig.permissions.webMenus.dashboard,
         overview:
           typeof config.permissions?.webMenus?.overview === 'boolean'
             ? config.permissions.webMenus.overview
@@ -527,10 +530,22 @@ function normalizeUserChannelConfig(config = {}, douyinAccounts = []) {
           typeof config.permissions?.webMenus?.dramaClip === 'boolean'
             ? config.permissions.webMenus.dramaClip
             : defaultConfig.permissions.webMenus.dramaClip,
+        feishuBoard:
+          typeof config.permissions?.webMenus?.feishuBoard === 'boolean'
+            ? config.permissions.webMenus.feishuBoard
+            : defaultConfig.permissions.webMenus.feishuBoard,
+        actionButtons:
+          typeof config.permissions?.webMenus?.actionButtons === 'boolean'
+            ? config.permissions.webMenus.actionButtons
+            : defaultConfig.permissions.webMenus.actionButtons,
         buildSubmit:
           typeof config.permissions?.webMenus?.buildSubmit === 'boolean'
             ? config.permissions.webMenus.buildSubmit
             : defaultConfig.permissions.webMenus.buildSubmit,
+        syncAccount:
+          typeof config.permissions?.webMenus?.syncAccount === 'boolean'
+            ? config.permissions.webMenus.syncAccount
+            : Boolean(config.permissions?.syncAccount),
       },
       desktopMenus: {
         download: Boolean(config.permissions?.desktopMenus?.download),
@@ -800,9 +815,6 @@ export function normalizeChannel(channel = {}) {
       adUserId: String(channel.changdu?.adUserId || '').trim(),
       rootAdUserId: String(channel.changdu?.rootAdUserId || '').trim(),
       appId: String(channel.changdu?.appId || '').trim(),
-    },
-    adx: {
-      cookie: String(channel.adx?.cookie || '').trim(),
     },
     createdAt: channel.createdAt || base.createdAt,
     updatedAt: channel.updatedAt || nowIso(),

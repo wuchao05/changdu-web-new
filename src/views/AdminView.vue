@@ -731,51 +731,193 @@
                             <div>
                               <p class="permission-group__eyebrow">Web 端</p>
                               <h4 class="permission-group__title">网页工作台权限</h4>
+                              <p class="permission-group__desc">
+                                大开关关闭后，对应页面或按钮区域会直接隐藏；打开后才可配置下级权限。
+                              </p>
                             </div>
                           </div>
                           <div class="permission-grid">
                             <div
-                              v-for="permission in webPermissionOptions"
-                              :key="permission.key"
-                              class="permission-card permission-card--web"
+                              class="permission-card permission-card--web permission-card--parent"
                             >
                               <div class="permission-card__body">
                                 <div class="min-w-0">
                                   <div class="permission-card__title-row">
-                                    <p class="permission-card__title">{{ permission.label }}</p>
+                                    <p class="permission-card__title">数据看板</p>
                                     <span
                                       class="permission-card__badge permission-card__badge--web"
                                     >
-                                      Web 端
+                                      大开关
                                     </span>
                                   </div>
+                                  <p class="permission-card__meta">
+                                    控制首页数据看板 Tab 是否展示。
+                                  </p>
                                 </div>
                                 <n-switch
-                                  :value="item.config.permissions.webMenus[permission.key]"
+                                  :value="item.config.permissions.webMenus.dashboard"
                                   @update:value="
                                     (value: boolean) =>
                                       updateWebPermission(
                                         item.config.permissions.webMenus,
-                                        permission.key,
+                                        'dashboard',
+                                        value
+                                      )
+                                  "
+                                />
+                              </div>
+                              <div
+                                v-if="item.config.permissions.webMenus.dashboard"
+                                class="permission-child-grid"
+                              >
+                                <div
+                                  v-for="permission in dataDashboardPermissionOptions"
+                                  :key="permission.key"
+                                  class="permission-child-card"
+                                >
+                                  <div>
+                                    <p class="permission-child-card__title">
+                                      {{ permission.label }}
+                                    </p>
+                                    <p class="permission-child-card__meta">
+                                      {{ permission.description }}
+                                    </p>
+                                  </div>
+                                  <n-switch
+                                    :value="item.config.permissions.webMenus[permission.key]"
+                                    @update:value="
+                                      (value: boolean) =>
+                                        updateWebPermission(
+                                          item.config.permissions.webMenus,
+                                          permission.key,
+                                          value
+                                        )
+                                    "
+                                  />
+                                </div>
+                              </div>
+                            </div>
+
+                            <div
+                              class="permission-card permission-card--web permission-card--parent"
+                            >
+                              <div class="permission-card__body">
+                                <div class="min-w-0">
+                                  <div class="permission-card__title-row">
+                                    <p class="permission-card__title">爆剧爆剪</p>
+                                    <span
+                                      class="permission-card__badge permission-card__badge--web"
+                                    >
+                                      大开关
+                                    </span>
+                                  </div>
+                                  <p class="permission-card__meta">
+                                    控制首页爆剧爆剪 Tab 是否展示。
+                                  </p>
+                                </div>
+                                <n-switch
+                                  :value="item.config.permissions.webMenus.dramaClip"
+                                  @update:value="
+                                    (value: boolean) =>
+                                      updateWebPermission(
+                                        item.config.permissions.webMenus,
+                                        'dramaClip',
                                         value
                                       )
                                   "
                                 />
                               </div>
                             </div>
-                            <div class="permission-card permission-card--web">
+
+                            <div
+                              class="permission-card permission-card--web permission-card--parent"
+                            >
                               <div class="permission-card__body">
                                 <div class="min-w-0">
                                   <div class="permission-card__title-row">
-                                    <p class="permission-card__title">同步账户</p>
+                                    <p class="permission-card__title">飞书表格</p>
                                     <span
                                       class="permission-card__badge permission-card__badge--web"
                                     >
-                                      Web 端
+                                      大开关
                                     </span>
                                   </div>
+                                  <p class="permission-card__meta">
+                                    控制首页飞书表格 Tab 是否展示。
+                                  </p>
                                 </div>
-                                <n-switch v-model:value="item.config.permissions.syncAccount" />
+                                <n-switch
+                                  :value="item.config.permissions.webMenus.feishuBoard"
+                                  @update:value="
+                                    (value: boolean) =>
+                                      updateWebPermission(
+                                        item.config.permissions.webMenus,
+                                        'feishuBoard',
+                                        value
+                                      )
+                                  "
+                                />
+                              </div>
+                            </div>
+
+                            <div
+                              class="permission-card permission-card--web permission-card--parent"
+                            >
+                              <div class="permission-card__body">
+                                <div class="min-w-0">
+                                  <div class="permission-card__title-row">
+                                    <p class="permission-card__title">操作按钮</p>
+                                    <span
+                                      class="permission-card__badge permission-card__badge--web"
+                                    >
+                                      大开关
+                                    </span>
+                                  </div>
+                                  <p class="permission-card__meta">
+                                    控制首页右上角业务操作按钮区域。
+                                  </p>
+                                </div>
+                                <n-switch
+                                  :value="item.config.permissions.webMenus.actionButtons"
+                                  @update:value="
+                                    (value: boolean) =>
+                                      updateWebPermission(
+                                        item.config.permissions.webMenus,
+                                        'actionButtons',
+                                        value
+                                      )
+                                  "
+                                />
+                              </div>
+                              <div
+                                v-if="item.config.permissions.webMenus.actionButtons"
+                                class="permission-child-grid"
+                              >
+                                <div
+                                  v-for="permission in operationButtonPermissionOptions"
+                                  :key="permission.key"
+                                  class="permission-child-card"
+                                >
+                                  <div>
+                                    <p class="permission-child-card__title">
+                                      {{ permission.label }}
+                                    </p>
+                                    <p class="permission-child-card__meta">
+                                      {{ permission.description }}
+                                    </p>
+                                  </div>
+                                  <n-switch
+                                    :value="item.config.permissions.webMenus[permission.key]"
+                                    @update:value="
+                                      (value: boolean) =>
+                                        updateWebPermission(
+                                          item.config.permissions.webMenus,
+                                          permission.key,
+                                          value
+                                        )
+                                    "
+                                  />
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -1482,14 +1624,6 @@
                       placeholder="请输入 rootAdUserId"
                     />
                   </n-form-item>
-                  <n-form-item label="ADX Cookie" class="md:col-span-2">
-                    <n-input
-                      v-model:value="channelForm.adx.cookie"
-                      type="textarea"
-                      :rows="3"
-                      placeholder="请输入 ADX Cookie"
-                    />
-                  </n-form-item>
                 </n-form>
               </section>
             </div>
@@ -1754,7 +1888,6 @@ interface ChannelFormModel {
   userBase: adminApi.ChannelUserBase
   juliang: adminApi.ChannelConfig['juliang']
   changdu: adminApi.ChannelConfig['changdu']
-  adx: NonNullable<adminApi.ChannelConfig['adx']>
 }
 
 interface DownloadCenterConfigFormModel {
@@ -1794,7 +1927,7 @@ const advanceHourOptions = Array.from({ length: 24 }, (_, hour) => ({
   value: String(hour),
 }))
 const advanceHourEndOptions = [...advanceHourOptions, { label: '24:00', value: '24' }]
-const webPermissionOptions: Array<{
+const dataDashboardPermissionOptions: Array<{
   key: WebPermissionKey
   label: string
   description: string
@@ -1814,15 +1947,21 @@ const webPermissionOptions: Array<{
     label: '订单统计',
     description: '控制首页订单统计模块是否展示。',
   },
-  {
-    key: 'dramaClip',
-    label: '爆剧爆剪',
-    description: '控制首页“爆剧爆剪”入口是否展示。',
-  },
+]
+const operationButtonPermissionOptions: Array<{
+  key: WebPermissionKey
+  label: string
+  description: string
+}> = [
   {
     key: 'buildSubmit',
     label: '提交搭建',
     description: '控制首页“提交搭建”按钮是否展示。',
+  },
+  {
+    key: 'syncAccount',
+    label: '同步账户',
+    description: '控制首页“同步账户”按钮是否展示。',
   },
 ]
 const desktopPermissionOptions: Array<{
@@ -2565,13 +2704,16 @@ function createDefaultUserChannelConfig(): adminApi.UserChannelBindingConfig {
       buildTimeWindowEnd: 20,
     },
     permissions: {
-      syncAccount: false,
       webMenus: {
+        dashboard: true,
         overview: true,
         report: true,
         orderStats: true,
         dramaClip: true,
+        feishuBoard: true,
+        actionButtons: true,
         buildSubmit: true,
+        syncAccount: false,
       },
       desktopMenus: {
         download: false,
@@ -2659,10 +2801,13 @@ function normalizeUserChannelConfig(
     permissions: {
       ...defaultConfig.permissions,
       ...(config?.permissions || {}),
-      syncAccount: Boolean(config?.permissions?.syncAccount),
       webMenus: {
         ...defaultConfig.permissions.webMenus,
         ...(config?.permissions?.webMenus || {}),
+        dashboard:
+          typeof config?.permissions?.webMenus?.dashboard === 'boolean'
+            ? config.permissions.webMenus.dashboard
+            : defaultConfig.permissions.webMenus.dashboard,
         overview:
           typeof config?.permissions?.webMenus?.overview === 'boolean'
             ? config.permissions.webMenus.overview
@@ -2679,10 +2824,25 @@ function normalizeUserChannelConfig(
           typeof config?.permissions?.webMenus?.dramaClip === 'boolean'
             ? config.permissions.webMenus.dramaClip
             : defaultConfig.permissions.webMenus.dramaClip,
+        feishuBoard:
+          typeof config?.permissions?.webMenus?.feishuBoard === 'boolean'
+            ? config.permissions.webMenus.feishuBoard
+            : defaultConfig.permissions.webMenus.feishuBoard,
+        actionButtons:
+          typeof config?.permissions?.webMenus?.actionButtons === 'boolean'
+            ? config.permissions.webMenus.actionButtons
+            : defaultConfig.permissions.webMenus.actionButtons,
         buildSubmit:
           typeof config?.permissions?.webMenus?.buildSubmit === 'boolean'
             ? config.permissions.webMenus.buildSubmit
             : defaultConfig.permissions.webMenus.buildSubmit,
+        syncAccount:
+          typeof config?.permissions?.webMenus?.syncAccount === 'boolean'
+            ? config.permissions.webMenus.syncAccount
+            : Boolean(
+                (config?.permissions as unknown as { syncAccount?: boolean } | undefined)
+                  ?.syncAccount
+              ),
       },
       desktopMenus: {
         ...defaultConfig.permissions.desktopMenus,
@@ -2746,7 +2906,6 @@ function cloneUserChannelConfig(
       ...normalizedConfig.materialPreview,
     },
     permissions: {
-      syncAccount: normalizedConfig.permissions.syncAccount,
       webMenus: {
         ...normalizedConfig.permissions.webMenus,
       },
@@ -2807,9 +2966,6 @@ function createDefaultChannelForm(): ChannelFormModel {
       adUserId: '',
       rootAdUserId: '',
       appId: '',
-    },
-    adx: {
-      cookie: '',
     },
   }
 }
@@ -4849,6 +5005,42 @@ watch(
 
 .permission-card--web {
   background: linear-gradient(135deg, rgba(248, 250, 252, 0.96), rgba(255, 255, 255, 0.96));
+}
+
+.permission-card--parent {
+  border-color: rgba(148, 163, 184, 0.32);
+}
+
+.permission-child-grid {
+  margin-top: 0.85rem;
+  display: grid;
+  gap: 0.62rem;
+  padding-top: 0.85rem;
+  border-top: 1px dashed rgba(148, 163, 184, 0.34);
+}
+
+.permission-child-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 0.8rem;
+  background: rgba(248, 250, 252, 0.8);
+}
+
+.permission-child-card__title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.permission-child-card__meta {
+  margin-top: 0.22rem;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: #64748b;
 }
 
 .permission-card--recommended {

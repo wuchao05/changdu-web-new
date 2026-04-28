@@ -279,9 +279,6 @@ router.get('/me', async ctx => {
           juliang: {
             channel: channel?.juliang?.cookie || '',
           },
-          adx: {
-            cookie: channel?.adx?.cookie || '',
-          },
         },
         feishu: {
           dramaListTableId: runtimeUser?.feishu?.dramaListTableId || '',

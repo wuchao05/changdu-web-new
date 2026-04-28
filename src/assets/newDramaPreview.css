@@ -1358,6 +1358,12 @@
   opacity: 0;
 }
 
+@media (max-width: 640px) {
+  .skeleton-drama-actions {
+    display: none;
+  }
+}
+
 .modal-enter-active .bg-white,
 .modal-leave-active .bg-white {
   transition: transform 0.3s ease;

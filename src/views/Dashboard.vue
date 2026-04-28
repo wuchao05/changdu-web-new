@@ -183,9 +183,25 @@
         </div>
       </div>
 
+      <div v-else-if="!hasHomeTabs" class="space-y-6">
+        <div
+          class="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center shadow-sm"
+        >
+          <div
+            class="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-500"
+          >
+            <Icon icon="mdi:lock-outline" class="h-8 w-8" />
+          </div>
+          <h2 class="mt-5 text-2xl font-bold text-slate-900">当前渠道暂无可展示页面</h2>
+          <p class="mx-auto mt-3 max-w-2xl text-sm leading-7 text-slate-500">
+            请联系管理员开通页面权限。
+          </p>
+        </div>
+      </div>
+
       <div v-else class="home-shell">
-        <!-- 顶部 Tab 切换器:数据看板 / 爆剧爆剪 / 飞书看板 -->
-        <div class="home-tab-bar" role="tablist">
+        <!-- 顶部 Tab 切换器:数据看板 / 爆剧爆剪 / 飞书表格 -->
+        <div v-if="shouldShowHomeTabBar" class="home-tab-bar" role="tablist">
           <button
             v-for="tab in homeTabs"
             :key="tab.key"
@@ -195,8 +211,6 @@
             :aria-selected="activeHomeTab === tab.key"
             class="home-tab-button"
             :class="{ active: activeHomeTab === tab.key }"
-            :disabled="!!tab.disabledReason"
-            :title="tab.disabledReason || ''"
             @click="handleHomeTabChange(tab.key)"
           >
             <Icon :icon="tab.icon" class="home-tab-button__icon" />
@@ -212,7 +226,11 @@
         </div>
 
         <!-- 数据看板 Pane -->
-        <div v-show="activeHomeTab === 'dashboard'" class="home-tab-pane space-y-6">
+        <div
+          v-if="canAccessDataDashboard"
+          v-show="activeHomeTab === 'dashboard'"
+          class="home-tab-pane space-y-6"
+        >
           <n-card v-if="canAccessOverview" :bordered="false" class="shadow-sm">
             <template #header>
               <div class="flex items-center justify-between gap-4 flex-wrap">
@@ -543,8 +561,8 @@
           <NewDramaPreview ref="clipPanelRef" embedded />
         </div>
 
-        <!-- 飞书看板 Pane -->
-        <div v-show="activeHomeTab === 'feishu'" class="home-tab-pane">
+        <!-- 飞书表格 Pane -->
+        <div v-if="canAccessFeishuBoard" v-show="activeHomeTab === 'feishu'" class="home-tab-pane">
           <FeishuBoardPanel ref="feishuPanelRef" />
         </div>
       </div>
@@ -695,11 +713,24 @@ const changePasswordFormRef = ref<FormInst | null>(null)
 
 type DateRangeValue = [string, string] | null
 type DashboardRequestScope = 'overview' | 'report' | 'orders' | 'material'
+type RuntimeWebMenus = adminApi.UserChannelBindingConfig['permissions']['webMenus']
 interface DashboardRequestContext {
   scope: DashboardRequestScope
   controller: AbortController
   generation: number
   signal: AbortSignal
+}
+
+const DEFAULT_RUNTIME_WEB_MENUS: RuntimeWebMenus = {
+  dashboard: true,
+  overview: true,
+  report: true,
+  orderStats: true,
+  dramaClip: true,
+  feishuBoard: true,
+  actionButtons: true,
+  buildSubmit: true,
+  syncAccount: false,
 }
 
 const dashboardRequestControllers = new Map<DashboardRequestScope, AbortController>()
@@ -726,33 +757,53 @@ const autoBuildDisabledReason = computed(() => {
 
   return ''
 })
+const runtimeWebMenus = computed<RuntimeWebMenus>(() => {
+  const permissions = sessionStore.currentRuntimeUser?.permissions
+  const webMenus: Partial<RuntimeWebMenus> = permissions?.webMenus || {}
+
+  return {
+    ...DEFAULT_RUNTIME_WEB_MENUS,
+    ...webMenus,
+    syncAccount:
+      typeof webMenus.syncAccount === 'boolean'
+        ? webMenus.syncAccount
+        : Boolean((permissions as { syncAccount?: boolean } | undefined)?.syncAccount),
+  }
+})
 const canAccessSyncAccount = computed(
-  () => hasActiveChannel.value && Boolean(sessionStore.currentRuntimeUser?.permissions?.syncAccount)
+  () =>
+    hasActiveChannel.value &&
+    Boolean(runtimeWebMenus.value.actionButtons) &&
+    Boolean(runtimeWebMenus.value.syncAccount)
 )
 const canAccessBuildSubmit = computed(
   () =>
     hasActiveChannel.value &&
-    Boolean(sessionStore.currentRuntimeUser?.permissions?.webMenus?.buildSubmit)
+    Boolean(runtimeWebMenus.value.actionButtons) &&
+    Boolean(runtimeWebMenus.value.buildSubmit)
 )
-const canAccessOverview = computed(
-  () =>
+const canAccessDataDashboard = computed(() => {
+  const webMenus = runtimeWebMenus.value
+  return (
     hasActiveChannel.value &&
-    Boolean(sessionStore.currentRuntimeUser?.permissions?.webMenus?.overview)
+    Boolean(webMenus?.dashboard) &&
+    (Boolean(webMenus?.overview) || Boolean(webMenus?.report) || Boolean(webMenus?.orderStats))
+  )
+})
+const canAccessOverview = computed(
+  () => canAccessDataDashboard.value && Boolean(runtimeWebMenus.value.overview)
 )
 const canAccessReport = computed(
-  () =>
-    hasActiveChannel.value &&
-    Boolean(sessionStore.currentRuntimeUser?.permissions?.webMenus?.report)
+  () => canAccessDataDashboard.value && Boolean(runtimeWebMenus.value.report)
 )
 const canAccessOrderStats = computed(
-  () =>
-    hasActiveChannel.value &&
-    Boolean(sessionStore.currentRuntimeUser?.permissions?.webMenus?.orderStats)
+  () => canAccessDataDashboard.value && Boolean(runtimeWebMenus.value.orderStats)
 )
 const canAccessDramaClip = computed(
-  () =>
-    hasActiveChannel.value &&
-    Boolean(sessionStore.currentRuntimeUser?.permissions?.webMenus?.dramaClip)
+  () => hasActiveChannel.value && Boolean(runtimeWebMenus.value.dramaClip)
+)
+const canAccessFeishuBoard = computed(
+  () => hasActiveChannel.value && Boolean(runtimeWebMenus.value.feishuBoard)
 )
 const hasAccountTableId = computed(() => Boolean(apiConfigStore.config.accountTableId))
 const dashboardSubtitle = computed(() => '数据驱动，精准运营')
@@ -770,7 +821,7 @@ const activeChannelTabId = computed(
   () => sessionStore.activeChannelId || sessionStore.currentChannel?.id || ''
 )
 
-// ====== 首页 Tab 切换:数据看板 / 爆剧爆剪 / 飞书看板 ======
+// ====== 首页 Tab 切换:数据看板 / 爆剧爆剪 / 飞书表格 ======
 type HomeTabKey = 'dashboard' | 'clip' | 'feishu'
 
 const VALID_HOME_TABS: HomeTabKey[] = ['dashboard', 'clip', 'feishu']
@@ -798,29 +849,63 @@ const homeTabs = computed(() => {
     key: HomeTabKey
     label: string
     icon: string
-    disabledReason: string
-  }> = [
-    {
+  }> = []
+
+  if (canAccessDataDashboard.value) {
+    list.push({
       key: 'dashboard',
       label: '数据看板',
       icon: 'mdi:chart-line',
-      disabledReason: '',
-    },
-    {
+    })
+  }
+
+  if (canAccessDramaClip.value) {
+    list.push({
       key: 'clip',
       label: '爆剧爆剪',
       icon: 'mdi:fire',
-      disabledReason: canAccessDramaClip.value ? '' : '当前账号无爆剧爆剪权限',
-    },
-    {
+    })
+  }
+
+  if (canAccessFeishuBoard.value) {
+    list.push({
       key: 'feishu',
-      label: '飞书看板',
+      label: '飞书表格',
       icon: 'mdi:view-dashboard-outline',
-      disabledReason: '',
-    },
-  ]
+    })
+  }
+
   return list
 })
+
+const hasHomeTabs = computed(() => homeTabs.value.length > 0)
+const shouldShowHomeTabBar = computed(() => homeTabs.value.length > 1)
+
+function isHomeTabAllowed(tab: HomeTabKey) {
+  return homeTabs.value.some(item => item.key === tab)
+}
+
+function getFirstAllowedHomeTab() {
+  return homeTabs.value[0]?.key || ''
+}
+
+function ensureActiveHomeTab() {
+  if (!hasActiveChannel.value || !hasHomeTabs.value) return
+
+  if (isHomeTabAllowed(activeHomeTab.value)) {
+    return
+  }
+
+  const next = getFirstAllowedHomeTab()
+  if (!next) return
+
+  cancelHomeTabRequests(activeHomeTab.value)
+  activeHomeTab.value = next
+  if (next === 'clip') {
+    clipPaneActivated.value = true
+  }
+  syncHomeTabToUrl(next)
+}
 
 function updateHomeTabIndicator() {
   const idx = homeTabs.value.findIndex(tab => tab.key === activeHomeTab.value)
@@ -850,9 +935,7 @@ function syncHomeTabToUrl(tab: HomeTabKey) {
 
 async function handleHomeTabChange(tab: HomeTabKey) {
   if (activeHomeTab.value === tab) return
-  const target = homeTabs.value.find(t => t.key === tab)
-  if (target?.disabledReason) {
-    message.warning(target.disabledReason)
+  if (!isHomeTabAllowed(tab)) {
     return
   }
   cancelHomeTabRequests(activeHomeTab.value)
@@ -864,7 +947,7 @@ async function handleHomeTabChange(tab: HomeTabKey) {
   await nextTick()
   updateHomeTabIndicator()
 
-  // 切到数据看板 / 飞书看板时主动刷新数据
+  // 切到数据看板 / 飞书表格时主动刷新数据
   if (tab === 'dashboard' && hasActiveChannel.value) {
     loadDashboardData().catch(error => {
       console.error('刷新首页数据失败:', error)
@@ -1669,7 +1752,13 @@ async function fetchReportData() {
 }
 
 async function fetchOrdersData() {
-  if (!hasActiveChannel.value || !orderDateRange.value) return
+  if (!hasActiveChannel.value || !canAccessOrderStats.value || !orderDateRange.value) {
+    ordersData.value = null
+    ordersError.value = ''
+    ordersCurrentPage.value = 1
+    ordersPagination.page = 1
+    return
+  }
 
   const requestContext = beginDashboardRequest('orders')
   ordersLoading.value = true
@@ -1725,8 +1814,13 @@ async function loadChannelMaterialConfig() {
 }
 
 async function loadDashboardData() {
-  if (!hasActiveChannel.value) return
-  await Promise.all([fetchOverviewData(), fetchReportData(), fetchOrdersData()])
+  if (!hasActiveChannel.value || !canAccessDataDashboard.value) return
+
+  const tasks: Array<Promise<void>> = []
+  if (canAccessOverview.value) tasks.push(fetchOverviewData())
+  if (canAccessReport.value) tasks.push(fetchReportData())
+  if (canAccessOrderStats.value) tasks.push(fetchOrdersData())
+  await Promise.all(tasks)
 }
 
 function handleAutoBuildClick() {
@@ -1834,6 +1928,8 @@ async function handleChannelChange(value: string) {
     await refreshDashboardContext(signal)
     if (signal.aborted || currentSwitchSerial !== channelSwitchSerial) return
 
+    ensureActiveHomeTab()
+
     await loadChannelMaterialConfig()
     if (signal.aborted || currentSwitchSerial !== channelSwitchSerial) return
 
@@ -1908,6 +2004,7 @@ onMounted(async () => {
   reportDateRange.value = getDefaultDateRange()
   orderDateRange.value = getDefaultDateRange()
   await refreshDashboardContext()
+  ensureActiveHomeTab()
   adminApi.reportPageVisit('首页').catch((error: unknown) => {
     console.warn('记录首页访问日志失败:', error)
   })
@@ -1948,6 +2045,10 @@ watch(
     const next: HomeTabKey = VALID_HOME_TABS.includes(String(newVal) as HomeTabKey)
       ? (String(newVal) as HomeTabKey)
       : 'dashboard'
+    if (!isHomeTabAllowed(next)) {
+      ensureActiveHomeTab()
+      return
+    }
     if (next !== activeHomeTab.value) {
       cancelHomeTabRequests(activeHomeTab.value)
       activeHomeTab.value = next
@@ -1960,6 +2061,7 @@ watch(
   hasActiveChannel,
   active => {
     if (active) {
+      ensureActiveHomeTab()
       loadChannelMaterialConfig().catch(error => {
         console.error('加载抖音号匹配素材失败:', error)
       })
@@ -1972,6 +2074,12 @@ watch(
   },
   { immediate: false }
 )
+
+watch(homeTabs, async () => {
+  ensureActiveHomeTab()
+  await nextTick()
+  updateHomeTabIndicator()
+})
 
 watch(reportCurrentPage, page => {
   reportPagination.page = page

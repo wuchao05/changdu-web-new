@@ -6,7 +6,7 @@
           <span class="feishu-panel__icon-box">
             <Icon icon="mdi:view-dashboard-outline" class="feishu-panel__icon" />
           </span>
-          <span>飞书看板</span>
+          <span>飞书表格</span>
           <n-tag size="small" :bordered="false" type="info" class="feishu-panel__hint">只读</n-tag>
         </div>
         <p class="feishu-panel__subtitle">
@@ -103,11 +103,13 @@
               </div>
               <n-data-table
                 v-if="group.records.length"
+                class="feishu-panel__table"
                 size="small"
                 :columns="tableColumns"
                 :data="group.records"
                 :bordered="false"
                 :single-line="false"
+                :scroll-x="980"
                 striped
                 :row-key="getRowKey"
               />
@@ -262,7 +264,7 @@ const dateTabs = computed<DateTab[]>(() => {
     const prefix = DATE_OFFSET_LABELS[offset]
     tabs.push({
       key: day.format('YYYY-MM-DD'),
-      label: `${prefix} ${day.format('YYYY-MM-DD')}`,
+      label: prefix,
       date: day.format('YYYY-MM-DD'),
     })
   }
@@ -307,26 +309,26 @@ const tableColumns = computed<DataTableColumns<BoardRecord>>(() => [
   {
     title: '剧名',
     key: 'dramaName',
-    minWidth: 180,
+    width: 280,
     ellipsis: { tooltip: true },
   },
   {
     title: '账号',
     key: 'account',
-    width: 160,
+    width: 210,
     ellipsis: { tooltip: true },
     render: row => row.account || '—',
   },
   {
     title: '上架时间',
     key: 'publishTime',
-    width: 170,
+    width: 200,
     render: row => row.publishTime || '—',
   },
   {
     title: '评级',
     key: 'rating',
-    width: 90,
+    width: 130,
     render: row => {
       if (!row.rating) return '—'
       const type = RATING_TAG_TYPE[row.rating] || 'default'
@@ -336,7 +338,7 @@ const tableColumns = computed<DataTableColumns<BoardRecord>>(() => [
   {
     title: '日期',
     key: 'date',
-    width: 120,
+    width: 160,
     render: row => row.date || '—',
   },
 ])
@@ -704,6 +706,24 @@ watch(
   padding: 8px 4px 12px;
 }
 
+.feishu-panel__table {
+  width: 100%;
+}
+
+.feishu-panel__table :deep(.n-data-table-base-table-body),
+.feishu-panel__table :deep(.n-data-table-base-table-header) {
+  scrollbar-width: thin;
+}
+
+.feishu-panel__table :deep(.n-data-table-th),
+.feishu-panel__table :deep(.n-data-table-td) {
+  white-space: nowrap;
+}
+
+.feishu-panel__table :deep(.n-data-table-base-table) {
+  min-width: 980px;
+}
+
 .feishu-panel__empty {
   display: flex;
   flex-direction: column;
@@ -784,6 +804,19 @@ watch(
 
   .feishu-panel__group {
     padding: 12px 10px 4px;
+  }
+
+  .feishu-panel__date-tab {
+    gap: 5px;
+  }
+
+  .feishu-panel__date-tab-label {
+    white-space: nowrap;
+  }
+
+  .feishu-panel__table :deep(.n-data-table-base-table-body) {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
   }
 }
 </style>

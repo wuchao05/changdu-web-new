@@ -155,7 +155,11 @@
 
     <!-- 主要内容区域 -->
     <div class="clip-workspace" :class="{ 'has-adx-panel': showAdxDrawer }">
-      <div class="clip-main-content px-4 sm:px-6 lg:px-8 py-6 pt-2 sm:pt-2 md:pt-2">
+      <div
+        ref="clipMainContentRef"
+        class="clip-main-content px-4 sm:px-6 lg:px-8 py-6 pt-2 sm:pt-2 md:pt-2"
+        :style="{ '--clip-content-panel-min-height': `${clipContentPanelMinHeight}px` }"
+      >
         <!-- 自动提交下载状态栏 -->
         <div
           v-if="isAutoSubmitEnabledForCurrentChannel && activeTab === 'new-drama'"
@@ -797,7 +801,7 @@
 
 <script setup lang="ts">
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { NInput, NSelect, useMessage } from 'naive-ui'
 import { useRouter } from 'vue-router'
@@ -956,6 +960,7 @@ onBeforeUnmount(() => {
     clearTimeout(searchDebounceTimer)
     searchDebounceTimer = null
   }
+  window.removeEventListener('resize', updateClipContentPanelMinHeight)
   stopStatusPolling() // 清理服务端状态轮询
 })
 
@@ -976,6 +981,27 @@ const currentChannelLabel = computed(() => apiConfigStore.config.channelName || 
 const currentDramaListTableId = computed(
   () => apiConfigStore.config.dramaListTableId || FEISHU_CONFIG.table_ids.drama_list
 )
+
+function updateClipContentPanelMinHeight() {
+  if (typeof window === 'undefined' || !showAdxDrawer.value) {
+    clipContentPanelMinHeight.value = 0
+    return
+  }
+
+  const mainContent = clipMainContentRef.value
+  if (!mainContent) return
+
+  const panel = mainContent.querySelector('.new-drama-preview, .drama-list, .empty-state')
+  if (!panel) return
+
+  const panelTop = Math.max(0, panel.getBoundingClientRect().top)
+  const footer = document.querySelector('footer')
+  const footerTop = footer?.getBoundingClientRect().top ?? window.innerHeight
+  const bottomLimit = Math.min(window.innerHeight, footerTop)
+  const bottomGap = 16
+
+  clipContentPanelMinHeight.value = Math.max(0, Math.floor(bottomLimit - panelTop - bottomGap))
+}
 
 // 新增：排行榜相关数据
 // 排行榜数据类型定义
@@ -1052,6 +1078,8 @@ const autoSubmitCountdown = ref(0) // 倒计时（秒）
 const showAutoSubmitModal = ref(false) // 是否显示时间选择弹窗
 const autoSubmitStarting = ref(false)
 const showAdxDrawer = ref(false)
+const clipMainContentRef = ref<HTMLElement | null>(null)
+const clipContentPanelMinHeight = ref(0)
 const autoSubmitOnlyRedFlag = ref(false) // 是否只提交红标剧，默认false（提交所有剧）
 const autoSubmitRangeDays = ref<1 | 2 | 3>(3)
 
@@ -2882,6 +2910,8 @@ defineExpose({ cancelAllRequests: cancelAllListRequests })
 
 // 组件挂载时获取数据
 onMounted(async () => {
+  window.addEventListener('resize', updateClipContentPanelMinHeight)
+
   await syncCurrentChannelConfig()
 
   reportPageVisit('剧单页').catch((error: unknown) => {
@@ -2925,6 +2955,16 @@ onMounted(async () => {
   } catch (error) {
     console.log('检查服务端自动提交状态失败:', error)
   }
+
+  nextTick(updateClipContentPanelMinHeight)
+})
+
+watch(showAdxDrawer, () => {
+  nextTick(updateClipContentPanelMinHeight)
+})
+
+watch([activeTab, searchKeyword, listSkeletonLoading, searchLoading, rankingLoading], () => {
+  nextTick(updateClipContentPanelMinHeight)
 })
 
 watch(
@@ -2977,8 +3017,21 @@ watch(
 }
 
 .clip-workspace.has-adx-panel .clip-main-content {
+  flex: 1 1 0;
   max-width: none;
   margin: 0;
+}
+
+.clip-workspace.has-adx-panel > :deep(.adx-ranking-panel) {
+  flex: 0 0 380px;
+}
+
+.clip-workspace.has-adx-panel .clip-main-content > .new-drama-preview,
+.clip-workspace.has-adx-panel .clip-main-content > .drama-list,
+.clip-workspace.has-adx-panel .clip-main-content > .empty-state {
+  width: 100%;
+  min-width: 0;
+  min-height: max(0px, var(--clip-content-panel-min-height, 0px));
 }
 
 .filter-sticky.is-embedded {
@@ -3416,6 +3469,7 @@ watch(
   }
 
   .clip-workspace > :deep(.adx-ranking-panel) {
+    flex: none;
     order: 1;
     margin: 12px 16px 0;
     width: calc(100% - 32px);

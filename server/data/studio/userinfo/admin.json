@@ -8,18 +8,21 @@
     "105851f2677b59575690c66f004b7e076522f0cbad629e5f",
     "d6459d532055a4c562ee0511151aae13bed007400f608cbb",
     "64f460590eed6dba3f570e81e5c90505bf89f392f8d74fbd",
-    "8658a0bdcebce87f47aaad471166843466108cd6c1e56a26"
+    "8658a0bdcebce87f47aaad471166843466108cd6c1e56a26",
+    "3983754b403ead57c31185db46198ff6333e9a981cb01db7"
   ],
   "userType": "admin",
-  "channelIds": [
-    "5f0d85e6-26a0-4fe2-a0c5-30c78a8770df",
-    "00514b91-884d-40f8-9e67-6a593a9df74f"
-  ],
+  "channelIds": ["5f0d85e6-26a0-4fe2-a0c5-30c78a8770df", "00514b91-884d-40f8-9e67-6a593a9df74f"],
   "defaultChannelId": "5f0d85e6-26a0-4fe2-a0c5-30c78a8770df",
   "channelConfigs": {
     "5f0d85e6-26a0-4fe2-a0c5-30c78a8770df": {
       "enabled": true,
+      "xtToken": "",
+      "xtTokenConfig": {
+        "allowCustom": false
+      },
       "buildPreference": {
+        "allowCustom": false,
         "bid": ""
       },
       "buildAdvanceConfig": {
@@ -35,6 +38,7 @@
         "accountTableId": "tblrlxmzydVtPcbW"
       },
       "materialPreview": {
+        "allowCustom": false,
         "enabled": true,
         "intervalMinutes": 20,
         "buildTimeWindowStart": 90,
@@ -45,6 +49,8 @@
         "webMenus": {
           "overview": true,
           "report": true,
+          "orderStats": true,
+          "dramaClip": true,
           "buildSubmit": true
         },
         "desktopMenus": {
@@ -59,16 +65,11 @@
       "orderUserStats": {
         "enabled": true,
         "sortMode": "amount_desc",
-        "usernames": [
-          "小红",
-          "小何",
-          "虎哥",
-          "岁月",
-          "昱飞"
-        ]
+        "usernames": ["小红", "小何", "虎哥", "岁月", "昱飞"],
+        "childUserIds": []
       },
-      "independentOrderStats": {
-        "enabled": false
+      "douyinMaterialConfig": {
+        "allowCustom": false
       },
       "douyinMaterialMatches": [
         {
@@ -180,7 +181,12 @@
     },
     "00514b91-884d-40f8-9e67-6a593a9df74f": {
       "enabled": true,
+      "xtToken": "",
+      "xtTokenConfig": {
+        "allowCustom": false
+      },
       "buildPreference": {
+        "allowCustom": false,
         "bid": ""
       },
       "buildAdvanceConfig": {
@@ -196,6 +202,7 @@
         "accountTableId": ""
       },
       "materialPreview": {
+        "allowCustom": false,
         "enabled": false,
         "intervalMinutes": 20,
         "buildTimeWindowStart": 90,
@@ -206,6 +213,8 @@
         "webMenus": {
           "overview": true,
           "report": true,
+          "orderStats": true,
+          "dramaClip": true,
           "buildSubmit": true
         },
         "desktopMenus": {
@@ -220,10 +229,11 @@
       "orderUserStats": {
         "enabled": false,
         "sortMode": "manual",
-        "usernames": []
+        "usernames": [],
+        "childUserIds": []
       },
-      "independentOrderStats": {
-        "enabled": false
+      "douyinMaterialConfig": {
+        "allowCustom": false
       },
       "douyinMaterialMatches": []
     }
@@ -356,11 +366,12 @@
     "accountTableId": "tblrlxmzydVtPcbW"
   },
   "materialPreview": {
+    "allowCustom": false,
     "enabled": true,
     "intervalMinutes": 20,
     "buildTimeWindowStart": 90,
     "buildTimeWindowEnd": 20
   },
   "createdAt": "2026-03-26T13:32:12.621Z",
-  "updatedAt": "2026-04-16T08:51:03.018Z"
+  "updatedAt": "2026-04-27T16:41:06.362Z"
 }

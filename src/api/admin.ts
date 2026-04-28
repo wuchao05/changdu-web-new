@@ -47,13 +47,16 @@ export interface UserChannelBindingConfig {
     buildTimeWindowEnd: number
   }
   permissions: {
-    syncAccount: boolean
     webMenus: {
+      dashboard: boolean
       overview: boolean
       report: boolean
       orderStats: boolean
       dramaClip: boolean
+      feishuBoard: boolean
+      actionButtons: boolean
       buildSubmit: boolean
+      syncAccount: boolean
     }
     desktopMenus: {
       download: boolean
@@ -133,13 +136,16 @@ export interface UserProfile {
     buildTimeWindowEnd: number
   }
   permissions?: {
-    syncAccount: boolean
     webMenus: {
+      dashboard: boolean
       overview: boolean
       report: boolean
       orderStats: boolean
       dramaClip: boolean
+      feishuBoard: boolean
+      actionButtons: boolean
       buildSubmit: boolean
+      syncAccount: boolean
     }
     desktopMenus: {
       download: boolean
@@ -190,9 +196,6 @@ export interface ChannelConfig {
     adUserId: string
     rootAdUserId: string
     appId: string
-  }
-  adx?: {
-    cookie: string
   }
   createdAt: string
   updatedAt: string
@@ -437,9 +440,6 @@ export function getCurrentSession(init?: RequestInit) {
       }
       juliang?: {
         channel?: string
-      }
-      adx?: {
-        cookie?: string
       }
     }
     feishu: {

@@ -7,7 +7,12 @@
     leave-from-class="transform translate-x-0 opacity-100"
     leave-to-class="transform translate-x-4 opacity-0"
   >
-    <aside v-if="visible" class="adx-ranking-panel">
+    <aside
+      v-if="visible"
+      ref="panelRef"
+      class="adx-ranking-panel"
+      :style="{ maxHeight: `${panelMaxHeight}px` }"
+    >
       <div class="adx-panel-header">
         <div class="adx-panel-title-wrap">
           <div class="adx-panel-eyebrow">ADX 热力</div>
@@ -87,8 +92,27 @@
             </n-button>
           </div>
 
-          <n-spin :show="loading">
-            <div v-if="rankingList.length" class="ranking-list">
+          <n-spin :show="loading && rankingList.length > 0">
+            <div v-if="loading && !rankingList.length" class="adx-loading-state">
+              <div class="adx-loading-orbit" aria-hidden="true">
+                <span class="adx-loading-orbit-dot dot-1"></span>
+                <span class="adx-loading-orbit-dot dot-2"></span>
+                <span class="adx-loading-orbit-core">
+                  <Icon icon="mdi:fire" />
+                </span>
+              </div>
+              <div class="adx-loading-copy">
+                <p class="adx-loading-title">正在拉取 ADX 热力榜</p>
+                <p class="adx-loading-desc">同步榜期数据与热力变化，请稍候</p>
+              </div>
+              <div class="adx-loading-bars" aria-hidden="true">
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </div>
+            <div v-else-if="rankingList.length" class="ranking-list">
               <div
                 v-for="item in rankingList"
                 :key="`${item.ranking}-${item.playletId}`"
@@ -153,7 +177,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
   NButton,
   NEmpty,
@@ -224,6 +248,9 @@ watch(
 )
 watch(visible, v => {
   emit('update:show', v)
+  if (v) {
+    nextTick(updatePanelMaxHeight)
+  }
 })
 
 const activeTab = ref<RankingTab>('day')
@@ -236,11 +263,51 @@ const monthPeriodOptions = ref<PeriodOption[]>([])
 const loading = ref(false)
 const rankingList = ref<AdxRankingItem[]>([])
 const unauthorized = ref(false)
+const panelRef = ref<HTMLElement | null>(null)
+const panelMaxHeight = ref(520)
 
 // Cookie 配置
 const showCookieModal = ref(false)
 const cookieInput = ref('')
 const savingCookie = ref(false)
+
+function updatePanelMaxHeight() {
+  if (typeof window === 'undefined') return
+
+  const panel = panelRef.value
+  if (!panel) return
+
+  const panelTop = panel?.getBoundingClientRect().top ?? 0
+  const footer = document.querySelector('footer')
+  const footerTop = footer?.getBoundingClientRect().top ?? window.innerHeight
+  const bottomLimit = Math.min(window.innerHeight, footerTop)
+  const bottomGap = 16
+  const minHeight = 280
+  const availableHeight = Math.max(minHeight, Math.floor(bottomLimit - panelTop - bottomGap))
+
+  if (window.innerWidth <= 640) {
+    const headerHeight =
+      panel.querySelector('.adx-panel-header')?.getBoundingClientRect().height || 0
+    const tabsHeight = panel.querySelector('.n-tabs')?.getBoundingClientRect().height || 0
+    const periodHeight =
+      panel.querySelector('.period-select-wrap')?.getBoundingClientRect().height || 0
+    const rankingItems = Array.from(panel.querySelectorAll('.ranking-item')).slice(0, 3)
+    const rankingHeight = rankingItems.reduce(
+      (total, item) => total + item.getBoundingClientRect().height,
+      0
+    )
+    const rankingGap = rankingItems.length > 1 ? (rankingItems.length - 1) * 8 : 0
+    const bodyPaddingAndSpacing = 44
+    const mobileHeight = Math.ceil(
+      headerHeight + tabsHeight + periodHeight + rankingHeight + rankingGap + bodyPaddingAndSpacing
+    )
+
+    panelMaxHeight.value = Math.min(availableHeight, Math.max(minHeight, mobileHeight || 420))
+    return
+  }
+
+  panelMaxHeight.value = availableHeight
+}
 
 const currentPeriodOptions = computed(() => {
   if (activeTab.value === 'day') return dayPeriodOptions.value
@@ -440,6 +507,7 @@ async function fetchRanking() {
 
     if (data?.statusCode === 200 || data?.code === 0) {
       rankingList.value = normalizeRankingList(data)
+      nextTick(updatePanelMaxHeight)
     } else {
       message.warning(data?.msg || data?.message || '获取榜单失败')
     }
@@ -479,27 +547,36 @@ watch(visible, v => {
     initPeriodOptions()
     loadCookie()
     fetchRanking()
+    nextTick(updatePanelMaxHeight)
   }
 })
 
 onMounted(() => {
+  window.addEventListener('resize', updatePanelMaxHeight)
+  window.addEventListener('scroll', updatePanelMaxHeight, true)
   initPeriodOptions()
   if (props.show) {
     loadCookie()
     fetchRanking()
+    nextTick(updatePanelMaxHeight)
   }
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', updatePanelMaxHeight)
+  window.removeEventListener('scroll', updatePanelMaxHeight, true)
 })
 </script>
 
 <style scoped>
 .adx-ranking-panel {
+  --adx-panel-sticky-top: 92px;
   position: sticky;
-  top: 92px;
+  top: var(--adx-panel-sticky-top);
   align-self: flex-start;
   display: flex;
   flex-direction: column;
   width: 380px;
-  max-height: calc(100vh - 112px);
   overflow: hidden;
   border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 20px;
@@ -632,6 +709,216 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.adx-loading-state {
+  position: relative;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  overflow: hidden;
+  padding: 30px 22px;
+  border: 1px solid rgba(147, 197, 253, 0.32);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 50% 20%, rgba(59, 130, 246, 0.16), transparent 32%),
+    linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(239, 246, 255, 0.78));
+}
+
+.adx-loading-state::before,
+.adx-loading-state::after {
+  content: '';
+  position: absolute;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, rgba(37, 99, 235, 0.16), transparent);
+  animation: adx-loading-shimmer 2.6s ease-in-out infinite;
+}
+
+.adx-loading-state::before {
+  top: 34px;
+  left: -36px;
+  width: 170px;
+  height: 8px;
+}
+
+.adx-loading-state::after {
+  right: -48px;
+  bottom: 46px;
+  width: 190px;
+  height: 8px;
+  animation-delay: 0.7s;
+}
+
+.adx-loading-orbit {
+  position: relative;
+  width: 86px;
+  height: 86px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow:
+    inset 0 0 0 1px rgba(147, 197, 253, 0.28),
+    0 18px 42px -26px rgba(37, 99, 235, 0.55);
+}
+
+.adx-loading-orbit::before {
+  content: '';
+  position: absolute;
+  inset: 7px;
+  border-radius: inherit;
+  border: 2px solid rgba(59, 130, 246, 0.14);
+  border-top-color: rgba(37, 99, 235, 0.78);
+  border-right-color: rgba(16, 185, 129, 0.58);
+  animation: adx-loading-spin 1.4s linear infinite;
+}
+
+.adx-loading-orbit-core {
+  position: relative;
+  z-index: 1;
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  color: #2563eb;
+  font-size: 24px;
+  background: linear-gradient(135deg, #eff6ff, #dcfce7);
+  animation: adx-loading-pulse 1.8s ease-in-out infinite;
+}
+
+.adx-loading-orbit-dot {
+  position: absolute;
+  z-index: 2;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #16a34a;
+  box-shadow: 0 0 18px rgba(22, 163, 74, 0.58);
+}
+
+.adx-loading-orbit-dot.dot-1 {
+  top: 12px;
+  right: 18px;
+  animation: adx-loading-float 1.7s ease-in-out infinite;
+}
+
+.adx-loading-orbit-dot.dot-2 {
+  left: 16px;
+  bottom: 16px;
+  width: 7px;
+  height: 7px;
+  background: #2563eb;
+  animation: adx-loading-float 1.7s ease-in-out infinite reverse;
+}
+
+.adx-loading-copy {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+}
+
+.adx-loading-title {
+  margin: 0;
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.adx-loading-desc {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.adx-loading-bars {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(4, 18px);
+  align-items: end;
+  gap: 7px;
+  height: 34px;
+}
+
+.adx-loading-bars span {
+  display: block;
+  border-radius: 999px 999px 6px 6px;
+  background: linear-gradient(180deg, #2563eb, #16a34a);
+  animation: adx-loading-bar 1.1s ease-in-out infinite;
+}
+
+.adx-loading-bars span:nth-child(1) {
+  height: 18px;
+}
+
+.adx-loading-bars span:nth-child(2) {
+  height: 28px;
+  animation-delay: 0.12s;
+}
+
+.adx-loading-bars span:nth-child(3) {
+  height: 22px;
+  animation-delay: 0.24s;
+}
+
+.adx-loading-bars span:nth-child(4) {
+  height: 32px;
+  animation-delay: 0.36s;
+}
+
+@keyframes adx-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes adx-loading-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+@keyframes adx-loading-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -6px, 0);
+  }
+}
+
+@keyframes adx-loading-bar {
+  0%,
+  100% {
+    transform: scaleY(0.68);
+    opacity: 0.58;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+@keyframes adx-loading-shimmer {
+  0%,
+  100% {
+    transform: translateX(0);
+    opacity: 0.34;
+  }
+  50% {
+    transform: translateX(46px);
+    opacity: 0.8;
+  }
 }
 
 .ranking-item {
@@ -795,7 +1082,6 @@ onMounted(() => {
     position: relative;
     top: auto;
     width: 100%;
-    max-height: 520px;
   }
 }
 

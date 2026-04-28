@@ -71,9 +71,6 @@ export async function readAuthConfig(ctx = null) {
       juliang: {
         channel: targetChannel?.juliang?.cookie || '',
       },
-      adx: {
-        cookie: '',
-      },
     },
     buildConfig: normalizeBuildConfig(targetChannel?.juliang?.buildConfig || DEFAULT_BUILD_CONFIG),
   }
@@ -112,9 +109,6 @@ router.get('/config', async ctx => {
           },
           juliang: {
             channel: channel?.juliang?.cookie || '',
-          },
-          adx: {
-            cookie: '',
           },
         },
         feishu: {
