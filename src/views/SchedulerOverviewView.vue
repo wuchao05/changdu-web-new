@@ -778,7 +778,11 @@ async function handleTaskToggle(
           tableId: task.tableId || undefined,
         })
       } else {
-        await adminStopBackgroundScheduler({ userId, channelId })
+        await adminStopBackgroundScheduler({
+          userId,
+          channelId,
+          tableId: task.tableId || undefined,
+        })
       }
     } else if (task.key === 'materialPreview') {
       if (enable) {

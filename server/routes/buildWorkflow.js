@@ -10,6 +10,7 @@ import {
   stopScheduler,
   getSchedulerStatus,
   triggerSchedulerBuild,
+  buildSchedulerInstanceKey,
 } from '../services/buildWorkflowScheduler.js'
 import {
   generateMicroAppLink,
@@ -18,7 +19,6 @@ import {
 } from '../utils/buildWorkflowUtils.js'
 import { clearExistingProjects } from '../utils/buildWorkflowProjectCleanup.js'
 import { createSessionRuntimeContextMiddleware } from '../utils/runtimeContextMiddleware.js'
-import { buildRuntimeInstanceKey } from '../utils/runtimeInstance.js'
 import { readUser, resolveRuntimeContext } from '../utils/studioData.js'
 import { normalizeChannelRuntime } from '../utils/channelRuntime.js'
 import { resolveEffectiveBuildBid } from '../utils/buildBid.js'
@@ -266,7 +266,10 @@ router.post('/validate-build-window', async ctx => {
 
     const buildConfig = ctx.state.channelRuntime?.buildConfig || {}
     const materialStatus = shouldValidateMaterialLibrary(ctx)
-      ? await queryDramaMaterialLibraryStatus(drama, String(getRuntimeUser(ctx)?.xtToken || '').trim())
+      ? await queryDramaMaterialLibraryStatus(
+          drama,
+          String(getRuntimeUser(ctx)?.xtToken || '').trim()
+        )
       : buildBypassMaterialStatus(drama)
     const earliestBuildTime = getEarliestBuildTime(drama, buildConfig)
     const canBuildByTime = canBuildDramaNow(drama, new Date(), buildConfig)
@@ -309,7 +312,10 @@ router.post('/material-library-statuses', async ctx => {
   try {
     const dramas = Array.isArray(ctx.request.body?.dramas) ? ctx.request.body.dramas : []
     const items = shouldValidateMaterialLibrary(ctx)
-      ? await queryDramaMaterialLibraryStatuses(dramas, String(getRuntimeUser(ctx)?.xtToken || '').trim())
+      ? await queryDramaMaterialLibraryStatuses(
+          dramas,
+          String(getRuntimeUser(ctx)?.xtToken || '').trim()
+        )
       : dramas.map(drama => buildBypassMaterialStatus(drama))
 
     ctx.body = {
@@ -2168,7 +2174,10 @@ function sleep(ms) {
 router.post('/scheduler/start', async ctx => {
   try {
     const { intervalMinutes, table_id } = ctx.request.body
-    console.log('[搭建调度器API] 用户启动，instanceKey:', buildRuntimeInstanceKey(ctx.state.buildWorkflowContext))
+    console.log(
+      '[搭建调度器API] 用户启动，instanceKey:',
+      buildSchedulerInstanceKey(ctx.state.buildWorkflowContext, table_id)
+    )
 
     if (!intervalMinutes || typeof intervalMinutes !== 'number' || intervalMinutes < 1) {
       ctx.status = 400
@@ -2211,8 +2220,21 @@ router.post('/scheduler/start', async ctx => {
  */
 router.post('/scheduler/stop', async ctx => {
   try {
-    console.log('[搭建调度器API] 用户停止，instanceKey:', buildRuntimeInstanceKey(ctx.state.buildWorkflowContext))
-    const status = await stopScheduler(ctx.state.buildWorkflowContext)
+    const { table_id } = ctx.request.body || {}
+    if (typeof table_id !== 'undefined' && typeof table_id !== 'string') {
+      ctx.status = 400
+      ctx.body = {
+        code: -1,
+        message: 'table_id 必须是字符串',
+      }
+      return
+    }
+
+    console.log(
+      '[搭建调度器API] 用户停止，instanceKey:',
+      buildSchedulerInstanceKey(ctx.state.buildWorkflowContext, table_id)
+    )
+    const status = await stopScheduler(table_id, ctx.state.buildWorkflowContext)
 
     ctx.body = {
       code: 0,
@@ -2235,7 +2257,17 @@ router.post('/scheduler/stop', async ctx => {
  */
 router.get('/scheduler/status', async ctx => {
   try {
-    const instanceKey = buildRuntimeInstanceKey(ctx.state.buildWorkflowContext)
+    const table_id = ctx.query.table_id
+    if (typeof table_id !== 'undefined' && typeof table_id !== 'string') {
+      ctx.status = 400
+      ctx.body = {
+        code: -1,
+        message: 'table_id 必须是字符串',
+      }
+      return
+    }
+
+    const instanceKey = buildSchedulerInstanceKey(ctx.state.buildWorkflowContext, table_id)
     const status = getSchedulerStatus(instanceKey)
 
     ctx.body = {
@@ -2337,15 +2369,24 @@ async function resolveAdminTargetContext(ctx) {
 router.post('/scheduler/admin/start', async ctx => {
   try {
     const targetContext = await resolveAdminTargetContext(ctx)
-    const resolvedKey = buildRuntimeInstanceKey(targetContext)
-    console.log('[搭建调度器API] 管理员启动，目标 instanceKey:', resolvedKey)
     const { intervalMinutes, table_id } = ctx.request.body || {}
+    const resolvedKey = buildSchedulerInstanceKey(targetContext, table_id)
+    console.log('[搭建调度器API] 管理员启动，目标 instanceKey:', resolvedKey)
 
     if (!intervalMinutes || typeof intervalMinutes !== 'number' || intervalMinutes < 1) {
       ctx.status = 400
       ctx.body = {
         code: -1,
         message: '轮询间隔必须是大于等于1的数字（单位：分钟）',
+      }
+      return
+    }
+
+    if (typeof table_id !== 'undefined' && typeof table_id !== 'string') {
+      ctx.status = 400
+      ctx.body = {
+        code: -1,
+        message: 'table_id 必须是字符串',
       }
       return
     }
@@ -2370,9 +2411,19 @@ router.post('/scheduler/admin/start', async ctx => {
 router.post('/scheduler/admin/stop', async ctx => {
   try {
     const targetContext = await resolveAdminTargetContext(ctx)
-    const resolvedKey = buildRuntimeInstanceKey(targetContext)
+    const { table_id } = ctx.request.body || {}
+    if (typeof table_id !== 'undefined' && typeof table_id !== 'string') {
+      ctx.status = 400
+      ctx.body = {
+        code: -1,
+        message: 'table_id 必须是字符串',
+      }
+      return
+    }
+
+    const resolvedKey = buildSchedulerInstanceKey(targetContext, table_id)
     console.log('[搭建调度器API] 管理员停止，目标 instanceKey:', resolvedKey)
-    const status = await stopScheduler(targetContext)
+    const status = await stopScheduler(table_id, targetContext)
 
     ctx.body = {
       code: 0,

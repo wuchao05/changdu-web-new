@@ -18,7 +18,7 @@ import {
 } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 import { Icon } from '@iconify/vue'
-import { feishuApi } from '@/api/feishu'
+import { feishuApi, type RuntimeFeishuTableGroup } from '@/api/feishu'
 import { FEISHU_CONFIG } from '@/config/feishu'
 import * as adminApi from '@/api/admin'
 import {
@@ -140,6 +140,19 @@ interface FeishuDramaRecord {
   }
 }
 
+interface SchedulerTableTarget {
+  id: string
+  name: string
+  tableId: string
+}
+
+interface BackgroundSchedulerEntry {
+  key: string
+  target: SchedulerTableTarget
+  status: buildWorkflowApi.BackgroundSchedulerStatus
+  isLegacy?: boolean
+}
+
 function getDramaRowKey(drama: FeishuDramaRecord) {
   return `${drama._tableId || ''}::${drama.record_id}`
 }
@@ -220,8 +233,11 @@ type RunMode = 'frontend' | 'backend'
 const runMode = ref<RunMode>('frontend') // 运行模式：前台/后台
 const showRunModeSelector = ref(false) // 是否显示运行模式选择器
 
-// 后台调度器状态
-const backgroundSchedulerStatus = ref<buildWorkflowApi.BackgroundSchedulerStatus | null>(null)
+// 后台调度器状态：按状态表隔离，避免多个飞书组共用同一个后台实例
+const backgroundSchedulerStatusMap = ref<
+  Record<string, buildWorkflowApi.BackgroundSchedulerStatus>
+>({})
+const legacyBackgroundSchedulerStatus = ref<buildWorkflowApi.BackgroundSchedulerStatus | null>(null)
 const isLoadingBackgroundStatus = ref(false)
 const backgroundPollingTimer = ref<ReturnType<typeof setInterval> | null>(null) // 后台状态轮询定时器
 const materialPreviewConfig = ref<adminApi.UserChannelBindingConfig['materialPreview'] | null>(null)
@@ -667,10 +683,10 @@ const dramasColumns = computed<DataTableColumns<FeishuDramaRecord>>(() => {
       render: row => {
         const isBuilding = manuallyBuildingIds.value.has(getDramaRowKey(row))
         const canBuild = canBuildDrama(row)
-        // 只有后台模式正在运行且有任务执行时，才禁用按钮
-        const isBackgroundRunning = backgroundSchedulerStatus.value?.enabled === true
-        const hasRunningTask =
-          isBackgroundRunning && backgroundSchedulerStatus.value?.currentTask !== null
+        // 只按当前剧集所在表格组判断后台任务，避免不同飞书组互相锁住按钮
+        const rowBackgroundStatus = getBackgroundStatusForDrama(row)
+        const isBackgroundRunning = rowBackgroundStatus?.enabled === true
+        const hasRunningTask = isBackgroundRunning && rowBackgroundStatus?.currentTask !== null
         const disabled = isBuilding || hasRunningTask || !canBuild
 
         return h(
@@ -752,6 +768,113 @@ const currentMaterialPreviewSummary = computed(() => {
   return `${materialPreviewConfig.value.intervalMinutes} 分钟 / ${materialPreviewConfig.value.buildTimeWindowStart}-${materialPreviewConfig.value.buildTimeWindowEnd} 分钟`
 })
 
+function getSchedulerTableKey(tableId?: string | null) {
+  return String(tableId || FEISHU_CONFIG.table_ids.drama_status || 'default').trim() || 'default'
+}
+
+function normalizeSchedulerTableTarget(
+  group: RuntimeFeishuTableGroup,
+  index: number
+): SchedulerTableTarget | null {
+  const tableId = String(group.feishu?.dramaStatusTableId || '').trim()
+  if (!tableId) {
+    return null
+  }
+
+  return {
+    id: String(group.id || (index === 0 ? 'default' : `group-${index + 1}`)).trim(),
+    name: String(group.name || (index === 0 ? '默认表格' : `表格组 ${index + 1}`)).trim(),
+    tableId,
+  }
+}
+
+const schedulerTableTargets = computed<SchedulerTableTarget[]>(() => {
+  const targets = feishuApi
+    .getRuntimeFeishuTableGroups()
+    .map(normalizeSchedulerTableTarget)
+    .filter((target): target is SchedulerTableTarget => Boolean(target?.tableId))
+
+  if (targets.length > 0) {
+    return targets
+  }
+
+  return [
+    {
+      id: 'default',
+      name: '默认表格',
+      tableId: FEISHU_CONFIG.table_ids.drama_status,
+    },
+  ]
+})
+
+function getSchedulerTargetByTableId(tableId?: string | null) {
+  const normalizedTableId = String(tableId || '').trim()
+  return schedulerTableTargets.value.find(target => target.tableId === normalizedTableId) || null
+}
+
+function getDramaSchedulerTarget(drama: FeishuDramaRecord): SchedulerTableTarget {
+  const tableId = String(drama._tableId || '').trim()
+  const configuredTarget = getSchedulerTargetByTableId(tableId)
+  if (configuredTarget) {
+    return configuredTarget
+  }
+
+  return {
+    id: String(drama._feishuTableGroupId || tableId || 'default').trim(),
+    name: String(drama._feishuTableGroupName || (tableId ? `表格 ${tableId}` : '默认表格')).trim(),
+    tableId: tableId || FEISHU_CONFIG.table_ids.drama_status,
+  }
+}
+
+function getBackgroundStatusForTableId(tableId?: string | null) {
+  return backgroundSchedulerStatusMap.value[getSchedulerTableKey(tableId)] || null
+}
+
+function getBackgroundStatusForDrama(drama: FeishuDramaRecord) {
+  return getBackgroundStatusForTableId(getDramaSchedulerTarget(drama).tableId)
+}
+
+const backgroundSchedulerEntries = computed<BackgroundSchedulerEntry[]>(() => {
+  const entries: BackgroundSchedulerEntry[] = []
+
+  schedulerTableTargets.value.forEach(target => {
+    const status = backgroundSchedulerStatusMap.value[getSchedulerTableKey(target.tableId)]
+    if (status) {
+      entries.push({
+        key: getSchedulerTableKey(target.tableId),
+        target,
+        status,
+      })
+    }
+  })
+
+  const legacyStatus = legacyBackgroundSchedulerStatus.value
+  if (legacyStatus?.enabled || legacyStatus?.currentTask) {
+    entries.push({
+      key: 'legacy',
+      target: {
+        id: 'legacy',
+        name: legacyStatus.tableId ? '旧全局调度器' : '旧全局调度器（所有表格）',
+        tableId: legacyStatus.tableId || '',
+      },
+      status: legacyStatus,
+      isLegacy: true,
+    })
+  }
+
+  return entries
+})
+
+const enabledBackgroundSchedulerEntries = computed(() =>
+  backgroundSchedulerEntries.value.filter(entry => entry.status.enabled)
+)
+const hasAnyBackgroundSchedulerEnabled = computed(
+  () => enabledBackgroundSchedulerEntries.value.length > 0
+)
+const hasAnyBackgroundCurrentTask = computed(() =>
+  enabledBackgroundSchedulerEntries.value.some(entry => Boolean(entry.status.currentTask))
+)
+
 // 监听显示状态变化
 function handleUpdateShow(show: boolean) {
   if (!show) {
@@ -773,7 +896,7 @@ watch(
         loadBuildAdvancePanelData(),
       ])
       // 如果后台调度器正在运行，开始轮询状态
-      if (backgroundSchedulerStatus.value?.enabled) {
+      if (hasAnyBackgroundSchedulerEnabled.value) {
         startBackgroundStatusPolling()
       }
       startMaterialPreviewPolling()
@@ -1226,11 +1349,24 @@ function stopAutoPolling() {
 async function loadBackgroundSchedulerStatus() {
   try {
     isLoadingBackgroundStatus.value = true
-    const result = await buildWorkflowApi.getBackgroundSchedulerStatus()
-    backgroundSchedulerStatus.value = result.data
+    const statusResults = await Promise.all(
+      schedulerTableTargets.value.map(async target => ({
+        target,
+        result: await buildWorkflowApi.getBackgroundSchedulerStatus(target.tableId),
+      }))
+    )
+    const nextStatusMap: Record<string, buildWorkflowApi.BackgroundSchedulerStatus> = {}
+    statusResults.forEach(({ target, result }) => {
+      nextStatusMap[getSchedulerTableKey(target.tableId)] = result.data
+    })
+    backgroundSchedulerStatusMap.value = nextStatusMap
+
+    const legacyResult = await buildWorkflowApi.getBackgroundSchedulerStatus()
+    legacyBackgroundSchedulerStatus.value =
+      legacyResult.data.enabled || legacyResult.data.currentTask ? legacyResult.data : null
 
     // 如果后台没有正在运行的任务，清空搭建中状态
-    if (!result.data.currentTask) {
+    if (!hasAnyBackgroundCurrentTask.value) {
       manuallyBuildingIds.value.clear()
     }
   } catch (error) {
@@ -1245,9 +1381,23 @@ async function loadBackgroundSchedulerStatus() {
  */
 async function startBackgroundScheduler(intervalMinutes: number) {
   try {
-    const result = await buildWorkflowApi.startBackgroundScheduler(intervalMinutes)
-    backgroundSchedulerStatus.value = result.data
-    message.success(`后台调度器已启动，轮询间隔：${intervalMinutes}分钟`)
+    const targets = schedulerTableTargets.value
+    const results = await Promise.all(
+      targets.map(async target => ({
+        target,
+        result: await buildWorkflowApi.startBackgroundScheduler(intervalMinutes, target.tableId),
+      }))
+    )
+    const nextStatusMap = { ...backgroundSchedulerStatusMap.value }
+    results.forEach(({ target, result }) => {
+      nextStatusMap[getSchedulerTableKey(target.tableId)] = result.data
+    })
+    backgroundSchedulerStatusMap.value = nextStatusMap
+    message.success(
+      targets.length > 1
+        ? `已启动 ${targets.length} 个表格组后台调度器，轮询间隔：${intervalMinutes}分钟`
+        : `后台调度器已启动，轮询间隔：${intervalMinutes}分钟`
+    )
 
     // 开始轮询后台状态
     startBackgroundStatusPolling()
@@ -1260,14 +1410,37 @@ async function startBackgroundScheduler(intervalMinutes: number) {
 /**
  * 停止后台调度器
  */
-async function stopBackgroundScheduler() {
+async function stopBackgroundScheduler(entry?: BackgroundSchedulerEntry) {
   try {
-    const result = await buildWorkflowApi.stopBackgroundScheduler()
-    backgroundSchedulerStatus.value = result.data
-    message.info('后台调度器已停止')
+    const targetEntries = entry ? [entry] : enabledBackgroundSchedulerEntries.value
+    if (targetEntries.length === 0) {
+      return
+    }
+
+    const results = await Promise.all(
+      targetEntries.map(async item => ({
+        item,
+        result: await buildWorkflowApi.stopBackgroundScheduler(
+          item.isLegacy ? undefined : item.target.tableId
+        ),
+      }))
+    )
+
+    const nextStatusMap = { ...backgroundSchedulerStatusMap.value }
+    results.forEach(({ item, result }) => {
+      if (item.isLegacy) {
+        legacyBackgroundSchedulerStatus.value = result.data
+      } else {
+        nextStatusMap[getSchedulerTableKey(item.target.tableId)] = result.data
+      }
+    })
+    backgroundSchedulerStatusMap.value = nextStatusMap
+    message.info(entry ? `${entry.target.name} 后台调度器已停止` : '后台调度器已全部停止')
 
     // 停止轮询后台状态
-    stopBackgroundStatusPolling()
+    if (!hasAnyBackgroundSchedulerEnabled.value) {
+      stopBackgroundStatusPolling()
+    }
   } catch (error) {
     console.error('停止后台调度器失败:', error)
     message.error(`停止后台调度器失败: ${getErrorMessage(error)}`)
@@ -1435,8 +1608,8 @@ async function handleBuildSingleDrama(drama: FeishuDramaRecord) {
     return
   }
 
-  // 如果后台调度器正在运行，使用后台手动搭建模式
-  if (backgroundSchedulerStatus.value?.enabled) {
+  // 如果该剧集所属表格组的后台调度器正在运行，使用对应后台实例手动搭建
+  if (getBackgroundStatusForDrama(drama)?.enabled) {
     await handleBackgroundManualBuild(drama)
   } else {
     await startAutoBuildWithDramas([drama])
@@ -1448,20 +1621,22 @@ async function handleBackgroundManualBuild(drama: FeishuDramaRecord) {
   const dramaId = drama.record_id
   const dramaRowKey = getDramaRowKey(drama)
   const dramaName = drama.fields['剧名']?.[0]?.text || '未知'
+  const schedulerTarget = getDramaSchedulerTarget(drama)
 
   // 添加到搭建中集合
   manuallyBuildingIds.value.add(dramaRowKey)
 
   // 立即返回提示
-  message.success(`已提交至后台搭建：${dramaName}`)
+  message.success(`已提交至「${schedulerTarget.name}」后台搭建：${dramaName}`)
 
   // 异步调用后台搭建API，不等待结果
   buildWorkflowApi
     .triggerBackgroundSchedulerBuild({
       dramaId: dramaId, // 传递剧集ID，指定搭建该剧集
-      tableId: drama._tableId,
+      tableId: schedulerTarget.tableId,
     })
     .then(() => {
+      manuallyBuildingIds.value.delete(dramaRowKey)
       // 刷新状态
       loadBackgroundSchedulerStatus()
     })
@@ -2282,7 +2457,7 @@ onBeforeUnmount(() => {
               :disabled="
                 autoPollingEnabled ||
                 isBuilding ||
-                backgroundSchedulerStatus?.enabled ||
+                hasAnyBackgroundSchedulerEnabled ||
                 showRunModeSelector
               "
               style="width: 160px"
@@ -2506,7 +2681,7 @@ onBeforeUnmount(() => {
       </n-alert>
 
       <!-- 后台调度器运行状态 -->
-      <div v-if="backgroundSchedulerStatus?.enabled" class="polling-state">
+      <div v-if="enabledBackgroundSchedulerEntries.length > 0" class="polling-state">
         <n-alert type="success" class="polling-info">
           <template #icon>
             <Icon icon="mdi:cloud-sync-outline" class="polling-icon" />
@@ -2516,108 +2691,139 @@ onBeforeUnmount(() => {
               <div class="polling-title-wrapper">
                 <span class="polling-title">后台自动搭建运行中</span>
                 <n-tag type="success" size="small" round>后台模式</n-tag>
+                <n-tag size="small" round
+                  >{{ enabledBackgroundSchedulerEntries.length }} 个表格组</n-tag
+                >
               </div>
-              <n-button size="small" type="error" secondary @click="stopBackgroundScheduler">
+              <n-button
+                v-if="enabledBackgroundSchedulerEntries.length > 1"
+                size="small"
+                type="error"
+                secondary
+                @click="stopBackgroundScheduler()"
+              >
                 <template #icon>
                   <Icon icon="mdi:stop" />
                 </template>
-                停止
+                停止全部
               </n-button>
             </div>
 
-            <div class="polling-details-inline">
-              <div class="polling-item-inline">
-                <span class="label">轮询间隔:</span>
-                <span class="value">{{ backgroundSchedulerStatus.intervalMinutes }}分钟</span>
-              </div>
-              <div class="polling-item-inline">
-                <span class="label">上次运行:</span>
-                <span class="value">{{
-                  formatBackgroundTime(backgroundSchedulerStatus.lastRunTime)
-                }}</span>
-              </div>
-              <div class="polling-item-inline">
-                <span class="label">下次运行:</span>
-                <span class="value countdown">{{
-                  formatBackgroundNextRunTime(backgroundSchedulerStatus)
-                }}</span>
-              </div>
-              <div class="polling-item-inline">
-                <span class="label">已搭建:</span>
-                <span class="value success"
-                  >{{ backgroundSchedulerStatus.stats.successCount }} 部</span
-                >
-              </div>
-              <div class="polling-item-inline">
-                <span class="label">失败:</span>
-                <span class="value error">{{ backgroundSchedulerStatus.stats.failCount }} 部</span>
-              </div>
-            </div>
-
-            <!-- 当前任务状态 -->
-            <div v-if="backgroundSchedulerStatus.currentTask" class="current-task">
-              <n-tag type="info" size="small">
-                <template #icon>
-                  <Icon icon="mdi:loading" class="animate-spin" />
-                </template>
-                正在搭建: {{ backgroundSchedulerStatus.currentTask.dramaName || '查询中...' }}
-              </n-tag>
-            </div>
-
-            <!-- 最近任务历史 -->
-            <div v-if="backgroundSchedulerStatus.taskHistory.length > 0" class="task-history">
-              <div class="history-title">最近搭建记录</div>
-              <div class="history-list">
-                <div
-                  v-for="(task, index) in backgroundSchedulerStatus.taskHistory.slice(0, 20)"
-                  :key="index"
-                  class="history-item"
-                  :class="task.status"
-                >
-                  <n-tooltip
-                    v-if="(task.status === 'failed' || task.status === 'skipped') && task.error"
-                    placement="top"
+            <div class="background-scheduler-grid">
+              <div
+                v-for="entry in enabledBackgroundSchedulerEntries"
+                :key="entry.key"
+                class="background-scheduler-card"
+              >
+                <div class="background-scheduler-card__header">
+                  <div class="background-scheduler-card__title-wrap">
+                    <span class="background-scheduler-card__title">{{ entry.target.name }}</span>
+                    <n-tag v-if="entry.isLegacy" size="small" type="warning" round>旧实例</n-tag>
+                  </div>
+                  <n-button
+                    size="small"
+                    type="error"
+                    secondary
+                    @click="stopBackgroundScheduler(entry)"
                   >
-                    <template #trigger>
-                      <Icon icon="mdi:alert-circle" class="history-icon" />
+                    <template #icon>
+                      <Icon icon="mdi:stop" />
                     </template>
+                    停止
+                  </n-button>
+                </div>
+
+                <div class="polling-details-inline">
+                  <div class="polling-item-inline">
+                    <span class="label">轮询间隔:</span>
+                    <span class="value">{{ entry.status.intervalMinutes }}分钟</span>
+                  </div>
+                  <div class="polling-item-inline">
+                    <span class="label">上次运行:</span>
+                    <span class="value">{{ formatBackgroundTime(entry.status.lastRunTime) }}</span>
+                  </div>
+                  <div class="polling-item-inline">
+                    <span class="label">下次运行:</span>
+                    <span class="value countdown">{{
+                      formatBackgroundNextRunTime(entry.status)
+                    }}</span>
+                  </div>
+                  <div class="polling-item-inline">
+                    <span class="label">已搭建:</span>
+                    <span class="value success">{{ entry.status.stats.successCount }} 部</span>
+                  </div>
+                  <div class="polling-item-inline">
+                    <span class="label">失败:</span>
+                    <span class="value error">{{ entry.status.stats.failCount }} 部</span>
+                  </div>
+                </div>
+
+                <!-- 当前任务状态 -->
+                <div v-if="entry.status.currentTask" class="current-task">
+                  <n-tag type="info" size="small">
+                    <template #icon>
+                      <Icon icon="mdi:loading" class="animate-spin" />
+                    </template>
+                    正在搭建: {{ entry.status.currentTask.dramaName || '查询中...' }}
+                  </n-tag>
+                </div>
+
+                <!-- 最近任务历史 -->
+                <div v-if="entry.status.taskHistory.length > 0" class="task-history">
+                  <div class="history-title">最近搭建记录</div>
+                  <div class="history-list">
                     <div
-                      class="error-tooltip"
-                      :class="{ 'skipped-tooltip': task.status === 'skipped' }"
+                      v-for="(task, index) in entry.status.taskHistory.slice(0, 20)"
+                      :key="index"
+                      class="history-item"
+                      :class="task.status"
                     >
-                      <div class="error-title">
-                        {{ task.status === 'skipped' ? '跳过原因' : '失败原因' }}
-                      </div>
-                      <div class="error-message">{{ task.error }}</div>
-                    </div>
-                  </n-tooltip>
-                  <Icon v-else icon="mdi:check-circle" class="history-icon" />
-                  <div class="history-main">
-                    <span class="history-drama">{{ task.dramaName }}</span>
-                    <div class="history-meta">
-                      <n-tag
-                        v-if="task.rating"
-                        :type="
-                          task.rating === '红标'
-                            ? 'error'
-                            : task.rating === '绿标'
-                              ? 'success'
-                              : 'warning'
-                        "
-                        size="tiny"
-                        :bordered="false"
+                      <n-tooltip
+                        v-if="(task.status === 'failed' || task.status === 'skipped') && task.error"
+                        placement="top"
                       >
-                        {{ task.rating }}
-                      </n-tag>
-                      <span v-if="task.date" class="meta-date">
-                        {{ formatTaskDate(task.date) }}
-                      </span>
-                      <span v-if="task.publishTime" class="meta-publish">
-                        上架{{ formatTaskPublishTime(task.publishTime) }}
-                      </span>
+                        <template #trigger>
+                          <Icon icon="mdi:alert-circle" class="history-icon" />
+                        </template>
+                        <div
+                          class="error-tooltip"
+                          :class="{ 'skipped-tooltip': task.status === 'skipped' }"
+                        >
+                          <div class="error-title">
+                            {{ task.status === 'skipped' ? '跳过原因' : '失败原因' }}
+                          </div>
+                          <div class="error-message">{{ task.error }}</div>
+                        </div>
+                      </n-tooltip>
+                      <Icon v-else icon="mdi:check-circle" class="history-icon" />
+                      <div class="history-main">
+                        <span class="history-drama">{{ task.dramaName }}</span>
+                        <div class="history-meta">
+                          <n-tag
+                            v-if="task.rating"
+                            :type="
+                              task.rating === '红标'
+                                ? 'error'
+                                : task.rating === '绿标'
+                                  ? 'success'
+                                  : 'warning'
+                            "
+                            size="tiny"
+                            :bordered="false"
+                          >
+                            {{ task.rating }}
+                          </n-tag>
+                          <span v-if="task.date" class="meta-date">
+                            {{ formatTaskDate(task.date) }}
+                          </span>
+                          <span v-if="task.publishTime" class="meta-publish">
+                            上架{{ formatTaskPublishTime(task.publishTime) }}
+                          </span>
+                        </div>
+                      </div>
+                      <span class="history-time">{{ formatBackgroundTime(task.completedAt) }}</span>
                     </div>
                   </div>
-                  <span class="history-time">{{ formatBackgroundTime(task.completedAt) }}</span>
                 </div>
               </div>
             </div>
@@ -2880,13 +3086,20 @@ onBeforeUnmount(() => {
           v-if="!showProgress"
           type="primary"
           :loading="isBuilding"
-          :disabled="isLoadingDramas || selectedRowKeys.length === 0"
+          :disabled="
+            isLoadingDramas || selectedRowKeys.length === 0 || hasAnyBackgroundSchedulerEnabled
+          "
           @click="startAutoBuild"
         >
           <template #icon>
             <Icon icon="mdi:rocket-launch" />
           </template>
-          开始搭建{{ selectedRowKeys.length > 0 ? ` (${selectedRowKeys.length}部)` : '' }}
+          {{ hasAnyBackgroundSchedulerEnabled ? '后台运行中，请使用单行搭建' : '开始搭建'
+          }}{{
+            !hasAnyBackgroundSchedulerEnabled && selectedRowKeys.length > 0
+              ? ` (${selectedRowKeys.length}部)`
+              : ''
+          }}
         </n-button>
 
         <!-- 进度状态：搭建完成后显示继续搭建按钮 -->
@@ -3190,6 +3403,42 @@ onBeforeUnmount(() => {
 
 .polling-status {
   flex: 1;
+}
+
+.background-scheduler-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.background-scheduler-card {
+  padding: 12px;
+  border: 1px solid rgba(24, 160, 88, 0.18);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.background-scheduler-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.background-scheduler-card__title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.background-scheduler-card__title {
+  font-weight: 600;
+  color: #1f7a45;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .polling-header {

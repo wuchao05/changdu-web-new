@@ -65,6 +65,27 @@ const isProduction = process.env.NODE_ENV === 'production'
 const STATE_FILE_PREFIX = 'build-workflow-scheduler-state-'
 const STATE_FILE_DIR = isProduction ? '/data/changdu-web' : path.join(__dirname, '../data')
 
+function normalizeSchedulerInstancePart(value = '', fallback = 'default') {
+  const normalized = String(value || '')
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+  return normalized || fallback
+}
+
+function normalizeSchedulerTableId(tableId = '') {
+  return String(tableId || '').trim()
+}
+
+export function buildSchedulerInstanceKey(channelRuntime = null, tableId = null) {
+  const baseKey = buildRuntimeInstanceKey(channelRuntime || {})
+  const normalizedTableId = normalizeSchedulerTableId(tableId)
+  if (!normalizedTableId) {
+    return baseKey
+  }
+
+  return `${baseKey}__table_${normalizeSchedulerInstancePart(normalizedTableId)}`
+}
+
 function createDefaultSchedulerState() {
   return {
     instanceKey: '',
@@ -73,6 +94,8 @@ function createDefaultSchedulerState() {
     enabled: false,
     intervalMinutes: null,
     tableId: null,
+    feishuTableGroupId: '',
+    feishuTableGroupName: '',
     channelId: '',
     channelName: '',
     channelRuntime: null,
@@ -301,6 +324,7 @@ async function ensureSchedulerRuntime(channelRuntime = null, instanceKey = getAc
           '小红'
       ).trim(),
     }
+    syncStateTableTarget(state)
     return normalizedRuntime
   }
 
@@ -340,10 +364,12 @@ async function ensureSchedulerRuntime(channelRuntime = null, instanceKey = getAc
     state.channelId = resolvedRuntime.channelId
     state.channelName = resolvedRuntime.channelName
     state.channelRuntime = resolvedRuntime
+    syncStateTableTarget(state)
     return resolvedRuntime
   }
 
   if (state.channelRuntime) {
+    syncStateTableTarget(state)
     return normalizeChannelRuntime(state.channelRuntime)
   }
 
@@ -355,6 +381,7 @@ async function ensureSchedulerRuntime(channelRuntime = null, instanceKey = getAc
   state.channelId = resolvedRuntime.channelId
   state.channelName = resolvedRuntime.channelName
   state.channelRuntime = resolvedRuntime
+  syncStateTableTarget(state)
   return resolvedRuntime
 }
 
@@ -367,18 +394,7 @@ function getDramaStatusTableId() {
   )
 }
 
-function getDramaStatusTableTargets() {
-  const state = getActiveSchedulerState()
-  if (state.tableId) {
-    return [
-      {
-        id: '',
-        name: '',
-        tableId: state.tableId,
-      },
-    ]
-  }
-
+function getRuntimeDramaStatusTableTargets(state = getActiveSchedulerState()) {
   const groups = Array.isArray(state.runtimeUserConfig?.feishuTableGroups)
     ? state.runtimeUserConfig.feishuTableGroups
     : []
@@ -399,9 +415,49 @@ function getDramaStatusTableTargets() {
     {
       id: 'default',
       name: '默认表格',
-      tableId: getDramaStatusTableId(),
+      tableId:
+        normalizeSchedulerTableId(state.runtimeUserConfig?.feishu?.dramaStatusTableId) ||
+        FEISHU_CONFIG.table_ids.drama_status,
     },
   ]
+}
+
+function resolveDramaStatusTableTarget(tableId, state = getActiveSchedulerState()) {
+  const normalizedTableId = normalizeSchedulerTableId(tableId)
+  const matchedTarget = getRuntimeDramaStatusTableTargets(state).find(
+    target => normalizeSchedulerTableId(target.tableId) === normalizedTableId
+  )
+
+  if (matchedTarget) {
+    return matchedTarget
+  }
+
+  return {
+    id: '',
+    name: normalizedTableId ? `表格 ${normalizedTableId}` : '默认表格',
+    tableId: normalizedTableId || FEISHU_CONFIG.table_ids.drama_status,
+  }
+}
+
+function syncStateTableTarget(state) {
+  if (!state.tableId) {
+    state.feishuTableGroupId = ''
+    state.feishuTableGroupName = ''
+    return
+  }
+
+  const target = resolveDramaStatusTableTarget(state.tableId, state)
+  state.feishuTableGroupId = target.id || ''
+  state.feishuTableGroupName = target.name || ''
+}
+
+function getDramaStatusTableTargets() {
+  const state = getActiveSchedulerState()
+  if (state.tableId) {
+    return [resolveDramaStatusTableTarget(state.tableId, state)]
+  }
+
+  return getRuntimeDramaStatusTableTargets(state)
 }
 
 function getRuntimeXtToken() {
@@ -1825,10 +1881,14 @@ function getRatingValue(drama) {
 }
 
 function getDramaTaskHistoryMeta(drama) {
+  const target = resolveDramaStatusTableTarget(drama?._tableId)
   return {
     rating: getRatingValue(drama),
     date: drama.fields['日期'] || null,
     publishTime: drama.fields['上架时间']?.value?.[0] || null,
+    tableId: target.tableId || drama?._tableId || null,
+    feishuTableGroupId: drama?._feishuTableGroupId || target.id || '',
+    feishuTableGroupName: drama?._feishuTableGroupName || target.name || '',
   }
 }
 
@@ -1960,6 +2020,9 @@ async function processPollingQueueUntilSuccess({
       status: 'building',
       dramaName,
       startTime: new Date().toISOString(),
+      tableId: meta.tableId || null,
+      feishuTableGroupId: meta.feishuTableGroupId || '',
+      feishuTableGroupName: meta.feishuTableGroupName || '',
     }
     await saveState(state.instanceKey)
 
@@ -2192,7 +2255,8 @@ export async function startScheduler(intervalMinutes, tableId = null, channelRun
     throw new Error('轮询间隔必须大于等于1分钟')
   }
 
-  const instanceKey = buildRuntimeInstanceKey(channelRuntime || {})
+  const normalizedTableId = normalizeSchedulerTableId(tableId)
+  const instanceKey = buildSchedulerInstanceKey(channelRuntime || {}, normalizedTableId)
   return runWithSchedulerContext(instanceKey, async () => {
     const entry = ensureSchedulerEntry(instanceKey)
     const state = entry.state
@@ -2207,7 +2271,8 @@ export async function startScheduler(intervalMinutes, tableId = null, channelRun
 
     state.enabled = true
     state.intervalMinutes = intervalMinutes
-    state.tableId = tableId || null
+    state.tableId = normalizedTableId || null
+    syncStateTableTarget(state)
     state.stats = { totalBuilt: 0, successCount: 0, failCount: 0 }
     state.taskHistory = []
 
@@ -2220,8 +2285,9 @@ export async function startScheduler(intervalMinutes, tableId = null, channelRun
 /**
  * 停止调度器
  */
-export async function stopScheduler(channelRuntime = null) {
-  const instanceKey = buildRuntimeInstanceKey(channelRuntime || {})
+export async function stopScheduler(tableId = null, channelRuntime = null) {
+  const normalizedTableId = normalizeSchedulerTableId(tableId)
+  const instanceKey = buildSchedulerInstanceKey(channelRuntime || {}, normalizedTableId)
   return runWithSchedulerContext(instanceKey, async () => {
     const entry = ensureSchedulerEntry(instanceKey)
     buildConsole.log('[后台搭建] 停止调度器', instanceKey)
@@ -2254,6 +2320,8 @@ export function getSchedulerStatus(instanceKey) {
     enabled: state.enabled,
     intervalMinutes: state.intervalMinutes,
     tableId: state.tableId,
+    feishuTableGroupId: state.feishuTableGroupId || '',
+    feishuTableGroupName: state.feishuTableGroupName || '',
     nextRunTime: state.nextRunTime,
     lastRunTime: state.lastRunTime,
     queueSnapshot: {
@@ -2345,7 +2413,8 @@ export async function triggerSchedulerBuild(
   tableId,
   channelRuntime = null
 ) {
-  const instanceKey = buildRuntimeInstanceKey(channelRuntime || {})
+  const normalizedTableId = normalizeSchedulerTableId(tableId)
+  const instanceKey = buildSchedulerInstanceKey(channelRuntime || {}, normalizedTableId)
   return runWithSchedulerContext(instanceKey, async () => {
     const entry = ensureSchedulerEntry(instanceKey)
     const state = entry.state
@@ -2366,23 +2435,16 @@ export async function triggerSchedulerBuild(
       throw new Error(`已有任务正在执行: ${state.currentTask.dramaName}，请等待完成后再试`)
     }
 
-    const previousTableId = state.tableId
     if (typeof tableId !== 'undefined') {
-      state.tableId = tableId || null
+      state.tableId = normalizedTableId || null
+      syncStateTableTarget(state)
       await saveState(instanceKey)
     }
 
-    try {
-      if (specificDramaId) {
-        await buildSpecificDrama(specificDramaId)
-      } else {
-        await executePollingCycle()
-      }
-    } finally {
-      if (specificDramaId && typeof tableId !== 'undefined') {
-        state.tableId = previousTableId || null
-        await saveState(instanceKey)
-      }
+    if (specificDramaId) {
+      await buildSpecificDrama(specificDramaId)
+    } else {
+      await executePollingCycle()
     }
 
     return getSchedulerStatus(instanceKey)
@@ -2397,6 +2459,8 @@ async function buildSpecificDrama(dramaId) {
   const state = getActiveSchedulerState()
   buildConsole.log(`[后台搭建] 开始搭建指定剧集: ${dramaId}`)
   state.lastRunTime = new Date().toISOString()
+  let targetDrama = null
+  let targetMeta = {}
 
   try {
     // 1. 查询待搭建剧集
@@ -2412,7 +2476,7 @@ async function buildSpecificDrama(dramaId) {
     await saveState(state.instanceKey)
 
     // 2. 找到指定的剧集
-    const targetDrama = dramas.find(d => d.record_id === dramaId)
+    targetDrama = dramas.find(d => d.record_id === dramaId)
     if (!targetDrama) {
       throw new Error(`找不到剧集ID: ${dramaId}`)
     }
@@ -2440,10 +2504,14 @@ async function buildSpecificDrama(dramaId) {
     }
 
     buildConsole.log(`[后台搭建] 找到指定剧集: ${dramaName}`)
+    targetMeta = getDramaTaskHistoryMeta(targetDrama)
     state.currentTask = {
       status: 'building',
       dramaName,
       startTime: new Date().toISOString(),
+      tableId: targetMeta.tableId || null,
+      feishuTableGroupId: targetMeta.feishuTableGroupId || '',
+      feishuTableGroupName: targetMeta.feishuTableGroupName || '',
     }
     await saveState(state.instanceKey)
 
@@ -2458,6 +2526,7 @@ async function buildSpecificDrama(dramaId) {
     state.taskHistory.unshift({
       dramaName,
       status: 'success',
+      ...targetMeta,
       completedAt: new Date().toISOString(),
     })
     if (state.taskHistory.length > 20) {
@@ -2474,6 +2543,7 @@ async function buildSpecificDrama(dramaId) {
     state.taskHistory.unshift({
       dramaName,
       status: 'failed',
+      ...(targetDrama ? getDramaTaskHistoryMeta(targetDrama) : targetMeta),
       error: error.message,
       completedAt: new Date().toISOString(),
     })

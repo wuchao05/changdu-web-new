@@ -451,6 +451,9 @@ export interface BackgroundSchedulerTaskHistory {
   rating?: string | null
   date?: number | null
   publishTime?: number | null
+  tableId?: string | null
+  feishuTableGroupId?: string
+  feishuTableGroupName?: string
   error?: string
   completedAt: string
 }
@@ -472,17 +475,32 @@ export interface BackgroundSchedulerCurrentTask {
   status: 'running' | 'building'
   dramaName?: string
   startTime: string
+  tableId?: string | null
+  feishuTableGroupId?: string
+  feishuTableGroupName?: string
 }
 
 /**
  * 后台调度器状态类型
  */
 export interface BackgroundSchedulerStatus {
+  instanceKey: string
+  userId?: string
+  runtimeUserName?: string
+  channelId?: string
+  channelName?: string
   enabled: boolean
   intervalMinutes: number | null
   tableId: string | null
+  feishuTableGroupId?: string
+  feishuTableGroupName?: string
   nextRunTime: string | null
   lastRunTime: string | null
+  queueSnapshot?: {
+    pendingCount: number
+    buildableCount: number
+    updatedAt: string | null
+  }
   stats: {
     totalBuilt: number
     successCount: number
@@ -525,7 +543,7 @@ export async function startBackgroundScheduler(
 /**
  * 停止搭建工作流后台调度器
  */
-export async function stopBackgroundScheduler(): Promise<{
+export async function stopBackgroundScheduler(tableId?: string): Promise<{
   code: number
   message: string
   data: BackgroundSchedulerStatus
@@ -533,6 +551,7 @@ export async function stopBackgroundScheduler(): Promise<{
   const response = await fetch(`${ENV.BASE_URL}/build-workflow/scheduler/stop`, {
     method: 'POST',
     headers: buildSessionHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ table_id: tableId }),
   })
 
   if (!response.ok) {
@@ -550,12 +569,13 @@ export async function stopBackgroundScheduler(): Promise<{
 /**
  * 查询搭建工作流后台调度器状态
  */
-export async function getBackgroundSchedulerStatus(): Promise<{
+export async function getBackgroundSchedulerStatus(tableId?: string): Promise<{
   code: number
   message: string
   data: BackgroundSchedulerStatus
 }> {
-  const response = await fetch(`${ENV.BASE_URL}/build-workflow/scheduler/status`, {
+  const query = tableId ? `?${new URLSearchParams({ table_id: tableId }).toString()}` : ''
+  const response = await fetch(`${ENV.BASE_URL}/build-workflow/scheduler/status${query}`, {
     method: 'GET',
     headers: buildSessionHeaders({ 'Content-Type': 'application/json' }),
   })
@@ -748,6 +768,7 @@ export async function adminStartBackgroundScheduler(params: {
 export async function adminStopBackgroundScheduler(params: {
   userId: string
   channelId: string
+  tableId?: string
 }): Promise<{
   code: number
   message: string
@@ -756,7 +777,11 @@ export async function adminStopBackgroundScheduler(params: {
   const response = await fetch(`${ENV.BASE_URL}/build-workflow/scheduler/admin/stop`, {
     method: 'POST',
     headers: buildSessionHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(params),
+    body: JSON.stringify({
+      userId: params.userId,
+      channelId: params.channelId,
+      table_id: params.tableId,
+    }),
   })
 
   if (!response.ok) {
