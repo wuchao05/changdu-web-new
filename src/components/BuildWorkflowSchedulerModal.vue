@@ -240,6 +240,7 @@ const backgroundSchedulerStatusMap = ref<
 const legacyBackgroundSchedulerStatus = ref<buildWorkflowApi.BackgroundSchedulerStatus | null>(null)
 const isLoadingBackgroundStatus = ref(false)
 const backgroundPollingTimer = ref<ReturnType<typeof setInterval> | null>(null) // 后台状态轮询定时器
+const hasWarnedLegacySchedulerAutoStop = ref(false)
 const materialPreviewConfig = ref<adminApi.UserChannelBindingConfig['materialPreview'] | null>(null)
 const currentBuildConfig = ref<adminApi.ChannelConfig['juliang']['buildConfig'] | null>(null)
 const currentBrandName = ref('小红')
@@ -1362,8 +1363,30 @@ async function loadBackgroundSchedulerStatus() {
     backgroundSchedulerStatusMap.value = nextStatusMap
 
     const legacyResult = await buildWorkflowApi.getBackgroundSchedulerStatus()
-    legacyBackgroundSchedulerStatus.value =
+    const hasScopedSchedulerActive = Object.values(nextStatusMap).some(
+      status => status.enabled || status.currentTask
+    )
+    let nextLegacyStatus: buildWorkflowApi.BackgroundSchedulerStatus | null =
       legacyResult.data.enabled || legacyResult.data.currentTask ? legacyResult.data : null
+
+    if (nextLegacyStatus?.enabled && hasScopedSchedulerActive) {
+      try {
+        const stoppedLegacyResult = await buildWorkflowApi.stopBackgroundScheduler()
+        nextLegacyStatus =
+          stoppedLegacyResult.data.enabled || stoppedLegacyResult.data.currentTask
+            ? stoppedLegacyResult.data
+            : null
+
+        if (!hasWarnedLegacySchedulerAutoStop.value) {
+          hasWarnedLegacySchedulerAutoStop.value = true
+          message.warning('检测到旧全局调度器，已自动停止，避免重复搭建')
+        }
+      } catch (error) {
+        console.error('自动停止旧全局调度器失败:', error)
+      }
+    }
+
+    legacyBackgroundSchedulerStatus.value = nextLegacyStatus
 
     // 如果后台没有正在运行的任务，清空搭建中状态
     if (!hasAnyBackgroundCurrentTask.value) {
@@ -2692,7 +2715,7 @@ onBeforeUnmount(() => {
                 <span class="polling-title">后台自动搭建运行中</span>
                 <n-tag type="success" size="small" round>后台模式</n-tag>
                 <n-tag size="small" round
-                  >{{ enabledBackgroundSchedulerEntries.length }} 个表格组</n-tag
+                  >{{ enabledBackgroundSchedulerEntries.length }} 个调度实例</n-tag
                 >
               </div>
               <n-button

@@ -2247,6 +2247,43 @@ function scheduleNextPolling(instanceKey = getActiveInstanceKey()) {
   void saveState(instanceKey)
 }
 
+async function stopSchedulerInstanceByKey(instanceKey, reason = '') {
+  await loadState(instanceKey)
+  const entry = ensureSchedulerEntry(instanceKey)
+  const state = entry.state
+
+  if (!state.enabled && !state.currentTask && !entry.timer) {
+    return false
+  }
+
+  if (reason) {
+    buildConsole.log(`[后台搭建] ${reason}: ${instanceKey}`)
+  }
+
+  state.enabled = false
+  state.nextRunTime = null
+
+  if (entry.timer) {
+    clearTimeout(entry.timer)
+    entry.timer = null
+  }
+
+  await saveState(instanceKey)
+  return true
+}
+
+async function stopLegacySchedulerForScopedInstance(channelRuntime, scopedInstanceKey) {
+  const legacyInstanceKey = buildSchedulerInstanceKey(channelRuntime || {}, null)
+  if (legacyInstanceKey === scopedInstanceKey) {
+    return
+  }
+
+  await stopSchedulerInstanceByKey(
+    legacyInstanceKey,
+    '检测到表格组级调度器启动，自动停止旧全局调度器，避免重复搭建'
+  )
+}
+
 /**
  * 启动调度器
  */
@@ -2277,6 +2314,9 @@ export async function startScheduler(intervalMinutes, tableId = null, channelRun
     state.taskHistory = []
 
     await saveState(instanceKey)
+    if (normalizedTableId) {
+      await stopLegacySchedulerForScopedInstance(channelRuntime, instanceKey)
+    }
     executePollingCycle()
     return getSchedulerStatus(instanceKey)
   })
