@@ -1810,6 +1810,221 @@ async function buildSingleDrama(drama) {
   }
 }
 
+function getRatingValue(drama) {
+  const ratingField = drama.fields['评级']
+  if (ratingField && typeof ratingField === 'object' && 'value' in ratingField) {
+    if (Array.isArray(ratingField.value) && ratingField.value[0]) {
+      return ratingField.value[0]
+    }
+  }
+  if (Array.isArray(ratingField) && ratingField[0]?.text) {
+    return ratingField[0].text
+  }
+  if (typeof ratingField === 'string') return ratingField
+  return null
+}
+
+function getDramaTaskHistoryMeta(drama) {
+  return {
+    rating: getRatingValue(drama),
+    date: drama.fields['日期'] || null,
+    publishTime: drama.fields['上架时间']?.value?.[0] || null,
+  }
+}
+
+function trimTaskHistory(state) {
+  if (state.taskHistory.length > 20) {
+    state.taskHistory = state.taskHistory.slice(0, 20)
+  }
+}
+
+function getDramaTableGroupKey(drama) {
+  const groupId = String(drama?._feishuTableGroupId || '').trim()
+  const tableId = String(drama?._tableId || '').trim()
+  return groupId || tableId || 'default'
+}
+
+function getDramaTableGroupName(drama) {
+  const groupName = String(drama?._feishuTableGroupName || '').trim()
+  if (groupName) return groupName
+
+  const tableId = String(drama?._tableId || '').trim()
+  return tableId ? `表格 ${tableId}` : '默认表格'
+}
+
+function groupDramasByTableGroup(dramas) {
+  const groupMap = new Map()
+
+  dramas.forEach(drama => {
+    const key = getDramaTableGroupKey(drama)
+    if (!groupMap.has(key)) {
+      groupMap.set(key, {
+        key,
+        name: getDramaTableGroupName(drama),
+        dramas: [],
+      })
+    }
+    groupMap.get(key).dramas.push(drama)
+  })
+
+  return Array.from(groupMap.values())
+}
+
+function removeDramaFromQueue(dramas, selectedDrama) {
+  const selectedRecordId = selectedDrama.record_id
+  const selectedTableId = String(selectedDrama._tableId || '')
+
+  return dramas.filter(
+    drama =>
+      drama.record_id !== selectedRecordId || String(drama._tableId || '') !== selectedTableId
+  )
+}
+
+function recordBuildSuccess(state, dramaName, meta) {
+  state.stats.totalBuilt++
+  state.stats.successCount++
+  state.taskHistory.unshift({
+    dramaName,
+    status: 'success',
+    ...meta,
+    completedAt: new Date().toISOString(),
+  })
+  trimTaskHistory(state)
+}
+
+function recordBuildFailure(state, dramaName, meta, status, errorMessage) {
+  if (status === 'failed') {
+    state.stats.failCount++
+  }
+
+  state.taskHistory.unshift({
+    dramaName,
+    status,
+    ...meta,
+    error: errorMessage,
+    completedAt: new Date().toISOString(),
+  })
+  trimTaskHistory(state)
+}
+
+async function processPollingQueueUntilSuccess({
+  state,
+  dramas,
+  now,
+  buildConfig,
+  queueName = '',
+}) {
+  let queue = dramas
+  let dramaIndex = 0
+  const logPrefix = queueName ? `${queueName} ` : ''
+
+  while (queue.length > 0) {
+    await attachDramaMaterialLibraryStatus(queue)
+    buildConsole.log(
+      `[后台搭建] ====== ${logPrefix}第 ${dramaIndex + 1} 次尝试，队列中还有 ${queue.length} 部剧集 ======`
+    )
+
+    const materialReadyDramas = queue.filter(drama => {
+      const ready = getDramaMaterialLibraryStatus(drama).ready
+      if (!ready) {
+        logMaterialBlockedDrama(drama)
+      }
+      return ready
+    })
+
+    const selectedDrama = selectHighestPriorityDrama(materialReadyDramas, {
+      currentTime: now,
+      buildConfig,
+      onSkip: (drama, context) => {
+        const dramaName = drama.fields['剧名']?.[0]?.text || '未知'
+        buildConsole.log(
+          `[优先级选择] ${logPrefix}跳过 "${dramaName}"：上架时间 ${context.publishTime.format('YYYY-MM-DD HH:mm')}，最早可搭建时间 ${context.earliestBuildTime?.format('YYYY-MM-DD HH:mm') || '-'}，规则：${context.ruleDescription}${context.blockedByForbiddenAdvanceWindow ? '（命中禁提前时段）' : ''}`
+        )
+      },
+    })
+
+    if (!selectedDrama) {
+      buildConsole.log(
+        queueName
+          ? `[后台搭建] ${queueName} 未找到符合条件的剧集，本轮跳过该表格组`
+          : '[后台搭建] 未找到符合条件的剧集，等待下次轮询'
+      )
+      return false
+    }
+
+    const dramaName = selectedDrama.fields['剧名']?.[0]?.text || '未知'
+    const meta = getDramaTaskHistoryMeta(selectedDrama)
+    buildConsole.log(`[后台搭建] ${logPrefix}选中剧集: ${dramaName} (剩余 ${queue.length - 1} 部)`)
+
+    state.currentTask = {
+      status: 'building',
+      dramaName,
+      startTime: new Date().toISOString(),
+    }
+    await saveState(state.instanceKey)
+
+    try {
+      await buildSingleDrama(selectedDrama)
+      recordBuildSuccess(state, dramaName, meta)
+
+      buildConsole.log(
+        queueName
+          ? `[后台搭建] ✅ ${queueName} 剧集 ${dramaName} 完成，本轮该表格组结束`
+          : `[后台搭建] ✅ 剧集 ${dramaName} 完成，结束本次轮询`
+      )
+
+      state.currentTask = null
+      await saveState(state.instanceKey)
+      return true
+    } catch (error) {
+      const isSkip = error.code === 'MICROAPP_NOT_APPROVED'
+      const action = isSkip ? '跳过' : '失败'
+
+      buildConsole.log(`[后台搭建] ⚠️ ${logPrefix}剧集 ${dramaName} ${action}: ${error.message}`)
+
+      try {
+        buildConsole.log('[后台搭建] 准备更新飞书状态...')
+        await updateDramaStatus(
+          selectedDrama.record_id,
+          isSkip ? '跳过搭建' : '搭建失败',
+          Date.now(),
+          getStatusUpdateTableId(selectedDrama),
+          error.message
+        )
+        buildConsole.log('[后台搭建] ✅ 已更新飞书状态为: ' + (isSkip ? '跳过搭建' : '搭建失败'))
+      } catch (feishuError) {
+        buildConsole.error('[后台搭建] ❌ 更新飞书状态失败:', feishuError.message)
+      }
+
+      buildConsole.log('[后台搭建] 准备更新任务历史...')
+      try {
+        recordBuildFailure(state, dramaName, meta, isSkip ? 'skipped' : 'failed', error.message)
+        buildConsole.log('[后台搭建] ✅ 任务历史已更新')
+      } catch (historyError) {
+        buildConsole.error('[后台搭建] ❌ 更新任务历史失败:', historyError.message)
+      }
+
+      buildConsole.log('[后台搭建] 准备从列表移除失败剧集...')
+      const beforeFilterCount = queue.length
+      buildConsole.log(`[后台搭建] 待移除的剧集 record_id: ${selectedDrama.record_id}`)
+      queue = removeDramaFromQueue(queue, selectedDrama)
+      const afterFilterCount = queue.length
+      buildConsole.log(
+        `[后台搭建] 已从列表移除 ${dramaName}，移除前: ${beforeFilterCount} 部，移除后: ${afterFilterCount} 部`
+      )
+      buildConsole.log(
+        queueName ? `[后台搭建] ${queueName} 继续尝试下一部剧集` : '[后台搭建] 继续尝试下一部剧集'
+      )
+
+      state.currentTask = null
+      await saveState(state.instanceKey)
+      dramaIndex++
+    }
+  }
+
+  return false
+}
+
 // ============== 调度器控制 ==============
 
 /**
@@ -1850,7 +2065,7 @@ async function loadState(instanceKey) {
 
 /**
  * 执行一次轮询周期
- * 成功则结束本次轮询，失败或跳过则继续下一部
+ * 单表格组保持原逻辑：成功一部后结束；多表格组时每组最多成功搭建一部。
  */
 async function executePollingCycle() {
   const entry = getActiveSchedulerEntry()
@@ -1883,170 +2098,50 @@ async function executePollingCycle() {
 
   try {
     // 1. 查询待搭建剧集
-    let dramas = await getPendingSetupDramas()
+    const dramas = await getPendingSetupDramas()
+    const buildConfig = getBuildRuleConfig()
     buildConsole.log('[后台搭建] 查询到 ' + dramas.length + ' 部待搭建剧集')
     const buildableCount = dramas.filter(drama =>
-      canBuildDramaWithMaterialStatus(drama, now, getBuildRuleConfig())
+      canBuildDramaWithMaterialStatus(drama, now, buildConfig)
     ).length
     updateQueueSnapshot(state, dramas.length, buildableCount, now.toISOString())
     buildConsole.log(`[后台搭建] 当前队列快照: 待搭建 ${dramas.length}，可搭建 ${buildableCount}`)
     await saveState(state.instanceKey)
 
-    // 2. 循环处理，��到成功或没有剧集
-    let dramaIndex = 0
-    while (dramas.length > 0) {
-      await attachDramaMaterialLibraryStatus(dramas)
+    const tableGroups = groupDramasByTableGroup(dramas)
+    if (tableGroups.length > 1) {
+      let successGroupCount = 0
       buildConsole.log(
-        `[后台搭建] ====== 第 ${dramaIndex + 1} 次尝试，队列中还有 ${dramas.length} 部剧集 ======`
+        `[后台搭建] 检测到 ${tableGroups.length} 个表格组，本轮每个表格组最多搭建 1 部`
       )
-      const materialReadyDramas = dramas.filter(drama => {
-        const ready = getDramaMaterialLibraryStatus(drama).ready
-        if (!ready) {
-          logMaterialBlockedDrama(drama)
-        }
-        return ready
-      })
-      const selectedDrama = selectHighestPriorityDrama(materialReadyDramas, {
-        currentTime: now,
-        buildConfig: getBuildRuleConfig(),
-        onSkip: (drama, context) => {
-          const dramaName = drama.fields['剧名']?.[0]?.text || '未知'
-          buildConsole.log(
-            `[优先级选择] 跳过 "${dramaName}"：上架时间 ${context.publishTime.format('YYYY-MM-DD HH:mm')}，最早可搭建时间 ${context.earliestBuildTime?.format('YYYY-MM-DD HH:mm') || '-'}，规则：${context.ruleDescription}${context.blockedByForbiddenAdvanceWindow ? '（命中禁提前时段）' : ''}`
-          )
-        },
-      })
 
-      if (!selectedDrama) {
-        buildConsole.log('[后台搭建] 未找到符合条件的剧集，等待下次轮询')
-        break
-      }
-
-      const dramaName = selectedDrama.fields['剧名']?.[0]?.text || '未知'
-      // 提取评级、日期和上架时间用于任务历史记录
-      const getRatingValue = drama => {
-        const ratingField = drama.fields['评级']
-        if (ratingField && typeof ratingField === 'object' && 'value' in ratingField) {
-          if (Array.isArray(ratingField.value) && ratingField.value[0]) {
-            return ratingField.value[0]
-          }
-        }
-        if (Array.isArray(ratingField) && ratingField[0]?.text) {
-          return ratingField[0].text
-        }
-        if (typeof ratingField === 'string') return ratingField
-        return null
-      }
-      const rating = getRatingValue(selectedDrama)
-      const date = selectedDrama.fields['日期'] || null
-      const publishTime = selectedDrama.fields['上架时间']?.value?.[0] || null
-      buildConsole.log(
-        '[后台搭建] 选中剧集: ' + dramaName + ' (剩余 ' + (dramas.length - 1) + ' 部)'
-      )
-      state.currentTask = {
-        status: 'building',
-        dramaName,
-        startTime: new Date().toISOString(),
-      }
-      await saveState(state.instanceKey)
-
-      // 3. 搭建该剧集
-      try {
-        await buildSingleDrama(selectedDrama)
-
-        // 成功：更新统计和历史
-        state.stats.totalBuilt++
-        state.stats.successCount++
-
-        state.taskHistory.unshift({
-          dramaName,
-          status: 'success',
-          rating,
-          date,
-          publishTime,
-          completedAt: new Date().toISOString(),
+      for (const group of tableGroups) {
+        const didBuild = await processPollingQueueUntilSuccess({
+          state,
+          dramas: group.dramas,
+          now,
+          buildConfig,
+          queueName: `表格组「${group.name}」`,
         })
-        if (state.taskHistory.length > 20) {
-          state.taskHistory = state.taskHistory.slice(0, 20)
+        if (didBuild) {
+          successGroupCount++
         }
-
-        buildConsole.log('[后台搭建] ✅ 剧集 ' + dramaName + ' 完成，结束本次轮询')
-
-        // 成功后结束本次轮询，等待下一个周期
-        state.currentTask = null
-        await saveState(state.instanceKey)
-        scheduleNextPolling(state.instanceKey)
-        return
-      } catch (error) {
-        // 失败或跳过：记录后继续下一部
-        const isSkip = error.code === 'MICROAPP_NOT_APPROVED'
-        const action = isSkip ? '跳过' : '失败'
-
-        buildConsole.log('[后台搭建] ⚠️ 剧集 ' + dramaName + ' ' + action + ': ' + error.message)
-
-        if (!isSkip) {
-          state.stats.failCount++
-        }
-
-        // 更新飞书状态为失败/跳过，并记录原因到备注
-        try {
-          buildConsole.log('[后台搭建] 准备更新飞书状态...')
-          await updateDramaStatus(
-            selectedDrama.record_id,
-            isSkip ? '跳过搭建' : '搭建失败',
-            Date.now(),
-            getStatusUpdateTableId(selectedDrama),
-            error.message
-          )
-          buildConsole.log('[后台搭建] ✅ 已更新飞书状态为: ' + (isSkip ? '跳过搭建' : '搭建失败'))
-        } catch (feishuError) {
-          buildConsole.error('[后台搭建] ❌ 更新飞书状态失败:', feishuError.message)
-        }
-
-        buildConsole.log('[后台搭建] 准备更新任务历史...')
-        try {
-          state.taskHistory.unshift({
-            dramaName,
-            status: isSkip ? 'skipped' : 'failed',
-            rating,
-            date,
-            publishTime,
-            error: error.message,
-            completedAt: new Date().toISOString(),
-          })
-          if (state.taskHistory.length > 20) {
-            state.taskHistory = state.taskHistory.slice(0, 20)
-          }
-          buildConsole.log('[后台搭建] ✅ 任务历史已更新')
-        } catch (historyError) {
-          buildConsole.error('[后台搭建] ❌ 更新任务历史失败:', historyError.message)
-        }
-
-        // 从待处理列表中移除，继续下一部
-        buildConsole.log('[后台搭建] 准备从列表移除失败剧集...')
-        const beforeFilterCount = dramas.length
-        const selectedRecordId = selectedDrama.record_id
-        const selectedTableId = selectedDrama._tableId
-        buildConsole.log(`[后台搭建] 待移除的剧集 record_id: ${selectedRecordId}`)
-        dramas = dramas.filter(
-          d =>
-            d.record_id !== selectedRecordId ||
-            String(d._tableId || '') !== String(selectedTableId || '')
-        )
-        const afterFilterCount = dramas.length
-        buildConsole.log(
-          `[后台搭建] 已从列表移除 ${dramaName}，移除前: ${beforeFilterCount} 部，移除后: ${afterFilterCount} 部`
-        )
-        buildConsole.log('[后台搭建] 继续尝试下一部剧集')
-        await saveState(state.instanceKey) // 保存状态，确保 progress 不会丢失
-        dramaIndex++ // 增加尝试计数
       }
+
+      buildConsole.log(
+        `[后台搭建] 多表格组轮询完成，本轮成功搭建 ${successGroupCount}/${tableGroups.length} 个表格组`
+      )
+    } else {
+      await processPollingQueueUntilSuccess({
+        state,
+        dramas,
+        now,
+        buildConfig,
+      })
     }
 
     state.currentTask = null
     await saveState(state.instanceKey)
-
-    // 所有剧集都跳过/失败，安排下次轮询
     scheduleNextPolling(state.instanceKey)
   } catch (error) {
     buildConsole.error('[后台搭建] 轮询周期异常:', error.message)
