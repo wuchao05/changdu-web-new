@@ -109,7 +109,7 @@
                 :data="group.records"
                 :bordered="false"
                 :single-line="false"
-                :scroll-x="980"
+                :scroll-x="tableScrollX"
                 striped
                 :row-key="getRowKey"
               />
@@ -129,7 +129,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, h, ref, watch } from 'vue'
+import { computed, h, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import {
   NButton,
@@ -199,6 +199,7 @@ const apiConfigStore = useApiConfigStore()
 
 const loading = ref(false)
 const records = ref<BoardRecord[]>([])
+const isMobile = ref(false)
 
 // 请求代际:Tab 切换时通过 cancelAllRequests() 自增,在途响应回来后丢弃
 let requestGeneration = 0
@@ -305,43 +306,69 @@ const groupedRecords = computed(() => {
   }))
 })
 
-const tableColumns = computed<DataTableColumns<BoardRecord>>(() => [
-  {
-    title: '剧名',
-    key: 'dramaName',
-    width: 280,
-    ellipsis: { tooltip: true },
-  },
-  {
-    title: '账号',
-    key: 'account',
-    width: 210,
-    ellipsis: { tooltip: true },
-    render: row => row.account || '—',
-  },
-  {
-    title: '上架时间',
-    key: 'publishTime',
-    width: 200,
-    render: row => row.publishTime || '—',
-  },
-  {
-    title: '评级',
-    key: 'rating',
-    width: 130,
-    render: row => {
-      if (!row.rating) return '—'
-      const type = RATING_TAG_TYPE[row.rating] || 'default'
-      return h(NTag, { size: 'small', type, bordered: false }, () => row.rating)
+const dramaNameColumn: DataTableColumns<BoardRecord>[number] = {
+  title: '剧名',
+  key: 'dramaName',
+  ellipsis: { tooltip: true },
+}
+
+const tableScrollX = computed(() => (isMobile.value ? undefined : 980))
+
+const tableColumns = computed<DataTableColumns<BoardRecord>>(() => {
+  if (isMobile.value) {
+    return [dramaNameColumn]
+  }
+
+  return [
+    {
+      ...dramaNameColumn,
+      width: 280,
     },
-  },
-  {
-    title: '日期',
-    key: 'date',
-    width: 160,
-    render: row => row.date || '—',
-  },
-])
+    {
+      title: '账号',
+      key: 'account',
+      width: 210,
+      ellipsis: { tooltip: true },
+      render: row => row.account || '—',
+    },
+    {
+      title: '上架时间',
+      key: 'publishTime',
+      width: 200,
+      render: row => row.publishTime || '—',
+    },
+    {
+      title: '评级',
+      key: 'rating',
+      width: 130,
+      render: row => {
+        if (!row.rating) return '—'
+        const type = RATING_TAG_TYPE[row.rating] || 'default'
+        return h(NTag, { size: 'small', type, bordered: false }, () => row.rating)
+      },
+    },
+    {
+      title: '日期',
+      key: 'date',
+      width: 160,
+      render: row => row.date || '—',
+    },
+  ]
+})
+
+function updateIsMobile() {
+  if (typeof window === 'undefined') return
+  isMobile.value = window.matchMedia('(max-width: 640px)').matches
+}
+
+onMounted(() => {
+  updateIsMobile()
+  window.addEventListener('resize', updateIsMobile)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', updateIsMobile)
+})
 
 function getRowKey(row: BoardRecord) {
   return row.recordId
@@ -517,6 +544,8 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 0;
+  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 22px;
@@ -676,9 +705,11 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 18px;
+  min-width: 0;
 }
 
 .feishu-panel__group {
+  min-width: 0;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.82);
   border: 1px solid rgba(148, 163, 184, 0.18);
@@ -815,8 +846,17 @@ watch(
   }
 
   .feishu-panel__table :deep(.n-data-table-base-table-body) {
-    overflow-x: auto !important;
+    overflow-x: hidden !important;
     -webkit-overflow-scrolling: touch;
+  }
+
+  .feishu-panel__table :deep(.n-data-table-base-table) {
+    min-width: 0;
+  }
+
+  .feishu-panel__table :deep(.n-data-table-th),
+  .feishu-panel__table :deep(.n-data-table-td) {
+    white-space: normal;
   }
 }
 </style>

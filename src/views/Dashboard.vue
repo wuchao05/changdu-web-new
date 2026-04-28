@@ -154,7 +154,7 @@
       </div>
     </header>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
+    <main class="dashboard-main max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
       <div v-if="!hasActiveChannel" class="space-y-6">
         <div
           class="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center shadow-sm"
@@ -2905,6 +2905,17 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 24px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.dashboard-main,
+.home-tab-pane {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .home-tab-bar {
@@ -3037,9 +3048,19 @@ onUnmounted(() => {
   .home-tab-bar {
     align-self: stretch;
     width: 100%;
+    max-width: 100%;
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
+  }
+
+  .channel-tabs-shell {
+    display: flex;
+    width: 100%;
+  }
+
+  .channel-tab-button {
+    flex: 0 0 auto;
   }
 
   .home-tab-bar::-webkit-scrollbar {
