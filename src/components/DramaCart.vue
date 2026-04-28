@@ -106,6 +106,7 @@ export interface CartItem {
 // 定义 emits
 const emit = defineEmits<{
   'batch-submitted': [bookIds: string[]]
+  'items-changed': [bookIds: string[]]
 }>()
 
 // 状态
@@ -117,6 +118,13 @@ const cartTriggerRef = ref<HTMLElement | null>(null)
 
 // 计算属性
 const submittingCount = computed(() => submittingIds.value.size)
+
+function emitItemsChanged() {
+  emit(
+    'items-changed',
+    cartItems.value.map(item => item.book_id)
+  )
+}
 
 // 切换购物车显示
 function toggleCart() {
@@ -133,7 +141,34 @@ function addItem(item: CartItem) {
 
   // 添加到购物车
   cartItems.value.push(item)
+  emitItemsChanged()
   message.success(`已添加: ${item.series_name}`)
+}
+
+function addItems(items: CartItem[]) {
+  if (items.length === 0) {
+    message.info('暂无可加入的剧集')
+    return { addedCount: 0, skippedCount: 0 }
+  }
+
+  const existingBookIds = new Set(cartItems.value.map(item => item.book_id))
+  const nextItems = items.filter(item => !existingBookIds.has(item.book_id))
+  const skippedCount = items.length - nextItems.length
+
+  if (nextItems.length === 0) {
+    message.info('当前日期可加入的剧集已全部在购物车中')
+    return { addedCount: 0, skippedCount }
+  }
+
+  cartItems.value.push(...nextItems)
+  emitItemsChanged()
+  message.success(
+    skippedCount > 0
+      ? `已加入 ${nextItems.length} 部，跳过 ${skippedCount} 部已在购物车中的剧`
+      : `已加入 ${nextItems.length} 部剧`
+  )
+
+  return { addedCount: nextItems.length, skippedCount }
 }
 
 // 移除单个剧集
@@ -142,6 +177,7 @@ function removeItem(bookId: string) {
   if (index > -1) {
     const item = cartItems.value[index]
     cartItems.value.splice(index, 1)
+    emitItemsChanged()
     message.info(`已移除: ${item.series_name}`)
   }
 }
@@ -167,6 +203,7 @@ function clearAll() {
     return
   }
   cartItems.value = []
+  emitItemsChanged()
   message.info('已清空待提交列表')
 }
 
@@ -199,6 +236,7 @@ async function submitAll() {
       // 清空购物车
       cartItems.value = []
       submittingIds.value.clear()
+      emitItemsChanged()
     } else {
       throw new Error(response.message || '批量提交失败')
     }
@@ -230,6 +268,7 @@ function finishSubmitting(success: boolean, successCount?: number, failedCount?:
     // 清空购物车
     cartItems.value = []
     submittingIds.value.clear()
+    emitItemsChanged()
 
     if (successCount !== undefined) {
       if (failedCount && failedCount > 0) {
@@ -246,6 +285,7 @@ function finishSubmitting(success: boolean, successCount?: number, failedCount?:
 // 暴露方法给父组件
 defineExpose({
   addItem,
+  addItems,
   removeItem,
   hasItem,
   updateItemRedFlag,

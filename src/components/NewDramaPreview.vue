@@ -200,41 +200,6 @@
           </div>
         </div>
 
-        <!-- 搜索结果列表 - 优先显示搜索结果，在所有tab中都显示 -->
-        <div v-if="isSearching && !searchLoading && searchResults.length > 0" class="drama-list">
-          <DramaCard
-            v-for="drama in searchResults"
-            :key="drama.book_id"
-            :drama="drama"
-            :download-data="getDownloadDataForDrama(drama.series_name)"
-            :is-download-triggered="isDownloadTriggered(drama.series_name)"
-            :is-syncing="syncingDramaId === drama.book_id"
-            :is-processing="clipProcessingDramaId === drama.book_id"
-            :is-any-syncing="isAnyOperationBlocked"
-            :is-downloaded="isDramaDownloaded(drama.series_name)"
-            :is-submitted-for-download="submittedForDownloadSet.has(drama.book_id)"
-            :is-submitted-for-clip="submittedForClipSet.has(drama.book_id)"
-            :is-manual-red-flag="isManualRedFlag(drama.book_id)"
-            :is-in-cart="isDramaInCart(drama.book_id)"
-            @show-image="showDramaImage"
-            @copy-name="copyDramaName"
-            @sync-to-feishu="syncToFeishu"
-            @add-to-cart="handleAddToCart"
-            @red-flag-change="handleManualRedFlagChange"
-            @download="handleDownload"
-          />
-        </div>
-        <div v-else-if="isSearching && searchLoading" class="empty-state">
-          <Icon icon="mdi:loading" class="empty-icon animate-spin" />
-          <h3 class="empty-title">搜索中...</h3>
-          <p class="empty-description">正在匹配短剧，请稍候</p>
-        </div>
-        <div v-else-if="isSearching && !searchLoading" class="empty-state">
-          <Icon icon="mdi:magnify" class="empty-icon" />
-          <h3 class="empty-title">未找到相关短剧</h3>
-          <p class="empty-description">请尝试其他关键词或清空搜索</p>
-        </div>
-
         <!-- 搜索态的全局提示 Toast -->
         <Transition
           enter-active-class="transition duration-300 ease-out"
@@ -250,14 +215,19 @@
           </div>
         </Transition>
 
-        <div v-if="!isSearching" class="new-drama-preview">
+        <div class="new-drama-preview">
           <div class="embedded-list-filter-row">
             <div v-if="activeTab === 'new-drama'" class="secondary-tab-switcher">
               <button
                 v-for="date in dateOptions"
                 :key="date.value"
-                @click="selectedDate = date.value"
-                :class="['secondary-tab-btn', selectedDate === date.value ? 'active' : '']"
+                :disabled="isSearching"
+                @click="!isSearching && (selectedDate = date.value)"
+                :class="[
+                  'secondary-tab-btn',
+                  selectedDate === date.value ? 'active' : '',
+                  isSearching ? 'is-disabled' : '',
+                ]"
               >
                 <Icon :icon="getDateIcon(date.value)" class="secondary-tab-icon" />
                 <span class="secondary-tab-text">{{ date.label }}</span>
@@ -277,7 +247,63 @@
                 <span class="secondary-tab-text">{{ level.label }}</span>
               </button>
             </div>
-            <DramaCart ref="dramaCartRef" inline @batch-submitted="handleBatchSubmitted" />
+            <div class="date-cart-actions">
+              <button
+                v-if="activeTab === 'new-drama' && !isSearching"
+                type="button"
+                class="bulk-cart-button"
+                :class="{ 'is-ready': currentDateAddableNotInCartCount > 0 }"
+                :disabled="currentDateAddableNotInCartCount === 0"
+                :title="bulkCartButtonTitle"
+                @click="handleAddCurrentDateToCart"
+              >
+                <span class="bulk-cart-button__glow"></span>
+                <Icon icon="mdi:tray-plus" class="bulk-cart-button__icon" />
+                <span class="bulk-cart-button__text">一键加入</span>
+                <span class="bulk-cart-button__count">{{ currentDateAddableNotInCartCount }}</span>
+              </button>
+              <DramaCart
+                ref="dramaCartRef"
+                inline
+                @batch-submitted="handleBatchSubmitted"
+                @items-changed="handleCartItemsChanged"
+              />
+            </div>
+          </div>
+
+          <!-- 搜索结果列表 - 保留筛选行和购物车常驻 -->
+          <div v-if="isSearching && !searchLoading && searchResults.length > 0" class="drama-list">
+            <DramaCard
+              v-for="drama in searchResults"
+              :key="drama.book_id"
+              :drama="drama"
+              :download-data="getDownloadDataForDrama(drama.series_name)"
+              :is-download-triggered="isDownloadTriggered(drama.series_name)"
+              :is-syncing="syncingDramaId === drama.book_id"
+              :is-processing="clipProcessingDramaId === drama.book_id"
+              :is-any-syncing="isAnyOperationBlocked"
+              :is-downloaded="isDramaDownloaded(drama.series_name)"
+              :is-submitted-for-download="submittedForDownloadSet.has(drama.book_id)"
+              :is-submitted-for-clip="submittedForClipSet.has(drama.book_id)"
+              :is-manual-red-flag="isManualRedFlag(drama.book_id)"
+              :is-in-cart="isDramaInCart(drama.book_id)"
+              @show-image="showDramaImage"
+              @copy-name="copyDramaName"
+              @sync-to-feishu="syncToFeishu"
+              @add-to-cart="handleAddToCart"
+              @red-flag-change="handleManualRedFlagChange"
+              @download="handleDownload"
+            />
+          </div>
+          <div v-else-if="isSearching && searchLoading" class="empty-state">
+            <Icon icon="mdi:loading" class="empty-icon animate-spin" />
+            <h3 class="empty-title">搜索中...</h3>
+            <p class="empty-description">正在匹配短剧，请稍候</p>
+          </div>
+          <div v-else-if="isSearching && !searchLoading" class="empty-state">
+            <Icon icon="mdi:magnify" class="empty-icon" />
+            <h3 class="empty-title">未找到相关短剧</h3>
+            <p class="empty-description">请尝试其他关键词或清空搜索</p>
           </div>
 
           <!-- 骨架屏加载状态 -->
@@ -838,7 +864,7 @@ import dayjs from 'dayjs'
 import DatePicker from './DatePicker.vue'
 import DramaCard from './DramaCard.vue'
 import AdxRankingDrawer from './AdxRankingDrawer.vue'
-import DramaCart from './DramaCart.vue'
+import DramaCart, { type CartItem } from './DramaCart.vue'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
 
@@ -967,6 +993,7 @@ async function searchDramaStatusRecordInConfiguredGroups(dramaName: string, time
 const message = useMessage()
 
 const dramaCartRef = ref<InstanceType<typeof DramaCart> | null>(null)
+const cartBookIds = ref<Set<string>>(new Set())
 
 // ===== 请求代际:用于 Tab 切换时丢弃在途请求结果 =====
 // 每次 cancelAllListRequests() 会把 generation +1
@@ -1395,6 +1422,42 @@ const currentDateDramas = computed(() => {
   })
 })
 
+function canAddDownloadDrama(drama: NewDramaItem | RankingDramaItem) {
+  return !drama.feishu_downloaded && !drama.feishu_exists
+}
+
+function buildCartItem(drama: NewDramaItem | RankingDramaItem): CartItem {
+  return {
+    book_id: drama.book_id,
+    series_name: (drama as any).series_name || (drama as any).book_name || '未知剧名',
+    publish_time: drama.publish_time || '',
+    manualRedFlag: isManualRedFlag(drama.book_id),
+    fromSearchResult: searchKeyword.value.trim().length > 0,
+    feishuTableGroupId: getSelectedFeishuTableGroupId(),
+    feishuTableGroupName: getSelectedFeishuTableGroupName(),
+  }
+}
+
+const currentDateAddableDramas = computed(() =>
+  currentDateDramas.value.filter(drama => canAddDownloadDrama(drama))
+)
+
+const currentDateAddableNotInCartCount = computed(
+  () => currentDateAddableDramas.value.filter(drama => !cartBookIds.value.has(drama.book_id)).length
+)
+
+const bulkCartButtonTitle = computed(() => {
+  if (currentDateAddableDramas.value.length === 0) {
+    return `${selectedDateLabel.value}暂无可加入购物车的剧`
+  }
+
+  if (currentDateAddableNotInCartCount.value === 0) {
+    return `${selectedDateLabel.value}可加入的剧已全部在购物车中`
+  }
+
+  return `将${selectedDateLabel.value}${currentDateAddableNotInCartCount.value}部可新增待下载剧加入购物车`
+})
+
 // 是否正在搜索
 const isSearching = computed(() => searchKeyword.value.trim().length > 0)
 
@@ -1409,8 +1472,6 @@ const filteredDramas = computed(() => {
   const dramas = currentDateDramas.value
 
   // 判断是否可以新增待下载
-  const canAddDownload = (drama: NewDramaItem) => !drama.feishu_downloaded && !drama.feishu_exists
-
   // 判断下载状态是否为完成
   const isDownloadCompleted = (drama: NewDramaItem) => {
     const downloadData = getDownloadDataForDrama(drama.series_name)
@@ -1427,12 +1488,12 @@ const filteredDramas = computed(() => {
     // 2. 可新增待下载 + 下载未完成
     // 3. 不可新增待下载
     const dramasWithAddAndCompleted = otherDramas.filter(
-      d => canAddDownload(d) && isDownloadCompleted(d)
+      d => canAddDownloadDrama(d) && isDownloadCompleted(d)
     )
     const dramasWithAddButNotCompleted = otherDramas.filter(
-      d => canAddDownload(d) && !isDownloadCompleted(d)
+      d => canAddDownloadDrama(d) && !isDownloadCompleted(d)
     )
-    const dramasWithoutAddButton = otherDramas.filter(d => !canAddDownload(d))
+    const dramasWithoutAddButton = otherDramas.filter(d => !canAddDownloadDrama(d))
 
     return [
       ...newDramas,
@@ -1443,11 +1504,13 @@ const filteredDramas = computed(() => {
   }
 
   // 没有增剧时，也对列表进行三级排序
-  const dramasWithAddAndCompleted = dramas.filter(d => canAddDownload(d) && isDownloadCompleted(d))
-  const dramasWithAddButNotCompleted = dramas.filter(
-    d => canAddDownload(d) && !isDownloadCompleted(d)
+  const dramasWithAddAndCompleted = dramas.filter(
+    d => canAddDownloadDrama(d) && isDownloadCompleted(d)
   )
-  const dramasWithoutAddButton = dramas.filter(d => !canAddDownload(d))
+  const dramasWithAddButNotCompleted = dramas.filter(
+    d => canAddDownloadDrama(d) && !isDownloadCompleted(d)
+  )
+  const dramasWithoutAddButton = dramas.filter(d => !canAddDownloadDrama(d))
 
   return [...dramasWithAddAndCompleted, ...dramasWithAddButNotCompleted, ...dramasWithoutAddButton]
 })
@@ -1761,7 +1824,11 @@ function isManualRedFlag(bookId: string) {
 }
 
 function isDramaInCart(bookId: string) {
-  return Boolean(dramaCartRef.value?.hasItem?.(bookId))
+  return cartBookIds.value.has(bookId)
+}
+
+function handleCartItemsChanged(bookIds: string[]) {
+  cartBookIds.value = new Set(bookIds)
 }
 
 function handleManualRedFlagChange(payload: {
@@ -1794,19 +1861,26 @@ function handleAddToCart(payload: {
     return
   }
 
-  // 构造购物车项
-  const cartItem = {
-    book_id: drama.book_id,
-    series_name: (drama as any).series_name || (drama as any).book_name || '未知剧名',
-    publish_time: drama.publish_time || '',
-    manualRedFlag: isManualRedFlag(drama.book_id),
-    fromSearchResult: searchKeyword.value.trim().length > 0,
-    feishuTableGroupId: getSelectedFeishuTableGroupId(),
-    feishuTableGroupName: getSelectedFeishuTableGroupName(),
+  // 添加到购物车（带动画）
+  dramaCartRef.value.addItem(buildCartItem(drama))
+}
+
+function handleAddCurrentDateToCart() {
+  if (!dramaCartRef.value) {
+    message.error('购物车组件未加载')
+    return
   }
 
-  // 添加到购物车（带动画）
-  dramaCartRef.value.addItem(cartItem)
+  const targetDramas = currentDateAddableDramas.value.filter(
+    drama => !cartBookIds.value.has(drama.book_id)
+  )
+
+  if (targetDramas.length === 0) {
+    message.info(bulkCartButtonTitle.value)
+    return
+  }
+
+  dramaCartRef.value.addItems(targetDramas.map(buildCartItem))
 }
 
 // 处理批量提交完成
@@ -3354,6 +3428,22 @@ watch(
   transform: none;
 }
 
+.new-drama-preview-page.is-embedded .secondary-tab-btn.is-disabled,
+.new-drama-preview-page.is-embedded .secondary-tab-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.44;
+  filter: grayscale(0.4);
+  transform: none;
+  box-shadow: none;
+}
+
+.new-drama-preview-page.is-embedded .secondary-tab-btn.is-disabled.active,
+.new-drama-preview-page.is-embedded .secondary-tab-btn:disabled.active {
+  border-color: rgba(148, 163, 184, 0.16);
+  background: rgba(148, 163, 184, 0.08);
+  color: #64748b;
+}
+
 .new-drama-preview-page.is-embedded .search-query-compact {
   min-width: min(520px, 100%);
   flex: 1 1 360px;
@@ -3388,6 +3478,107 @@ watch(
   padding-bottom: 14px;
   margin-bottom: 18px;
   border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.date-cart-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.bulk-cart-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 46px;
+  min-width: 126px;
+  padding: 0 13px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.96)),
+    radial-gradient(circle at 20% 0%, rgba(14, 165, 233, 0.18), transparent 34%);
+  color: #0369a1;
+  cursor: pointer;
+  box-shadow:
+    0 10px 28px -18px rgba(15, 23, 42, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    color 0.2s ease,
+    opacity 0.2s ease;
+  backdrop-filter: blur(12px);
+}
+
+.bulk-cart-button:not(:disabled):hover {
+  transform: translateY(-2px);
+  border-color: rgba(14, 165, 233, 0.38);
+  color: #075985;
+  box-shadow:
+    0 18px 38px -20px rgba(14, 165, 233, 0.65),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+.bulk-cart-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.54;
+  box-shadow: none;
+}
+
+.bulk-cart-button.is-ready {
+  border-color: rgba(14, 165, 233, 0.32);
+  background:
+    linear-gradient(135deg, #f0f9ff 0%, #ecfeff 100%),
+    radial-gradient(circle at top left, rgba(59, 130, 246, 0.18), transparent 36%);
+}
+
+.bulk-cart-button__glow {
+  position: absolute;
+  inset: -40% auto auto -30%;
+  width: 72px;
+  height: 72px;
+  border-radius: 999px;
+  background: rgba(14, 165, 233, 0.16);
+  filter: blur(12px);
+}
+
+.bulk-cart-button__icon,
+.bulk-cart-button__text,
+.bulk-cart-button__count {
+  position: relative;
+  z-index: 1;
+}
+
+.bulk-cart-button__icon {
+  width: 20px;
+  height: 20px;
+}
+
+.bulk-cart-button__text {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.bulk-cart-button__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: #f97316;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  box-shadow: 0 6px 14px rgba(249, 115, 22, 0.26);
 }
 
 .new-drama-preview-page.is-embedded .drama-list {
@@ -3702,6 +3893,22 @@ watch(
 
   .new-drama-preview-page.is-embedded .embedded-list-filter-row {
     align-items: flex-start;
+  }
+
+  .date-cart-actions {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-end;
+  }
+
+  .bulk-cart-button {
+    height: 40px;
+    min-width: 112px;
+    border-radius: 14px;
+  }
+
+  .bulk-cart-button__text {
+    font-size: 12px;
   }
 
   .new-drama-preview-page.is-embedded .secondary-tab-switcher {
