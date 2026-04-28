@@ -522,7 +522,7 @@
                         {{ countUserCustomizableSections(item.channel, item.config) }} 项用户自定义
                       </span>
                       <span class="channel-config-card__pill channel-config-card__pill--info">
-                        {{ countConfiguredMaterialMatches(item.config.douyinMaterialMatches) }}
+                        {{ countConfiguredFeishuGroupMaterialMatches(item.config) }}
                         条有效规则
                       </span>
                     </div>
@@ -645,38 +645,6 @@
                       </n-form>
                     </div>
 
-                    <div class="config-subpanel">
-                      <div class="config-subpanel__head">
-                        <div>
-                          <p class="text-sm font-semibold text-emerald-600">飞书表格 ID</p>
-                        </div>
-                      </div>
-                      <n-form
-                        :model="item.config"
-                        label-placement="top"
-                        class="grid grid-cols-1 gap-3 md:grid-cols-2"
-                      >
-                        <n-form-item label="剧集清单 table_id">
-                          <n-input
-                            v-model:value="item.config.feishu.dramaListTableId"
-                            placeholder="请输入剧集清单 table_id"
-                          />
-                        </n-form-item>
-                        <n-form-item label="剧集状态 table_id">
-                          <n-input
-                            v-model:value="item.config.feishu.dramaStatusTableId"
-                            placeholder="请输入剧集状态 table_id"
-                          />
-                        </n-form-item>
-                        <n-form-item label="账户 table_id" class="md:col-span-2">
-                          <n-input
-                            v-model:value="item.config.feishu.accountTableId"
-                            placeholder="请输入账户 table_id"
-                          />
-                        </n-form-item>
-                      </n-form>
-                    </div>
-
                     <div class="config-subpanel config-subpanel--sky">
                       <div class="config-subpanel__head config-subpanel__head--split">
                         <div>
@@ -719,6 +687,242 @@
                           />
                         </n-form-item>
                       </n-form>
+                    </div>
+
+                    <div class="config-subpanel channel-config-section--wide">
+                      <div class="config-subpanel__head config-subpanel__head--split">
+                        <div>
+                          <p class="text-sm font-semibold text-emerald-600">飞书表格组</p>
+                          <p class="mt-1 text-xs text-slate-500">
+                            同一渠道可拆成多套表格，每组独立绑定账户表和抖音素材。
+                          </p>
+                        </div>
+                        <div class="flex flex-wrap items-center justify-end gap-3">
+                          <div class="toggle-hero">
+                            <div>
+                              <p class="toggle-hero__title">允许用户自定义素材</p>
+                            </div>
+                            <n-switch
+                              v-model:value="item.config.douyinMaterialConfig.allowCustom"
+                            />
+                          </div>
+                          <n-button
+                            size="small"
+                            type="primary"
+                            secondary
+                            @click="addUserChannelFeishuTableGroup(item.channel.id)"
+                          >
+                            新增表格组
+                          </n-button>
+                        </div>
+                      </div>
+
+                      <div class="space-y-4">
+                        <div
+                          v-for="(group, groupIndex) in item.config.feishuTableGroups"
+                          :key="group.id"
+                          class="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-4"
+                        >
+                          <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+                            <div class="min-w-0 flex-1">
+                              <n-input
+                                v-model:value="group.name"
+                                size="small"
+                                placeholder="表格组名称，如 电脑A"
+                                class="max-w-xs"
+                              />
+                              <p class="mt-1 text-xs text-slate-500">
+                                第 {{ groupIndex + 1 }} 组 ·
+                                {{ group.enabled ? '参与业务' : '已停用' }}
+                              </p>
+                            </div>
+                            <div class="flex items-center gap-3">
+                              <n-switch v-model:value="group.enabled" size="small" />
+                              <n-button
+                                size="small"
+                                tertiary
+                                type="error"
+                                :disabled="item.config.feishuTableGroups.length <= 1"
+                                @click="
+                                  removeUserChannelFeishuTableGroup(item.channel.id, group.id)
+                                "
+                              >
+                                删除
+                              </n-button>
+                            </div>
+                          </div>
+
+                          <n-form
+                            :model="group"
+                            label-placement="top"
+                            class="grid grid-cols-1 gap-3 md:grid-cols-3"
+                          >
+                            <n-form-item label="剧集清单 table_id">
+                              <n-input
+                                v-model:value="group.feishu.dramaListTableId"
+                                placeholder="请输入剧集清单 table_id"
+                                @update:value="syncDefaultUserChannelFeishuGroup(item.channel.id)"
+                              />
+                            </n-form-item>
+                            <n-form-item label="剧集状态 table_id">
+                              <n-input
+                                v-model:value="group.feishu.dramaStatusTableId"
+                                placeholder="请输入剧集状态 table_id"
+                                @update:value="syncDefaultUserChannelFeishuGroup(item.channel.id)"
+                              />
+                            </n-form-item>
+                            <n-form-item label="账户 table_id">
+                              <n-input
+                                v-model:value="group.feishu.accountTableId"
+                                placeholder="请输入账户 table_id"
+                                @update:value="syncDefaultUserChannelFeishuGroup(item.channel.id)"
+                              />
+                            </n-form-item>
+                          </n-form>
+
+                          <div class="mt-3 rounded-2xl border border-violet-100 bg-white/80 p-3">
+                            <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+                              <p class="text-sm font-semibold text-violet-600">抖音号匹配素材</p>
+                              <div class="flex flex-wrap items-center gap-2">
+                                <span
+                                  class="channel-config-card__pill channel-config-card__pill--neutral"
+                                >
+                                  总素材
+                                  {{ getMaterialMatchTotalCount(group.douyinMaterialMatches) || 0 }}
+                                </span>
+                                <span
+                                  class="channel-config-card__pill channel-config-card__pill--violet"
+                                >
+                                  {{ group.douyinMaterialMatches.length }} 条规则
+                                </span>
+                              </div>
+                            </div>
+
+                            <div
+                              v-if="userForm.douyinAccounts.length === 0"
+                              class="material-match-empty-warning"
+                            >
+                              当前用户还没有绑定抖音号，请先到顶部“抖音号配置”里维护。
+                            </div>
+
+                            <div v-else class="material-match-builder">
+                              <div class="material-match-builder__toolbar">
+                                <div class="material-match-builder__selector">
+                                  <p class="material-match-builder__label">选择抖音号</p>
+                                  <n-select
+                                    :value="
+                                      getUserChannelGroupSelectedMaterialAccountIds(
+                                        item.channel.id,
+                                        group.id
+                                      )
+                                    "
+                                    multiple
+                                    filterable
+                                    clearable
+                                    max-tag-count="responsive"
+                                    :options="
+                                      getUserChannelGroupMaterialSelectOptions(
+                                        item.channel.id,
+                                        group.id
+                                      )
+                                    "
+                                    placeholder="请选择该表格组要使用的抖音号"
+                                    @update:value="
+                                      value =>
+                                        handleUserChannelGroupMaterialSelectionChange(
+                                          item.channel.id,
+                                          group.id,
+                                          value
+                                        )
+                                    "
+                                  />
+                                </div>
+                                <div class="material-match-builder__average">
+                                  <span class="material-match-builder__average-label"
+                                    >素材总数</span
+                                  >
+                                  <n-input-number
+                                    :value="
+                                      materialMatchBatchTotals[
+                                        getFeishuTableGroupKey(item.channel.id, group.id)
+                                      ] ?? null
+                                    "
+                                    :min="1"
+                                    :precision="0"
+                                    placeholder="素材总数"
+                                    class="w-full"
+                                    @update:value="
+                                      setMaterialMatchGroupBatchTotal(
+                                        item.channel.id,
+                                        group.id,
+                                        $event
+                                      )
+                                    "
+                                  />
+                                </div>
+                              </div>
+
+                              <div
+                                v-if="group.douyinMaterialMatches.length > 0"
+                                class="material-match-list material-match-list--compact"
+                              >
+                                <div
+                                  v-for="(match, matchIndex) in group.douyinMaterialMatches"
+                                  :key="match.id"
+                                  class="material-match-card material-match-card--compact"
+                                >
+                                  <div class="material-match-card__summary">
+                                    <div
+                                      class="material-match-card__items material-match-card__items--stacked"
+                                    >
+                                      <div class="material-match-card__item">
+                                        <span class="material-match-card__order">{{
+                                          matchIndex + 1
+                                        }}</span>
+                                        <div class="material-match-card__account-line">
+                                          <span class="material-match-card__name">
+                                            {{
+                                              getMaterialMatchAccountMeta(match).douyinAccount ||
+                                              '未选择抖音号'
+                                            }}
+                                          </span>
+                                          <span
+                                            v-if="
+                                              getMaterialMatchAccountMeta(match).douyinAccountId
+                                            "
+                                            class="material-match-card__account-id"
+                                          >
+                                            ID
+                                            {{ getMaterialMatchAccountMeta(match).douyinAccountId }}
+                                          </span>
+                                        </div>
+                                      </div>
+                                      <div class="material-match-card__meta-row">
+                                        <span class="material-match-card__range">{{
+                                          match.materialRange || '--'
+                                        }}</span>
+                                        <span class="material-match-card__count">
+                                          {{
+                                            getMaterialRangeCount(match.materialRange) || 0
+                                          }}
+                                          个素材
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div
+                                v-else
+                                class="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-500"
+                              >
+                                先选择该表格组使用的抖音号，再填写素材总数自动平均分配。
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
                     <div class="config-subpanel channel-config-section--wide">
@@ -1089,137 +1293,6 @@
                           />
                         </n-form-item>
                       </n-form>
-                    </div>
-
-                    <div
-                      class="config-subpanel config-subpanel--violet channel-config-section--wide"
-                    >
-                      <div class="config-subpanel__head config-subpanel__head--split">
-                        <div>
-                          <p class="text-sm font-semibold text-violet-600">抖音号匹配素材</p>
-                        </div>
-                        <div class="flex flex-wrap items-center justify-end gap-3">
-                          <div class="toggle-hero">
-                            <div>
-                              <p class="toggle-hero__title">允许用户自定义</p>
-                            </div>
-                            <n-switch
-                              v-model:value="item.config.douyinMaterialConfig.allowCustom"
-                            />
-                          </div>
-                          <span
-                            class="channel-config-card__pill channel-config-card__pill--neutral"
-                          >
-                            总素材
-                            {{ getMaterialMatchTotalCount(item.config.douyinMaterialMatches) || 0 }}
-                          </span>
-                          <span class="channel-config-card__pill channel-config-card__pill--violet">
-                            {{ item.config.douyinMaterialMatches.length }} 条规则
-                          </span>
-                          <span
-                            class="channel-config-card__pill"
-                            :class="
-                              countConfiguredMaterialMatches(item.config.douyinMaterialMatches) > 0
-                                ? 'channel-config-card__pill--success'
-                                : 'channel-config-card__pill--danger'
-                            "
-                          >
-                            {{ countConfiguredMaterialMatches(item.config.douyinMaterialMatches) }}
-                            条有效规则
-                          </span>
-                        </div>
-                      </div>
-
-                      <div
-                        v-if="userForm.douyinAccounts.length === 0"
-                        class="material-match-empty-warning"
-                      >
-                        当前用户还没有绑定抖音号，请先到顶部“抖音号配置”里维护。
-                      </div>
-
-                      <div v-else class="material-match-builder">
-                        <div class="material-match-builder__toolbar">
-                          <div class="material-match-builder__selector">
-                            <p class="material-match-builder__label">选择抖音号</p>
-                            <n-select
-                              :value="getUserChannelSelectedMaterialAccountIds(item.channel.id)"
-                              multiple
-                              filterable
-                              clearable
-                              max-tag-count="responsive"
-                              :options="getUserChannelMaterialSelectOptions(item.channel.id)"
-                              placeholder="请选择当前渠道要使用的抖音号"
-                              @update:value="
-                                value =>
-                                  handleUserChannelMaterialSelectionChange(item.channel.id, value)
-                              "
-                            />
-                          </div>
-                          <div class="material-match-builder__average">
-                            <span class="material-match-builder__average-label">素材总数</span>
-                            <n-input-number
-                              :value="materialMatchBatchTotals[item.channel.id] ?? null"
-                              :min="1"
-                              :precision="0"
-                              placeholder="素材总数"
-                              class="w-full"
-                              @update:value="setMaterialMatchBatchTotal(item.channel.id, $event)"
-                            />
-                          </div>
-                        </div>
-
-                        <div
-                          v-if="item.config.douyinMaterialMatches.length > 0"
-                          class="material-match-list material-match-list--compact"
-                        >
-                          <div
-                            v-for="(match, matchIndex) in item.config.douyinMaterialMatches"
-                            :key="match.id"
-                            class="material-match-card material-match-card--compact"
-                          >
-                            <div class="material-match-card__summary">
-                              <div
-                                class="material-match-card__items material-match-card__items--stacked"
-                              >
-                                <div class="material-match-card__item">
-                                  <span class="material-match-card__order">{{
-                                    matchIndex + 1
-                                  }}</span>
-                                  <div class="material-match-card__account-line">
-                                    <span class="material-match-card__name">
-                                      {{
-                                        getMaterialMatchAccountMeta(match).douyinAccount ||
-                                        '未选择抖音号'
-                                      }}
-                                    </span>
-                                    <span
-                                      v-if="getMaterialMatchAccountMeta(match).douyinAccountId"
-                                      class="material-match-card__account-id"
-                                    >
-                                      ID {{ getMaterialMatchAccountMeta(match).douyinAccountId }}
-                                    </span>
-                                  </div>
-                                </div>
-                                <div class="material-match-card__meta-row">
-                                  <span class="material-match-card__range">{{
-                                    match.materialRange || '--'
-                                  }}</span>
-                                  <span class="material-match-card__count">
-                                    {{ getMaterialRangeCount(match.materialRange) || 0 }} 个素材
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div
-                          v-else
-                          class="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500"
-                        >
-                          先在上方选择抖音号，再填写素材总数自动平均分配。
-                        </div>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -1855,6 +1928,7 @@ const selectedDouyinAccountByUser = reactive<Record<string, string>>({})
 const materialMatchBatchTotals = reactive<Record<string, number | null>>({})
 const selectedMaterialAccountIdsByChannel = reactive<Record<string, string[]>>({})
 const userChannelReuseSourceIds = reactive<Record<string, string>>({})
+const DEFAULT_FEISHU_TABLE_GROUP_ID = 'default'
 const draggedOrderUsername = reactive({
   channelId: '',
   index: -1,
@@ -2674,6 +2748,8 @@ function createDefaultUserForm(): UserFormModel {
 }
 
 function createDefaultUserChannelConfig(): adminApi.UserChannelBindingConfig {
+  const defaultFeishuTableGroup = createDefaultFeishuTableGroup()
+
   return {
     enabled: true,
     xtToken: '',
@@ -2696,6 +2772,7 @@ function createDefaultUserChannelConfig(): adminApi.UserChannelBindingConfig {
       dramaStatusTableId: '',
       accountTableId: '',
     },
+    feishuTableGroups: [defaultFeishuTableGroup],
     materialPreview: {
       allowCustom: false,
       enabled: true,
@@ -2737,31 +2814,95 @@ function createDefaultUserChannelConfig(): adminApi.UserChannelBindingConfig {
   }
 }
 
+function createDefaultFeishuTableGroup(): adminApi.UserChannelBindingConfig['feishuTableGroups'][number] {
+  const now = new Date().toISOString()
+
+  return {
+    id: DEFAULT_FEISHU_TABLE_GROUP_ID,
+    name: '默认表格',
+    enabled: true,
+    feishu: {
+      dramaListTableId: '',
+      dramaStatusTableId: '',
+      accountTableId: '',
+    },
+    douyinMaterialMatches: [],
+    createdAt: now,
+    updatedAt: now,
+  }
+}
+
+function createNewFeishuTableGroup(
+  index: number
+): adminApi.UserChannelBindingConfig['feishuTableGroups'][number] {
+  return {
+    ...createDefaultFeishuTableGroup(),
+    id: crypto.randomUUID(),
+    name: `表格组 ${index + 1}`,
+  }
+}
+
+function normalizeFeishuTableGroups(
+  config?: Partial<adminApi.UserChannelBindingConfig>
+): adminApi.UserChannelBindingConfig['feishuTableGroups'] {
+  const rawGroups = Array.isArray(config?.feishuTableGroups) ? config.feishuTableGroups : []
+  const sourceGroups = rawGroups.length
+    ? rawGroups
+    : [
+        {
+          ...createDefaultFeishuTableGroup(),
+          feishu: {
+            dramaListTableId: String(config?.feishu?.dramaListTableId || '').trim(),
+            dramaStatusTableId: String(config?.feishu?.dramaStatusTableId || '').trim(),
+            accountTableId: String(config?.feishu?.accountTableId || '').trim(),
+          },
+          douyinMaterialMatches: Array.isArray(config?.douyinMaterialMatches)
+            ? config.douyinMaterialMatches
+            : [],
+        },
+      ]
+
+  return sourceGroups.map((group, index) => ({
+    id: String(group?.id || (index === 0 ? DEFAULT_FEISHU_TABLE_GROUP_ID : crypto.randomUUID())),
+    name: String(group?.name || (index === 0 ? '默认表格' : `表格组 ${index + 1}`)).trim(),
+    enabled: group?.enabled !== false,
+    feishu: {
+      dramaListTableId: String(group?.feishu?.dramaListTableId || '').trim(),
+      dramaStatusTableId: String(group?.feishu?.dramaStatusTableId || '').trim(),
+      accountTableId: String(group?.feishu?.accountTableId || '').trim(),
+    },
+    douyinMaterialMatches: Array.isArray(group?.douyinMaterialMatches)
+      ? group.douyinMaterialMatches
+          .map(match => ({
+            id: String(match?.id || crypto.randomUUID()),
+            douyinAccountRefId: String(match?.douyinAccountRefId || ''),
+            douyinAccount: String(match?.douyinAccount || ''),
+            douyinAccountId: String(match?.douyinAccountId || ''),
+            cooperationCode: String(match?.cooperationCode || ''),
+            materialRange: String(match?.materialRange || ''),
+            createdAt: match?.createdAt,
+            updatedAt: match?.updatedAt,
+          }))
+          .filter(
+            match =>
+              match.douyinAccountRefId ||
+              match.douyinAccount ||
+              match.douyinAccountId ||
+              match.cooperationCode ||
+              match.materialRange
+          )
+      : [],
+    createdAt: group?.createdAt,
+    updatedAt: group?.updatedAt,
+  }))
+}
+
 function normalizeUserChannelConfig(
   config?: Partial<adminApi.UserChannelBindingConfig>
 ): adminApi.UserChannelBindingConfig {
   const defaultConfig = createDefaultUserChannelConfig()
-  const douyinMaterialMatches = Array.isArray(config?.douyinMaterialMatches)
-    ? config.douyinMaterialMatches
-        .map(match => ({
-          id: String(match?.id || crypto.randomUUID()),
-          douyinAccountRefId: String(match?.douyinAccountRefId || ''),
-          douyinAccount: String(match?.douyinAccount || ''),
-          douyinAccountId: String(match?.douyinAccountId || ''),
-          cooperationCode: String(match?.cooperationCode || ''),
-          materialRange: String(match?.materialRange || ''),
-          createdAt: match?.createdAt,
-          updatedAt: match?.updatedAt,
-        }))
-        .filter(
-          match =>
-            match.douyinAccountRefId ||
-            match.douyinAccount ||
-            match.douyinAccountId ||
-            match.cooperationCode ||
-            match.materialRange
-        )
-    : []
+  const feishuTableGroups = normalizeFeishuTableGroups(config)
+  const defaultFeishuGroup = feishuTableGroups[0] || createDefaultFeishuTableGroup()
 
   return {
     ...defaultConfig,
@@ -2790,8 +2931,9 @@ function normalizeUserChannelConfig(
     },
     feishu: {
       ...defaultConfig.feishu,
-      ...(config?.feishu || {}),
+      ...defaultFeishuGroup.feishu,
     },
+    feishuTableGroups,
     materialPreview: {
       ...defaultConfig.materialPreview,
       ...(config?.materialPreview || {}),
@@ -2876,7 +3018,7 @@ function normalizeUserChannelConfig(
     douyinMaterialConfig: {
       allowCustom: Boolean(config?.douyinMaterialConfig?.allowCustom),
     },
-    douyinMaterialMatches,
+    douyinMaterialMatches: defaultFeishuGroup.douyinMaterialMatches,
   }
 }
 
@@ -2902,6 +3044,17 @@ function cloneUserChannelConfig(
     feishu: {
       ...normalizedConfig.feishu,
     },
+    feishuTableGroups: normalizedConfig.feishuTableGroups.map(group => ({
+      ...group,
+      id: group.id === DEFAULT_FEISHU_TABLE_GROUP_ID ? group.id : crypto.randomUUID(),
+      feishu: {
+        ...group.feishu,
+      },
+      douyinMaterialMatches: group.douyinMaterialMatches.map(match => ({
+        ...match,
+        id: crypto.randomUUID(),
+      })),
+    })),
     materialPreview: {
       ...normalizedConfig.materialPreview,
     },
@@ -3027,6 +3180,16 @@ function countConfiguredMaterialMatches(
   ).length
 }
 
+function countConfiguredFeishuGroupMaterialMatches(config: adminApi.UserChannelBindingConfig) {
+  return (config.feishuTableGroups || []).reduce(
+    (sum, group) =>
+      group.enabled === false
+        ? sum
+        : sum + countConfiguredMaterialMatches(group.douyinMaterialMatches || []),
+    0
+  )
+}
+
 function getMaterialRangeCount(materialRange?: string) {
   const normalizedRange = String(materialRange || '').trim()
   if (!normalizedRange) {
@@ -3054,62 +3217,96 @@ function getMaterialMatchTotalCount(
   return totalCount > 0 ? totalCount : null
 }
 
-function syncUserChannelMaterialBatchTotal(channelId: string) {
-  const currentTotal = getMaterialMatchTotalCount(
-    userForm.channelConfigs?.[channelId]?.douyinMaterialMatches || []
-  )
-  materialMatchBatchTotals[channelId] = currentTotal
+function getFeishuTableGroupKey(channelId: string, groupId: string) {
+  return `${channelId}::${groupId || DEFAULT_FEISHU_TABLE_GROUP_ID}`
 }
 
-function countUserCustomizableSections(
-  channel: adminApi.ChannelConfig,
-  config: adminApi.UserChannelBindingConfig
-) {
-  return [
-    config.buildAdvanceConfig.allowCustom,
-    isXingtianChannel(channel) ? config.xtTokenConfig.allowCustom : false,
-    config.materialPreview.allowCustom,
-    config.douyinMaterialConfig.allowCustom,
-  ].filter(Boolean).length
-}
-
-function createDraftUserChannelMaterialMatch(douyinAccountRefId: string) {
-  return {
-    id: crypto.randomUUID(),
-    douyinAccountRefId,
-    materialRange: '',
+function ensureUserChannelFeishuGroups(channelId: string) {
+  if (!userForm.channelConfigs[channelId]) {
+    userForm.channelConfigs[channelId] = createDefaultUserChannelConfig()
   }
+
+  const config = userForm.channelConfigs[channelId]
+  if (!Array.isArray(config.feishuTableGroups) || config.feishuTableGroups.length === 0) {
+    config.feishuTableGroups = normalizeFeishuTableGroups(config)
+  }
+
+  config.feishu = { ...config.feishuTableGroups[0].feishu }
+  config.douyinMaterialMatches = config.feishuTableGroups[0].douyinMaterialMatches
+
+  return config.feishuTableGroups
 }
 
-const USER_CHANNEL_MATERIAL_SELECT_ALL_VALUE = '__user_channel_material_select_all__'
+function syncDefaultUserChannelFeishuGroup(channelId: string) {
+  const groups = ensureUserChannelFeishuGroups(channelId)
+  const defaultGroup = groups[0]
+  if (!defaultGroup) return
 
-function syncUserChannelMaterialSelection(channelId: string) {
-  const matches = userForm.channelConfigs?.[channelId]?.douyinMaterialMatches || []
-  selectedMaterialAccountIdsByChannel[channelId] = matches
+  userForm.channelConfigs[channelId].feishu = { ...defaultGroup.feishu }
+  userForm.channelConfigs[channelId].douyinMaterialMatches = defaultGroup.douyinMaterialMatches
+}
+
+function addUserChannelFeishuTableGroup(channelId: string) {
+  const groups = ensureUserChannelFeishuGroups(channelId)
+  groups.push(createNewFeishuTableGroup(groups.length))
+}
+
+function removeUserChannelFeishuTableGroup(channelId: string, groupId: string) {
+  const groups = ensureUserChannelFeishuGroups(channelId)
+  if (groups.length <= 1) {
+    message.warning('至少保留一个表格组')
+    return
+  }
+
+  const index = groups.findIndex(group => group.id === groupId)
+  if (index < 0) return
+
+  const removed = groups.splice(index, 1)[0]
+  delete selectedMaterialAccountIdsByChannel[getFeishuTableGroupKey(channelId, removed.id)]
+  delete materialMatchBatchTotals[getFeishuTableGroupKey(channelId, removed.id)]
+  syncDefaultUserChannelFeishuGroup(channelId)
+}
+
+function syncUserChannelGroupMaterialBatchTotal(channelId: string, groupId: string) {
+  const group = ensureUserChannelFeishuGroups(channelId).find(item => item.id === groupId)
+  const currentTotal = getMaterialMatchTotalCount(group?.douyinMaterialMatches || [])
+  materialMatchBatchTotals[getFeishuTableGroupKey(channelId, groupId)] = currentTotal
+}
+
+function syncUserChannelGroupMaterialSelection(channelId: string, groupId: string) {
+  const group = ensureUserChannelFeishuGroups(channelId).find(item => item.id === groupId)
+  const key = getFeishuTableGroupKey(channelId, groupId)
+  selectedMaterialAccountIdsByChannel[key] = (group?.douyinMaterialMatches || [])
     .map(match => String(match.douyinAccountRefId || '').trim())
     .filter(Boolean)
-  syncUserChannelMaterialBatchTotal(channelId)
+  syncUserChannelGroupMaterialBatchTotal(channelId, groupId)
 }
 
-function getUserChannelSelectedMaterialAccountIds(channelId: string) {
-  if (!Array.isArray(selectedMaterialAccountIdsByChannel[channelId])) {
-    syncUserChannelMaterialSelection(channelId)
+function getUserChannelGroupSelectedMaterialAccountIds(channelId: string, groupId: string) {
+  const key = getFeishuTableGroupKey(channelId, groupId)
+  if (!Array.isArray(selectedMaterialAccountIdsByChannel[key])) {
+    syncUserChannelGroupMaterialSelection(channelId, groupId)
   }
 
-  return Array.isArray(selectedMaterialAccountIdsByChannel[channelId])
-    ? selectedMaterialAccountIdsByChannel[channelId]
+  return Array.isArray(selectedMaterialAccountIdsByChannel[key])
+    ? selectedMaterialAccountIdsByChannel[key]
     : []
 }
 
-function getUserChannelOccupiedMaterialAccountIds(channelId: string) {
+function getUserChannelGroupOccupiedMaterialAccountIds(channelId: string, groupId: string) {
   const occupiedIds = new Set<string>()
+  const config = userForm.channelConfigs?.[channelId]
 
-  Object.entries(userForm.channelConfigs || {}).forEach(([currentChannelId, config]) => {
-    if (currentChannelId === channelId) {
+  ;(config?.feishuTableGroups || []).forEach(group => {
+    if (group.enabled === false) {
       return
     }
 
-    ;(config.douyinMaterialMatches || []).forEach(match => {
+    if (group.id === groupId) {
+      return
+    }
+
+    ;(group.douyinMaterialMatches || []).forEach(match => {
       const refId = String(match?.douyinAccountRefId || '').trim()
       if (refId) {
         occupiedIds.add(refId)
@@ -3120,59 +3317,65 @@ function getUserChannelOccupiedMaterialAccountIds(channelId: string) {
   return occupiedIds
 }
 
-function getUserChannelSelectableMaterialAccountIds(channelId: string) {
-  const occupiedIds = getUserChannelOccupiedMaterialAccountIds(channelId)
+function getUserChannelGroupSelectableMaterialAccountIds(channelId: string, groupId: string) {
+  const occupiedIds = getUserChannelGroupOccupiedMaterialAccountIds(channelId, groupId)
 
   return getUserDouyinAccountOptions()
     .map(option => String(option.value || '').trim())
     .filter(accountId => accountId && !occupiedIds.has(accountId))
 }
 
-function areAllUserChannelSelectableMaterialAccountsSelected(channelId: string) {
-  const selectableIds = getUserChannelSelectableMaterialAccountIds(channelId)
+function areAllUserChannelGroupSelectableMaterialAccountsSelected(
+  channelId: string,
+  groupId: string
+) {
+  const selectableIds = getUserChannelGroupSelectableMaterialAccountIds(channelId, groupId)
   if (!selectableIds.length) {
     return false
   }
 
-  const selectedIds = new Set(getUserChannelSelectedMaterialAccountIds(channelId))
+  const selectedIds = new Set(getUserChannelGroupSelectedMaterialAccountIds(channelId, groupId))
   return selectableIds.every(accountId => selectedIds.has(accountId))
 }
 
-function getUserChannelMaterialSelectOptions(channelId: string) {
-  const selectedIds = new Set(getUserChannelSelectedMaterialAccountIds(channelId))
-  const occupiedIds = getUserChannelOccupiedMaterialAccountIds(channelId)
-  const selectableIds = getUserChannelSelectableMaterialAccountIds(channelId)
+function getUserChannelGroupMaterialSelectOptions(channelId: string, groupId: string) {
+  const selectedIds = new Set(getUserChannelGroupSelectedMaterialAccountIds(channelId, groupId))
+  const occupiedIds = getUserChannelGroupOccupiedMaterialAccountIds(channelId, groupId)
+  const selectableIds = getUserChannelGroupSelectableMaterialAccountIds(channelId, groupId)
 
   return [
     {
-      label: areAllUserChannelSelectableMaterialAccountsSelected(channelId)
+      label: areAllUserChannelGroupSelectableMaterialAccountsSelected(channelId, groupId)
         ? '取消全选'
-        : '全选可选抖音号',
+        : '全选可用抖音号',
       value: USER_CHANNEL_MATERIAL_SELECT_ALL_VALUE,
       disabled: !selectableIds.length,
     },
     ...getUserDouyinAccountOptions().map(option => ({
       ...option,
-      disabled:
-        occupiedIds.has(String(option.value || '')) && !selectedIds.has(String(option.value || '')),
+      disabled: occupiedIds.has(String(option.value)) && !selectedIds.has(String(option.value)),
     })),
   ]
 }
 
-function handleUserChannelMaterialSelectionChange(channelId: string, value: string[] | null) {
-  if (!userForm.channelConfigs[channelId]) {
-    userForm.channelConfigs[channelId] = createDefaultUserChannelConfig()
-  }
+function handleUserChannelGroupMaterialSelectionChange(
+  channelId: string,
+  groupId: string,
+  value: string[] | null
+) {
+  const groups = ensureUserChannelFeishuGroups(channelId)
+  const group = groups.find(item => item.id === groupId)
+  if (!group) return
 
-  const occupiedIds = getUserChannelOccupiedMaterialAccountIds(channelId)
+  const occupiedIds = getUserChannelGroupOccupiedMaterialAccountIds(channelId, groupId)
   const rawSelectedIds = (Array.isArray(value) ? value : [])
     .map(item => String(item || '').trim())
     .filter(Boolean)
   const includesSelectAll = rawSelectedIds.includes(USER_CHANNEL_MATERIAL_SELECT_ALL_VALUE)
   const selectedIds = includesSelectAll
-    ? areAllUserChannelSelectableMaterialAccountsSelected(channelId)
+    ? areAllUserChannelGroupSelectableMaterialAccountsSelected(channelId, groupId)
       ? []
-      : getUserChannelSelectableMaterialAccountIds(channelId)
+      : getUserChannelGroupSelectableMaterialAccountIds(channelId, groupId)
     : Array.from(
         new Set(
           rawSelectedIds
@@ -3181,13 +3384,10 @@ function handleUserChannelMaterialSelectionChange(channelId: string, value: stri
         )
       )
   const currentMatchMap = new Map(
-    userForm.channelConfigs[channelId].douyinMaterialMatches.map(match => [
-      String(match.douyinAccountRefId || '').trim(),
-      match,
-    ])
+    group.douyinMaterialMatches.map(match => [String(match.douyinAccountRefId || '').trim(), match])
   )
 
-  userForm.channelConfigs[channelId].douyinMaterialMatches = selectedIds.map(accountId => {
+  group.douyinMaterialMatches = selectedIds.map(accountId => {
     const currentMatch = currentMatchMap.get(accountId)
     return currentMatch
       ? {
@@ -3196,26 +3396,36 @@ function handleUserChannelMaterialSelectionChange(channelId: string, value: stri
         }
       : createDraftUserChannelMaterialMatch(accountId)
   })
-  selectedMaterialAccountIdsByChannel[channelId] = selectedIds
 
-  if (materialMatchBatchTotals[channelId]) {
-    applyUserChannelAverageMaterialRanges(channelId, true)
+  const key = getFeishuTableGroupKey(channelId, groupId)
+  selectedMaterialAccountIdsByChannel[key] = selectedIds
+  syncDefaultUserChannelFeishuGroup(channelId)
+
+  if (materialMatchBatchTotals[key]) {
+    applyUserChannelGroupAverageMaterialRanges(channelId, groupId, true)
     return
   }
 
-  syncUserChannelMaterialBatchTotal(channelId)
+  syncUserChannelGroupMaterialBatchTotal(channelId, groupId)
 }
 
-function setMaterialMatchBatchTotal(channelId: string, value: number | null) {
-  materialMatchBatchTotals[channelId] = value
-  if (value && getUserChannelSelectedMaterialAccountIds(channelId).length > 0) {
-    applyUserChannelAverageMaterialRanges(channelId, true)
+function setMaterialMatchGroupBatchTotal(channelId: string, groupId: string, value: number | null) {
+  const key = getFeishuTableGroupKey(channelId, groupId)
+  materialMatchBatchTotals[key] = value
+  if (value && getUserChannelGroupSelectedMaterialAccountIds(channelId, groupId).length > 0) {
+    applyUserChannelGroupAverageMaterialRanges(channelId, groupId, true)
   }
 }
 
-function applyUserChannelAverageMaterialRanges(channelId: string, silent = false) {
-  const totalCount = Number(materialMatchBatchTotals[channelId])
-  const matches = userForm.channelConfigs?.[channelId]?.douyinMaterialMatches || []
+function applyUserChannelGroupAverageMaterialRanges(
+  channelId: string,
+  groupId: string,
+  silent = false
+) {
+  const key = getFeishuTableGroupKey(channelId, groupId)
+  const totalCount = Number(materialMatchBatchTotals[key])
+  const group = ensureUserChannelFeishuGroups(channelId).find(item => item.id === groupId)
+  const matches = group?.douyinMaterialMatches || []
 
   if (!matches.length) {
     message.warning('请先选择至少 1 个抖音号')
@@ -3248,10 +3458,34 @@ function applyUserChannelAverageMaterialRanges(channelId: string, silent = false
     currentIndex = end + 1
   })
 
+  syncDefaultUserChannelFeishuGroup(channelId)
+
   if (!silent) {
-    message.success(`已为当前渠道平均分配 ${totalCount} 个素材`)
+    message.success(`已为当前表格组平均分配 ${totalCount} 个素材`)
   }
 }
+
+function countUserCustomizableSections(
+  channel: adminApi.ChannelConfig,
+  config: adminApi.UserChannelBindingConfig
+) {
+  return [
+    config.buildAdvanceConfig.allowCustom,
+    isXingtianChannel(channel) ? config.xtTokenConfig.allowCustom : false,
+    config.materialPreview.allowCustom,
+    config.douyinMaterialConfig.allowCustom,
+  ].filter(Boolean).length
+}
+
+function createDraftUserChannelMaterialMatch(douyinAccountRefId: string) {
+  return {
+    id: crypto.randomUUID(),
+    douyinAccountRefId,
+    materialRange: '',
+  }
+}
+
+const USER_CHANNEL_MATERIAL_SELECT_ALL_VALUE = '__user_channel_material_select_all__'
 
 function getUserChannelReuseOptions(channelId: string) {
   return selectedUserChannels.value
@@ -3288,10 +3522,9 @@ function copyUserChannelConfig(channelId: string) {
     channels.value.find(channel => channel.id === channelId)?.name || `渠道 ${channelId}`
 
   userForm.channelConfigs[channelId] = cloneUserChannelConfig(sourceConfig)
-  handleUserChannelMaterialSelectionChange(
-    channelId,
-    userForm.channelConfigs[channelId].douyinMaterialMatches.map(match => match.douyinAccountRefId)
-  )
+  ensureUserChannelFeishuGroups(channelId).forEach(group => {
+    syncUserChannelGroupMaterialSelection(channelId, group.id)
+  })
   orderUsernameDrafts[channelId] = ''
   activeUserChannelId.value = channelId
 
@@ -3431,18 +3664,22 @@ function syncUserChannelConfigs() {
   })
 
   userForm.channelConfigs = nextConfigs
-  Object.keys(selectedMaterialAccountIdsByChannel).forEach(channelId => {
+  Object.keys(selectedMaterialAccountIdsByChannel).forEach(key => {
+    const channelId = key.split('::')[0]
     if (!nextSelectedSet.has(channelId)) {
-      delete selectedMaterialAccountIdsByChannel[channelId]
+      delete selectedMaterialAccountIdsByChannel[key]
     }
   })
-  Object.keys(materialMatchBatchTotals).forEach(channelId => {
+  Object.keys(materialMatchBatchTotals).forEach(key => {
+    const channelId = key.split('::')[0]
     if (!nextSelectedSet.has(channelId)) {
-      delete materialMatchBatchTotals[channelId]
+      delete materialMatchBatchTotals[key]
     }
   })
   selectedChannelIds.forEach(channelId => {
-    syncUserChannelMaterialSelection(channelId)
+    ensureUserChannelFeishuGroups(channelId).forEach(group => {
+      syncUserChannelGroupMaterialSelection(channelId, group.id)
+    })
   })
   syncUserChannelReuseSourceState(selectedChannelIds)
   syncActiveUserChannelId(selectedChannelIds)
@@ -3585,7 +3822,6 @@ async function saveUser() {
   try {
     delete (userForm as Record<string, unknown>).materialPreview
     syncUserChannelConfigs()
-    const channelMaterialMap = new Map<string, string>()
 
     for (const channelId of userForm.channelIds) {
       const channelConfig = userForm.channelConfigs?.[channelId]
@@ -3613,45 +3849,44 @@ async function saveUser() {
       }
 
       const configuredMatchRefIds = new Set<string>()
+      const feishuTableGroups = ensureUserChannelFeishuGroups(channelId)
 
-      for (const match of channelConfig?.douyinMaterialMatches || []) {
-        const hasRef = Boolean(String(match.douyinAccountRefId || '').trim())
-        const hasRange = Boolean(String(match.materialRange || '').trim())
-
-        if (!hasRef && !hasRange) {
+      for (const group of feishuTableGroups) {
+        if (group.enabled === false) {
           continue
         }
 
-        if (!hasRef || !hasRange) {
-          message.error(`【${channelName}】请先填写素材总数并完成平均分配`)
-          return
+        const groupName = group.name || '未命名表格组'
+        const groupLabel = `${channelName}/${groupName}`
+
+        for (const match of group.douyinMaterialMatches || []) {
+          const hasRef = Boolean(String(match.douyinAccountRefId || '').trim())
+          const hasRange = Boolean(String(match.materialRange || '').trim())
+
+          if (!hasRef && !hasRange) {
+            continue
+          }
+
+          if (!hasRef || !hasRange) {
+            message.error(`【${groupLabel}】请先填写素材总数并完成平均分配`)
+            return
+          }
+
+          if (!getBoundDouyinAccount(match.douyinAccountRefId)) {
+            message.error(`【${groupLabel}】存在未绑定的抖音号，请先到“抖音号配置”里维护后再保存`)
+            return
+          }
+
+          if (configuredMatchRefIds.has(match.douyinAccountRefId)) {
+            message.error(`【${channelName}】同一个抖音号只能分配给当前渠道的一个表格组`)
+            return
+          }
+
+          configuredMatchRefIds.add(match.douyinAccountRefId)
         }
-
-        if (!getBoundDouyinAccount(match.douyinAccountRefId)) {
-          message.error(`【${channelName}】存在未绑定的抖音号，请先到“抖音号配置”里维护后再保存`)
-          return
-        }
-
-        if (configuredMatchRefIds.has(match.douyinAccountRefId)) {
-          message.error(`【${channelName}】同一个抖音号只需要配置一条素材序号规则`)
-          return
-        }
-
-        const occupiedChannelName = channelMaterialMap.get(match.douyinAccountRefId)
-        if (occupiedChannelName) {
-          const accountName =
-            getBoundDouyinAccount(match.douyinAccountRefId)?.douyinAccount ||
-            match.douyinAccountRefId
-          message.error(
-            `抖音号「${accountName}」已在渠道【${occupiedChannelName}】配置，不能重复分配到【${channelName}】`
-          )
-          return
-        }
-
-        channelMaterialMap.set(match.douyinAccountRefId, channelName)
-
-        configuredMatchRefIds.add(match.douyinAccountRefId)
       }
+
+      syncDefaultUserChannelFeishuGroup(channelId)
     }
 
     if (userForm.defaultChannelId && !userForm.channelIds.includes(userForm.defaultChannelId)) {

@@ -35,6 +35,32 @@ function getResolvedMatches(user, channelId) {
   return buildRuntimeUser(user, channelId).douyinMaterialMatches || []
 }
 
+function getDefaultFeishuTableGroup(channelConfig) {
+  if (
+    !Array.isArray(channelConfig.feishuTableGroups) ||
+    channelConfig.feishuTableGroups.length === 0
+  ) {
+    channelConfig.feishuTableGroups = [
+      {
+        id: 'default',
+        name: '默认表格',
+        enabled: true,
+        feishu: channelConfig.feishu || {},
+        douyinMaterialMatches: Array.isArray(channelConfig.douyinMaterialMatches)
+          ? channelConfig.douyinMaterialMatches
+          : [],
+      },
+    ]
+  }
+
+  return channelConfig.feishuTableGroups[0]
+}
+
+function syncDefaultFeishuTableGroupMatches(channelConfig) {
+  const defaultGroup = getDefaultFeishuTableGroup(channelConfig)
+  channelConfig.douyinMaterialMatches = defaultGroup.douyinMaterialMatches
+}
+
 function getDouyinAccount(user, douyinAccountRefId) {
   return Array.isArray(user?.douyinAccounts)
     ? user.douyinAccounts.find(account => account.id === douyinAccountRefId) || null
@@ -138,8 +164,9 @@ router.post('/config', async ctx => {
       return
     }
 
+    const defaultGroup = getDefaultFeishuTableGroup(channelConfig)
     if (
-      channelConfig.douyinMaterialMatches.some(
+      defaultGroup.douyinMaterialMatches.some(
         item => item.douyinAccountRefId === rawDouyinAccountRefId
       )
     ) {
@@ -159,7 +186,8 @@ router.post('/config', async ctx => {
       updatedAt: new Date().toISOString(),
     }
 
-    channelConfig.douyinMaterialMatches.push(newMatch)
+    defaultGroup.douyinMaterialMatches.push(newMatch)
+    syncDefaultFeishuTableGroupMatches(channelConfig)
     user.updatedAt = new Date().toISOString()
     const savedUser = await writeUser(user)
     const createdMatch = getResolvedMatches(savedUser, channelId).find(
@@ -186,7 +214,9 @@ router.put('/config/:id', async ctx => {
     const { id } = ctx.params
     const { user, channelConfig, channelId } = await getCurrentUserContext(ctx)
     assertDouyinMaterialCustomizable(ctx, channelConfig)
-    const index = channelConfig.douyinMaterialMatches.findIndex(item => item.id === id)
+    const defaultGroup = getDefaultFeishuTableGroup(channelConfig)
+    const matches = defaultGroup.douyinMaterialMatches
+    const index = matches.findIndex(item => item.id === id)
 
     if (index < 0) {
       ctx.status = 404
@@ -199,12 +229,10 @@ router.put('/config/:id', async ctx => {
 
     const updates = ctx.request.body || {}
     const nextDouyinAccountRefId = String(
-      updates.douyinAccountRefId ||
-        channelConfig.douyinMaterialMatches[index].douyinAccountRefId ||
-        ''
+      updates.douyinAccountRefId || matches[index].douyinAccountRefId || ''
     ).trim()
     const nextMaterialRange = String(
-      updates.materialRange || channelConfig.douyinMaterialMatches[index].materialRange || ''
+      updates.materialRange || matches[index].materialRange || ''
     ).trim()
 
     if (!nextDouyinAccountRefId || !nextMaterialRange) {
@@ -246,9 +274,7 @@ router.put('/config/:id', async ctx => {
     }
 
     if (
-      channelConfig.douyinMaterialMatches.some(
-        item => item.douyinAccountRefId === nextDouyinAccountRefId && item.id !== id
-      )
+      matches.some(item => item.douyinAccountRefId === nextDouyinAccountRefId && item.id !== id)
     ) {
       ctx.status = 400
       ctx.body = {
@@ -259,14 +285,15 @@ router.put('/config/:id', async ctx => {
     }
 
     const updatedMatch = {
-      ...channelConfig.douyinMaterialMatches[index],
+      ...matches[index],
       id,
       douyinAccountRefId: nextDouyinAccountRefId,
       materialRange: nextMaterialRange,
       updatedAt: new Date().toISOString(),
     }
 
-    channelConfig.douyinMaterialMatches[index] = updatedMatch
+    matches[index] = updatedMatch
+    syncDefaultFeishuTableGroupMatches(channelConfig)
     user.updatedAt = new Date().toISOString()
     const savedUser = await writeUser(user)
     const resolvedMatch = getResolvedMatches(savedUser, channelId).find(item => item.id === id)
@@ -291,7 +318,9 @@ router.delete('/config/:id', async ctx => {
     const { id } = ctx.params
     const { user, channelConfig } = await getCurrentUserContext(ctx)
     assertDouyinMaterialCustomizable(ctx, channelConfig)
-    const index = channelConfig.douyinMaterialMatches.findIndex(item => item.id === id)
+    const defaultGroup = getDefaultFeishuTableGroup(channelConfig)
+    const matches = defaultGroup.douyinMaterialMatches
+    const index = matches.findIndex(item => item.id === id)
 
     if (index < 0) {
       ctx.status = 404
@@ -302,7 +331,8 @@ router.delete('/config/:id', async ctx => {
       return
     }
 
-    const deleted = channelConfig.douyinMaterialMatches.splice(index, 1)[0]
+    const deleted = matches.splice(index, 1)[0]
+    syncDefaultFeishuTableGroupMatches(channelConfig)
     user.updatedAt = new Date().toISOString()
     await writeUser(user)
 

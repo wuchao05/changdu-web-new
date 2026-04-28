@@ -137,47 +137,53 @@ function validateUserChannelMaterialConfigs(userPayload = {}, channels = []) {
       : {}
   const channelMap = new Map(channels.map(channel => [channel.id, channel]))
   const douyinAccountNameMap = buildDouyinAccountNameMap(userPayload)
-  const enabledMatchChannelMap = new Map()
 
   Object.entries(channelConfigs).forEach(([channelId, config]) => {
     const channelName = channelMap.get(channelId)?.name || channelId
+    const rawTableGroups =
+      Array.isArray(config?.feishuTableGroups) && config.feishuTableGroups.length
+        ? config.feishuTableGroups
+        : [
+            {
+              name: '默认表格',
+              douyinMaterialMatches: Array.isArray(config?.douyinMaterialMatches)
+                ? config.douyinMaterialMatches
+                : [],
+            },
+          ]
+    const tableGroups = rawTableGroups.filter(group => group?.enabled !== false)
     const localMatchSet = new Set()
-    const matches = Array.isArray(config?.douyinMaterialMatches) ? config.douyinMaterialMatches : []
 
-    matches.forEach(match => {
-      const refId = String(match?.douyinAccountRefId || '').trim()
-      const materialRange = String(match?.materialRange || '').trim()
+    tableGroups.forEach((group, groupIndex) => {
+      const groupName = String(group?.name || `表格组 ${groupIndex + 1}`).trim()
+      const groupLabel = `${channelName}/${groupName}`
+      const matches = Array.isArray(group?.douyinMaterialMatches) ? group.douyinMaterialMatches : []
 
-      if (!refId && !materialRange) {
-        return
-      }
+      matches.forEach(match => {
+        const refId = String(match?.douyinAccountRefId || '').trim()
+        const materialRange = String(match?.materialRange || '').trim()
 
-      if (!refId || !materialRange) {
-        const error = new Error(`【${channelName}】请选择抖音号并填写素材序号`)
-        error.status = 400
-        throw error
-      }
+        if (!refId && !materialRange) {
+          return
+        }
 
-      if (localMatchSet.has(refId)) {
-        const accountName = douyinAccountNameMap.get(refId) || refId
-        const error = new Error(`【${channelName}】抖音号「${accountName}」只需要配置一条素材规则`)
-        error.status = 400
-        throw error
-      }
+        if (!refId || !materialRange) {
+          const error = new Error(`【${groupLabel}】请选择抖音号并填写素材序号`)
+          error.status = 400
+          throw error
+        }
 
-      localMatchSet.add(refId)
+        if (localMatchSet.has(refId)) {
+          const accountName = douyinAccountNameMap.get(refId) || refId
+          const error = new Error(
+            `【${channelName}】抖音号「${accountName}」只需要配置一条素材规则`
+          )
+          error.status = 400
+          throw error
+        }
 
-      const occupiedChannelName = enabledMatchChannelMap.get(refId)
-      if (occupiedChannelName) {
-        const accountName = douyinAccountNameMap.get(refId) || refId
-        const error = new Error(
-          `抖音号「${accountName}」已在渠道【${occupiedChannelName}】配置，不能重复分配到【${channelName}】`
-        )
-        error.status = 400
-        throw error
-      }
-
-      enabledMatchChannelMap.set(refId, channelName)
+        localMatchSet.add(refId)
+      })
     })
   })
 }

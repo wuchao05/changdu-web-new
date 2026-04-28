@@ -225,6 +225,8 @@ export interface BatchSubmitItem {
   publish_time: string
   manualRedFlag?: boolean
   fromSearchResult?: boolean
+  feishuTableGroupId?: string
+  feishuTableGroupName?: string
 }
 
 export interface BatchSubmitResponse {

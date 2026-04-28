@@ -27,7 +27,7 @@
           size="small"
           secondary
           :loading="loading"
-          :disabled="!resolvedTableId"
+          :disabled="resolvedTableGroups.length === 0"
           @click="refresh"
         >
           <template #icon>
@@ -74,7 +74,7 @@
         </span>
       </div>
 
-      <div v-if="!resolvedTableId" class="feishu-panel__empty">
+      <div v-if="resolvedTableGroups.length === 0" class="feishu-panel__empty">
         <Icon icon="mdi:link-variant-off" class="feishu-panel__empty-icon" />
         <p class="feishu-panel__empty-title">未配置飞书状态表</p>
         <p class="feishu-panel__empty-desc">
@@ -150,6 +150,7 @@ import { useSessionStore } from '@/stores/session'
 
 interface BoardRecord {
   recordId: string
+  tableGroupName: string
   dramaName: string
   account: string
   publishTime: string
@@ -234,20 +235,53 @@ const userOptions = computed(() =>
 
 const selectedUser = computed(() => adminUsers.value.find(user => user.id === selectedUserId.value))
 
-// 解析当前要查询的 tableId:严格按"当前选中的渠道"取
+interface BoardTableGroup {
+  id: string
+  name: string
+  tableId: string
+}
+
+function normalizeBoardTableGroups(groups: unknown): BoardTableGroup[] {
+  if (!Array.isArray(groups)) return []
+
+  return groups
+    .map((group, index) => {
+      const item = group as {
+        id?: string
+        name?: string
+        enabled?: boolean
+        feishu?: { dramaStatusTableId?: string }
+      }
+      return {
+        id: String(item.id || (index === 0 ? 'default' : `group-${index + 1}`)),
+        name: String(item.name || (index === 0 ? '默认表格' : `表格组 ${index + 1}`)),
+        enabled: item.enabled !== false,
+        tableId: String(item.feishu?.dramaStatusTableId || '').trim(),
+      }
+    })
+    .filter(group => group.enabled && group.tableId)
+}
+
+// 解析当前要查询的表格组:严格按"当前选中的渠道"取
 // - 管理员:用面板内选中的用户 + 顶部全局渠道(sessionStore.activeChannelId)
-// - 普通用户:直接用 apiConfigStore.config.dramaStatusTableId(已是当前渠道下的)
-const resolvedTableId = computed(() => {
+// - 普通用户:直接用 apiConfigStore.config.feishuTableGroups(已是当前渠道下的)
+const resolvedTableGroups = computed<BoardTableGroup[]>(() => {
   if (isAdmin.value) {
     const user = selectedUser.value
-    if (!user) return ''
+    if (!user) return []
     const activeChannelId =
       sessionStore.activeChannelId || user.defaultChannelId || user.channelIds?.[0] || ''
-    if (!activeChannelId) return ''
+    if (!activeChannelId) return []
     const binding = user.channelConfigs?.[activeChannelId]
-    return String(binding?.feishu?.dramaStatusTableId || '').trim()
+    const groups = normalizeBoardTableGroups(binding?.feishuTableGroups)
+    if (groups.length > 0) return groups
+    const tableId = String(binding?.feishu?.dramaStatusTableId || '').trim()
+    return tableId ? [{ id: 'default', name: '默认表格', tableId }] : []
   }
-  return String(apiConfigStore.config.dramaStatusTableId || '').trim()
+  const groups = normalizeBoardTableGroups(apiConfigStore.config.feishuTableGroups)
+  if (groups.length > 0) return groups
+  const tableId = String(apiConfigStore.config.dramaStatusTableId || '').trim()
+  return tableId ? [{ id: 'default', name: '默认表格', tableId }] : []
 })
 
 // 日期 Tab：昨天 / 今天 / 明天 / 后天 + 总览
@@ -330,6 +364,13 @@ const tableColumns = computed<DataTableColumns<BoardRecord>>(() => {
       width: 210,
       ellipsis: { tooltip: true },
       render: row => row.account || '—',
+    },
+    {
+      title: '表格组',
+      key: 'tableGroupName',
+      width: 130,
+      ellipsis: { tooltip: true },
+      render: row => row.tableGroupName || '默认表格',
     },
     {
       title: '上架时间',
@@ -449,10 +490,11 @@ interface RawFeishuRecord {
   fields?: Record<string, unknown>
 }
 
-function normalizeRecord(item: RawFeishuRecord): BoardRecord {
+function normalizeRecord(item: RawFeishuRecord, tableGroupName = '默认表格'): BoardRecord {
   const fields = item?.fields || {}
   return {
-    recordId: item?.record_id || item?.recordId || `${Math.random()}`,
+    recordId: `${tableGroupName}::${item?.record_id || item?.recordId || Math.random()}`,
+    tableGroupName,
     dramaName: extractText(fields['剧名']),
     account: extractText(fields['账户']),
     publishTime: formatDateTime(fields['上架时间']),
@@ -478,8 +520,8 @@ async function loadAdminUsers() {
 
 async function fetchData() {
   const generation = beginRequest()
-  const tableId = resolvedTableId.value
-  if (!tableId) {
+  const tableGroups = resolvedTableGroups.value
+  if (tableGroups.length === 0) {
     records.value = []
     return
   }
@@ -488,9 +530,18 @@ async function fetchData() {
 
   loading.value = true
   try {
-    const result = await feishuApi.getDramaStatusBoard(dates, [...TARGET_STATUSES], tableId)
+    const results = await Promise.all(
+      tableGroups.map(async group => {
+        const result = await feishuApi.getDramaStatusBoard(
+          dates,
+          [...TARGET_STATUSES],
+          group.tableId
+        )
+        return result.items.map(item => normalizeRecord(item, group.name))
+      })
+    )
     if (isStaleRequest(generation)) return
-    records.value = result.items.map(normalizeRecord).filter(record => record.dramaName)
+    records.value = results.flat().filter(record => record.dramaName)
   } catch (error) {
     if (isStaleRequest(generation)) return
     console.warn('[FeishuBoardPanel] 加载飞书看板数据失败:', error)
@@ -524,7 +575,7 @@ watch(selectedUserId, () => {
 
 // 普通用户切渠道(外部 store 变化):重新拉数据
 watch(
-  () => apiConfigStore.config.dramaStatusTableId,
+  () => [apiConfigStore.config.dramaStatusTableId, apiConfigStore.config.feishuTableGroups],
   () => {
     if (!isAdmin.value) void fetchData()
   }

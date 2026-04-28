@@ -745,7 +745,16 @@ const changePasswordForm = reactive({
   confirmPassword: '',
 })
 
-const hasMaterialRules = computed(() => douyinMaterialStore.matches.length > 0)
+const hasMaterialRules = computed(() => {
+  const tableGroups = (apiConfigStore.config.feishuTableGroups || []).filter(
+    group => group.enabled !== false
+  )
+  if (tableGroups.some(group => (group.douyinMaterialMatches || []).length > 0)) {
+    return true
+  }
+
+  return douyinMaterialStore.matches.length > 0
+})
 const autoBuildDisabledReason = computed(() => {
   if (!hasActiveChannel.value) {
     return '请先配置可用渠道'
@@ -805,7 +814,15 @@ const canAccessDramaClip = computed(
 const canAccessFeishuBoard = computed(
   () => hasActiveChannel.value && Boolean(runtimeWebMenus.value.feishuBoard)
 )
-const hasAccountTableId = computed(() => Boolean(apiConfigStore.config.accountTableId))
+const hasAccountTableId = computed(() => {
+  const tableGroups = (apiConfigStore.config.feishuTableGroups || []).filter(
+    group => group.enabled !== false
+  )
+  return (
+    Boolean(apiConfigStore.config.accountTableId) ||
+    tableGroups.some(group => Boolean(group.feishu?.accountTableId))
+  )
+})
 const dashboardSubtitle = computed(() => '数据驱动，精准运营')
 const hasActiveChannel = computed(() =>
   isAdmin.value ? Boolean(sessionStore.activeChannelId) : Boolean(sessionStore.currentChannel?.id)

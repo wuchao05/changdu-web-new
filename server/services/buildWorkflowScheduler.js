@@ -87,6 +87,7 @@ function createDefaultSchedulerState() {
       feishu: {
         dramaStatusTableId: '',
       },
+      feishuTableGroups: [],
       brandName: '小红',
     },
     nextRunTime: null,
@@ -291,6 +292,9 @@ async function ensureSchedulerRuntime(channelRuntime = null, instanceKey = getAc
             ''
         ).trim(),
       },
+      feishuTableGroups: Array.isArray(channelRuntime.runtimeUser?.feishuTableGroups)
+        ? channelRuntime.runtimeUser.feishuTableGroups
+        : [],
       brandName: String(
         channelRuntime.runtimeUser?.brandName ||
           channelRuntime.runtimeUserConfig?.brandName ||
@@ -320,6 +324,9 @@ async function ensureSchedulerRuntime(channelRuntime = null, instanceKey = getAc
           feishu: {
             dramaStatusTableId: String(latestRuntimeUser?.feishu?.dramaStatusTableId || '').trim(),
           },
+          feishuTableGroups: Array.isArray(latestRuntimeUser?.feishuTableGroups)
+            ? latestRuntimeUser.feishuTableGroups
+            : [],
           brandName: String(latestRuntimeUser?.brandName || '小红').trim() || '小红',
         }
       } catch (error) {
@@ -358,6 +365,43 @@ function getDramaStatusTableId() {
     state.runtimeUserConfig?.feishu?.dramaStatusTableId ||
     FEISHU_CONFIG.table_ids.drama_status
   )
+}
+
+function getDramaStatusTableTargets() {
+  const state = getActiveSchedulerState()
+  if (state.tableId) {
+    return [
+      {
+        id: '',
+        name: '',
+        tableId: state.tableId,
+      },
+    ]
+  }
+
+  const groups = Array.isArray(state.runtimeUserConfig?.feishuTableGroups)
+    ? state.runtimeUserConfig.feishuTableGroups
+    : []
+  const targets = groups
+    .filter(group => group?.enabled !== false)
+    .map((group, index) => ({
+      id: String(group?.id || (index === 0 ? 'default' : `group-${index + 1}`)).trim(),
+      name: String(group?.name || (index === 0 ? '默认表格' : `表格组 ${index + 1}`)).trim(),
+      tableId: String(group?.feishu?.dramaStatusTableId || '').trim(),
+    }))
+    .filter(group => group.tableId)
+
+  if (targets.length > 0) {
+    return targets
+  }
+
+  return [
+    {
+      id: 'default',
+      name: '默认表格',
+      tableId: getDramaStatusTableId(),
+    },
+  ]
 }
 
 function getRuntimeXtToken() {
@@ -497,7 +541,7 @@ async function getFeishuAccessToken() {
  */
 async function getPendingSetupDramas() {
   const accessToken = await getFeishuAccessToken()
-  const dramaStatusTableId = getDramaStatusTableId()
+  const tableTargets = getDramaStatusTableTargets()
   const fieldNames = [
     '剧名',
     '短剧ID',
@@ -514,41 +558,49 @@ async function getPendingSetupDramas() {
     fieldNames.splice(fieldNames.length - 1, 0, '推送素材ID')
   }
 
-  const response = await fetch(
-    `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.app_token}/tables/${dramaStatusTableId}/records/search`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({
-        field_names: fieldNames,
-        page_size: 100,
-        filter: {
-          conjunction: 'and',
-          conditions: [
-            {
-              field_name: '当前状态',
-              operator: 'is',
-              value: ['待搭建'],
+  const results = await Promise.all(
+    tableTargets.map(async target => {
+      const response = await fetch(
+        `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.app_token}/tables/${target.tableId}/records/search`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            field_names: fieldNames,
+            page_size: 100,
+            filter: {
+              conjunction: 'and',
+              conditions: [
+                {
+                  field_name: '当前状态',
+                  operator: 'is',
+                  value: ['待搭建'],
+                },
+              ],
             },
-          ],
-        },
-      }),
-    }
+          }),
+        }
+      )
+
+      const result = await response.json()
+      if (result.code !== 0) {
+        throw new Error(`查询飞书待搭建剧集失败: ${result.msg}`)
+      }
+
+      const items = result.data?.items || []
+      items.forEach(item => {
+        item._tableId = target.tableId
+        item._feishuTableGroupId = target.id
+        item._feishuTableGroupName = target.name
+      })
+      return items
+    })
   )
 
-  const result = await response.json()
-  if (result.code !== 0) {
-    throw new Error(`查询飞书待搭建剧集失败: ${result.msg}`)
-  }
-
-  // 为每条记录添加 _tableId 属性
-  const items = result.data?.items || []
-  items.forEach(item => {
-    item._tableId = dramaStatusTableId
-  })
+  const items = results.flat()
   await attachDramaMaterialLibraryStatus(items)
   return items
 }
@@ -1974,8 +2026,13 @@ async function executePollingCycle() {
         buildConsole.log('[后台搭建] 准备从列表移除失败剧集...')
         const beforeFilterCount = dramas.length
         const selectedRecordId = selectedDrama.record_id
+        const selectedTableId = selectedDrama._tableId
         buildConsole.log(`[后台搭建] 待移除的剧集 record_id: ${selectedRecordId}`)
-        dramas = dramas.filter(d => d.record_id !== selectedRecordId)
+        dramas = dramas.filter(
+          d =>
+            d.record_id !== selectedRecordId ||
+            String(d._tableId || '') !== String(selectedTableId || '')
+        )
         const afterFilterCount = dramas.length
         buildConsole.log(
           `[后台搭建] 已从列表移除 ${dramaName}，移除前: ${beforeFilterCount} 部，移除后: ${afterFilterCount} 部`
@@ -2214,15 +2271,23 @@ export async function triggerSchedulerBuild(
       throw new Error(`已有任务正在执行: ${state.currentTask.dramaName}，请等待完成后再试`)
     }
 
+    const previousTableId = state.tableId
     if (typeof tableId !== 'undefined') {
       state.tableId = tableId || null
       await saveState(instanceKey)
     }
 
-    if (specificDramaId) {
-      await buildSpecificDrama(specificDramaId)
-    } else {
-      await executePollingCycle()
+    try {
+      if (specificDramaId) {
+        await buildSpecificDrama(specificDramaId)
+      } else {
+        await executePollingCycle()
+      }
+    } finally {
+      if (specificDramaId && typeof tableId !== 'undefined') {
+        state.tableId = previousTableId || null
+        await saveState(instanceKey)
+      }
     }
 
     return getSchedulerStatus(instanceKey)

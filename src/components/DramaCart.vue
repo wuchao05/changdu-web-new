@@ -43,6 +43,9 @@
                 <div class="item-meta">
                   <span class="item-date">{{ item.publish_time.split(' ')[0] }}</span>
                   <span v-if="item.manualRedFlag" class="item-red-flag">红标</span>
+                  <span v-if="item.feishuTableGroupName" class="item-date">
+                    {{ item.feishuTableGroupName }}
+                  </span>
                 </div>
               </div>
               <button
@@ -96,6 +99,8 @@ export interface CartItem {
   publish_time: string
   manualRedFlag?: boolean // 是否手动开启红标
   fromSearchResult?: boolean // 是否来自搜索结果
+  feishuTableGroupId?: string
+  feishuTableGroupName?: string
 }
 
 // 定义 emits

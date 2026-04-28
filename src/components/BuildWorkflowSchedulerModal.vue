@@ -120,6 +120,8 @@ function sanitizeDramaName(name: string): string {
 interface FeishuDramaRecord {
   record_id: string
   _tableId?: string // 记录所在的表ID，用于更新时使用正确的表
+  _feishuTableGroupId?: string
+  _feishuTableGroupName?: string
   fields: {
     剧名?: [{ text: string }]
     短剧ID?: { value?: [{ text: string }] }
@@ -136,6 +138,10 @@ interface FeishuDramaRecord {
       | { type: number; value: Array<number | string> }
     备注?: [{ text: string }] | string // 备注字段，用于记录失败或跳过原因
   }
+}
+
+function getDramaRowKey(drama: FeishuDramaRecord) {
+  return `${drama._tableId || ''}::${drama.record_id}`
 }
 
 // 初始化数据（资产化流程的输出）
@@ -365,8 +371,8 @@ function getDramaMaterialStatus(
   drama: FeishuDramaRecord
 ): buildWorkflowApi.DramaMaterialLibraryStatus {
   return (
-    dramaMaterialStatusMap.value[drama.record_id] || {
-      recordId: drama.record_id,
+    dramaMaterialStatusMap.value[getDramaRowKey(drama)] || {
+      recordId: getDramaRowKey(drama),
       dramaName: drama.fields['剧名']?.[0]?.text || '',
       materialId: '',
       status: null,
@@ -421,6 +427,10 @@ async function refreshDramaMaterialStatuses(targetDramas: FeishuDramaRecord[]) {
   result.data.items.forEach(item => {
     if (item.recordId) {
       nextMap[item.recordId] = item
+      const matchedDrama = targetDramas.find(drama => drama.record_id === item.recordId)
+      if (matchedDrama) {
+        nextMap[getDramaRowKey(matchedDrama)] = item
+      }
     }
   })
 
@@ -545,6 +555,15 @@ const dramasColumns = computed<DataTableColumns<FeishuDramaRecord>>(() => {
       render: row => row.fields['账户']?.[0]?.text || '-',
     },
     {
+      title: '表格组',
+      key: 'feishuTableGroupName',
+      width: 120,
+      ellipsis: {
+        tooltip: true,
+      },
+      render: row => row._feishuTableGroupName || '默认表格',
+    },
+    {
       title: '日期',
       key: 'date',
       width: 110,
@@ -646,7 +665,7 @@ const dramasColumns = computed<DataTableColumns<FeishuDramaRecord>>(() => {
       width: 100,
       fixed: 'right',
       render: row => {
-        const isBuilding = manuallyBuildingIds.value.has(row.record_id)
+        const isBuilding = manuallyBuildingIds.value.has(getDramaRowKey(row))
         const canBuild = canBuildDrama(row)
         // 只有后台模式正在运行且有任务执行时，才禁用按钮
         const isBackgroundRunning = backgroundSchedulerStatus.value?.enabled === true
@@ -945,7 +964,7 @@ async function loadPendingDramas() {
     })
     await refreshDramaMaterialStatuses(dramas.value)
     selectedRowKeys.value = selectedRowKeys.value.filter(recordId =>
-      dramas.value.some(drama => drama.record_id === recordId && canBuildDrama(drama))
+      dramas.value.some(drama => getDramaRowKey(drama) === recordId && canBuildDrama(drama))
     )
 
     console.log(`找到 ${dramas.value.length} 部待搭建剧集（已按日期排序）`)
@@ -1100,7 +1119,7 @@ async function buildSingleDramaInPolling(drama: FeishuDramaRecord) {
   // 初始化搭建记录（showProgress会自动变为true）
   buildRecords.value = [
     {
-      id: drama.record_id,
+      id: getDramaRowKey(drama),
       index: 1,
       dramaName: drama.fields['剧名']?.[0]?.text || '未知',
       accountId: drama.fields['账户']?.[0]?.text || '未知',
@@ -1427,10 +1446,11 @@ async function handleBuildSingleDrama(drama: FeishuDramaRecord) {
 // 后台模式下的手动搭建
 async function handleBackgroundManualBuild(drama: FeishuDramaRecord) {
   const dramaId = drama.record_id
+  const dramaRowKey = getDramaRowKey(drama)
   const dramaName = drama.fields['剧名']?.[0]?.text || '未知'
 
   // 添加到搭建中集合
-  manuallyBuildingIds.value.add(dramaId)
+  manuallyBuildingIds.value.add(dramaRowKey)
 
   // 立即返回提示
   message.success(`已提交至后台搭建：${dramaName}`)
@@ -1439,6 +1459,7 @@ async function handleBackgroundManualBuild(drama: FeishuDramaRecord) {
   buildWorkflowApi
     .triggerBackgroundSchedulerBuild({
       dramaId: dramaId, // 传递剧集ID，指定搭建该剧集
+      tableId: drama._tableId,
     })
     .then(() => {
       // 刷新状态
@@ -1448,7 +1469,7 @@ async function handleBackgroundManualBuild(drama: FeishuDramaRecord) {
       console.error('提交手动搭建失败:', error)
       message.error(`提交搭建失败: ${getErrorMessage(error)}`)
       // 失败时移除搭建中状态
-      manuallyBuildingIds.value.delete(dramaId)
+      manuallyBuildingIds.value.delete(dramaRowKey)
     })
 }
 
@@ -1459,9 +1480,9 @@ async function startAutoBuild() {
     return
   }
 
-  // 根据选中的 record_id 筛选剧集
+  // 根据选中的记录键筛选剧集
   const selectedDramas = dramas.value.filter(drama =>
-    selectedRowKeys.value.includes(drama.record_id)
+    selectedRowKeys.value.includes(getDramaRowKey(drama))
   )
   const buildableSelectedDramas = selectedDramas.filter(drama => canBuildDrama(drama))
 
@@ -1492,7 +1513,7 @@ async function startAutoBuild() {
     )
   }
 
-  selectedRowKeys.value = buildableSelectedDramas.map(drama => drama.record_id)
+  selectedRowKeys.value = buildableSelectedDramas.map(drama => getDramaRowKey(drama))
   await startAutoBuildWithDramas(buildableSelectedDramas)
 }
 
@@ -1533,7 +1554,7 @@ async function startAutoBuildWithDramas(dramasToBeBuilt: FeishuDramaRecord[]) {
       )
 
       return {
-        id: drama.record_id,
+        id: getDramaRowKey(drama),
         index: index + 1,
         dramaName: drama.fields['剧名']?.[0]?.text || '未知',
         accountId: drama.fields['账户']?.[0]?.text || '未知',
@@ -2763,7 +2784,7 @@ onBeforeUnmount(() => {
               v-model:checked-row-keys="selectedRowKeys"
               :columns="dramasColumns"
               :data="dramas"
-              :row-key="(row: FeishuDramaRecord) => row.record_id"
+              :row-key="getDramaRowKey"
               :bordered="false"
               :single-line="false"
               size="small"

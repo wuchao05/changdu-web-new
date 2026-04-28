@@ -163,6 +163,7 @@ function createDefaultState() {
         dramaStatusTableId: '',
         accountTableId: '',
       },
+      feishuTableGroups: [],
       brandName: '小红',
       douyinMaterialMatches: [],
     },
@@ -174,6 +175,7 @@ function createDefaultState() {
     onlyRedFlag: false,
     runOnce: false,
     submitRangeDays: 3,
+    nextFeishuTableGroupIndex: 0,
     stats: {
       totalProcessed: 0,
       successCount: 0,
@@ -225,12 +227,35 @@ function ensureSchedulerEntry(instanceKey = '') {
 
 function normalizeRuntimeUserConfig(runtimeContext = {}) {
   const runtimeUser = runtimeContext.runtimeUser || runtimeContext.runtimeUserConfig || {}
+  const feishuTableGroups = Array.isArray(runtimeUser.feishuTableGroups)
+    ? runtimeUser.feishuTableGroups
+        .map((group, index) => ({
+          id: String(group?.id || (index === 0 ? 'default' : `group-${index + 1}`)).trim(),
+          name: String(group?.name || (index === 0 ? '默认表格' : `表格组 ${index + 1}`)).trim(),
+          enabled: group?.enabled !== false,
+          feishu: {
+            dramaListTableId: String(group?.feishu?.dramaListTableId || '').trim(),
+            dramaStatusTableId: String(group?.feishu?.dramaStatusTableId || '').trim(),
+            accountTableId: String(group?.feishu?.accountTableId || '').trim(),
+          },
+          douyinMaterialMatches: Array.isArray(group?.douyinMaterialMatches)
+            ? group.douyinMaterialMatches.map(item => ({
+                douyinAccount: String(item?.douyinAccount || '').trim(),
+                douyinAccountId: String(item?.douyinAccountId || '').trim(),
+                materialRange: String(item?.materialRange || '').trim(),
+              }))
+            : [],
+        }))
+        .filter(group => group.enabled)
+    : []
+
   return {
     feishu: {
       dramaListTableId: String(runtimeUser.feishu?.dramaListTableId || '').trim(),
       dramaStatusTableId: String(runtimeUser.feishu?.dramaStatusTableId || '').trim(),
       accountTableId: String(runtimeUser.feishu?.accountTableId || '').trim(),
     },
+    feishuTableGroups,
     brandName: String(runtimeUser.brandName || '小红').trim() || '小红',
     douyinMaterialMatches: Array.isArray(runtimeUser.douyinMaterialMatches)
       ? runtimeUser.douyinMaterialMatches.map(item => ({
@@ -265,6 +290,45 @@ function getSchedulerProfile(instanceKey) {
       ? runtimeUserConfig.douyinMaterialMatches
       : [],
   }
+}
+
+function getSchedulerFeishuTableGroups(instanceKey) {
+  const entry = ensureSchedulerEntry(instanceKey)
+  const runtimeUserConfig = entry.state.runtimeUserConfig || createDefaultState().runtimeUserConfig
+  const groups = Array.isArray(runtimeUserConfig.feishuTableGroups)
+    ? runtimeUserConfig.feishuTableGroups.filter(group => group.enabled !== false)
+    : []
+
+  if (groups.length > 0) {
+    return groups.map((group, index) => ({
+      id: group.id || (index === 0 ? 'default' : `group-${index + 1}`),
+      name: group.name || (index === 0 ? '默认表格' : `表格组 ${index + 1}`),
+      dramaListTableId: group.feishu?.dramaListTableId || FEISHU_CONFIG.table_ids.drama_list,
+      dramaStatusTableId: group.feishu?.dramaStatusTableId || FEISHU_CONFIG.table_ids.drama_status,
+      accountTableId: group.feishu?.accountTableId || FEISHU_CONFIG.table_ids.account,
+      douyinMaterialMatches: Array.isArray(group.douyinMaterialMatches)
+        ? group.douyinMaterialMatches
+        : [],
+    }))
+  }
+
+  const profile = getSchedulerProfile(instanceKey)
+  return [
+    {
+      id: 'default',
+      name: '默认表格',
+      dramaListTableId: profile.dramaListTableId,
+      dramaStatusTableId: profile.dramaStatusTableId,
+      accountTableId: profile.accountTableId,
+      douyinMaterialMatches: profile.douyinMaterialMatches,
+    },
+  ]
+}
+
+function getSchedulerFeishuTableGroupProfile(instanceKey, tableGroupId = '') {
+  const groups = getSchedulerFeishuTableGroups(instanceKey)
+  const normalizedGroupId = String(tableGroupId || '').trim()
+  return groups.find(group => group.id === normalizedGroupId) || groups[0]
 }
 
 async function ensureSchedulerRuntime(instanceKey, runtimeContext = null) {
@@ -624,9 +688,9 @@ async function getFeishuAccessToken() {
 /**
  * 搜索飞书剧集清单
  */
-async function searchDramaList(channelId, dramaName) {
+async function searchDramaList(channelId, dramaName, tableGroupId = '') {
   const accessToken = await getFeishuAccessToken()
-  const profile = getSchedulerProfile(channelId)
+  const profile = getSchedulerFeishuTableGroupProfile(channelId, tableGroupId)
 
   const response = await fetch(
     `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.app_token}/tables/${profile.dramaListTableId}/records/search`,
@@ -655,9 +719,16 @@ async function searchDramaList(channelId, dramaName) {
 
   return safeJsonParse(response, '搜索剧集清单')
 }
-async function createDramaRecord(channelId, dramaName, publishTime, bookId, rating) {
+async function createDramaRecord(
+  channelId,
+  dramaName,
+  publishTime,
+  bookId,
+  rating,
+  tableGroupId = ''
+) {
   const accessToken = await getFeishuAccessToken()
-  const profile = getSchedulerProfile(channelId)
+  const profile = getSchedulerFeishuTableGroupProfile(channelId, tableGroupId)
 
   const fields = { 剧名: dramaName }
 
@@ -700,9 +771,9 @@ async function createDramaRecord(channelId, dramaName, publishTime, bookId, rati
 /**
  * 查询可用的虎鱼账户
  */
-async function getAvailableChannelAccounts(channelId) {
+async function getAvailableChannelAccounts(channelId, tableGroupId = '') {
   const accessToken = await getFeishuAccessToken()
-  const profile = getSchedulerProfile(channelId)
+  const profile = getSchedulerFeishuTableGroupProfile(channelId, tableGroupId)
 
   const response = await fetch(
     `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.app_token}/tables/${profile.accountTableId}/records/search?ignore_consistency_check=true`,
@@ -739,9 +810,9 @@ function isAccountRecycleEnabled(channelId) {
   return Boolean(getSchedulerRuntime(channelId).buildConfig?.recycleAccountsWhenExhausted)
 }
 
-async function resetAllChannelAccountsUnused(channelId) {
+async function resetAllChannelAccountsUnused(channelId, tableGroupId = '') {
   const accessToken = await getFeishuAccessToken()
-  const profile = getSchedulerProfile(channelId)
+  const profile = getSchedulerFeishuTableGroupProfile(channelId, tableGroupId)
 
   const response = await fetch(
     `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.app_token}/tables/${profile.accountTableId}/records/search?ignore_consistency_check=true`,
@@ -805,8 +876,8 @@ async function resetAllChannelAccountsUnused(channelId) {
  * 获取抖音素材配置（根据当前渠道）
  * @returns {string} 格式化后的抖音素材配置字符串
  */
-async function getDouyinMaterialConfig(channelId) {
-  const profile = getSchedulerProfile(channelId)
+async function getDouyinMaterialConfig(channelId, tableGroupId = '') {
+  const profile = getSchedulerFeishuTableGroupProfile(channelId, tableGroupId)
   return profile.douyinMaterialMatches
     .filter(match => match.douyinAccount && match.douyinAccountId && match.materialRange)
     .map(match => `${match.douyinAccount} ${match.douyinAccountId} ${match.materialRange}`)
@@ -816,11 +887,11 @@ async function getDouyinMaterialConfig(channelId) {
 /**
  * 获取第一个可用账户
  */
-async function getFirstAvailableAccount(channelId) {
-  let accounts = await getAvailableChannelAccounts(channelId)
+async function getFirstAvailableAccount(channelId, tableGroupId = '') {
+  let accounts = await getAvailableChannelAccounts(channelId, tableGroupId)
   if (accounts.length === 0 && isAccountRecycleEnabled(channelId)) {
-    await resetAllChannelAccountsUnused(channelId)
-    accounts = await getAvailableChannelAccounts(channelId)
+    await resetAllChannelAccountsUnused(channelId, tableGroupId)
+    accounts = await getAvailableChannelAccounts(channelId, tableGroupId)
   }
 
   if (accounts.length === 0) {
@@ -843,12 +914,54 @@ async function getFirstAvailableAccount(channelId) {
   }
 }
 
+async function dramaExistsInAnyFeishuTableGroup(channelId, dramaName) {
+  const groups = getSchedulerFeishuTableGroups(channelId)
+  const results = await Promise.all(
+    groups.map(group => searchDramaList(channelId, dramaName, group.id))
+  )
+
+  return results.some(result =>
+    (result.data?.items || []).some(item => item.fields?.['剧名']?.[0]?.text === dramaName)
+  )
+}
+
+async function selectFeishuTableGroupWithAccount(channelId, preferredGroupId = '') {
+  const entry = ensureSchedulerEntry(channelId)
+  const groups = getSchedulerFeishuTableGroups(channelId)
+  if (!groups.length) {
+    return null
+  }
+
+  const preferredGroup = preferredGroupId
+    ? groups.find(group => group.id === preferredGroupId) || null
+    : null
+  const candidateGroups = preferredGroup
+    ? [preferredGroup]
+    : groups.map((_, index) => {
+        const startIndex = Number(entry.state.nextFeishuTableGroupIndex || 0)
+        return groups[(startIndex + index) % groups.length]
+      })
+
+  for (const group of candidateGroups) {
+    const availableAccount = await getFirstAvailableAccount(channelId, group.id)
+    if (availableAccount) {
+      if (!preferredGroup) {
+        const groupIndex = groups.findIndex(item => item.id === group.id)
+        entry.state.nextFeishuTableGroupIndex = (groupIndex + 1) % groups.length
+      }
+      return { group, availableAccount }
+    }
+  }
+
+  return null
+}
+
 /**
  * 创建剧集状态记录
  */
 async function createDramaStatusRecord(channelId, params) {
-  const { dramaName, publishTime, account, status, douyinMaterial, rating } = params
-  const profile = getSchedulerProfile(channelId)
+  const { dramaName, publishTime, account, status, douyinMaterial, rating, tableGroupId } = params
+  const profile = getSchedulerFeishuTableGroupProfile(channelId, tableGroupId)
   const accessToken = await getFeishuAccessToken()
 
   // 计算日期时间戳（与前端逻辑一致）
@@ -944,9 +1057,9 @@ function resolveDramaRating(drama, newDramaSet, options = {}) {
 /**
  * 更新账户使用状态
  */
-async function updateAccountUsedStatus(channelId, recordId) {
+async function updateAccountUsedStatus(channelId, recordId, tableGroupId = '') {
   const accessToken = await getFeishuAccessToken()
-  const profile = getSchedulerProfile(channelId)
+  const profile = getSchedulerFeishuTableGroupProfile(channelId, tableGroupId)
 
   const response = await fetch(
     `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.app_token}/tables/${profile.accountTableId}/records/${recordId}`,
@@ -1188,7 +1301,7 @@ async function fetchAutoSubmitDramas(channelId, submitRangeDays = 3) {
   serviceConsole.log(`[自动提交-${channelId}] 明天:`, formatDate(dateRanges.tomorrow))
   serviceConsole.log(`[自动提交-${channelId}] 后天:`, formatDate(dateRanges.dayAfterTomorrow))
 
-  const dramaListTableId = getSchedulerProfile(channelId).dramaListTableId
+  const dramaListTableId = getSchedulerFeishuTableGroupProfile(channelId).dramaListTableId
   const { batchSize, batchDelay, totalPages } = AUTO_SUBMIT_CONFIG.pagination
 
   // 并发获取下载任务列表
@@ -1362,33 +1475,37 @@ async function processDrama(channelId, drama, downloadList, newDramaSet, options
   const logPrefix = `[${logScope}-${channelId}]`
 
   try {
-    // 1. 检查可用账户
-    const availableAccount = await getFirstAvailableAccount(channelId)
-    if (!availableAccount) {
+    // 1. 检查当前渠道所有表格组是否已存在，避免同渠道重复提交
+    const alreadyExists = await dramaExistsInAnyFeishuTableGroup(channelId, dramaName)
+    if (alreadyExists) {
+      serviceConsole.log(`${logPrefix} 剧集已存在，跳过: ${dramaName}`)
+      return { success: false, reason: 'already_exists' }
+    }
+
+    // 2. 选择目标表格组并检查可用账户
+    const selectedGroup = await selectFeishuTableGroupWithAccount(
+      channelId,
+      options.feishuTableGroupId
+    )
+    if (!selectedGroup?.availableAccount) {
       serviceConsole.log(`${logPrefix} 无可用账户，跳过: ${dramaName}`)
       return { success: false, reason: 'no_account' }
     }
-
-    // 2. 搜索飞书剧集清单，检查是否已存在
-    const searchResult = await searchDramaList(channelId, dramaName)
-    if (searchResult.data && searchResult.data.total > 0) {
-      const existingDrama = searchResult.data.items.find(item => {
-        const itemDramaName = item.fields['剧名']?.[0]?.text
-        return itemDramaName === dramaName
-      })
-
-      if (existingDrama) {
-        serviceConsole.log(`${logPrefix} 剧集已存在，跳过: ${dramaName}`)
-        return { success: false, reason: 'already_exists' }
-      }
-    }
+    const { group, availableAccount } = selectedGroup
 
     // 3. 确定评级
     const rating = resolveDramaRating(drama, newDramaSet, options)
 
     // 4. 创建飞书剧集清单记录
-    await createDramaRecord(channelId, dramaName, drama.publish_time, drama.book_id, rating)
-    serviceConsole.log(`${logPrefix} 创建剧集清单记录成功: ${dramaName}`)
+    await createDramaRecord(
+      channelId,
+      dramaName,
+      drama.publish_time,
+      drama.book_id,
+      rating,
+      group.id
+    )
+    serviceConsole.log(`${logPrefix} 创建剧集清单记录成功: ${dramaName} -> ${group.name}`)
 
     // 5. 根据下载状态确定飞书状态
     const downloadData = getDownloadDataForDrama(downloadList, drama)
@@ -1398,7 +1515,7 @@ async function processDrama(channelId, drama, downloadList, newDramaSet, options
       taskStatus !== undefined && readyStatuses.includes(taskStatus) ? '待下载' : '待提交'
 
     // 6. 获取抖音素材配置（根据当前渠道）
-    const douyinMaterial = await getDouyinMaterialConfig(channelId)
+    const douyinMaterial = await getDouyinMaterialConfig(channelId, group.id)
 
     // 7. 创建剧集状态记录
     await createDramaStatusRecord(channelId, {
@@ -1408,11 +1525,14 @@ async function processDrama(channelId, drama, downloadList, newDramaSet, options
       status: feishuStatus,
       douyinMaterial: douyinMaterial || undefined, // 如果为空字符串则传 undefined
       rating, // 传递评级参数
+      tableGroupId: group.id,
     })
-    serviceConsole.log(`${logPrefix} 创建剧集状态记录成功，分配账户: ${availableAccount.account}`)
+    serviceConsole.log(
+      `${logPrefix} 创建剧集状态记录成功，表格组: ${group.name}，分配账户: ${availableAccount.account}`
+    )
 
     // 9. 更新账户使用状态
-    await updateAccountUsedStatus(channelId, availableAccount.recordId)
+    await updateAccountUsedStatus(channelId, availableAccount.recordId, group.id)
 
     // 10. 更新巨量账户备注
     if (availableAccount.account) {
@@ -1912,6 +2032,7 @@ async function executeBatchSubmit(items, runtimeContext = null) {
       const result = await processDrama(channelId, drama, downloadList, new Set(), {
         manualRedFlag: item.manualRedFlag,
         fromSearchResult: item.fromSearchResult,
+        feishuTableGroupId: item.feishuTableGroupId,
         logScope: '批量提交',
       })
 

@@ -39,6 +39,28 @@ export interface UserChannelBindingConfig {
     dramaStatusTableId: string
     accountTableId: string
   }
+  feishuTableGroups: Array<{
+    id: string
+    name: string
+    enabled: boolean
+    feishu: {
+      dramaListTableId: string
+      dramaStatusTableId: string
+      accountTableId: string
+    }
+    douyinMaterialMatches: Array<{
+      id: string
+      douyinAccountRefId: string
+      douyinAccount?: string
+      douyinAccountId?: string
+      cooperationCode?: string
+      materialRange: string
+      createdAt?: string
+      updatedAt?: string
+    }>
+    createdAt?: string
+    updatedAt?: string
+  }>
   materialPreview: {
     allowCustom: boolean
     enabled: boolean
@@ -129,6 +151,7 @@ export interface UserProfile {
     dramaStatusTableId: string
     accountTableId: string
   }
+  feishuTableGroups?: UserChannelBindingConfig['feishuTableGroups']
   materialPreview: {
     enabled: boolean
     intervalMinutes: number

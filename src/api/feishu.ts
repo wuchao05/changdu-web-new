@@ -18,6 +18,25 @@ import type {
   FeishuCreateRecordResponse,
 } from '@/api/types/feishu'
 
+export interface RuntimeFeishuTableGroup {
+  id: string
+  name: string
+  enabled: boolean
+  feishu: {
+    dramaListTableId?: string
+    dramaStatusTableId?: string
+    accountTableId?: string
+  }
+  douyinMaterialMatches?: Array<{
+    id?: string
+    douyinAccountRefId?: string
+    douyinAccount?: string
+    douyinAccountId?: string
+    cooperationCode?: string
+    materialRange?: string
+  }>
+}
+
 class FeishuApiService {
   private tokenCache: {
     token: string | null
@@ -87,6 +106,45 @@ class FeishuApiService {
   private getAccountTableId(): string {
     const apiConfigStore = useApiConfigStore()
     return apiConfigStore.config.accountTableId || ''
+  }
+
+  private getFeishuTableGroups(): RuntimeFeishuTableGroup[] {
+    const apiConfigStore = useApiConfigStore()
+    const groups = Array.isArray(apiConfigStore.config.feishuTableGroups)
+      ? apiConfigStore.config.feishuTableGroups
+      : []
+
+    if (groups.length > 0) {
+      return groups
+        .map((group, index) => ({
+          id: String(group.id || (index === 0 ? 'default' : `group-${index + 1}`)),
+          name: String(group.name || (index === 0 ? '默认表格' : `表格组 ${index + 1}`)),
+          enabled: group.enabled !== false,
+          feishu: group.feishu || {},
+          douyinMaterialMatches: Array.isArray(group.douyinMaterialMatches)
+            ? group.douyinMaterialMatches
+            : [],
+        }))
+        .filter(group => group.enabled)
+    }
+
+    return [
+      {
+        id: 'default',
+        name: '默认表格',
+        enabled: true,
+        feishu: {
+          dramaListTableId: this.getDramaListTableId(),
+          dramaStatusTableId: this.getDramaStatusTableId(),
+          accountTableId: this.getAccountTableId(),
+        },
+        douyinMaterialMatches: [],
+      },
+    ]
+  }
+
+  getRuntimeFeishuTableGroups(): RuntimeFeishuTableGroup[] {
+    return this.getFeishuTableGroups()
   }
 
   private async queryChannelAccounts(accountTableId?: string): Promise<any[]> {
@@ -304,8 +362,8 @@ class FeishuApiService {
   }
 
   // 便捷方法：搜索剧集清单
-  async searchDramaList(dramaName: string) {
-    return this.searchRecords(this.getDramaListTableId(), {
+  async searchDramaList(dramaName: string, tableId?: string) {
+    return this.searchRecords(tableId || this.getDramaListTableId(), {
       field_names: ['剧名'],
       filter: {
         conjunction: 'and',
@@ -335,9 +393,10 @@ class FeishuApiService {
     account?: string,
     publishTime?: string,
     bookId?: string,
-    rating?: string
+    rating?: string,
+    tableId?: string
   ): Promise<FeishuCreateRecordResponse> {
-    const tableId = this.getDramaListTableId()
+    const targetTableId = tableId || this.getDramaListTableId()
     const response = await fetch(`${ENV.BASE_URL}/feishu/bitable/records`, {
       method: 'POST',
       headers: FEISHU_API_CONFIG.headers,
@@ -347,7 +406,7 @@ class FeishuApiService {
         publishTime: publishTime || '',
         bookId: bookId || '',
         rating: rating || '',
-        table_id: tableId,
+        table_id: targetTableId,
       }),
     })
 
@@ -658,9 +717,10 @@ class FeishuApiService {
     account?: string,
     status?: string,
     douyinMaterial?: string,
-    rating?: string
+    rating?: string,
+    tableId?: string
   ): Promise<FeishuCreateRecordResponse> {
-    const tableId = this.getDramaStatusTableId()
+    const targetTableId = tableId || this.getDramaStatusTableId()
     // 将首发时间转换为当天00:00:00的13位时间戳
     const dateOnly = publishTime.split(' ')[0] // 提取日期部分 YYYY-MM-DD
     const publishDateAtMidnight = new Date(`${dateOnly} 00:00:00`)
@@ -687,7 +747,7 @@ class FeishuApiService {
         status,
         douyinMaterial,
         rating,
-        table_id: tableId,
+        table_id: targetTableId,
       }),
     })
 
@@ -711,16 +771,17 @@ class FeishuApiService {
    */
   async searchDramaStatusRecord(
     dramaName: string,
-    timestamp: number
+    timestamp: number,
+    tableId?: string
   ): Promise<FeishuSearchRecordResponse> {
-    const tableId = this.getDramaStatusTableId()
+    const targetTableId = tableId || this.getDramaStatusTableId()
     const response = await fetch(`${ENV.BASE_URL}/feishu/bitable/drama-status/search`, {
       method: 'POST',
       headers: FEISHU_API_CONFIG.headers,
       body: JSON.stringify({
         dramaName,
         timestamp,
-        table_id: tableId,
+        table_id: targetTableId,
       }),
     })
 
@@ -924,9 +985,10 @@ class FeishuApiService {
     publishTime?: string,
     douyinMaterial?: string,
     rating?: string,
-    status?: string
+    status?: string,
+    tableId?: string
   ): Promise<FeishuCreateRecordResponse> {
-    const tableId = this.getDramaStatusTableId()
+    const targetTableId = tableId || this.getDramaStatusTableId()
     const response = await fetch(`${ENV.BASE_URL}/feishu/bitable/drama-status/clip`, {
       method: 'POST',
       headers: FEISHU_API_CONFIG.headers,
@@ -938,7 +1000,7 @@ class FeishuApiService {
         douyinMaterial,
         rating,
         status,
-        table_id: tableId,
+        table_id: targetTableId,
       }),
     })
 
@@ -1093,7 +1155,30 @@ class FeishuApiService {
     includeBookId: boolean = false,
     includePushMaterialId: boolean = false
   ): Promise<FeishuSearchRecordResponse> {
-    const resolvedTableId = tableId || this.getDramaStatusTableId()
+    const targetGroups = tableId
+      ? [
+          {
+            id: '',
+            name: '',
+            tableId,
+          },
+        ]
+      : this.getFeishuTableGroups()
+          .map(group => ({
+            id: group.id,
+            name: group.name,
+            tableId: String(group.feishu?.dramaStatusTableId || '').trim(),
+          }))
+          .filter(group => group.tableId)
+
+    if (targetGroups.length === 0) {
+      return {
+        code: 0,
+        msg: 'success',
+        data: { has_more: false, items: [], total: 0 },
+      } as FeishuSearchRecordResponse
+    }
+
     const conditions: Array<{ field_name: string; operator: string; value: string[] }> = [
       {
         field_name: '当前状态',
@@ -1124,28 +1209,53 @@ class FeishuApiService {
       fieldNames.splice(fieldNames.length - 1, 0, '推送素材ID')
     }
 
-    const response = await fetch(`${ENV.BASE_URL}/feishu/bitable/drama-status/pending-build`, {
-      method: 'POST',
-      headers: FEISHU_API_CONFIG.headers,
-      body: JSON.stringify({
-        table_id: resolvedTableId,
-        field_names: fieldNames,
-        page_size: 100,
-        filter,
-      }),
-      signal,
-    })
+    const results = await Promise.all(
+      targetGroups.map(async group => {
+        const response = await fetch(`${ENV.BASE_URL}/feishu/bitable/drama-status/pending-build`, {
+          method: 'POST',
+          headers: FEISHU_API_CONFIG.headers,
+          body: JSON.stringify({
+            table_id: group.tableId,
+            field_names: fieldNames,
+            page_size: 100,
+            filter,
+          }),
+          signal,
+        })
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
-    }
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
 
-    const result: FeishuSearchRecordResponse = await response.json()
-    if (result.code !== 0) {
-      throw new Error(result.msg || '查询待搭建剧集失败')
-    }
+        const result: FeishuSearchRecordResponse = await response.json()
+        if (result.code !== 0) {
+          throw new Error(result.msg || '查询待搭建剧集失败')
+        }
 
-    return result
+        const items = Array.isArray(result.data?.items) ? result.data.items : []
+        items.forEach((item: any) => {
+          item._tableId = group.tableId
+          item._feishuTableGroupId = group.id
+          item._feishuTableGroupName = group.name
+        })
+
+        return {
+          items,
+          total: result.data?.total ?? items.length,
+        }
+      })
+    )
+
+    const items = results.flatMap(result => result.items)
+    return {
+      code: 0,
+      msg: 'success',
+      data: {
+        has_more: false,
+        items,
+        total: results.reduce((sum, result) => sum + Number(result.total || 0), 0),
+      },
+    } as FeishuSearchRecordResponse
   }
 
   /**

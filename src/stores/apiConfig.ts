@@ -14,6 +14,24 @@ export interface ApiConfig {
   dramaListTableId?: string
   dramaStatusTableId?: string
   accountTableId?: string
+  feishuTableGroups?: Array<{
+    id: string
+    name: string
+    enabled: boolean
+    feishu: {
+      dramaListTableId?: string
+      dramaStatusTableId?: string
+      accountTableId?: string
+    }
+    douyinMaterialMatches?: Array<{
+      id?: string
+      douyinAccountRefId?: string
+      douyinAccount?: string
+      douyinAccountId?: string
+      cooperationCode?: string
+      materialRange?: string
+    }>
+  }>
   userType?: 'admin' | 'normal'
   channelId?: string
   channelName?: string
@@ -35,6 +53,7 @@ const DEFAULT_API_CONFIG: ApiConfig = {
   dramaListTableId: '',
   dramaStatusTableId: '',
   accountTableId: '',
+  feishuTableGroups: [],
   userType: 'normal',
   channelId: '',
   channelName: '',
@@ -135,6 +154,7 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
       dramaListTableId?: string
       dramaStatusTableId?: string
       accountTableId?: string
+      tableGroups?: ApiConfig['feishuTableGroups']
     }
     sessionUser?: {
       id?: string
@@ -170,6 +190,8 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
         dramaStatusTableId:
           authData.feishu?.dramaStatusTableId ?? runtimeConfig.value.dramaStatusTableId,
         accountTableId: authData.feishu?.accountTableId ?? runtimeConfig.value.accountTableId,
+        feishuTableGroups:
+          authData.feishu?.tableGroups ?? runtimeConfig.value.feishuTableGroups ?? [],
         userId: runtimeUser?.id ?? sessionUser?.id ?? runtimeConfig.value.userId,
         userType: sessionUser?.userType ?? runtimeConfig.value.userType,
         channelId:

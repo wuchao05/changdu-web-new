@@ -17,6 +17,7 @@ const FALLBACK_STUDIO_DATA_DIR = path.join(__dirname, '../data/studio')
 
 export const CHANNEL_USER_BASE_SINGLE = 'single'
 export const CHANNEL_USER_BASE_MULTI = 'multi'
+export const DEFAULT_FEISHU_TABLE_GROUP_ID = 'default'
 
 export function normalizeChannelUserBase(value = '') {
   return value === CHANNEL_USER_BASE_MULTI ? CHANNEL_USER_BASE_MULTI : CHANNEL_USER_BASE_SINGLE
@@ -89,6 +90,18 @@ function defaultFeishuConfig() {
   }
 }
 
+function defaultFeishuTableGroup() {
+  return {
+    id: DEFAULT_FEISHU_TABLE_GROUP_ID,
+    name: '默认表格',
+    enabled: true,
+    feishu: defaultFeishuConfig(),
+    douyinMaterialMatches: [],
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  }
+}
+
 function defaultOrderUserStats() {
   return {
     enabled: false,
@@ -124,6 +137,7 @@ function defaultUserChannelConfig() {
       ...DEFAULT_USER_BUILD_ADVANCE_CONFIG,
     },
     feishu: defaultFeishuConfig(),
+    feishuTableGroups: [defaultFeishuTableGroup()],
     materialPreview: defaultMaterialPreview(),
     permissions: {
       webMenus: {
@@ -274,6 +288,13 @@ function collectLegacyDouyinAccounts(user = {}) {
   Object.values(rawChannelConfigs).forEach(channelConfig => {
     if (Array.isArray(channelConfig?.douyinMaterialMatches)) {
       channelConfig.douyinMaterialMatches.forEach(pushMatchAsAccount)
+    }
+    if (Array.isArray(channelConfig?.feishuTableGroups)) {
+      channelConfig.feishuTableGroups.forEach(group => {
+        if (Array.isArray(group?.douyinMaterialMatches)) {
+          group.douyinMaterialMatches.forEach(pushMatchAsAccount)
+        }
+      })
     }
   })
 
@@ -487,8 +508,82 @@ function normalizeFeishuConfig(feishu = {}) {
   }
 }
 
+function normalizeFeishuTableGroup(group = {}, douyinAccounts = [], index = 0) {
+  const base = defaultFeishuTableGroup()
+  const normalizedFeishu = normalizeFeishuConfig(group.feishu || group)
+  const id = String(
+    group.id || (index === 0 ? DEFAULT_FEISHU_TABLE_GROUP_ID : crypto.randomUUID())
+  ).trim()
+  const name = String(group.name || (index === 0 ? '默认表格' : `表格组 ${index + 1}`)).trim()
+
+  return {
+    id: id || (index === 0 ? DEFAULT_FEISHU_TABLE_GROUP_ID : crypto.randomUUID()),
+    name: name || (index === 0 ? '默认表格' : `表格组 ${index + 1}`),
+    enabled: group.enabled !== false,
+    feishu: normalizedFeishu,
+    douyinMaterialMatches: normalizeDouyinMaterialMatches(
+      group.douyinMaterialMatches,
+      douyinAccounts
+    ),
+    createdAt: group.createdAt || base.createdAt,
+    updatedAt: group.updatedAt || nowIso(),
+  }
+}
+
+function normalizeFeishuTableGroups(config = {}, douyinAccounts = []) {
+  const rawGroups = Array.isArray(config.feishuTableGroups) ? config.feishuTableGroups : []
+
+  const sourceGroups = rawGroups.length
+    ? rawGroups
+    : [
+        {
+          ...defaultFeishuTableGroup(),
+          feishu: normalizeFeishuConfig(config.feishu || config),
+          douyinMaterialMatches: Array.isArray(config.douyinMaterialMatches)
+            ? config.douyinMaterialMatches
+            : [],
+        },
+      ]
+
+  const normalizedGroups = sourceGroups.map((group, index) =>
+    normalizeFeishuTableGroup(group, douyinAccounts, index)
+  )
+
+  return normalizedGroups.length > 0 ? normalizedGroups : [defaultFeishuTableGroup()]
+}
+
+export function resolveFeishuTableGroups(groups = [], douyinAccounts = []) {
+  const normalizedDouyinAccounts = normalizeDouyinAccounts(douyinAccounts)
+  const douyinAccountMap = new Map(normalizedDouyinAccounts.map(account => [account.id, account]))
+
+  return (Array.isArray(groups) ? groups : [])
+    .map((group, index) => normalizeFeishuTableGroup(group, normalizedDouyinAccounts, index))
+    .map(group => ({
+      ...group,
+      douyinMaterialMatches: group.douyinMaterialMatches
+        .map(match => {
+          const relatedDouyinAccount = douyinAccountMap.get(match.douyinAccountRefId)
+          if (!relatedDouyinAccount) {
+            return null
+          }
+
+          return {
+            ...match,
+            douyinAccount: relatedDouyinAccount.douyinAccount,
+            douyinAccountId: relatedDouyinAccount.douyinAccountId,
+            cooperationCode: relatedDouyinAccount.cooperationCode,
+          }
+        })
+        .filter(
+          match => match && match.douyinAccount && match.douyinAccountId && match.materialRange
+        ),
+    }))
+}
+
 function normalizeUserChannelConfig(config = {}, douyinAccounts = []) {
   const defaultConfig = defaultUserChannelConfig()
+  const feishuTableGroups = normalizeFeishuTableGroups(config, douyinAccounts)
+  const defaultFeishuGroup = feishuTableGroups[0] || defaultFeishuTableGroup()
 
   return {
     enabled: true,
@@ -501,7 +596,8 @@ function normalizeUserChannelConfig(config = {}, douyinAccounts = []) {
       bid: String(config.buildPreference?.bid || '').trim(),
     },
     buildAdvanceConfig: normalizeUserBuildAdvanceConfig(config.buildAdvanceConfig),
-    feishu: normalizeFeishuConfig(config.feishu || config),
+    feishu: defaultFeishuGroup.feishu,
+    feishuTableGroups,
     materialPreview: {
       ...defaultMaterialPreview(),
       ...(config.materialPreview || {}),
@@ -563,10 +659,7 @@ function normalizeUserChannelConfig(config = {}, douyinAccounts = []) {
     douyinMaterialConfig: {
       allowCustom: Boolean(config.douyinMaterialConfig?.allowCustom),
     },
-    douyinMaterialMatches: normalizeDouyinMaterialMatches(
-      config.douyinMaterialMatches,
-      douyinAccounts
-    ),
+    douyinMaterialMatches: defaultFeishuGroup.douyinMaterialMatches,
   }
 }
 
@@ -604,14 +697,25 @@ function normalizeUserChannelConfigs(
   )
   const legacyChannelId = defaultChannelId || channelIds[0] || ''
   if (legacyChannelId && hasFeishuConfig(legacyFeishuConfig)) {
+    const currentConfig = normalizedConfigs[legacyChannelId] || defaultUserChannelConfig()
+    const currentGroups = Array.isArray(currentConfig.feishuTableGroups)
+      ? currentConfig.feishuTableGroups
+      : [defaultFeishuTableGroup()]
+    const nextFeishu = hasFeishuConfig(currentConfig.feishu)
+      ? currentConfig.feishu
+      : legacyFeishuConfig
     normalizedConfigs[legacyChannelId] = {
       ...defaultUserChannelConfig(),
-      ...(normalizedConfigs[legacyChannelId] || {}),
-      feishu:
-        normalizedConfigs[legacyChannelId] &&
-        hasFeishuConfig(normalizedConfigs[legacyChannelId].feishu)
-          ? normalizedConfigs[legacyChannelId].feishu
-          : legacyFeishuConfig,
+      ...currentConfig,
+      feishu: nextFeishu,
+      feishuTableGroups: currentGroups.map((group, index) =>
+        index === 0
+          ? {
+              ...group,
+              feishu: nextFeishu,
+            }
+          : group
+      ),
     }
   }
 
@@ -638,10 +742,22 @@ function normalizeUserChannelConfigs(
       !Array.isArray(normalizedConfigs[legacyChannelId].douyinMaterialMatches) ||
       normalizedConfigs[legacyChannelId].douyinMaterialMatches.length === 0)
   ) {
+    const currentConfig = normalizedConfigs[legacyChannelId] || defaultUserChannelConfig()
+    const currentGroups = Array.isArray(currentConfig.feishuTableGroups)
+      ? currentConfig.feishuTableGroups
+      : [defaultFeishuTableGroup()]
     normalizedConfigs[legacyChannelId] = {
       ...defaultUserChannelConfig(),
-      ...(normalizedConfigs[legacyChannelId] || {}),
+      ...currentConfig,
       douyinMaterialMatches: legacyDouyinMaterialMatches,
+      feishuTableGroups: currentGroups.map((group, index) =>
+        index === 0
+          ? {
+              ...group,
+              douyinMaterialMatches: legacyDouyinMaterialMatches,
+            }
+          : group
+      ),
     }
   }
 
@@ -712,6 +828,10 @@ export function buildRuntimeUser(user = {}, channelId = '') {
     sourceChannelConfig.douyinMaterialMatches,
     normalizedUser.douyinAccounts
   )
+  const feishuTableGroups = resolveFeishuTableGroups(
+    channelConfig.feishuTableGroups,
+    normalizedUser.douyinAccounts
+  )
 
   return {
     ...normalizedUser,
@@ -719,6 +839,7 @@ export function buildRuntimeUser(user = {}, channelId = '') {
     buildPreference: sourceChannelConfig.buildPreference,
     buildAdvanceConfig: sourceChannelConfig.buildAdvanceConfig,
     feishu: channelConfig.feishu,
+    feishuTableGroups,
     materialPreview: channelConfig.materialPreview,
     permissions: channelConfig.permissions,
     orderUserStats: channelConfig.orderUserStats,

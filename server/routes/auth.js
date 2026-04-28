@@ -115,6 +115,9 @@ router.get('/config', async ctx => {
           dramaListTableId: runtimeUser?.feishu?.dramaListTableId || '',
           dramaStatusTableId: runtimeUser?.feishu?.dramaStatusTableId || '',
           accountTableId: runtimeUser?.feishu?.accountTableId || '',
+          tableGroups: Array.isArray(runtimeUser?.feishuTableGroups)
+            ? runtimeUser.feishuTableGroups
+            : [],
         },
         materialPreview: runtimeUser?.materialPreview || {
           allowCustom: false,
