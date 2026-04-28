@@ -371,12 +371,12 @@ function closePanel() {
 // 加载已有 cookie
 async function loadCookie() {
   try {
-    const res = await fetch('/api/session/me', {
+    const res = await fetch('/api/adx/config', {
       headers: buildSessionHeaders(),
     })
     const data = await res.json()
     if (data?.code === 0) {
-      cookieInput.value = data.data?.platforms?.adx?.cookie || ''
+      cookieInput.value = data.data?.cookie || ''
     }
   } catch {}
 }
@@ -385,45 +385,27 @@ async function loadCookie() {
 async function saveCookie() {
   savingCookie.value = true
   try {
-    const currentSessionRes = await fetch('/api/session/me', {
-      headers: buildSessionHeaders(),
-    })
-    const currentSession = await currentSessionRes.json()
-    const activeChannelId = currentSession?.data?.channel?.id
-
-    if (!activeChannelId) {
-      throw new Error('当前没有可用的渠道，无法保存 ADX Cookie')
-    }
-
-    const channelsRes = await fetch('/api/admin/channels', {
-      headers: buildSessionHeaders(),
-    })
-    const channelsResult = await channelsRes.json()
-    const currentChannel = (channelsResult?.data || []).find(
-      (item: { id: string }) => item.id === activeChannelId
-    )
-
-    if (!currentChannel) {
-      throw new Error('未找到当前渠道，无法保存 ADX Cookie')
-    }
-
-    await fetch(`/api/admin/channels/${activeChannelId}`, {
+    const response = await fetch('/api/adx/config', {
       method: 'PUT',
       headers: buildSessionHeaders({
         'Content-Type': 'application/json',
       }),
       body: JSON.stringify({
-        ...currentChannel,
-        adx: {
-          cookie: cookieInput.value,
-        },
+        cookie: cookieInput.value,
       }),
     })
-    message.success('ADX Cookie 保存成功')
+
+    const result = await response.json()
+    if (!response.ok || result?.code !== 0) {
+      throw new Error(result?.message || '保存失败')
+    }
+
+    message.success('ADX Cookie 已保存为全局配置')
     showCookieModal.value = false
     fetchRanking()
-  } catch {
-    message.error('保存失败')
+  } catch (error) {
+    console.error('保存 ADX Cookie 失败:', error)
+    message.error(error instanceof Error ? error.message : '保存失败')
   } finally {
     savingCookie.value = false
   }

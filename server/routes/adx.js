@@ -1,9 +1,46 @@
 import Router from '@koa/router'
-import { createSessionRuntimeContextMiddleware } from '../utils/runtimeContextMiddleware.js'
+import { readAdxConfig, writeAdxConfig } from '../utils/studioData.js'
+import { requireSession } from '../utils/studioSession.js'
 
 const router = new Router()
 
-router.use(createSessionRuntimeContextMiddleware('adxContext'))
+router.use(requireSession)
+
+router.get('/config', async ctx => {
+  const config = await readAdxConfig()
+  ctx.body = {
+    code: 0,
+    message: 'success',
+    data: {
+      cookie: ctx.state.sessionUser?.userType === 'admin' ? config.cookie : '',
+      configured: Boolean(config.cookie),
+      updatedAt: config.updatedAt,
+    },
+  }
+})
+
+router.put('/config', async ctx => {
+  if (ctx.state.sessionUser?.userType !== 'admin') {
+    ctx.status = 403
+    ctx.body = {
+      code: 403,
+      message: '无权配置 ADX Cookie',
+    }
+    return
+  }
+
+  const cookie = String(ctx.request.body?.cookie || '').trim()
+  const config = await writeAdxConfig({ cookie })
+
+  ctx.body = {
+    code: 0,
+    message: 'ADX Cookie 保存成功',
+    data: {
+      configured: Boolean(config.cookie),
+      updatedAt: config.updatedAt,
+    },
+  }
+})
 
 /**
  * ADX 榜单代理
@@ -11,14 +48,14 @@ router.use(createSessionRuntimeContextMiddleware('adxContext'))
  */
 router.post('/ranking', async ctx => {
   try {
-    const channel = ctx.state.adxContext?.channel
-    const adxCookie = String(channel?.adx?.cookie || '').trim()
+    const adxConfig = await readAdxConfig()
+    const adxCookie = String(adxConfig.cookie || '').trim()
 
     if (!adxCookie) {
       ctx.status = 400
       ctx.body = {
         code: -1,
-        message: '当前渠道未配置 ADX Cookie，请先配置',
+        message: '未配置 ADX Cookie，请先配置',
       }
       return
     }

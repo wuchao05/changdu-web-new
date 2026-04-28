@@ -44,10 +44,15 @@ export function getDownloadCenterConfigsFilePath() {
   return path.join(getStudioDataDir(), 'download-center-configs.json')
 }
 
+export function getAdxConfigFilePath() {
+  return path.join(getStudioDataDir(), 'adx-config.json')
+}
+
 export const STUDIO_DATA_DIR = getStudioDataDir
 export const USERINFO_DIR = getUserinfoDir
 export const CHANNELS_FILE_PATH = getChannelsFilePath
 export const DOWNLOAD_CENTER_CONFIGS_FILE_PATH = getDownloadCenterConfigsFilePath
+export const ADX_CONFIG_FILE_PATH = getAdxConfigFilePath
 
 function nowIso() {
   return new Date().toISOString()
@@ -186,6 +191,21 @@ function defaultDownloadCenterConfig() {
     isDefault: false,
     createdAt: nowIso(),
     updatedAt: nowIso(),
+  }
+}
+
+function defaultAdxConfig() {
+  return {
+    cookie: '',
+    updatedAt: nowIso(),
+  }
+}
+
+function normalizeAdxConfig(config = {}) {
+  const base = defaultAdxConfig()
+  return {
+    cookie: String(config.cookie || '').trim(),
+    updatedAt: config.updatedAt || base.updatedAt,
   }
 }
 
@@ -830,6 +850,12 @@ export async function ensureStudioData() {
       'utf-8'
     )
   }
+
+  try {
+    await fs.access(getAdxConfigFilePath())
+  } catch {
+    await fs.writeFile(getAdxConfigFilePath(), JSON.stringify(defaultAdxConfig(), null, 2), 'utf-8')
+  }
 }
 
 export async function readChannels() {
@@ -870,6 +896,22 @@ export async function writeDownloadCenterConfigs(configs) {
     updatedAt: nowIso(),
   }
   await fs.writeFile(getDownloadCenterConfigsFilePath(), JSON.stringify(payload, null, 2), 'utf-8')
+  return payload
+}
+
+export async function readAdxConfig() {
+  await ensureStudioData()
+  const raw = await fs.readFile(getAdxConfigFilePath(), 'utf-8')
+  return normalizeAdxConfig(JSON.parse(raw))
+}
+
+export async function writeAdxConfig(config) {
+  await ensureStudioData()
+  const payload = normalizeAdxConfig({
+    ...config,
+    updatedAt: nowIso(),
+  })
+  await fs.writeFile(getAdxConfigFilePath(), JSON.stringify(payload, null, 2), 'utf-8')
   return payload
 }
 
