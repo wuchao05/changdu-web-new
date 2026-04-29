@@ -269,18 +269,28 @@
                         </div>
                       </template>
                       <div class="douyin-material-tooltip">
-                        <template v-if="task.douyinMaterialSummary.items.length">
+                        <template v-if="getDouyinMaterialSummaryGroups(task).length">
                           <div
-                            v-for="item in task.douyinMaterialSummary.items"
-                            :key="`${task.key}-${item.douyinAccount}-${item.materialRange}`"
-                            class="douyin-material-tooltip__row"
+                            v-for="groupItem in getDouyinMaterialSummaryGroups(task)"
+                            :key="`${task.key}-${groupItem.id}`"
+                            class="douyin-material-tooltip__group"
                           >
-                            <span class="douyin-material-tooltip__name">{{
-                              item.douyinAccount
-                            }}</span>
-                            <span class="douyin-material-tooltip__count">
-                              {{ item.materialCount }} 个素材
-                            </span>
+                            <div class="douyin-material-tooltip__group-title">
+                              <span>{{ groupItem.name }}</span>
+                              <span>{{ groupItem.total }} 个抖音号</span>
+                            </div>
+                            <div
+                              v-for="item in groupItem.items"
+                              :key="`${task.key}-${groupItem.id}-${item.douyinAccount}-${item.materialRange}`"
+                              class="douyin-material-tooltip__row"
+                            >
+                              <span class="douyin-material-tooltip__name">{{
+                                item.douyinAccount
+                              }}</span>
+                              <span class="douyin-material-tooltip__count">
+                                {{ item.materialCount }} 个素材
+                              </span>
+                            </div>
                           </div>
                         </template>
                         <span v-else class="douyin-material-tooltip__empty"
@@ -540,10 +550,41 @@ function formatTaskExtra(task: SchedulerOverviewTask) {
   }
 
   if (task.key === 'buildWorkflow') {
-    return `${Number(task.douyinMaterialSummary?.total || 0)}个抖音号`
+    const groupCount = getDouyinMaterialSummaryGroups(task).length
+    const accountCount = Number(task.douyinMaterialSummary?.total || 0)
+    return groupCount > 1 ? `${groupCount}组/${accountCount}个抖音号` : `${accountCount}个抖音号`
   }
 
   return formatTaskRunningDuration(task)
+}
+
+function getDouyinMaterialSummaryGroups(task: SchedulerOverviewTask) {
+  if (task.key !== 'buildWorkflow') {
+    return []
+  }
+
+  const groups = Array.isArray(task.douyinMaterialSummary?.groups)
+    ? task.douyinMaterialSummary.groups
+    : []
+
+  if (groups.length > 0) {
+    return groups.filter(group => group.items.length > 0)
+  }
+
+  const items = Array.isArray(task.douyinMaterialSummary?.items)
+    ? task.douyinMaterialSummary.items
+    : []
+
+  return items.length
+    ? [
+        {
+          id: 'default',
+          name: '默认表格',
+          total: items.length,
+          items,
+        },
+      ]
+    : []
 }
 
 function getSecondFactLabel(task: SchedulerOverviewTask) {
@@ -1729,10 +1770,28 @@ onBeforeUnmount(() => {
 }
 
 .douyin-material-tooltip {
-  min-width: 180px;
+  min-width: 220px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+}
+
+.douyin-material-tooltip__group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.douyin-material-tooltip__group-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+  color: #bfdbfe;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .douyin-material-tooltip__row {

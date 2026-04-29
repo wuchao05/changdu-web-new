@@ -38,17 +38,18 @@ export const useDouyinMaterialStore = defineStore('douyinMaterial', () => {
   // 抖音号匹配素材列表
   const matches = ref<DouyinMaterialMatch[]>([])
 
-  function getCacheKey() {
+  function getCacheKey(feishuTableGroupId = '') {
     const channelId = getSelectedChannelId() || 'default'
-    return `${CACHE_KEY}:${channelId}`
+    const tableGroupId = String(feishuTableGroupId || 'default').trim() || 'default'
+    return `${CACHE_KEY}:${channelId}:${tableGroupId}`
   }
 
   /**
    * 从本地缓存加载数据
    */
-  function loadFromCache(): boolean {
+  function loadFromCache(feishuTableGroupId = ''): boolean {
     try {
-      const cacheKey = getCacheKey()
+      const cacheKey = getCacheKey(feishuTableGroupId)
       const cached = localStorage.getItem(cacheKey)
       if (!cached) return false
 
@@ -81,14 +82,14 @@ export const useDouyinMaterialStore = defineStore('douyinMaterial', () => {
   /**
    * 保存到本地缓存
    */
-  function saveToCache() {
+  function saveToCache(feishuTableGroupId = '') {
     try {
       const cacheData: CacheData = {
         version: CACHE_VERSION,
         timestamp: Date.now(),
         matches: matches.value,
       }
-      localStorage.setItem(getCacheKey(), JSON.stringify(cacheData))
+      localStorage.setItem(getCacheKey(feishuTableGroupId), JSON.stringify(cacheData))
       console.log('💾 已缓存抖音号素材匹配配置到本地')
     } catch (error) {
       console.error('保存抖音号素材匹配配置缓存失败:', error)
@@ -99,20 +100,24 @@ export const useDouyinMaterialStore = defineStore('douyinMaterial', () => {
    * 从服务器加载配置
    * @param forceRefresh 是否强制刷新，忽略缓存
    */
-  async function loadFromServer(forceRefresh = false, signal?: AbortSignal) {
+  async function loadFromServer(
+    forceRefresh = false,
+    signal?: AbortSignal,
+    feishuTableGroupId = ''
+  ) {
     // 如果不是强制刷新，先尝试从缓存加载
-    if (!forceRefresh && loadFromCache()) {
+    if (!forceRefresh && loadFromCache(feishuTableGroupId)) {
       return
     }
 
     try {
       console.log('🌐 从服务器加载抖音号素材匹配配置...')
-      const list = await douyinMaterialApi.getDouyinMaterialConfig({ signal })
+      const list = await douyinMaterialApi.getDouyinMaterialConfig({ signal, feishuTableGroupId })
       // 确保返回的是数组
       if (Array.isArray(list)) {
         matches.value = list
         // 保存到缓存
-        saveToCache()
+        saveToCache(feishuTableGroupId)
       } else {
         console.error('服务器返回的数据不是数组:', list)
         matches.value = []
@@ -124,7 +129,7 @@ export const useDouyinMaterialStore = defineStore('douyinMaterial', () => {
 
       console.error('从服务器加载抖音号素材匹配配置失败:', error)
       // 如果服务器加载失败，尝试使用本地缓存
-      if (!loadFromCache()) {
+      if (!loadFromCache(feishuTableGroupId)) {
         matches.value = []
       }
     }
@@ -141,14 +146,19 @@ export const useDouyinMaterialStore = defineStore('douyinMaterial', () => {
   /**
    * 添加匹配规则
    */
-  async function addMatch(douyinAccountRefId: string, materialRange: string) {
+  async function addMatch(
+    douyinAccountRefId: string,
+    materialRange: string,
+    feishuTableGroupId = ''
+  ) {
     try {
       const newMatch = await douyinMaterialApi.addDouyinMaterialMatch({
         douyinAccountRefId,
         materialRange,
+        feishuTableGroupId,
       })
       matches.value.push(newMatch)
-      saveToCache()
+      saveToCache(feishuTableGroupId)
       return newMatch
     } catch (error) {
       console.error('添加抖音号素材匹配规则失败:', error)
@@ -159,16 +169,22 @@ export const useDouyinMaterialStore = defineStore('douyinMaterial', () => {
   /**
    * 更新匹配规则
    */
-  async function updateMatch(id: string, douyinAccountRefId: string, materialRange: string) {
+  async function updateMatch(
+    id: string,
+    douyinAccountRefId: string,
+    materialRange: string,
+    feishuTableGroupId = ''
+  ) {
     try {
       const updatedMatch = await douyinMaterialApi.updateDouyinMaterialMatch(id, {
         douyinAccountRefId,
         materialRange,
+        feishuTableGroupId,
       })
       const index = matches.value.findIndex(m => m.id === id)
       if (index !== -1) {
         matches.value[index] = updatedMatch
-        saveToCache()
+        saveToCache(feishuTableGroupId)
       }
       return updatedMatch
     } catch (error) {
@@ -180,13 +196,13 @@ export const useDouyinMaterialStore = defineStore('douyinMaterial', () => {
   /**
    * 删除匹配规则
    */
-  async function deleteMatch(id: string) {
+  async function deleteMatch(id: string, feishuTableGroupId = '') {
     try {
-      await douyinMaterialApi.deleteDouyinMaterialMatch(id)
+      await douyinMaterialApi.deleteDouyinMaterialMatch(id, feishuTableGroupId)
       const index = matches.value.findIndex(m => m.id === id)
       if (index !== -1) {
         matches.value.splice(index, 1)
-        saveToCache()
+        saveToCache(feishuTableGroupId)
       }
     } catch (error) {
       console.error('删除抖音号素材匹配规则失败:', error)

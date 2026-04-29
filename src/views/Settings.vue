@@ -179,11 +179,27 @@
             </div>
           </template>
           <div class="space-y-4 material-panel">
+            <div class="material-panel__global-switch">
+              <div>
+                <p class="material-panel__eyebrow">当前渠道</p>
+                <h4 class="material-panel__channel">{{ activeChannelName }}</h4>
+              </div>
+              <div class="material-panel__group-control">
+                <label class="material-panel__average-label">表格组</label>
+                <n-select
+                  v-model:value="selectedFeishuTableGroupId"
+                  :options="feishuTableGroupOptions"
+                  class="material-panel__global-group-select"
+                  placeholder="选择表格组"
+                />
+              </div>
+            </div>
+
             <div class="material-panel__hero">
               <div class="material-panel__summary">
                 <div>
-                  <p class="material-panel__eyebrow">当前渠道</p>
-                  <h4 class="material-panel__channel">{{ activeChannelName }}</h4>
+                  <p class="material-panel__eyebrow">当前表格组</p>
+                  <h4 class="material-panel__channel">{{ activeFeishuTableGroupName }}</h4>
                 </div>
                 <div class="material-panel__stats">
                   <span class="material-panel__stat">{{ materialMatches.length }} 条规则</span>
@@ -209,7 +225,7 @@
                 <n-button
                   quaternary
                   type="primary"
-                  :disabled="!hasAvailableDouyinAccounts"
+                  :disabled="!hasAvailableDouyinAccounts || !selectedFeishuTableGroupId"
                   :loading="savingAllMaterialMatches"
                   @click="saveAllMaterialMatches"
                 >
@@ -217,7 +233,7 @@
                 </n-button>
               </div>
               <p class="material-panel__note">
-                先选抖音号，再填写素材总数自动平均分配；已在其他渠道占用的抖音号不可重复选择。
+                先选择表格组和抖音号，再填写素材总数自动平均分配；同一渠道内已占用的抖音号不可重复选择。
               </p>
             </div>
 
@@ -232,7 +248,7 @@
               <div>
                 <h4 class="text-sm font-semibold text-slate-900">选择抖音号</h4>
                 <p class="mt-1 text-xs text-slate-500">
-                  共 {{ availableDouyinAccounts.length }} 个可用抖音号，当前已选
+                  共 {{ availableDouyinAccounts.length }} 个可用抖音号，当前表格组已选
                   {{ materialMatchesWithAccountCount }} 个。
                 </p>
               </div>
@@ -248,8 +264,10 @@
               />
               <p v-if="occupiedMaterialAccountCount" class="material-select-box__hint">
                 有
-                {{ occupiedMaterialAccountCount }}
-                个抖音号已被其他渠道占用，因此这里不可重复选择。
+                {{
+                  occupiedMaterialAccountCount
+                }}
+                个抖音号已被当前渠道内其他表格组占用，因此这里不可重复选择。
               </p>
             </div>
 
@@ -405,6 +423,7 @@ const savingXtToken = ref(false)
 const buildBidInput = ref<number | null>(null)
 const averageMaterialTotal = ref<number | null>(null)
 const selectedMaterialAccountIds = ref<string[]>([])
+const selectedFeishuTableGroupId = ref('')
 const MATERIAL_SELECT_ALL_VALUE = '__material_select_all__'
 const xtTokenDraft = ref('')
 
@@ -455,21 +474,95 @@ const activeUserChannelConfig = computed(() => {
   return activeChannelId ? currentChannelConfigs.value[activeChannelId] || null : null
 })
 
+type FeishuTableGroup = UserChannelBindingConfig['feishuTableGroups'][number]
+
+const feishuTableGroups = computed<FeishuTableGroup[]>(() => {
+  const groups = Array.isArray(activeUserChannelConfig.value?.feishuTableGroups)
+    ? activeUserChannelConfig.value.feishuTableGroups
+    : []
+
+  if (groups.length > 0) {
+    return groups
+      .map((group, index) => ({
+        ...group,
+        id: String(group.id || (index === 0 ? 'default' : `group-${index + 1}`)).trim(),
+        name: String(group.name || (index === 0 ? '默认表格' : `表格组 ${index + 1}`)).trim(),
+        enabled: group.enabled !== false,
+      }))
+      .filter(group => group.enabled)
+  }
+
+  return [
+    {
+      id: 'default',
+      name: '默认表格',
+      enabled: true,
+      feishu: activeUserChannelConfig.value?.feishu || {
+        dramaListTableId: '',
+        dramaStatusTableId: '',
+        accountTableId: '',
+      },
+      douyinMaterialMatches: activeUserChannelConfig.value?.douyinMaterialMatches || [],
+    },
+  ]
+})
+
+const feishuTableGroupOptions = computed(() =>
+  feishuTableGroups.value.map(group => ({
+    label: group.name,
+    value: group.id,
+  }))
+)
+
+const activeFeishuTableGroup = computed(() => {
+  return (
+    feishuTableGroups.value.find(group => group.id === selectedFeishuTableGroupId.value) ||
+    feishuTableGroups.value[0] ||
+    null
+  )
+})
+
+const activeFeishuTableGroupName = computed(() => activeFeishuTableGroup.value?.name || '默认表格')
+
 const occupiedMaterialAccountIds = computed(() => {
   const currentChannelId = String(sessionStore.activeChannelId || '').trim()
   const occupiedIds = new Set<string>()
+  const currentConfig = currentChannelId ? currentChannelConfigs.value[currentChannelId] : null
 
-  Object.entries(currentChannelConfigs.value).forEach(([channelId, config]) => {
-    if (channelId === currentChannelId) {
-      return
-    }
+  if (!currentConfig) {
+    return occupiedIds
+  }
 
-    ;(config.douyinMaterialMatches || []).forEach(match => {
-      const refId = String(match?.douyinAccountRefId || '').trim()
-      if (refId) {
-        occupiedIds.add(refId)
+  const groups = Array.isArray(currentConfig.feishuTableGroups)
+    ? currentConfig.feishuTableGroups
+    : []
+
+  if (groups.length > 0) {
+    groups.forEach((group, index) => {
+      const groupId = String(group?.id || (index === 0 ? 'default' : `group-${index + 1}`)).trim()
+      if (groupId === selectedFeishuTableGroupId.value) {
+        return
       }
+
+      ;(group.douyinMaterialMatches || []).forEach(match => {
+        const refId = String(match?.douyinAccountRefId || '').trim()
+        if (refId) {
+          occupiedIds.add(refId)
+        }
+      })
     })
+    return occupiedIds
+  }
+
+  if (!selectedFeishuTableGroupId.value) {
+    return occupiedIds
+  }
+
+  ;(currentConfig.douyinMaterialMatches || []).forEach(match => {
+    const refId = String(match?.douyinAccountRefId || '').trim()
+    if (refId) {
+      occupiedIds.add(refId)
+    }
   })
 
   return occupiedIds
@@ -609,6 +702,36 @@ watch(
 )
 
 watch(
+  feishuTableGroups,
+  groups => {
+    if (!groups.length) {
+      selectedFeishuTableGroupId.value = ''
+      return
+    }
+
+    if (!groups.some(group => group.id === selectedFeishuTableGroupId.value)) {
+      selectedFeishuTableGroupId.value = groups[0].id
+    }
+  },
+  { immediate: true }
+)
+
+watch(
+  selectedFeishuTableGroupId,
+  feishuTableGroupId => {
+    if (!feishuTableGroupId || !sessionStore.activeChannelId) {
+      materialMatches.value = []
+      selectedMaterialAccountIds.value = []
+      averageMaterialTotal.value = null
+      return
+    }
+
+    void douyinMaterialStore.loadFromServer(true, undefined, feishuTableGroupId)
+  },
+  { immediate: true }
+)
+
+watch(
   selectedMaterialAccountIds,
   value => {
     syncMaterialMatchesFromSelectedIds(value)
@@ -638,7 +761,9 @@ watch(
     buildBidConfig.value = createDefaultBuildBidConfig()
     buildBidInput.value = null
     averageMaterialTotal.value = null
-    void douyinMaterialStore.loadFromServer(true)
+    if (selectedFeishuTableGroupId.value) {
+      void douyinMaterialStore.loadFromServer(true, undefined, selectedFeishuTableGroupId.value)
+    }
     void loadBuildBidConfig()
   },
   { immediate: true }
@@ -892,12 +1017,18 @@ function applyAverageMaterialRanges(silent = false) {
 }
 
 async function saveAllMaterialMatches() {
+  const feishuTableGroupId = selectedFeishuTableGroupId.value
+  if (!feishuTableGroupId) {
+    message.warning('请先选择表格组')
+    return
+  }
+
   const occupiedConflict = materialMatches.value.find(match =>
     occupiedMaterialAccountIds.value.has(String(match.douyinAccountRefId || '').trim())
   )
 
   if (occupiedConflict) {
-    message.warning('存在已被其他渠道占用的抖音号，请先取消选择后再保存')
+    message.warning('存在当前渠道内已占用的抖音号，请先取消选择后再保存')
     return
   }
 
@@ -923,7 +1054,7 @@ async function saveAllMaterialMatches() {
     for (const match of originalMatches) {
       const refId = String(match.douyinAccountRefId || '').trim()
       if (!targetMatchMap.has(refId)) {
-        await douyinMaterialStore.deleteMatch(match.id)
+        await douyinMaterialStore.deleteMatch(match.id, feishuTableGroupId)
       }
     }
 
@@ -933,19 +1064,25 @@ async function saveAllMaterialMatches() {
         await douyinMaterialStore.updateMatch(
           existingMatch.id,
           match.douyinAccountRefId,
-          match.materialRange
+          match.materialRange,
+          feishuTableGroupId
         )
         continue
       }
 
-      await douyinMaterialStore.addMatch(match.douyinAccountRefId, match.materialRange)
+      await douyinMaterialStore.addMatch(
+        match.douyinAccountRefId,
+        match.materialRange,
+        feishuTableGroupId
+      )
     }
 
-    await douyinMaterialStore.loadFromServer(true)
+    await douyinMaterialStore.loadFromServer(true, undefined, feishuTableGroupId)
+    await sessionStore.loadSession()
     message.success('抖音号素材配置已保存')
   } catch (error) {
     message.error(error instanceof Error ? error.message : '保存抖音号素材配置失败')
-    await douyinMaterialStore.loadFromServer(true)
+    await douyinMaterialStore.loadFromServer(true, undefined, feishuTableGroupId)
   } finally {
     savingAllMaterialMatches.value = false
   }
@@ -989,6 +1126,28 @@ async function resetAllSettings() {
   background: linear-gradient(135deg, #f8fafc 0%, #eef6ff 100%);
 }
 
+.material-panel__global-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 14px 16px;
+  background: #fff;
+}
+
+.material-panel__group-control {
+  display: grid;
+  grid-template-columns: auto minmax(220px, 320px);
+  align-items: center;
+  gap: 10px;
+}
+
+.material-panel__global-group-select {
+  min-width: 220px;
+}
+
 .material-panel__summary {
   display: flex;
   align-items: flex-start;
@@ -1007,6 +1166,13 @@ async function resetAllSettings() {
   font-size: 18px;
   font-weight: 700;
   color: #0f172a;
+}
+
+.material-panel__group {
+  margin: 4px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #2563eb;
 }
 
 .material-panel__stats {
@@ -1202,9 +1368,14 @@ async function resetAllSettings() {
   }
 
   .material-panel__summary,
+  .material-panel__global-switch,
   .material-panel__actions {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .material-panel__group-control {
+    grid-template-columns: 1fr;
   }
 
   .material-panel__stats {

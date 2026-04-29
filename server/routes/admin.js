@@ -455,7 +455,29 @@ function getMaterialRangeCount(materialRange = '') {
 
 function buildDouyinMaterialSummary(user = {}, channelId = '') {
   const runtimeUser = buildRuntimeUser(user, channelId)
-  const items = Array.isArray(runtimeUser.douyinMaterialMatches)
+  const groups = Array.isArray(runtimeUser.feishuTableGroups)
+    ? runtimeUser.feishuTableGroups
+        .filter(group => group?.enabled !== false)
+        .map((group, index) => {
+          const items = Array.isArray(group?.douyinMaterialMatches)
+            ? group.douyinMaterialMatches
+                .map(match => ({
+                  douyinAccount: String(match?.douyinAccount || '').trim(),
+                  materialRange: String(match?.materialRange || '').trim(),
+                  materialCount: getMaterialRangeCount(match?.materialRange),
+                }))
+                .filter(item => item.douyinAccount && item.materialRange)
+            : []
+
+          return {
+            id: String(group?.id || (index === 0 ? 'default' : `group-${index + 1}`)).trim(),
+            name: String(group?.name || (index === 0 ? '默认表格' : `表格组 ${index + 1}`)).trim(),
+            total: items.length,
+            items,
+          }
+        })
+    : []
+  const fallbackItems = Array.isArray(runtimeUser.douyinMaterialMatches)
     ? runtimeUser.douyinMaterialMatches
         .map(match => ({
           douyinAccount: String(match?.douyinAccount || '').trim(),
@@ -464,10 +486,28 @@ function buildDouyinMaterialSummary(user = {}, channelId = '') {
         }))
         .filter(item => item.douyinAccount && item.materialRange)
     : []
+  const normalizedGroups = groups.length
+    ? groups
+    : [
+        {
+          id: 'default',
+          name: '默认表格',
+          total: fallbackItems.length,
+          items: fallbackItems,
+        },
+      ]
+  const items = normalizedGroups.flatMap(group =>
+    group.items.map(item => ({
+      ...item,
+      feishuTableGroupId: group.id,
+      feishuTableGroupName: group.name,
+    }))
+  )
 
   return {
     total: items.length,
     items,
+    groups: normalizedGroups,
   }
 }
 

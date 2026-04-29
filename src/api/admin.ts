@@ -292,9 +292,21 @@ export interface SchedulerOverviewBuildWorkflowTask extends SchedulerOverviewTas
   douyinMaterialSummary: {
     total: number
     items: Array<{
+      feishuTableGroupId?: string
+      feishuTableGroupName?: string
       douyinAccount: string
       materialRange: string
       materialCount: number
+    }>
+    groups?: Array<{
+      id: string
+      name: string
+      total: number
+      items: Array<{
+        douyinAccount: string
+        materialRange: string
+        materialCount: number
+      }>
     }>
   }
   stats: {

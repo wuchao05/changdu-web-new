@@ -31,8 +31,29 @@ async function getCurrentUserContext(ctx) {
   }
 }
 
-function getResolvedMatches(user, channelId) {
-  return buildRuntimeUser(user, channelId).douyinMaterialMatches || []
+function getRequestedFeishuTableGroupId(ctx) {
+  return String(
+    ctx.get('x-feishu-table-group-id') ||
+      ctx.query?.feishuTableGroupId ||
+      ctx.request.body?.feishuTableGroupId ||
+      ''
+  ).trim()
+}
+
+function getResolvedMatches(user, channelId, feishuTableGroupId = '') {
+  const runtimeUser = buildRuntimeUser(user, channelId)
+  const normalizedGroupId = String(feishuTableGroupId || '').trim()
+
+  if (normalizedGroupId) {
+    const matchedGroup = Array.isArray(runtimeUser.feishuTableGroups)
+      ? runtimeUser.feishuTableGroups.find(
+          group => String(group?.id || '').trim() === normalizedGroupId
+        )
+      : null
+    return matchedGroup?.douyinMaterialMatches || []
+  }
+
+  return runtimeUser.douyinMaterialMatches || []
 }
 
 function getDefaultFeishuTableGroup(channelConfig) {
@@ -56,6 +77,28 @@ function getDefaultFeishuTableGroup(channelConfig) {
   return channelConfig.feishuTableGroups[0]
 }
 
+function getTargetFeishuTableGroup(channelConfig, feishuTableGroupId = '') {
+  const normalizedGroupId = String(feishuTableGroupId || '').trim()
+  const groups = getDefaultFeishuTableGroup(channelConfig) && channelConfig.feishuTableGroups
+
+  if (!normalizedGroupId) {
+    return channelConfig.feishuTableGroups[0]
+  }
+
+  const matchedGroup = groups.find(group => String(group?.id || '').trim() === normalizedGroupId)
+  if (!matchedGroup) {
+    const error = new Error('表格组不存在，请刷新后重试')
+    error.status = 404
+    throw error
+  }
+
+  if (!Array.isArray(matchedGroup.douyinMaterialMatches)) {
+    matchedGroup.douyinMaterialMatches = []
+  }
+
+  return matchedGroup
+}
+
 function syncDefaultFeishuTableGroupMatches(channelConfig) {
   const defaultGroup = getDefaultFeishuTableGroup(channelConfig)
   channelConfig.douyinMaterialMatches = defaultGroup.douyinMaterialMatches
@@ -67,25 +110,45 @@ function getDouyinAccount(user, douyinAccountRefId) {
     : null
 }
 
-function isDouyinAccountOccupiedByOtherEnabledChannels(user, currentChannelId, douyinAccountRefId) {
-  const normalizedChannelId = String(currentChannelId || '').trim()
+function isDouyinAccountOccupiedInCurrentChannel(
+  channelConfig,
+  currentFeishuTableGroupId,
+  douyinAccountRefId
+) {
+  const normalizedGroupId = String(currentFeishuTableGroupId || '').trim()
   const normalizedRefId = String(douyinAccountRefId || '').trim()
 
-  if (!normalizedChannelId || !normalizedRefId || !user?.channelConfigs) {
+  if (!normalizedRefId || !channelConfig) {
     return false
   }
 
-  return Object.entries(user.channelConfigs).some(([channelId, config]) => {
-    if (channelId === normalizedChannelId) {
-      return false
-    }
+  const groups = Array.isArray(channelConfig.feishuTableGroups)
+    ? channelConfig.feishuTableGroups
+    : []
 
-    return Array.isArray(config?.douyinMaterialMatches)
-      ? config.douyinMaterialMatches.some(
-          match => String(match?.douyinAccountRefId || '').trim() === normalizedRefId
-        )
-      : false
-  })
+  if (groups.length > 0) {
+    return groups.some(group => {
+      const groupId = String(group?.id || '').trim()
+      if (groupId === normalizedGroupId) {
+        return false
+      }
+      return Array.isArray(group?.douyinMaterialMatches)
+        ? group.douyinMaterialMatches.some(
+            match => String(match?.douyinAccountRefId || '').trim() === normalizedRefId
+          )
+        : false
+    })
+  }
+
+  if (!normalizedGroupId) {
+    return false
+  }
+
+  return Array.isArray(channelConfig.douyinMaterialMatches)
+    ? channelConfig.douyinMaterialMatches.some(
+        match => String(match?.douyinAccountRefId || '').trim() === normalizedRefId
+      )
+    : false
 }
 
 function assertDouyinMaterialCustomizable(ctx, channelConfig) {
@@ -103,10 +166,11 @@ function assertDouyinMaterialCustomizable(ctx, channelConfig) {
 router.get('/config', async ctx => {
   try {
     const { user, channelId } = await getCurrentUserContext(ctx)
+    const feishuTableGroupId = getRequestedFeishuTableGroupId(ctx)
     ctx.body = {
       code: 0,
       message: 'success',
-      data: getResolvedMatches(user, channelId),
+      data: getResolvedMatches(user, channelId, feishuTableGroupId),
     }
   } catch (error) {
     ctx.status = error.status || 500
@@ -133,6 +197,7 @@ router.post('/config', async ctx => {
     }
 
     const { user, channelConfig, channelId } = await getCurrentUserContext(ctx)
+    const feishuTableGroupId = getRequestedFeishuTableGroupId(ctx)
     assertDouyinMaterialCustomizable(ctx, channelConfig)
 
     const selectedDouyinAccount = getDouyinAccount(user, rawDouyinAccountRefId)
@@ -155,16 +220,22 @@ router.post('/config', async ctx => {
       return
     }
 
-    if (isDouyinAccountOccupiedByOtherEnabledChannels(user, channelId, rawDouyinAccountRefId)) {
+    if (
+      isDouyinAccountOccupiedInCurrentChannel(
+        channelConfig,
+        feishuTableGroupId,
+        rawDouyinAccountRefId
+      )
+    ) {
       ctx.status = 400
       ctx.body = {
         code: -1,
-        message: '该抖音号已在其他渠道配置素材序号',
+        message: '该抖音号已在当前渠道内其他表格组配置素材序号',
       }
       return
     }
 
-    const defaultGroup = getDefaultFeishuTableGroup(channelConfig)
+    const defaultGroup = getTargetFeishuTableGroup(channelConfig, feishuTableGroupId)
     if (
       defaultGroup.douyinMaterialMatches.some(
         item => item.douyinAccountRefId === rawDouyinAccountRefId
@@ -190,7 +261,7 @@ router.post('/config', async ctx => {
     syncDefaultFeishuTableGroupMatches(channelConfig)
     user.updatedAt = new Date().toISOString()
     const savedUser = await writeUser(user)
-    const createdMatch = getResolvedMatches(savedUser, channelId).find(
+    const createdMatch = getResolvedMatches(savedUser, channelId, feishuTableGroupId).find(
       item => item.id === newMatch.id
     )
 
@@ -213,8 +284,9 @@ router.put('/config/:id', async ctx => {
   try {
     const { id } = ctx.params
     const { user, channelConfig, channelId } = await getCurrentUserContext(ctx)
+    const feishuTableGroupId = getRequestedFeishuTableGroupId(ctx)
     assertDouyinMaterialCustomizable(ctx, channelConfig)
-    const defaultGroup = getDefaultFeishuTableGroup(channelConfig)
+    const defaultGroup = getTargetFeishuTableGroup(channelConfig, feishuTableGroupId)
     const matches = defaultGroup.douyinMaterialMatches
     const index = matches.findIndex(item => item.id === id)
 
@@ -264,11 +336,17 @@ router.put('/config/:id', async ctx => {
       return
     }
 
-    if (isDouyinAccountOccupiedByOtherEnabledChannels(user, channelId, nextDouyinAccountRefId)) {
+    if (
+      isDouyinAccountOccupiedInCurrentChannel(
+        channelConfig,
+        feishuTableGroupId,
+        nextDouyinAccountRefId
+      )
+    ) {
       ctx.status = 400
       ctx.body = {
         code: -1,
-        message: '该抖音号已在其他渠道配置素材序号',
+        message: '该抖音号已在当前渠道内其他表格组配置素材序号',
       }
       return
     }
@@ -296,7 +374,9 @@ router.put('/config/:id', async ctx => {
     syncDefaultFeishuTableGroupMatches(channelConfig)
     user.updatedAt = new Date().toISOString()
     const savedUser = await writeUser(user)
-    const resolvedMatch = getResolvedMatches(savedUser, channelId).find(item => item.id === id)
+    const resolvedMatch = getResolvedMatches(savedUser, channelId, feishuTableGroupId).find(
+      item => item.id === id
+    )
 
     ctx.body = {
       code: 0,
@@ -317,8 +397,9 @@ router.delete('/config/:id', async ctx => {
   try {
     const { id } = ctx.params
     const { user, channelConfig } = await getCurrentUserContext(ctx)
+    const feishuTableGroupId = getRequestedFeishuTableGroupId(ctx)
     assertDouyinMaterialCustomizable(ctx, channelConfig)
-    const defaultGroup = getDefaultFeishuTableGroup(channelConfig)
+    const defaultGroup = getTargetFeishuTableGroup(channelConfig, feishuTableGroupId)
     const matches = defaultGroup.douyinMaterialMatches
     const index = matches.findIndex(item => item.id === id)
 
