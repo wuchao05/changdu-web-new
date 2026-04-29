@@ -1,5 +1,8 @@
 <template>
-  <div class="drama-card" :class="{ 'is-new-drama': isNewDrama }">
+  <div
+    class="drama-card"
+    :class="{ 'is-new-drama': isNewDrama, 'has-ranking': showRanking && ranking }"
+  >
     <!-- 排名徽章 -->
     <div v-if="showRanking && ranking" class="ranking-badge">
       <div :class="getRankingClass(ranking)" class="ranking-number">{{ ranking }}</div>
@@ -952,7 +955,7 @@ async function handleDownload() {
 <style scoped>
 /* 短剧卡片样式 */
 .drama-card {
-  @apply bg-white rounded-xl border border-gray-200 p-5 hover:shadow-xl transition-all duration-300 hover:border-blue-300;
+  @apply relative bg-white rounded-xl border border-gray-200 p-5 hover:shadow-xl transition-all duration-300 hover:border-blue-300;
   background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
   box-shadow:
     0 2px 4px -1px rgba(0, 0, 0, 0.1),
@@ -1091,7 +1094,9 @@ async function handleDownload() {
 
 /* 排名徽章样式 */
 .ranking-badge {
-  @apply absolute -top-2 -left-2 z-10;
+  @apply absolute -top-2 -left-2 z-20 pointer-events-none;
+  opacity: 1;
+  visibility: visible;
 }
 
 .ranking-number {

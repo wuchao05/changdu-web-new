@@ -635,60 +635,62 @@
       <AdxRankingDrawer v-model:show="showAdxDrawer" @search-drama="handleAdxDramaSearch" />
     </div>
 
-    <!-- 剧集大图弹窗（需要在搜索态也可用，放到最外层） -->
-    <Transition
-      enter-active-class="transition duration-300 ease-out"
-      enter-from-class="transform scale-95 opacity-0"
-      enter-to-class="transform scale-100 opacity-100"
-      leave-active-class="transition duration-200 ease-in"
-      leave-from-class="transform scale-100 opacity-100"
-      leave-to-class="transform scale-95 opacity-0"
-    >
-      <div v-if="showImageModal" class="image-modal-overlay" @click="closeImageModal">
-        <div class="image-modal" @click.stop>
-          <div class="image-modal-header">
-            <h3 class="image-modal-title">
-              {{ currentDramaImage?.series_name || '剧集大图' }}
-            </h3>
-            <button @click="closeImageModal" class="image-modal-close">
-              <Icon icon="mdi:close" class="close-icon" />
-            </button>
-          </div>
-          <div class="image-modal-content">
-            <div class="image-container">
-              <!-- 骨架屏加载效果 -->
-              <div v-if="imageLoading" class="image-skeleton">
-                <div class="skeleton-image-large"></div>
-                <div class="skeleton-loading-text">正在加载大图...</div>
-              </div>
+    <Teleport to="body">
+      <!-- 剧集大图弹窗（需要按视口全局居中，不能受短剧列表滚动容器影响） -->
+      <Transition
+        enter-active-class="transition duration-300 ease-out"
+        enter-from-class="transform scale-95 opacity-0"
+        enter-to-class="transform scale-100 opacity-100"
+        leave-active-class="transition duration-200 ease-in"
+        leave-from-class="transform scale-100 opacity-100"
+        leave-to-class="transform scale-95 opacity-0"
+      >
+        <div v-if="showImageModal" class="image-modal-overlay" @click="closeImageModal">
+          <div class="image-modal" @click.stop>
+            <div class="image-modal-header">
+              <h3 class="image-modal-title">
+                {{ currentDramaImage?.series_name || '剧集大图' }}
+              </h3>
+              <button @click="closeImageModal" class="image-modal-close">
+                <Icon icon="mdi:close" class="close-icon" />
+              </button>
+            </div>
+            <div class="image-modal-content">
+              <div class="image-container">
+                <!-- 骨架屏加载效果 -->
+                <div v-if="imageLoading" class="image-skeleton">
+                  <div class="skeleton-image-large"></div>
+                  <div class="skeleton-loading-text">正在加载大图...</div>
+                </div>
 
-              <!-- 错误状态 -->
-              <div v-else-if="imageError" class="image-error">
-                <Icon icon="mdi:alert-circle" class="error-icon" />
-                <span>{{ imageError }}</span>
-              </div>
+                <!-- 错误状态 -->
+                <div v-else-if="imageError" class="image-error">
+                  <Icon icon="mdi:alert-circle" class="error-icon" />
+                  <span>{{ imageError }}</span>
+                </div>
 
-              <!-- 图片显示 -->
-              <div v-else-if="currentDramaImage?.original_thumb_url" class="image-display">
-                <img
-                  :src="currentDramaImage.original_thumb_url"
-                  :alt="currentDramaImage.series_name"
-                  class="image-large image-fade-in"
-                  @click="closeImageModal"
-                  @error="handleImageError"
-                />
-              </div>
+                <!-- 图片显示 -->
+                <div v-else-if="currentDramaImage?.original_thumb_url" class="image-display">
+                  <img
+                    :src="currentDramaImage.original_thumb_url"
+                    :alt="currentDramaImage.series_name"
+                    class="image-large image-fade-in"
+                    @click="closeImageModal"
+                    @error="handleImageError"
+                  />
+                </div>
 
-              <!-- 空状态 -->
-              <div v-else class="image-empty">
-                <Icon icon="mdi:image-off" class="empty-icon" />
-                <span>暂无大图信息</span>
+                <!-- 空状态 -->
+                <div v-else class="image-empty">
+                  <Icon icon="mdi:image-off" class="empty-icon" />
+                  <span>暂无大图信息</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    </Transition>
+      </Transition>
+    </Teleport>
 
     <!-- 日期选择器弹窗 -->
     <DatePicker
@@ -914,6 +916,7 @@ function resetChannelScopedData() {
   rankingList.value = []
   rankingTotal.value = 0
   rankingPageIndex.value = 0
+  rankingListCache.clear()
   downloadList.value = []
 }
 
@@ -1222,6 +1225,12 @@ const rankingList = ref<RankingDramaItem[]>([])
 const rankingLoading = ref(false)
 const rankingError = ref('')
 const rankingDownloadList = ref<DownloadTask[]>([])
+interface RankingListCacheEntry {
+  list: RankingDramaItem[]
+  total: number
+  downloadList: DownloadTask[]
+}
+const rankingListCache = new Map<string, RankingListCacheEntry>()
 
 // 榜单剧分页相关状态
 const rankingPageIndex = ref(0)
@@ -2753,7 +2762,7 @@ async function handleRefresh() {
       fetchDramaList()
     } else if (activeTab.value === 'ranking') {
       // 排行榜标签页：刷新排行榜数据
-      fetchRankingList()
+      fetchRankingList({ force: true })
     }
   }
 }
@@ -2919,8 +2928,37 @@ async function goToSearchPage(page: number) {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
+function getRankingListCacheKey() {
+  return [
+    currentDramaListTableId.value,
+    selectedIncomeLevel.value,
+    rankingPageIndex.value,
+    rankingPageSize.value,
+  ].join('|')
+}
+
+function applyRankingListCacheEntry(entry: RankingListCacheEntry) {
+  rankingList.value = entry.list
+  rankingTotal.value = entry.total
+  rankingDownloadList.value = entry.downloadList
+  rankingError.value = ''
+}
+
 // 获取排行榜数据
-async function fetchRankingList() {
+async function fetchRankingList(options: { force?: boolean } = {}) {
+  const cacheKey = getRankingListCacheKey()
+  if (options.force) {
+    rankingListCache.delete(cacheKey)
+  }
+
+  if (!options.force) {
+    const cachedEntry = rankingListCache.get(cacheKey)
+    if (cachedEntry) {
+      applyRankingListCacheEntry(cachedEntry)
+      return
+    }
+  }
+
   const requestGen = beginListRequest()
   rankingLoading.value = true
   rankingError.value = ''
@@ -3023,8 +3061,16 @@ async function fetchRankingList() {
             processedRankingData
           )
           rankingDownloadList.value = filteredRankingDownloadList
+        } else {
+          rankingDownloadList.value = []
         }
       }
+
+      rankingListCache.set(cacheKey, {
+        list: rankingList.value,
+        total: rankingTotal.value,
+        downloadList: rankingDownloadList.value,
+      })
 
       console.log(
         '排行榜数据已包含飞书状态和下载状态:',
@@ -3092,6 +3138,13 @@ async function fetchRankingList() {
       }
     } else {
       rankingList.value = []
+      rankingTotal.value = 0
+      rankingDownloadList.value = []
+      rankingListCache.set(cacheKey, {
+        list: [],
+        total: 0,
+        downloadList: [],
+      })
     }
   } catch (error) {
     if (isListRequestStale(requestGen)) return
