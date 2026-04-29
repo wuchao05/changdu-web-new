@@ -90,7 +90,19 @@ function normalizeState(state = {}) {
     lastResolvedConfig: {
       tableId: String(state.lastResolvedConfig?.tableId || '').trim(),
       awemeWhiteList: Array.isArray(state.lastResolvedConfig?.awemeWhiteList)
-        ? state.lastResolvedConfig.awemeWhiteList.map(item => String(item || '').trim()).filter(Boolean)
+        ? state.lastResolvedConfig.awemeWhiteList
+            .map(item => String(item || '').trim())
+            .filter(Boolean)
+        : [],
+      tableGroups: Array.isArray(state.lastResolvedConfig?.tableGroups)
+        ? state.lastResolvedConfig.tableGroups.map(group => ({
+            id: String(group?.id || '').trim(),
+            name: String(group?.name || '').trim(),
+            tableId: String(group?.tableId || '').trim(),
+            awemeWhiteList: Array.isArray(group?.awemeWhiteList)
+              ? group.awemeWhiteList.map(item => String(item || '').trim()).filter(Boolean)
+              : [],
+          }))
         : [],
     },
     stats: {
@@ -110,6 +122,59 @@ function getMaterialPreviewLogPrefix(source = {}) {
     channelName: source.channelName,
     channelId: source.channelId,
   })
+}
+
+function buildAwemeWhiteList(matches = []) {
+  return Array.from(
+    new Set(
+      (Array.isArray(matches) ? matches : [])
+        .map(item => String(item?.douyinAccount || '').trim())
+        .filter(Boolean)
+    )
+  )
+}
+
+export function buildMaterialPreviewExecutionGroups(runtimeUser = {}) {
+  const tableGroups = Array.isArray(runtimeUser.feishuTableGroups)
+    ? runtimeUser.feishuTableGroups
+    : []
+  const enabledGroups = tableGroups.filter(group => group?.enabled !== false)
+
+  if (tableGroups.length > 1) {
+    return enabledGroups
+      .map((group, index) => {
+        const awemeWhiteList = buildAwemeWhiteList(group?.douyinMaterialMatches)
+        if (!awemeWhiteList.length) {
+          return null
+        }
+
+        return {
+          id: String(group?.id || (index === 0 ? 'default' : `group-${index + 1}`)).trim(),
+          name: String(group?.name || (index === 0 ? '默认表格' : `表格组 ${index + 1}`)).trim(),
+          tableId:
+            String(group?.feishu?.dramaStatusTableId || '').trim() ||
+            FEISHU_CONFIG.table_ids.drama_status,
+          awemeWhiteList,
+        }
+      })
+      .filter(Boolean)
+  }
+
+  const awemeWhiteList = buildAwemeWhiteList(runtimeUser.douyinMaterialMatches)
+  if (!awemeWhiteList.length) {
+    return []
+  }
+
+  return [
+    {
+      id: 'default',
+      name: '默认表格',
+      tableId:
+        String(runtimeUser.feishu?.dramaStatusTableId || '').trim() ||
+        FEISHU_CONFIG.table_ids.drama_status,
+      awemeWhiteList,
+    },
+  ]
 }
 
 class MaterialPreviewManager {
@@ -151,9 +216,13 @@ class MaterialPreviewManager {
       channelName: runtimeContext.channel?.name || existing?.channelName || '',
       enabled: true,
       running: false,
-      intervalMinutes: Number(options.intervalMinutes || existing?.intervalMinutes || DEFAULT_INTERVAL_MINUTES),
+      intervalMinutes: Number(
+        options.intervalMinutes || existing?.intervalMinutes || DEFAULT_INTERVAL_MINUTES
+      ),
       buildTimeWindowStart: Number(
-        options.buildTimeWindowStart || existing?.buildTimeWindowStart || DEFAULT_BUILD_TIME_WINDOW_START
+        options.buildTimeWindowStart ||
+          existing?.buildTimeWindowStart ||
+          DEFAULT_BUILD_TIME_WINDOW_START
       ),
       buildTimeWindowEnd: Number(
         options.buildTimeWindowEnd || existing?.buildTimeWindowEnd || DEFAULT_BUILD_TIME_WINDOW_END
@@ -230,7 +299,9 @@ class MaterialPreviewManager {
       state.intervalMinutes = Number(updates.intervalMinutes || state.intervalMinutes)
     }
     if (updates.buildTimeWindowStart !== undefined) {
-      state.buildTimeWindowStart = Number(updates.buildTimeWindowStart || state.buildTimeWindowStart)
+      state.buildTimeWindowStart = Number(
+        updates.buildTimeWindowStart || state.buildTimeWindowStart
+      )
     }
     if (updates.buildTimeWindowEnd !== undefined) {
       state.buildTimeWindowEnd = Number(updates.buildTimeWindowEnd || state.buildTimeWindowEnd)
@@ -258,7 +329,9 @@ class MaterialPreviewManager {
   getStatus(instanceKey) {
     const normalizedKey = normalizeRuntimeInstanceKey(instanceKey)
     const state = this.states.get(normalizedKey)
-    return state ? this.serializeState(state) : this.serializeState(normalizeState({ instanceKey: normalizedKey }))
+    return state
+      ? this.serializeState(state)
+      : this.serializeState(normalizeState({ instanceKey: normalizedKey }))
   }
 
   listStatus(filters = {}) {
@@ -298,6 +371,7 @@ class MaterialPreviewManager {
       lastError: state.lastError,
       tableId: state.lastResolvedConfig.tableId,
       awemeWhiteList: state.lastResolvedConfig.awemeWhiteList,
+      tableGroups: state.lastResolvedConfig.tableGroups,
       stats: state.stats,
       lastRunTimeText: formatBeijingTime(state.lastRunTime),
       nextRunTimeText: formatBeijingTime(state.nextRunTime),
@@ -314,35 +388,36 @@ class MaterialPreviewManager {
     const channelRuntime = await resolveChannelRuntimeById(runtimeContext.channel.id)
     const cookie = String(channelRuntime.juliang.cookie || '').trim()
     if (!cookie) {
-      throw new Error(`渠道 ${runtimeContext.channel.name || runtimeContext.channel.id} 未配置巨量 Cookie`)
-    }
-
-    const awemeWhiteList = Array.from(
-      new Set(
-        (runtimeContext.runtimeUser.douyinMaterialMatches || [])
-          .map(item => String(item?.douyinAccount || '').trim())
-          .filter(Boolean)
+      throw new Error(
+        `渠道 ${runtimeContext.channel.name || runtimeContext.channel.id} 未配置巨量 Cookie`
       )
-    )
-    if (!awemeWhiteList.length) {
-      throw new Error(`渠道 ${runtimeContext.channel.name || runtimeContext.channel.id} 未配置抖音号匹配素材`)
     }
 
-    const tableId =
-      String(runtimeContext.runtimeUser.feishu?.dramaStatusTableId || '').trim() ||
-      FEISHU_CONFIG.table_ids.drama_status
+    const groups = buildMaterialPreviewExecutionGroups(runtimeContext.runtimeUser)
+    if (!groups.length) {
+      throw new Error(
+        `渠道 ${runtimeContext.channel.name || runtimeContext.channel.id} 未配置抖音号匹配素材`
+      )
+    }
 
-    state.runtimeUserName = String(runtimeContext.runtimeUser.nickname || state.runtimeUserName || '').trim()
+    const awemeWhiteList = Array.from(new Set(groups.flatMap(group => group.awemeWhiteList)))
+    const tableId = groups.length === 1 ? groups[0].tableId : ''
+
+    state.runtimeUserName = String(
+      runtimeContext.runtimeUser.nickname || state.runtimeUserName || ''
+    ).trim()
     state.channelName = String(runtimeContext.channel.name || state.channelName || '').trim()
     state.lastResolvedConfig = {
       tableId,
       awemeWhiteList,
+      tableGroups: groups,
     }
 
     return {
       tableId,
       cookie,
       awemeWhiteList,
+      groups,
     }
   }
 
@@ -362,12 +437,15 @@ class MaterialPreviewManager {
           ? Math.max(savedNextRunMs, nowMs)
           : nowMs + intervalMs
 
-    const timerId = setTimeout(() => {
-      this.timers.delete(instanceKey)
-      this.executePreview(instanceKey).catch(error => {
-        console.error(`${getMaterialPreviewLogPrefix(state)} 定时执行失败:`, instanceKey, error)
-      })
-    }, Math.max(0, nextRunMs - nowMs))
+    const timerId = setTimeout(
+      () => {
+        this.timers.delete(instanceKey)
+        this.executePreview(instanceKey).catch(error => {
+          console.error(`${getMaterialPreviewLogPrefix(state)} 定时执行失败:`, instanceKey, error)
+        })
+      },
+      Math.max(0, nextRunMs - nowMs)
+    )
 
     this.timers.set(instanceKey, timerId)
     state.nextRunTime = new Date(nextRunMs).toISOString()
@@ -416,12 +494,19 @@ class MaterialPreviewManager {
             buildTimeWindowEnd: state.buildTimeWindowEnd,
             tableId: executionConfig.tableId,
             awemeWhiteList: executionConfig.awemeWhiteList,
+            tableGroups: executionConfig.groups.map(group => ({
+              id: group.id,
+              name: group.name,
+              tableId: group.tableId,
+              awemeWhiteList: group.awemeWhiteList,
+            })),
           },
           null,
           2
         )
       )
-      const result = await this.previewService.batchProcessFromFeishu({
+      const result = await this.previewService.batchProcessFromFeishuGroups({
+        groups: executionConfig.groups,
         feishu: {
           appId: FEISHU_CONFIG.app_id,
           appSecret: FEISHU_CONFIG.app_secret,
@@ -490,7 +575,10 @@ class MaterialPreviewManager {
       const parsed = JSON.parse(raw)
       const items = parsed && typeof parsed === 'object' ? parsed : {}
       for (const [instanceKey, state] of Object.entries(items)) {
-        this.states.set(normalizeRuntimeInstanceKey(instanceKey), normalizeState({ ...state, instanceKey }))
+        this.states.set(
+          normalizeRuntimeInstanceKey(instanceKey),
+          normalizeState({ ...state, instanceKey })
+        )
       }
     } catch {
       // 忽略首次启动场景
@@ -532,7 +620,10 @@ class MaterialPreviewManager {
       if (state.enabled) {
         const savedNextRunMs = Date.parse(String(state.nextRunTime || ''))
         if (Number.isFinite(savedNextRunMs) && savedNextRunMs <= Date.now()) {
-          console.log(`${getMaterialPreviewLogPrefix(state)} 检测到已过点任务，立即补跑:`, instanceKey)
+          console.log(
+            `${getMaterialPreviewLogPrefix(state)} 检测到已过点任务，立即补跑:`,
+            instanceKey
+          )
         } else {
           console.log(
             `${getMaterialPreviewLogPrefix(state)} 恢复定时任务，下次运行:`,

@@ -8,7 +8,10 @@ import {
 } from '../utils/studioData.js'
 import { resolveChannelRuntimeById } from '../utils/channelRuntime.js'
 import { buildRuntimeInstanceKey } from '../utils/runtimeInstance.js'
-import { materialPreviewManager } from '../services/materialPreviewManager.js'
+import {
+  buildMaterialPreviewExecutionGroups,
+  materialPreviewManager,
+} from '../services/materialPreviewManager.js'
 import { MaterialPreviewService } from '../services/materialPreviewService.js'
 import { FEISHU_CONFIG } from '../config/feishu.js'
 
@@ -119,11 +122,7 @@ function assertMaterialPreviewCustomizable(targetContext) {
 
 function buildAwemeWhiteList(runtimeUser) {
   return Array.from(
-    new Set(
-      (runtimeUser?.douyinMaterialMatches || [])
-        .map(item => String(item?.douyinAccount || '').trim())
-        .filter(Boolean)
-    )
+    new Set(buildMaterialPreviewExecutionGroups(runtimeUser).flatMap(group => group.awemeWhiteList))
   )
 }
 
@@ -154,7 +153,14 @@ function buildPreviewTaskConfig(targetContext, body = {}) {
 router.post('/start', async ctx => {
   try {
     const targetContext = await resolveTargetContext(ctx)
-    console.log('[素材预览API] 启动，instanceKey:', targetContext.instanceKey, '用户:', targetContext.user?.id, '渠道:', targetContext.channel?.id)
+    console.log(
+      '[素材预览API] 启动，instanceKey:',
+      targetContext.instanceKey,
+      '用户:',
+      targetContext.user?.id,
+      '渠道:',
+      targetContext.channel?.id
+    )
     assertMaterialPreviewCustomizable(targetContext)
     const config = normalizePreviewConfig(targetContext.channelConfig, ctx.request.body || {})
     await persistMaterialPreviewConfig(targetContext.user, targetContext.channel.id, {
@@ -187,7 +193,14 @@ router.post('/start', async ctx => {
 router.post('/stop', async ctx => {
   try {
     const targetContext = await resolveTargetContext(ctx)
-    console.log('[素材预览API] 停止，instanceKey:', targetContext.instanceKey, '用户:', targetContext.user?.id, '渠道:', targetContext.channel?.id)
+    console.log(
+      '[素材预览API] 停止，instanceKey:',
+      targetContext.instanceKey,
+      '用户:',
+      targetContext.user?.id,
+      '渠道:',
+      targetContext.channel?.id
+    )
     assertMaterialPreviewCustomizable(targetContext)
     await persistMaterialPreviewConfig(targetContext.user, targetContext.channel.id, {
       enabled: false,
@@ -312,19 +325,23 @@ router.post('/execute-once', async ctx => {
       ctx.throw(400, '当前渠道未配置巨量 Cookie')
     }
 
-    const awemeWhiteList = buildAwemeWhiteList(targetContext.runtimeUser)
-    if (!awemeWhiteList.length) {
+    const groups = buildMaterialPreviewExecutionGroups(targetContext.runtimeUser)
+    if (!groups.length) {
       ctx.throw(400, '当前渠道未配置抖音号匹配素材')
     }
+    const awemeWhiteList = Array.from(new Set(groups.flatMap(group => group.awemeWhiteList)))
 
-    const result = await previewService.batchProcessFromFeishu({
+    const result = await previewService.batchProcessFromFeishuGroups({
+      groups,
       feishu: {
         appId: FEISHU_CONFIG.app_id,
         appSecret: FEISHU_CONFIG.app_secret,
         appToken: FEISHU_CONFIG.app_token,
         tableId:
-          String(targetContext.runtimeUser.feishu?.dramaStatusTableId || '').trim() ||
-          FEISHU_CONFIG.table_ids.drama_status,
+          groups.length === 1
+            ? groups[0].tableId
+            : String(targetContext.runtimeUser.feishu?.dramaStatusTableId || '').trim() ||
+              FEISHU_CONFIG.table_ids.drama_status,
       },
       buildTimeFilterWindowStartMinutes: config.buildTimeWindowStart,
       buildTimeFilterWindowEndMinutes: config.buildTimeWindowEnd,

@@ -907,4 +907,96 @@ export class MaterialPreviewService {
       logPrefix: config.logPrefix,
     })
   }
+
+  async batchProcessFromFeishuGroups(config) {
+    const groups = Array.isArray(config.groups) ? config.groups : []
+
+    if (groups.length <= 1) {
+      const group = groups[0] || {}
+      return this.batchProcessFromFeishu({
+        ...config,
+        feishu: {
+          ...config.feishu,
+          tableId: group.tableId || config.feishu?.tableId,
+        },
+        aweme_white_list: group.awemeWhiteList || config.aweme_white_list || [],
+        logPrefix: group.logPrefix || config.logPrefix,
+      })
+    }
+
+    const results = []
+    const groupResults = []
+    let total = 0
+    let success = 0
+    let failed = 0
+
+    for (const group of groups) {
+      try {
+        const groupResult = await this.batchProcessFromFeishu({
+          ...config,
+          feishu: {
+            ...config.feishu,
+            tableId: group.tableId || config.feishu?.tableId,
+          },
+          aweme_white_list: group.awemeWhiteList || [],
+          logPrefix:
+            group.logPrefix || `${resolveLogPrefix(config.logPrefix)}[${group.name || group.id}]`,
+        })
+
+        total += Number(groupResult.total || 0)
+        success += Number(groupResult.success || 0)
+        failed += Number(groupResult.failed || 0)
+        results.push(
+          ...(groupResult.results || []).map(item => ({
+            ...item,
+            feishuTableGroupId: group.id,
+            feishuTableGroupName: group.name,
+            feishuTableId: group.tableId,
+          }))
+        )
+        groupResults.push({
+          id: group.id,
+          name: group.name,
+          tableId: group.tableId,
+          total: Number(groupResult.total || 0),
+          success: Number(groupResult.success || 0),
+          failed: Number(groupResult.failed || 0),
+        })
+      } catch (error) {
+        failed += 1
+        const errorMessage = error?.message || String(error)
+        results.push({
+          feishuTableGroupId: group.id,
+          feishuTableGroupName: group.name,
+          feishuTableId: group.tableId,
+          status: 'failed',
+          needPreviewCount: 0,
+          needDeleteCount: 0,
+          canDeletePromotionsCount: 0,
+          error: errorMessage,
+        })
+        groupResults.push({
+          id: group.id,
+          name: group.name,
+          tableId: group.tableId,
+          total: 0,
+          success: 0,
+          failed: 1,
+          error: errorMessage,
+        })
+        console.error(
+          `${resolveLogPrefix(config.logPrefix)} 表格组处理失败 group=${group.name || group.id}:`,
+          errorMessage
+        )
+      }
+    }
+
+    return {
+      total,
+      success,
+      failed,
+      results,
+      groups: groupResults,
+    }
+  }
 }
