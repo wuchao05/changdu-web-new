@@ -268,7 +268,13 @@
                           <span class="task-monitor__fact-value">{{ formatTaskExtra(task) }}</span>
                         </div>
                       </template>
-                      <div class="douyin-material-tooltip">
+                      <div
+                        class="douyin-material-tooltip"
+                        :class="{
+                          'douyin-material-tooltip--multi':
+                            getDouyinMaterialSummaryGroups(task).length > 1,
+                        }"
+                      >
                         <template v-if="getDouyinMaterialSummaryGroups(task).length">
                           <div
                             v-for="groupItem in getDouyinMaterialSummaryGroups(task)"
@@ -1774,6 +1780,16 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.douyin-material-tooltip--multi {
+  min-width: 460px;
+  max-width: 560px;
+  max-height: min(70vh, 560px);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  overflow-y: auto;
 }
 
 .douyin-material-tooltip__group {
