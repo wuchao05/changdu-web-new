@@ -20,8 +20,12 @@
           <p class="adx-panel-subtitle">点击“搜索”即可在爆剧爆剪中联动查询</p>
         </div>
         <div class="adx-panel-actions">
-          <n-button v-if="isAdmin && !unauthorized" size="small" @click="showCookieModal = true">
-            配置 Cookie
+          <n-button
+            v-if="isAdmin && !unauthorized"
+            size="small"
+            @click="showCredentialModal = true"
+          >
+            配置凭证
           </n-button>
           <button class="adx-panel-close" title="收起热力榜" @click="closePanel">
             <Icon icon="mdi:chevron-right" />
@@ -48,15 +52,15 @@
               />
             </svg>
           </div>
-          <p class="unauthorized-title">ADX 账号已下线</p>
-          <p class="unauthorized-desc">请联系管理员更新 Cookie</p>
+          <p class="unauthorized-title">DataEye 凭证已失效</p>
+          <p class="unauthorized-desc">请联系管理员更新访问凭证</p>
           <n-button
             v-if="isAdmin"
             type="warning"
             style="margin-top: 20px"
-            @click="showCookieModal = true"
+            @click="showCredentialModal = true"
           >
-            去配置 Cookie
+            去配置凭证
           </n-button>
         </div>
 
@@ -163,15 +167,24 @@
     </aside>
   </Transition>
 
-  <n-modal v-model:show="showCookieModal" preset="dialog" title="配置 ADX Cookie">
-    <n-input
-      v-model:value="cookieInput"
-      type="textarea"
-      :rows="4"
-      placeholder="请输入 ADX Cookie"
-    />
+  <n-modal v-model:show="showCredentialModal" preset="dialog" title="配置 DataEye 凭证">
+    <div class="credential-form">
+      <label class="credential-field">
+        <span class="credential-label">authentication</span>
+        <n-input
+          v-model:value="authenticationInput"
+          type="textarea"
+          :rows="3"
+          placeholder="请输入 authentication"
+        />
+      </label>
+      <label class="credential-field">
+        <span class="credential-label">loginUserId</span>
+        <n-input v-model:value="loginUserIdInput" placeholder="请输入 loginUserId" />
+      </label>
+    </div>
     <template #action>
-      <n-button type="primary" :loading="savingCookie" @click="saveCookie">保存</n-button>
+      <n-button type="primary" :loading="savingCredentials" @click="saveCredentials">保存</n-button>
     </template>
   </n-modal>
 </template>
@@ -266,10 +279,11 @@ const unauthorized = ref(false)
 const panelRef = ref<HTMLElement | null>(null)
 const panelMaxHeight = ref(520)
 
-// Cookie 配置
-const showCookieModal = ref(false)
-const cookieInput = ref('')
-const savingCookie = ref(false)
+// DataEye 凭证配置
+const showCredentialModal = ref(false)
+const authenticationInput = ref('')
+const loginUserIdInput = ref('')
+const savingCredentials = ref(false)
 
 function updatePanelMaxHeight() {
   if (typeof window === 'undefined') return
@@ -435,22 +449,23 @@ function closePanel() {
   visible.value = false
 }
 
-// 加载已有 cookie
-async function loadCookie() {
+// 加载已有 DataEye 凭证
+async function loadCredentials() {
   try {
     const res = await fetch('/api/adx/config', {
       headers: buildSessionHeaders(),
     })
     const data = await res.json()
     if (data?.code === 0) {
-      cookieInput.value = data.data?.cookie || ''
+      authenticationInput.value = data.data?.authentication || ''
+      loginUserIdInput.value = data.data?.loginUserId || ''
     }
   } catch {}
 }
 
-// 保存 cookie
-async function saveCookie() {
-  savingCookie.value = true
+// 保存 DataEye 凭证
+async function saveCredentials() {
+  savingCredentials.value = true
   try {
     const response = await fetch('/api/adx/config', {
       method: 'PUT',
@@ -458,7 +473,8 @@ async function saveCookie() {
         'Content-Type': 'application/json',
       }),
       body: JSON.stringify({
-        cookie: cookieInput.value,
+        authentication: authenticationInput.value,
+        loginUserId: loginUserIdInput.value,
       }),
     })
 
@@ -467,14 +483,14 @@ async function saveCookie() {
       throw new Error(result?.message || '保存失败')
     }
 
-    message.success('ADX Cookie 已保存为全局配置')
-    showCookieModal.value = false
+    message.success('DataEye 凭证已保存为全局配置')
+    showCredentialModal.value = false
     fetchRanking()
   } catch (error) {
-    console.error('保存 ADX Cookie 失败:', error)
+    console.error('保存 DataEye 凭证失败:', error)
     message.error(error instanceof Error ? error.message : '保存失败')
   } finally {
-    savingCookie.value = false
+    savingCredentials.value = false
   }
 }
 
@@ -545,7 +561,7 @@ function getRankClass(rank: number) {
 watch(visible, v => {
   if (v) {
     initPeriodOptions()
-    loadCookie()
+    loadCredentials()
     fetchRanking()
     nextTick(updatePanelMaxHeight)
   }
@@ -556,7 +572,7 @@ onMounted(() => {
   window.addEventListener('scroll', updatePanelMaxHeight, true)
   initPeriodOptions()
   if (props.show) {
-    loadCookie()
+    loadCredentials()
     fetchRanking()
     nextTick(updatePanelMaxHeight)
   }
@@ -569,6 +585,24 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.credential-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.credential-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.credential-label {
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .adx-ranking-panel {
   --adx-panel-sticky-top: 92px;
   position: sticky;

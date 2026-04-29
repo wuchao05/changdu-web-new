@@ -39,7 +39,6 @@ function parseDataeyeConfigText(text = '') {
 
   return {
     authentication: getTextConfigValue(trimmed, 'authentication'),
-    S: getTextConfigValue(trimmed, 'S'),
     loginUserId: getTextConfigValue(trimmed, 'loginUserId'),
   }
 }
@@ -54,7 +53,6 @@ function resolveDataeyeCredentials(adxConfig = {}) {
         textConfig.authentication ||
         ''
     ).trim(),
-    signature: String(process.env.DATAEYE_S || textConfig.S || textConfig.s || '').trim(),
     loginUserId: String(process.env.DATAEYE_LOGIN_USER_ID || textConfig.loginUserId || '').trim(),
     userAgent: String(
       process.env.DATAEYE_USER_AGENT || textConfig.userAgent || DATAEYE_DEFAULT_USER_AGENT
@@ -106,7 +104,6 @@ async function fetchDataeyeRankingPage({ credentials, type, periodValue, pageId,
       Accept: 'application/json, text/plain, */*',
       'Content-Type': 'application/json',
       authentication: credentials.authentication,
-      S: credentials.signature,
       loginUserId: credentials.loginUserId,
       Referer: credentials.referer,
       'User-Agent': credentials.userAgent,
@@ -180,12 +177,18 @@ async function fetchFilteredDataeyeRanking({ credentials, type, periodValue, pag
 
 router.get('/config', async ctx => {
   const config = await readAdxConfig()
+  const storedCredentials = parseDataeyeConfigText(config.cookie)
+  const resolvedCredentials = resolveDataeyeCredentials(config)
+  const isAdmin = ctx.state.sessionUser?.userType === 'admin'
+
   ctx.body = {
     code: 0,
     message: 'success',
     data: {
-      cookie: ctx.state.sessionUser?.userType === 'admin' ? config.cookie : '',
-      configured: Boolean(config.cookie),
+      cookie: isAdmin ? config.cookie : '',
+      authentication: isAdmin ? storedCredentials.authentication || '' : '',
+      loginUserId: isAdmin ? storedCredentials.loginUserId || '' : '',
+      configured: Boolean(resolvedCredentials.authentication && resolvedCredentials.loginUserId),
       updatedAt: config.updatedAt,
     },
   }
@@ -196,19 +199,33 @@ router.put('/config', async ctx => {
     ctx.status = 403
     ctx.body = {
       code: 403,
-      message: '无权配置 ADX Cookie',
+      message: '无权配置 DataEye 凭证',
     }
     return
   }
 
-  const cookie = String(ctx.request.body?.cookie || '').trim()
+  const requestBody = ctx.request.body || {}
+  const authentication = String(requestBody.authentication || '').trim()
+  const loginUserId = String(requestBody.loginUserId || '').trim()
+  const hasDataeyeCredentials = authentication || loginUserId
+  const cookie = hasDataeyeCredentials
+    ? JSON.stringify(
+        {
+          authentication,
+          loginUserId,
+        },
+        null,
+        2
+      )
+    : String(requestBody.cookie || '').trim()
   const config = await writeAdxConfig({ cookie })
+  const credentials = resolveDataeyeCredentials(config)
 
   ctx.body = {
     code: 0,
-    message: 'ADX Cookie 保存成功',
+    message: 'DataEye 凭证保存成功',
     data: {
-      configured: Boolean(config.cookie),
+      configured: Boolean(credentials.authentication && credentials.loginUserId),
       updatedAt: config.updatedAt,
     },
   }
@@ -223,11 +240,11 @@ router.post('/ranking', async ctx => {
     const adxConfig = await readAdxConfig()
     const credentials = resolveDataeyeCredentials(adxConfig)
 
-    if (!credentials.authentication || !credentials.signature || !credentials.loginUserId) {
+    if (!credentials.authentication || !credentials.loginUserId) {
       ctx.status = 400
       ctx.body = {
         code: -1,
-        message: '未配置 DataEye 访问凭证，请配置 authentication、S 和 loginUserId',
+        message: '未配置 DataEye 访问凭证，请配置 authentication 和 loginUserId',
       }
       return
     }
