@@ -80,6 +80,18 @@
         <span class="feishu-panel__summary-total">
           共 <strong>{{ visibleRecords.length }}</strong> 条记录
         </span>
+        <span v-if="tableGroupRecordSummaries.length" class="feishu-panel__summary-groups">
+          <span
+            v-for="item in tableGroupRecordSummaries"
+            :key="item.id"
+            class="feishu-panel__summary-group"
+          >
+            {{ item.name }} {{ item.count }} 条
+          </span>
+        </span>
+        <span v-if="isAdmin" class="feishu-panel__summary-latest">
+          最后选剧时间 {{ latestSelectionTime || '—' }}
+        </span>
       </div>
 
       <div v-if="resolvedTableGroups.length === 0" class="feishu-panel__empty">
@@ -162,6 +174,7 @@ interface BoardRecord {
   dramaName: string
   account: string
   publishTime: string
+  selectionTime: string
   rating: string
   status: string
   date: string
@@ -361,6 +374,26 @@ const visibleRecords = computed(() => {
   return records.value.filter(record => record.date === selectedDateKey.value)
 })
 
+const tableGroupRecordSummaries = computed(() => {
+  if (!hasMultipleTableGroups.value) return []
+  const counts = new Map<string, number>()
+  visibleRecords.value.forEach(record => {
+    counts.set(record.tableGroupName, (counts.get(record.tableGroupName) || 0) + 1)
+  })
+  return visibleTableGroups.value.map(group => ({
+    id: group.id,
+    name: group.name,
+    count: counts.get(group.name) || 0,
+  }))
+})
+
+const latestSelectionTime = computed(() => {
+  return visibleRecords.value.reduce((latest, record) => {
+    if (!record.selectionTime) return latest
+    return !latest || record.selectionTime > latest ? record.selectionTime : latest
+  }, '')
+})
+
 const groupedRecords = computed(() => {
   const map = new Map<TargetStatus, BoardRecord[]>()
   TARGET_STATUSES.forEach(status => map.set(status, []))
@@ -382,7 +415,10 @@ const dramaNameColumn: DataTableColumns<BoardRecord>[number] = {
   ellipsis: { tooltip: true },
 }
 
-const tableScrollX = computed(() => (isMobile.value ? undefined : 980))
+const tableScrollX = computed(() => {
+  if (isMobile.value) return undefined
+  return isAdmin.value || showTableGroupColumn.value ? 1150 : 980
+})
 
 const tableColumns = computed<DataTableColumns<BoardRecord>>(() => {
   if (isMobile.value) {
@@ -395,30 +431,11 @@ const tableColumns = computed<DataTableColumns<BoardRecord>>(() => {
       width: 280,
     },
     {
-      title: '账号',
+      title: '账户',
       key: 'account',
       width: 210,
       ellipsis: { tooltip: true },
       render: row => row.account || '—',
-    },
-  ]
-
-  if (showTableGroupColumn.value) {
-    columns.push({
-      title: '表格组',
-      key: 'tableGroupName',
-      width: 130,
-      ellipsis: { tooltip: true },
-      render: row => row.tableGroupName || '默认表格',
-    })
-  }
-
-  columns.push(
-    {
-      title: '上架时间',
-      key: 'publishTime',
-      width: 200,
-      render: row => row.publishTime || '—',
     },
     {
       title: '评级',
@@ -431,12 +448,31 @@ const tableColumns = computed<DataTableColumns<BoardRecord>>(() => {
       },
     },
     {
-      title: '日期',
-      key: 'date',
-      width: 160,
-      render: row => row.date || '—',
-    }
-  )
+      title: '上架时间',
+      key: 'publishTime',
+      width: 200,
+      render: row => row.publishTime || '—',
+    },
+  ]
+
+  if (isAdmin.value) {
+    columns.push({
+      title: '选剧时间',
+      key: 'selectionTime',
+      width: 200,
+      render: row => row.selectionTime || '—',
+    })
+  }
+
+  if (showTableGroupColumn.value) {
+    columns.push({
+      title: '表格组',
+      key: 'tableGroupName',
+      width: 130,
+      ellipsis: { tooltip: true },
+      render: row => row.tableGroupName || '默认表格',
+    })
+  }
 
   return columns
 })
@@ -542,6 +578,7 @@ function normalizeRecord(item: RawFeishuRecord, tableGroupName = '默认表格')
     dramaName: extractText(fields['剧名']),
     account: extractText(fields['账户']),
     publishTime: formatDateTime(fields['上架时间']),
+    selectionTime: formatDateTime(fields['创建时间']),
     rating: extractText(fields['评级']),
     status: extractText(fields['当前状态']),
     date: formatDateOnly(fields['日期']),
@@ -583,7 +620,12 @@ async function fetchData() {
         const result = await feishuApi.getDramaStatusBoard(
           dates,
           [...TARGET_STATUSES],
-          group.tableId
+          group.tableId,
+          {
+            fieldNames: isAdmin.value
+              ? ['剧名', '账户', '上架时间', '评级', '当前状态', '日期', '创建时间']
+              : undefined,
+          }
         )
         return result.items.map(item => normalizeRecord(item, group.name))
       })
@@ -819,6 +861,44 @@ watch(
 .feishu-panel__summary-total strong {
   color: #0284c7;
   font-weight: 700;
+}
+
+.feishu-panel__summary-groups {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.feishu-panel__summary-group {
+  display: inline-flex;
+  align-items: center;
+  max-width: 180px;
+  padding: 6px 9px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 999px;
+  background: rgba(248, 250, 252, 0.92);
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.feishu-panel__summary-latest {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 7px 11px;
+  border: 1px solid rgba(20, 184, 166, 0.18);
+  border-radius: 999px;
+  background: rgba(240, 253, 250, 0.9);
+  color: #0f766e;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
 }
 
 .feishu-panel__groups {

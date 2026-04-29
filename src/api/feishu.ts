@@ -1308,7 +1308,8 @@ class FeishuApiService {
   async getDramaStatusBoard(
     dates: string[],
     statuses: string[],
-    tableId?: string
+    tableId?: string,
+    options: { fieldNames?: string[] } = {}
   ): Promise<{ items: any[]; total: number }> {
     // 看板严格按"传入的 tableId"查询，不回退到全局默认，避免显示错误数据
     const targetTableId = String(tableId || '').trim()
@@ -1323,6 +1324,7 @@ class FeishuApiService {
         table_id: targetTableId,
         dates,
         statuses,
+        field_names: options.fieldNames,
       }),
     })
 

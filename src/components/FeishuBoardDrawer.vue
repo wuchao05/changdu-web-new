@@ -111,6 +111,9 @@
               <span class="board-summary__total">
                 共 <strong>{{ visibleRecords.length }}</strong> 条记录
               </span>
+              <span v-if="isAdmin" class="board-summary__latest">
+                最后选剧时间 {{ latestSelectionTime || '—' }}
+              </span>
             </div>
 
             <n-spin :show="loading">
@@ -183,6 +186,7 @@ interface BoardRecord {
   dramaName: string
   account: string
   publishTime: string
+  selectionTime: string
   rating: string
   status: string
   date: string
@@ -337,6 +341,13 @@ const visibleRecords = computed(() => {
   return records.value.filter(record => record.date === selectedDateKey.value)
 })
 
+const latestSelectionTime = computed(() => {
+  return visibleRecords.value.reduce((latest, record) => {
+    if (!record.selectionTime) return latest
+    return !latest || record.selectionTime > latest ? record.selectionTime : latest
+  }, '')
+})
+
 // 按状态分组
 const groupedRecords = computed(() => {
   const map = new Map<TargetStatus, BoardRecord[]>()
@@ -363,17 +374,11 @@ const tableColumns = computed<DataTableColumns<BoardRecord>>(() => [
     ellipsis: { tooltip: true },
   },
   {
-    title: '账号',
+    title: '账户',
     key: 'account',
     width: 160,
     ellipsis: { tooltip: true },
     render: row => row.account || '—',
-  },
-  {
-    title: '上架时间',
-    key: 'publishTime',
-    width: 170,
-    render: row => row.publishTime || '—',
   },
   {
     title: '评级',
@@ -386,11 +391,21 @@ const tableColumns = computed<DataTableColumns<BoardRecord>>(() => [
     },
   },
   {
-    title: '日期',
-    key: 'date',
-    width: 120,
-    render: row => row.date || '—',
+    title: '上架时间',
+    key: 'publishTime',
+    width: 170,
+    render: row => row.publishTime || '—',
   },
+  ...(isAdmin.value
+    ? [
+        {
+          title: '选剧时间',
+          key: 'selectionTime',
+          width: 170,
+          render: row => row.selectionTime || '—',
+        } as DataTableColumns<BoardRecord>[number],
+      ]
+    : []),
 ])
 
 function getRowKey(row: BoardRecord) {
@@ -489,6 +504,7 @@ function normalizeRecord(item: RawFeishuRecord): BoardRecord {
     dramaName: extractText(fields['剧名']),
     account: extractText(fields['账户']),
     publishTime: formatDateTime(fields['上架时间']),
+    selectionTime: formatDateTime(fields['创建时间']),
     rating: extractText(fields['评级']),
     status: extractText(fields['当前状态']),
     date: formatDateOnly(fields['日期']),
@@ -520,7 +536,11 @@ async function fetchData() {
 
   loading.value = true
   try {
-    const result = await feishuApi.getDramaStatusBoard(dates, [...TARGET_STATUSES], tableId)
+    const result = await feishuApi.getDramaStatusBoard(dates, [...TARGET_STATUSES], tableId, {
+      fieldNames: isAdmin.value
+        ? ['剧名', '账户', '上架时间', '评级', '当前状态', '日期', '创建时间']
+        : undefined,
+    })
     records.value = result.items.map(normalizeRecord).filter(record => record.dramaName)
   } catch (error) {
     console.warn('[FeishuBoardDrawer] 加载飞书看板数据失败:', error)
@@ -724,6 +744,19 @@ onBeforeUnmount(() => {
 .board-summary__total strong {
   color: #ae7943;
   font-weight: 700;
+}
+
+.board-summary__latest {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  padding: 6px 10px;
+  border: 1px solid rgba(174, 121, 67, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 248, 237, 0.92);
+  color: #8a5a2b;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
 }
 
 .board-groups {
