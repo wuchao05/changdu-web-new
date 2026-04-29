@@ -7,12 +7,7 @@
     leave-from-class="transform translate-x-0 opacity-100"
     leave-to-class="transform translate-x-4 opacity-0"
   >
-    <aside
-      v-if="visible"
-      ref="panelRef"
-      class="adx-ranking-panel"
-      :style="{ maxHeight: `${panelMaxHeight}px` }"
-    >
+    <aside v-if="visible" class="adx-ranking-panel">
       <div class="adx-panel-header">
         <div class="adx-panel-title-wrap">
           <div class="adx-panel-eyebrow">ADX 热力</div>
@@ -96,72 +91,74 @@
             </n-button>
           </div>
 
-          <n-spin :show="loading && rankingList.length > 0">
-            <div v-if="loading && !rankingList.length" class="adx-loading-state">
-              <div class="adx-loading-orbit" aria-hidden="true">
-                <span class="adx-loading-orbit-dot dot-1"></span>
-                <span class="adx-loading-orbit-dot dot-2"></span>
-                <span class="adx-loading-orbit-core">
-                  <Icon icon="mdi:fire" />
-                </span>
+          <div class="ranking-scroll-area">
+            <n-spin :show="loading && rankingList.length > 0">
+              <div v-if="loading && !rankingList.length" class="adx-loading-state">
+                <div class="adx-loading-orbit" aria-hidden="true">
+                  <span class="adx-loading-orbit-dot dot-1"></span>
+                  <span class="adx-loading-orbit-dot dot-2"></span>
+                  <span class="adx-loading-orbit-core">
+                    <Icon icon="mdi:fire" />
+                  </span>
+                </div>
+                <div class="adx-loading-copy">
+                  <p class="adx-loading-title">正在拉取 ADX 热力榜</p>
+                  <p class="adx-loading-desc">同步榜期数据与热力变化，请稍候</p>
+                </div>
+                <div class="adx-loading-bars" aria-hidden="true">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
               </div>
-              <div class="adx-loading-copy">
-                <p class="adx-loading-title">正在拉取 ADX 热力榜</p>
-                <p class="adx-loading-desc">同步榜期数据与热力变化，请稍候</p>
-              </div>
-              <div class="adx-loading-bars" aria-hidden="true">
-                <span></span>
-                <span></span>
-                <span></span>
-                <span></span>
-              </div>
-            </div>
-            <div v-else-if="rankingList.length" class="ranking-list">
-              <div
-                v-for="item in rankingList"
-                :key="`${item.ranking}-${item.playletId}`"
-                class="ranking-item"
-              >
-                <span class="ranking-num" :class="getRankClass(item.ranking)">
-                  {{ item.ranking }}
-                </span>
-                <div class="ranking-info">
-                  <button
-                    class="ranking-name"
-                    :title="`搜索：${item.playletName}`"
-                    @click="searchPlayletName(item.playletName)"
-                  >
-                    {{ item.playletName }}
-                  </button>
-                  <div class="ranking-actions">
+              <div v-else-if="rankingList.length" class="ranking-list">
+                <div
+                  v-for="item in rankingList"
+                  :key="`${item.ranking}-${item.playletId}`"
+                  class="ranking-item"
+                >
+                  <span class="ranking-num" :class="getRankClass(item.ranking)">
+                    {{ item.ranking }}
+                  </span>
+                  <div class="ranking-info">
                     <button
-                      class="ranking-action-btn primary"
-                      title="在爆剧爆剪中搜索"
+                      class="ranking-name"
+                      :title="`搜索：${item.playletName}`"
                       @click="searchPlayletName(item.playletName)"
                     >
-                      <Icon icon="mdi:magnify" />
-                      搜索
+                      {{ item.playletName }}
                     </button>
-                    <button
-                      class="ranking-action-btn"
-                      title="复制剧名"
-                      @click="copyPlayletName(item.playletName)"
-                    >
-                      <Icon icon="mdi:content-copy" />
-                      复制
-                    </button>
-                  </div>
-                  <div class="ranking-meta">
-                    <span class="meta-tag">热力值 {{ formatHotValue(item.consumeNum) }}</span>
-                    <span class="meta-tag"
-                      >累计热力值 {{ formatHotValue(item.totalConsumeNum) }}</span
-                    >
+                    <div class="ranking-actions">
+                      <button
+                        class="ranking-action-btn primary"
+                        title="在爆剧爆剪中搜索"
+                        @click="searchPlayletName(item.playletName)"
+                      >
+                        <Icon icon="mdi:magnify" />
+                        搜索
+                      </button>
+                      <button
+                        class="ranking-action-btn"
+                        title="复制剧名"
+                        @click="copyPlayletName(item.playletName)"
+                      >
+                        <Icon icon="mdi:content-copy" />
+                        复制
+                      </button>
+                    </div>
+                    <div class="ranking-meta">
+                      <span class="meta-tag">热力值 {{ formatHotValue(item.consumeNum) }}</span>
+                      <span class="meta-tag"
+                        >累计热力值 {{ formatHotValue(item.totalConsumeNum) }}</span
+                      >
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-            <n-empty v-else-if="!loading" description="暂无数据" />
-          </n-spin>
+              <n-empty v-else-if="!loading" description="暂无数据" />
+            </n-spin>
+          </div>
         </template>
       </div>
     </aside>
@@ -190,7 +187,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import {
   NButton,
   NEmpty,
@@ -261,9 +258,6 @@ watch(
 )
 watch(visible, v => {
   emit('update:show', v)
-  if (v) {
-    nextTick(updatePanelMaxHeight)
-  }
 })
 
 const activeTab = ref<RankingTab>('day')
@@ -276,52 +270,12 @@ const monthPeriodOptions = ref<PeriodOption[]>([])
 const loading = ref(false)
 const rankingList = ref<AdxRankingItem[]>([])
 const unauthorized = ref(false)
-const panelRef = ref<HTMLElement | null>(null)
-const panelMaxHeight = ref(520)
 
 // DataEye 凭证配置
 const showCredentialModal = ref(false)
 const authenticationInput = ref('')
 const loginUserIdInput = ref('')
 const savingCredentials = ref(false)
-
-function updatePanelMaxHeight() {
-  if (typeof window === 'undefined') return
-
-  const panel = panelRef.value
-  if (!panel) return
-
-  const panelTop = panel?.getBoundingClientRect().top ?? 0
-  const footer = document.querySelector('footer')
-  const footerTop = footer?.getBoundingClientRect().top ?? window.innerHeight
-  const bottomLimit = Math.min(window.innerHeight, footerTop)
-  const bottomGap = 16
-  const minHeight = 280
-  const availableHeight = Math.max(minHeight, Math.floor(bottomLimit - panelTop - bottomGap))
-
-  if (window.innerWidth <= 640) {
-    const headerHeight =
-      panel.querySelector('.adx-panel-header')?.getBoundingClientRect().height || 0
-    const tabsHeight = panel.querySelector('.n-tabs')?.getBoundingClientRect().height || 0
-    const periodHeight =
-      panel.querySelector('.period-select-wrap')?.getBoundingClientRect().height || 0
-    const rankingItems = Array.from(panel.querySelectorAll('.ranking-item')).slice(0, 3)
-    const rankingHeight = rankingItems.reduce(
-      (total, item) => total + item.getBoundingClientRect().height,
-      0
-    )
-    const rankingGap = rankingItems.length > 1 ? (rankingItems.length - 1) * 8 : 0
-    const bodyPaddingAndSpacing = 44
-    const mobileHeight = Math.ceil(
-      headerHeight + tabsHeight + periodHeight + rankingHeight + rankingGap + bodyPaddingAndSpacing
-    )
-
-    panelMaxHeight.value = Math.min(availableHeight, Math.max(minHeight, mobileHeight || 420))
-    return
-  }
-
-  panelMaxHeight.value = availableHeight
-}
 
 const currentPeriodOptions = computed(() => {
   if (activeTab.value === 'day') return dayPeriodOptions.value
@@ -523,7 +477,6 @@ async function fetchRanking() {
 
     if (data?.statusCode === 200 || data?.code === 0) {
       rankingList.value = normalizeRankingList(data)
-      nextTick(updatePanelMaxHeight)
     } else {
       message.warning(data?.msg || data?.message || '获取榜单失败')
     }
@@ -563,24 +516,15 @@ watch(visible, v => {
     initPeriodOptions()
     loadCredentials()
     fetchRanking()
-    nextTick(updatePanelMaxHeight)
   }
 })
 
 onMounted(() => {
-  window.addEventListener('resize', updatePanelMaxHeight)
-  window.addEventListener('scroll', updatePanelMaxHeight, true)
   initPeriodOptions()
   if (props.show) {
     loadCredentials()
     fetchRanking()
-    nextTick(updatePanelMaxHeight)
   }
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('resize', updatePanelMaxHeight)
-  window.removeEventListener('scroll', updatePanelMaxHeight, true)
 })
 </script>
 
@@ -610,6 +554,7 @@ onBeforeUnmount(() => {
   align-self: flex-start;
   display: flex;
   flex-direction: column;
+  height: clamp(500px, 68vh, 680px);
   width: 380px;
   overflow: hidden;
   border: 1px solid rgba(148, 163, 184, 0.2);
@@ -688,10 +633,19 @@ onBeforeUnmount(() => {
 }
 
 .adx-panel-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 14px;
+}
+
+.ranking-scroll-area {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 14px;
+  overscroll-behavior: contain;
 }
 
 .period-select-wrap {
@@ -1115,6 +1069,7 @@ onBeforeUnmount(() => {
   .adx-ranking-panel {
     position: relative;
     top: auto;
+    height: auto;
     width: 100%;
   }
 }

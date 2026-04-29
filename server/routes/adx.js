@@ -92,6 +92,17 @@ function isRequiredCompanyItem(item) {
   )
 }
 
+function getRankingItemDedupKey(item) {
+  const playletId = String(item?.playletId || '').trim()
+  if (playletId) return `id:${playletId}`
+
+  const playletName = String(item?.playletName || '').trim()
+  if (playletName) return `name:${playletName}`
+
+  const ranking = String(item?.ranking || '').trim()
+  return ranking ? `ranking:${ranking}` : ''
+}
+
 async function fetchDataeyeRankingPage({ credentials, type, periodValue, pageId, pageSize }) {
   const params = new URLSearchParams()
   appendPeriodParam(params, type, periodValue)
@@ -124,6 +135,7 @@ async function fetchFilteredDataeyeRanking({ credentials, type, periodValue, pag
   let upstreamStatusCode = 200
   let upstreamCode
   let upstreamMsg = ''
+  const seenItemKeys = new Set()
 
   for (let currentPageId = 1; currentPageId <= DATAEYE_MAX_FETCH_PAGES; currentPageId += 1) {
     const { response, data } = await fetchDataeyeRankingPage({
@@ -144,7 +156,15 @@ async function fetchFilteredDataeyeRanking({ credentials, type, periodValue, pag
 
     const content = Array.isArray(data?.content) ? data.content : []
     upstreamTotalRecords = normalizePositiveInteger(data?.page?.totalRecords, upstreamTotalRecords)
-    filteredContent.push(...content.filter(isRequiredCompanyItem))
+    for (const item of content) {
+      if (!isRequiredCompanyItem(item)) continue
+
+      const dedupKey = getRankingItemDedupKey(item)
+      if (dedupKey && seenItemKeys.has(dedupKey)) continue
+      if (dedupKey) seenItemKeys.add(dedupKey)
+
+      filteredContent.push(item)
+    }
 
     const fetchedRecords = currentPageId * upstreamPageSize
     if (
