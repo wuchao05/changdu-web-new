@@ -327,7 +327,7 @@ function buildConfiguredOrderStatsUserTargets(users = [], usernames = []) {
 
       return {
         username,
-        aliases: collectUserDouyinAccountNames(matchedUser),
+        aliases: [username, ...collectUserDouyinAccountNames(matchedUser)],
       }
     })
     .filter(Boolean)
