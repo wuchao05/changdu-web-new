@@ -72,9 +72,35 @@ function filterOrdersByPromotionAliases(orders = [], aliases = []) {
   }
 
   return orders.filter(order => {
-    const promotionName = String(order?.promotion_name || '').trim()
-    return Boolean(promotionName && normalizedAliases.some(alias => promotionName.includes(alias)))
+    return normalizedAliases.some(alias =>
+      isPromotionNameMatchedByAlias(order?.promotion_name, alias)
+    )
   })
+}
+
+function getPromotionNameSegments(promotionName) {
+  const normalizedName = String(promotionName || '').trim()
+  if (!normalizedName) {
+    return []
+  }
+
+  return normalizedName
+    .split('-')
+    .map(item => item.trim())
+    .filter(Boolean)
+}
+
+function isPromotionNameMatchedByAlias(promotionName, alias) {
+  const normalizedName = String(promotionName || '').trim()
+  const normalizedAlias = String(alias || '').trim()
+  if (!normalizedName || !normalizedAlias) {
+    return false
+  }
+
+  return (
+    normalizedName === normalizedAlias ||
+    getPromotionNameSegments(normalizedName).includes(normalizedAlias)
+  )
 }
 
 function normalizeOrderUserStatsConfig(config = {}) {
@@ -140,12 +166,11 @@ function calculateRechargeAmount(orders = []) {
 }
 
 function isOrderMatchedByTarget(order, target = {}) {
-  const promotionName = String(order?.promotion_name || '').trim()
   const aliases = Array.isArray(target.aliases)
     ? target.aliases.map(item => String(item || '').trim()).filter(Boolean)
     : []
 
-  return Boolean(promotionName && aliases.some(alias => promotionName.includes(alias)))
+  return aliases.some(alias => isPromotionNameMatchedByAlias(order?.promotion_name, alias))
 }
 
 function buildPromotionUserSummaries(orders = [], targets = []) {
@@ -277,6 +302,37 @@ function buildUserOrderStatsTarget(user) {
   }
 }
 
+function getUserOrderStatsNameCandidates(user = {}) {
+  return [user?.nickname, user?.account, user?.id]
+    .map(item => String(item || '').trim())
+    .filter(Boolean)
+    .filter((item, index, list) => list.indexOf(item) === index)
+}
+
+function buildConfiguredOrderStatsUserTargets(users = [], usernames = []) {
+  const normalizedUsernames = Array.isArray(usernames)
+    ? usernames.map(item => String(item || '').trim()).filter(Boolean)
+    : []
+  const userList = Array.isArray(users) ? users : []
+
+  return normalizedUsernames
+    .map(username => {
+      const matchedUser = userList.find(user =>
+        getUserOrderStatsNameCandidates(user).includes(username)
+      )
+
+      if (!matchedUser) {
+        return null
+      }
+
+      return {
+        username,
+        aliases: collectUserDouyinAccountNames(matchedUser),
+      }
+    })
+    .filter(Boolean)
+}
+
 function buildConfiguredUserOrderStatsTargets(configTargets = [], userTargets = []) {
   const userTargetMap = new Map(
     userTargets.filter(target => target?.username).map(target => [target.username, target])
@@ -307,6 +363,19 @@ function buildConfiguredUserOrderStatsTargets(configTargets = [], userTargets = 
   return normalizePromotionUserTargets([...displayTargets, ...appendTargets])
 }
 
+function appendTargetAliases(target, aliases = []) {
+  if (!target) {
+    return null
+  }
+
+  return {
+    ...target,
+    aliases: [...(target.aliases || []), ...aliases].filter(
+      (item, index, list) => item && list.indexOf(item) === index
+    ),
+  }
+}
+
 async function resolveOrderUserStatsRuntime(ctx) {
   const sessionUser = await getSessionUser(ctx)
   if (!sessionUser) {
@@ -330,26 +399,36 @@ async function resolveOrderUserStatsRuntime(ctx) {
     ownDouyinAccounts,
   }
 
-  if (!config.enabled || config.childUserIds.length === 0) {
+  if (!config.enabled) {
     return scopedConfig
   }
 
+  const users = await listUsers()
   const childUserIdSet = new Set(config.childUserIds)
   const childUserMap = new Map(
-    (await listUsers())
+    users
       .filter(user => user.userType !== 'admin' && childUserIdSet.has(user.id))
       .map(user => [user.id, user])
+  )
+  const configuredUserTargets = buildConfiguredOrderStatsUserTargets(
+    [runtimeContext.runtimeUser, ...users],
+    config.usernames
   )
   const childUserTargets = config.childUserIds
     .map(userId => buildUserOrderStatsTarget(childUserMap.get(userId)))
     .filter(Boolean)
-  const parentTarget = buildUserOrderStatsTarget(runtimeContext.runtimeUser)
-  const userTargets = [parentTarget, ...childUserTargets].filter(Boolean)
+  const parentNameCandidates = getUserOrderStatsNameCandidates(runtimeContext.runtimeUser)
+  const childAliases = childUserTargets.flatMap(target => target.aliases || [])
+  const topLevelUserTargets = configuredUserTargets.map(target =>
+    parentNameCandidates.includes(target.username)
+      ? appendTargetAliases(target, childAliases)
+      : target
+  )
 
   return {
     ...scopedConfig,
-    matchTargets: buildConfiguredUserOrderStatsTargets(config.matchTargets, userTargets),
-    branchTargets: [],
+    matchTargets: buildConfiguredUserOrderStatsTargets(config.matchTargets, topLevelUserTargets),
+    branchTargets: normalizePromotionUserTargets(childUserTargets),
   }
 }
 

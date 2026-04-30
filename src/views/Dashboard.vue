@@ -1142,6 +1142,27 @@ function getOrderSummaryTarget(username: string) {
   return orderSummaryTargets.value.find(target => target.username === username) || null
 }
 
+function getPromotionNameSegments(promotionName: string) {
+  return String(promotionName || '')
+    .trim()
+    .split('-')
+    .map(item => item.trim())
+    .filter(Boolean)
+}
+
+function isPromotionNameMatchedByAlias(promotionName: string, alias: string) {
+  const normalizedName = String(promotionName || '').trim()
+  const normalizedAlias = String(alias || '').trim()
+  if (!normalizedName || !normalizedAlias) {
+    return false
+  }
+
+  return (
+    normalizedName === normalizedAlias ||
+    getPromotionNameSegments(normalizedName).includes(normalizedAlias)
+  )
+}
+
 function isOrderMatchedBySummaryTarget(order: OrderItem, username: string) {
   const target = getOrderSummaryTarget(username)
   if (!target) {
@@ -1149,7 +1170,7 @@ function isOrderMatchedBySummaryTarget(order: OrderItem, username: string) {
   }
 
   const promotionName = String(order.promotion_name || '').trim()
-  return target.aliases.some(alias => promotionName.includes(alias))
+  return target.aliases.some(alias => isPromotionNameMatchedByAlias(promotionName, alias))
 }
 
 const rootPromotionOrders = computed(() => {
@@ -1169,7 +1190,7 @@ function matchOrdersByAliases(orders: OrderItem[], aliases: string[]) {
 
   return orders.filter(order => {
     const promotionName = String(order.promotion_name || '').trim()
-    return aliases.some(alias => promotionName.includes(alias))
+    return aliases.some(alias => isPromotionNameMatchedByAlias(promotionName, alias))
   })
 }
 
