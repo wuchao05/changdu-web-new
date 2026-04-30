@@ -391,9 +391,15 @@ async function resolveOrderUserStatsRuntime(ctx) {
     .filter(Boolean)
   const parentNameCandidates = getUserOrderStatsNameCandidates(runtimeContext.runtimeUser)
   const childAliases = childUserTargets.flatMap(target => target.aliases || [])
-  const parentBranchTarget = configuredUserTargets.find(target =>
+  const configuredParentTarget = configuredUserTargets.find(target =>
     parentNameCandidates.includes(target.username)
   )
+  const parentBranchTarget = configuredParentTarget
+    ? {
+        username: configuredParentTarget.username,
+        aliases: ownDouyinAccounts,
+      }
+    : null
   const topLevelUserTargets = configuredUserTargets.map(target =>
     parentNameCandidates.includes(target.username)
       ? appendTargetAliases(target, childAliases)
