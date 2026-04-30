@@ -277,6 +277,36 @@ function buildUserOrderStatsTarget(user) {
   }
 }
 
+function buildConfiguredUserOrderStatsTargets(configTargets = [], userTargets = []) {
+  const userTargetMap = new Map(
+    userTargets.filter(target => target?.username).map(target => [target.username, target])
+  )
+  const resolvedUsernameSet = new Set()
+  const displayTargets = (Array.isArray(configTargets) ? configTargets : []).map(target => {
+    const username = String(target?.username || '').trim()
+    const userTarget = userTargetMap.get(username)
+
+    if (userTarget) {
+      resolvedUsernameSet.add(username)
+      return {
+        username,
+        aliases: userTarget.aliases,
+      }
+    }
+
+    return target
+  })
+  const appendTargets = userTargets.filter(target => {
+    if (!target?.username || resolvedUsernameSet.has(target.username)) {
+      return false
+    }
+    resolvedUsernameSet.add(target.username)
+    return true
+  })
+
+  return normalizePromotionUserTargets([...displayTargets, ...appendTargets])
+}
+
 async function resolveOrderUserStatsRuntime(ctx) {
   const sessionUser = await getSessionUser(ctx)
   if (!sessionUser) {
@@ -314,20 +344,12 @@ async function resolveOrderUserStatsRuntime(ctx) {
     .map(userId => buildUserOrderStatsTarget(childUserMap.get(userId)))
     .filter(Boolean)
   const parentTarget = buildUserOrderStatsTarget(runtimeContext.runtimeUser)
-  const parentWithChildAliases = parentTarget
-    ? {
-        ...parentTarget,
-        aliases: [
-          ...parentTarget.aliases,
-          ...childUserTargets.flatMap(target => target.aliases || []),
-        ].filter((item, index, list) => item && list.indexOf(item) === index),
-      }
-    : null
+  const userTargets = [parentTarget, ...childUserTargets].filter(Boolean)
 
   return {
     ...scopedConfig,
-    matchTargets: normalizePromotionUserTargets([...config.matchTargets, parentWithChildAliases]),
-    branchTargets: normalizePromotionUserTargets([parentTarget, ...childUserTargets]),
+    matchTargets: buildConfiguredUserOrderStatsTargets(config.matchTargets, userTargets),
+    branchTargets: [],
   }
 }
 
