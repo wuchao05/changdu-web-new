@@ -419,6 +419,9 @@ async function resolveOrderUserStatsRuntime(ctx) {
     .filter(Boolean)
   const parentNameCandidates = getUserOrderStatsNameCandidates(runtimeContext.runtimeUser)
   const childAliases = childUserTargets.flatMap(target => target.aliases || [])
+  const parentBranchTarget = configuredUserTargets.find(target =>
+    parentNameCandidates.includes(target.username)
+  )
   const topLevelUserTargets = configuredUserTargets.map(target =>
     parentNameCandidates.includes(target.username)
       ? appendTargetAliases(target, childAliases)
@@ -428,7 +431,7 @@ async function resolveOrderUserStatsRuntime(ctx) {
   return {
     ...scopedConfig,
     matchTargets: buildConfiguredUserOrderStatsTargets(config.matchTargets, topLevelUserTargets),
-    branchTargets: normalizePromotionUserTargets(childUserTargets),
+    branchTargets: normalizePromotionUserTargets([parentBranchTarget, ...childUserTargets]),
   }
 }
 
