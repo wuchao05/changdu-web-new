@@ -13,20 +13,7 @@ const SECONDS_PER_DAY = 24 * 60 * 60
 const MAX_ORDER_RANGE_DAYS = 10
 
 /**
- * 从promotion_name提取抖音号
- * promotion_name格式示例: "1842852415368202-CC-欣雅2-4294-小龙-美女总裁不好惹贴身保镖专治不服-小红-葸辉看剧"
- * 抖音号是最后一个"-"后的内容
- * @param {string} promotionName - 推广名称
- * @returns {string|null} 抖音号或null
- */
-function extractDouyinAccount(promotionName) {
-  if (!promotionName || typeof promotionName !== 'string') return null
-  const parts = promotionName.split('-')
-  return parts.length > 0 ? parts[parts.length - 1].trim() : null
-}
-
-/**
- * 根据抖音号列表过滤订单数据
+ * 根据抖音号列表过滤订单数据，推广链包含任一抖音号即命中。
  * @param {Array} orders - 订单列表
  * @param {string} douyinAccountsStr - 逗号分隔的抖音号字符串
  * @returns {Array} 过滤后的订单列表
@@ -45,8 +32,8 @@ function filterOrdersByDouyinAccounts(orders, douyinAccountsStr) {
   }
 
   return orders.filter(order => {
-    const douyinAccount = extractDouyinAccount(order.promotion_name)
-    return douyinAccount && accountsArray.includes(douyinAccount)
+    const promotionName = String(order?.promotion_name || '').trim()
+    return accountsArray.some(account => promotionName.includes(account))
   })
 }
 
@@ -78,18 +65,6 @@ function filterOrdersByPromotionAliases(orders = [], aliases = []) {
   })
 }
 
-function getPromotionNameSegments(promotionName) {
-  const normalizedName = String(promotionName || '').trim()
-  if (!normalizedName) {
-    return []
-  }
-
-  return normalizedName
-    .split('-')
-    .map(item => item.trim())
-    .filter(Boolean)
-}
-
 function isPromotionNameMatchedByAlias(promotionName, alias) {
   const normalizedName = String(promotionName || '').trim()
   const normalizedAlias = String(alias || '').trim()
@@ -97,22 +72,7 @@ function isPromotionNameMatchedByAlias(promotionName, alias) {
     return false
   }
 
-  return (
-    normalizedName === normalizedAlias ||
-    getPromotionNameSegments(normalizedName).includes(normalizedAlias)
-  )
-}
-
-function isPromotionNameMatchedByPrefixAlias(promotionName, alias) {
-  const normalizedName = String(promotionName || '').trim()
-  const normalizedAlias = String(alias || '').trim()
-  if (!normalizedName || !normalizedAlias) {
-    return false
-  }
-
-  return getPromotionNameSegments(normalizedName).some(segment =>
-    segment.startsWith(normalizedAlias)
-  )
+  return normalizedName.includes(normalizedAlias)
 }
 
 function normalizeOrderUserStatsConfig(config = {}) {
@@ -155,20 +115,11 @@ function normalizePromotionUserTargets(targets = []) {
     const current = targetMap.get(username) || {
       username,
       aliases: [],
-      prefixAliases: [],
     }
-    const prefixAliases = Array.isArray(target?.prefixAliases)
-      ? target.prefixAliases.map(item => String(item || '').trim()).filter(Boolean)
-      : []
 
     aliases.forEach(alias => {
       if (!current.aliases.includes(alias)) {
         current.aliases.push(alias)
-      }
-    })
-    prefixAliases.forEach(alias => {
-      if (!current.prefixAliases.includes(alias)) {
-        current.prefixAliases.push(alias)
       }
     })
     targetMap.set(username, current)
@@ -190,14 +141,8 @@ function isOrderMatchedByTarget(order, target = {}) {
   const aliases = Array.isArray(target.aliases)
     ? target.aliases.map(item => String(item || '').trim()).filter(Boolean)
     : []
-  const prefixAliases = Array.isArray(target.prefixAliases)
-    ? target.prefixAliases.map(item => String(item || '').trim()).filter(Boolean)
-    : []
 
-  return (
-    aliases.some(alias => isPromotionNameMatchedByAlias(order?.promotion_name, alias)) ||
-    prefixAliases.some(alias => isPromotionNameMatchedByPrefixAlias(order?.promotion_name, alias))
-  )
+  return aliases.some(alias => isPromotionNameMatchedByAlias(order?.promotion_name, alias))
 }
 
 function buildPromotionUserSummaries(orders = [], targets = []) {
@@ -208,7 +153,6 @@ function buildPromotionUserSummaries(orders = [], targets = []) {
     return {
       username: target.username,
       aliases: target.aliases,
-      prefix_aliases: target.prefixAliases,
       total: matchedOrders.length,
       total_amount: calculateRechargeAmount(matchedOrders),
       paid_order_count: matchedOrders.filter(order => order?.pay_status === 0).length,
@@ -355,8 +299,7 @@ function buildConfiguredOrderStatsUserTargets(users = [], usernames = []) {
 
       return {
         username,
-        aliases: [username, ...collectUserDouyinAccountNames(matchedUser)],
-        prefixAliases: [username],
+        aliases: [username],
       }
     })
     .filter(Boolean)
@@ -376,7 +319,6 @@ function buildConfiguredUserOrderStatsTargets(configTargets = [], userTargets = 
       return {
         username,
         aliases: userTarget.aliases,
-        prefixAliases: userTarget.prefixAliases,
       }
     }
 
@@ -403,17 +345,6 @@ function appendTargetAliases(target, aliases = []) {
     aliases: [...(target.aliases || []), ...aliases].filter(
       (item, index, list) => item && list.indexOf(item) === index
     ),
-  }
-}
-
-function omitTargetPrefixAliases(target) {
-  if (!target) {
-    return null
-  }
-
-  return {
-    ...target,
-    prefixAliases: [],
   }
 }
 
@@ -460,8 +391,8 @@ async function resolveOrderUserStatsRuntime(ctx) {
     .filter(Boolean)
   const parentNameCandidates = getUserOrderStatsNameCandidates(runtimeContext.runtimeUser)
   const childAliases = childUserTargets.flatMap(target => target.aliases || [])
-  const parentBranchTarget = omitTargetPrefixAliases(
-    configuredUserTargets.find(target => parentNameCandidates.includes(target.username))
+  const parentBranchTarget = configuredUserTargets.find(target =>
+    parentNameCandidates.includes(target.username)
   )
   const topLevelUserTargets = configuredUserTargets.map(target =>
     parentNameCandidates.includes(target.username)
