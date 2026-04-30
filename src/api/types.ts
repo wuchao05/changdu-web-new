@@ -101,6 +101,7 @@ export interface OrderItem {
 export interface PromotionUserSummary {
   username: string
   aliases?: string[]
+  prefix_aliases?: string[]
   total: number // 命中的订单数
   total_amount: number // 充值总金额（分）
   paid_order_count: number // 支付成功订单数

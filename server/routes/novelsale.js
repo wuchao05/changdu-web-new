@@ -103,6 +103,18 @@ function isPromotionNameMatchedByAlias(promotionName, alias) {
   )
 }
 
+function isPromotionNameMatchedByPrefixAlias(promotionName, alias) {
+  const normalizedName = String(promotionName || '').trim()
+  const normalizedAlias = String(alias || '').trim()
+  if (!normalizedName || !normalizedAlias) {
+    return false
+  }
+
+  return getPromotionNameSegments(normalizedName).some(segment =>
+    segment.startsWith(normalizedAlias)
+  )
+}
+
 function normalizeOrderUserStatsConfig(config = {}) {
   const usernames = Array.isArray(config?.usernames)
     ? config.usernames
@@ -143,11 +155,20 @@ function normalizePromotionUserTargets(targets = []) {
     const current = targetMap.get(username) || {
       username,
       aliases: [],
+      prefixAliases: [],
     }
+    const prefixAliases = Array.isArray(target?.prefixAliases)
+      ? target.prefixAliases.map(item => String(item || '').trim()).filter(Boolean)
+      : []
 
     aliases.forEach(alias => {
       if (!current.aliases.includes(alias)) {
         current.aliases.push(alias)
+      }
+    })
+    prefixAliases.forEach(alias => {
+      if (!current.prefixAliases.includes(alias)) {
+        current.prefixAliases.push(alias)
       }
     })
     targetMap.set(username, current)
@@ -169,8 +190,14 @@ function isOrderMatchedByTarget(order, target = {}) {
   const aliases = Array.isArray(target.aliases)
     ? target.aliases.map(item => String(item || '').trim()).filter(Boolean)
     : []
+  const prefixAliases = Array.isArray(target.prefixAliases)
+    ? target.prefixAliases.map(item => String(item || '').trim()).filter(Boolean)
+    : []
 
-  return aliases.some(alias => isPromotionNameMatchedByAlias(order?.promotion_name, alias))
+  return (
+    aliases.some(alias => isPromotionNameMatchedByAlias(order?.promotion_name, alias)) ||
+    prefixAliases.some(alias => isPromotionNameMatchedByPrefixAlias(order?.promotion_name, alias))
+  )
 }
 
 function buildPromotionUserSummaries(orders = [], targets = []) {
@@ -181,6 +208,7 @@ function buildPromotionUserSummaries(orders = [], targets = []) {
     return {
       username: target.username,
       aliases: target.aliases,
+      prefix_aliases: target.prefixAliases,
       total: matchedOrders.length,
       total_amount: calculateRechargeAmount(matchedOrders),
       paid_order_count: matchedOrders.filter(order => order?.pay_status === 0).length,
@@ -328,6 +356,7 @@ function buildConfiguredOrderStatsUserTargets(users = [], usernames = []) {
       return {
         username,
         aliases: [username, ...collectUserDouyinAccountNames(matchedUser)],
+        prefixAliases: [username],
       }
     })
     .filter(Boolean)
@@ -347,6 +376,7 @@ function buildConfiguredUserOrderStatsTargets(configTargets = [], userTargets = 
       return {
         username,
         aliases: userTarget.aliases,
+        prefixAliases: userTarget.prefixAliases,
       }
     }
 
@@ -373,6 +403,17 @@ function appendTargetAliases(target, aliases = []) {
     aliases: [...(target.aliases || []), ...aliases].filter(
       (item, index, list) => item && list.indexOf(item) === index
     ),
+  }
+}
+
+function omitTargetPrefixAliases(target) {
+  if (!target) {
+    return null
+  }
+
+  return {
+    ...target,
+    prefixAliases: [],
   }
 }
 
@@ -419,8 +460,8 @@ async function resolveOrderUserStatsRuntime(ctx) {
     .filter(Boolean)
   const parentNameCandidates = getUserOrderStatsNameCandidates(runtimeContext.runtimeUser)
   const childAliases = childUserTargets.flatMap(target => target.aliases || [])
-  const parentBranchTarget = configuredUserTargets.find(target =>
-    parentNameCandidates.includes(target.username)
+  const parentBranchTarget = omitTargetPrefixAliases(
+    configuredUserTargets.find(target => parentNameCandidates.includes(target.username))
   )
   const topLevelUserTargets = configuredUserTargets.map(target =>
     parentNameCandidates.includes(target.username)

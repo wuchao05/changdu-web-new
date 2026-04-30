@@ -1117,6 +1117,7 @@ const orderSummaryTargets = computed(() =>
         username: item.username,
         aliases:
           Array.isArray(item.aliases) && item.aliases.length > 0 ? item.aliases : [item.username],
+        prefixAliases: Array.isArray(item.prefix_aliases) ? item.prefix_aliases : [],
       }))
     : []
 )
@@ -1163,6 +1164,18 @@ function isPromotionNameMatchedByAlias(promotionName: string, alias: string) {
   )
 }
 
+function isPromotionNameMatchedByPrefixAlias(promotionName: string, alias: string) {
+  const normalizedName = String(promotionName || '').trim()
+  const normalizedAlias = String(alias || '').trim()
+  if (!normalizedName || !normalizedAlias) {
+    return false
+  }
+
+  return getPromotionNameSegments(normalizedName).some(segment =>
+    segment.startsWith(normalizedAlias)
+  )
+}
+
 function isOrderMatchedBySummaryTarget(order: OrderItem, username: string) {
   const target = getOrderSummaryTarget(username)
   if (!target) {
@@ -1170,7 +1183,10 @@ function isOrderMatchedBySummaryTarget(order: OrderItem, username: string) {
   }
 
   const promotionName = String(order.promotion_name || '').trim()
-  return target.aliases.some(alias => isPromotionNameMatchedByAlias(promotionName, alias))
+  return (
+    target.aliases.some(alias => isPromotionNameMatchedByAlias(promotionName, alias)) ||
+    target.prefixAliases.some(alias => isPromotionNameMatchedByPrefixAlias(promotionName, alias))
+  )
 }
 
 const rootPromotionOrders = computed(() => {
@@ -1183,14 +1199,25 @@ const rootPromotionOrders = computed(() => {
   )
 })
 
-function matchOrdersByAliases(orders: OrderItem[], aliases: string[]) {
-  if (!Array.isArray(aliases) || aliases.length === 0) {
+function matchOrdersByAliases(
+  orders: OrderItem[],
+  aliases: string[],
+  prefixAliases: string[] = []
+) {
+  const normalizedAliases = Array.isArray(aliases) ? aliases : []
+  const normalizedPrefixAliases = Array.isArray(prefixAliases) ? prefixAliases : []
+  if (normalizedAliases.length === 0 && normalizedPrefixAliases.length === 0) {
     return []
   }
 
   return orders.filter(order => {
     const promotionName = String(order.promotion_name || '').trim()
-    return aliases.some(alias => isPromotionNameMatchedByAlias(promotionName, alias))
+    return (
+      normalizedAliases.some(alias => isPromotionNameMatchedByAlias(promotionName, alias)) ||
+      normalizedPrefixAliases.some(alias =>
+        isPromotionNameMatchedByPrefixAlias(promotionName, alias)
+      )
+    )
   })
 }
 
@@ -1206,6 +1233,7 @@ const orderBranchCardItems = computed(() => {
     totalAmount: Number(summary.total_amount || 0),
     paidOrderCount: Number(summary.paid_order_count || 0),
     aliases: Array.isArray(summary.aliases) ? summary.aliases : [],
+    prefixAliases: Array.isArray(summary.prefix_aliases) ? summary.prefix_aliases : [],
   }))
 })
 
@@ -1222,7 +1250,11 @@ const shouldShowOrderBranch = computed(
 
 const orderRows = computed<OrderItem[]>(() => {
   if (shouldShowOrderBranch.value && activeBranchCard.value) {
-    return matchOrdersByAliases(rootPromotionOrders.value, activeBranchCard.value?.aliases || [])
+    return matchOrdersByAliases(
+      rootPromotionOrders.value,
+      activeBranchCard.value?.aliases || [],
+      activeBranchCard.value?.prefixAliases || []
+    )
   }
 
   if (!activePromotionUserName.value) {
