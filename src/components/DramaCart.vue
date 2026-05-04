@@ -15,13 +15,23 @@
 
     <!-- 购物车面板 -->
     <transition name="slide-fade">
-      <div v-if="isOpen" class="cart-panel">
+      <div v-if="isOpen" ref="cartPanelRef" class="cart-panel">
         <div class="cart-header">
           <h3 class="cart-title">待提交剧集</h3>
-          <button @click="clearAll" class="clear-btn" v-if="cartItems.length > 0">
-            <Icon icon="mdi:delete-outline" class="w-4 h-4" />
-            清空
-          </button>
+          <div class="cart-header-actions">
+            <button @click="clearAll" class="clear-btn" v-if="cartItems.length > 0">
+              <Icon icon="mdi:delete-outline" class="w-4 h-4" />
+              清空
+            </button>
+            <button
+              type="button"
+              class="cart-close-btn"
+              aria-label="关闭待提交剧集"
+              @click="closeCart"
+            >
+              <Icon icon="mdi:close" class="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         <div class="cart-body">
@@ -61,10 +71,21 @@
 
         <div class="cart-footer" v-if="cartItems.length > 0">
           <div class="footer-info">
-            <span class="total-count">共 {{ cartItems.length }} 部剧</span>
-            <span v-if="submittingCount > 0" class="submitting-count">
-              提交中: {{ submittingCount }}/{{ cartItems.length }}
-            </span>
+            <div class="footer-counts">
+              <span class="total-count">共 {{ cartItems.length }} 部剧</span>
+              <span v-if="submittingCount > 0" class="submitting-count">
+                提交中: {{ submittingCount }}/{{ cartItems.length }}
+              </span>
+            </div>
+            <button
+              type="button"
+              @click="clearAll"
+              class="footer-clear-btn"
+              :disabled="isSubmitting"
+            >
+              <Icon icon="mdi:delete-outline" class="w-4 h-4" />
+              清空
+            </button>
           </div>
           <button
             @click="submitAll"
@@ -81,7 +102,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useMessage } from 'naive-ui'
 import { batchSubmitDownload } from '@/api/index'
@@ -115,6 +136,7 @@ const cartItems = ref<CartItem[]>([])
 const submittingIds = ref<Set<string>>(new Set())
 const isSubmitting = ref(false)
 const cartTriggerRef = ref<HTMLElement | null>(null)
+const cartPanelRef = ref<HTMLElement | null>(null)
 
 // 计算属性
 const submittingCount = computed(() => submittingIds.value.size)
@@ -130,6 +152,29 @@ function emitItemsChanged() {
 function toggleCart() {
   isOpen.value = !isOpen.value
 }
+
+function closeCart() {
+  isOpen.value = false
+}
+
+function handleDocumentPointerDown(event: PointerEvent) {
+  if (!isOpen.value || !(event.target instanceof Node)) return
+
+  const target = event.target
+  if (cartTriggerRef.value?.contains(target) || cartPanelRef.value?.contains(target)) {
+    return
+  }
+
+  closeCart()
+}
+
+onMounted(() => {
+  document.addEventListener('pointerdown', handleDocumentPointerDown)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', handleDocumentPointerDown)
+})
 
 // 添加剧集到购物车（带抛物线动画）
 function addItem(item: CartItem) {
@@ -290,6 +335,7 @@ defineExpose({
   hasItem,
   updateItemRedFlag,
   clearAll,
+  closeCart,
   startSubmitting,
   markSubmitting,
   finishSubmitting,
@@ -308,7 +354,7 @@ defineExpose({
   position: relative;
   right: auto;
   bottom: auto;
-  z-index: 20;
+  z-index: 1000;
   margin-left: auto;
 }
 
@@ -398,6 +444,7 @@ defineExpose({
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  z-index: 1;
 }
 
 .drama-cart-container.is-inline .cart-panel {
@@ -424,10 +471,18 @@ defineExpose({
   .drama-cart-container.is-inline .cart-panel {
     position: fixed;
     top: auto;
+    left: 12px;
     right: 12px;
     bottom: 12px;
-    width: calc(100vw - 24px);
-    max-height: min(70vh, 560px);
+    width: auto;
+    height: min(78dvh, 560px);
+    max-height: calc(100dvh - 24px);
+    border-radius: 20px;
+  }
+
+  .drama-cart-container.is-inline .cart-body {
+    min-height: 0;
+    max-height: none;
   }
 }
 
@@ -436,6 +491,8 @@ defineExpose({
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-shrink: 0;
+  gap: 12px;
   padding: 16px;
   border-bottom: 1px solid #e5e7eb;
   background: linear-gradient(135deg, #f8fafc 0%, #eef6ff 100%);
@@ -446,6 +503,14 @@ defineExpose({
   font-weight: 600;
   color: #0f172a;
   margin: 0;
+  min-width: 0;
+}
+
+.cart-header-actions {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 8px;
 }
 
 .clear-btn {
@@ -456,7 +521,6 @@ defineExpose({
   background: #fff;
   color: #64748b;
   border: 1px solid rgba(148, 163, 184, 0.22);
-  border: none;
   border-radius: 6px;
   font-size: 12px;
   cursor: pointer;
@@ -466,6 +530,29 @@ defineExpose({
 .clear-btn:hover {
   background: #fff7ed;
   color: #ea580c;
+}
+
+.cart-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 10px;
+  background: #fff;
+  color: #64748b;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.cart-close-btn:hover {
+  border-color: rgba(14, 165, 233, 0.28);
+  background: #f8fafc;
+  color: #0f172a;
 }
 
 /* 内容区 */
@@ -593,6 +680,7 @@ defineExpose({
 
 /* 底部 */
 .cart-footer {
+  flex-shrink: 0;
   padding: 16px;
   border-top: 1px solid #e5e7eb;
   background: #f9fafb;
@@ -602,8 +690,16 @@ defineExpose({
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   margin-bottom: 12px;
   font-size: 13px;
+}
+
+.footer-counts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
 }
 
 .total-count {
@@ -614,6 +710,37 @@ defineExpose({
 .submitting-count {
   color: #3b82f6;
   font-size: 12px;
+}
+
+.footer-clear-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  gap: 4px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 10px;
+  background: #fff;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.footer-clear-btn:hover:not(:disabled) {
+  background: #fff7ed;
+  color: #ea580c;
+}
+
+.footer-clear-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .submit-btn {

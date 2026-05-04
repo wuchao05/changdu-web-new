@@ -1949,6 +1949,8 @@ async function handleChannelChange(value: string) {
   const { signal } = channelSwitchController
 
   cancelDashboardRequests()
+  clipPanelRef.value?.cancelAllRequests()
+  feishuPanelRef.value?.cancelAllRequests()
   resetOrderStatsForChannelSwitch()
   sessionStore.updateSelectedChannel(value)
 
@@ -3061,7 +3063,8 @@ onUnmounted(() => {
 }
 
 .home-tab-pane {
-  animation: home-tab-fade-in 0.32s ease both;
+  /* 不保留 transform，避免移动端 fixed 浮层被当前 Tab 面板重新定位。 */
+  animation: home-tab-fade-in 0.32s ease;
 }
 
 @keyframes home-tab-fade-in {

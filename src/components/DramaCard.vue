@@ -178,23 +178,37 @@
                   <!-- 新增待下载按钮 -->
                   <button
                     @click="handleSyncClick"
-                    :disabled="isSyncing || isProcessing"
+                    :disabled="isSyncing || isProcessing || isInCart"
                     class="action-button action-button-sync action-button-sync-download"
                     :class="{
-                      'opacity-50 cursor-not-allowed': isAnySyncing && !isSyncing,
+                      'opacity-50 cursor-not-allowed': isInCart || (isAnySyncing && !isSyncing),
                     }"
                     :title="
-                      isAnySyncing && !isSyncing
-                        ? '其他剧集正在同步中，请稍候...'
-                        : `新增待下载: ${drama.series_name}`
+                      isInCart
+                        ? '已加入购物车'
+                        : isAnySyncing && !isSyncing
+                          ? '其他剧集正在同步中，请稍候...'
+                          : `新增待下载: ${drama.series_name}`
                     "
                   >
                     <Icon
-                      :icon="isSyncing || isProcessing ? 'mdi:loading' : 'mdi:cloud-sync'"
+                      :icon="
+                        isInCart
+                          ? 'mdi:check'
+                          : isSyncing || isProcessing
+                            ? 'mdi:loading'
+                            : 'mdi:cloud-sync'
+                      "
                       :class="['button-icon', isSyncing || isProcessing ? 'animate-spin' : '']"
                     />
                     <span>{{
-                      isSyncing ? '同步中...' : isProcessing ? '处理中...' : '新增待下载'
+                      isInCart
+                        ? '已加入购物车'
+                        : isSyncing
+                          ? '同步中...'
+                          : isProcessing
+                            ? '处理中...'
+                            : '新增待下载'
                     }}</span>
                   </button>
                 </div>
@@ -642,7 +656,10 @@ function handleSyncClick(event: MouseEvent) {
   event.stopPropagation()
 
   const isDisabled =
-    props.isSyncing || props.isProcessing || (props.isAnySyncing && !props.isSyncing)
+    props.isSyncing ||
+    props.isProcessing ||
+    props.isInCart ||
+    (props.isAnySyncing && !props.isSyncing)
 
   if (isDisabled) {
     return

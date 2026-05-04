@@ -1002,6 +1002,7 @@ const cartBookIds = ref<Set<string>>(new Set())
 // 每次 cancelAllListRequests() 会把 generation +1
 // 列表/搜索/榜单类请求在响应回来后会检查 generation,若不一致则丢弃结果
 let listRequestGeneration = 0
+let channelScopedReloadGeneration = 0
 function beginListRequest() {
   return listRequestGeneration
 }
@@ -3295,7 +3296,18 @@ watch(
       return
     }
 
+    const reloadGeneration = ++channelScopedReloadGeneration
+    cancelAllListRequests()
+    resetChannelScopedData()
+
     await syncCurrentChannelConfig()
+
+    if (
+      reloadGeneration !== channelScopedReloadGeneration ||
+      String(apiConfigStore.config.channelId || '') !== String(newChannelId)
+    ) {
+      return
+    }
 
     douyinMaterialStore.loadFromServer(true).catch(error => {
       console.error('切换渠道后加载抖音号匹配素材失败:', error)

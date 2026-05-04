@@ -447,8 +447,8 @@ async function resolveRuntimeFeishuConfig(ctx) {
 
 function resolveDramaListTableId(runtimeFeishuConfig, requestedTableId) {
   return (
-    String(runtimeFeishuConfig?.dramaListTableId || '').trim() ||
     String(requestedTableId || '').trim() ||
+    String(runtimeFeishuConfig?.dramaListTableId || '').trim() ||
     FEISHU_CONFIG.table_ids.drama_list
   )
 }
