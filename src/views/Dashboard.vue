@@ -7,37 +7,99 @@
         <div class="flex items-center justify-between h-16 relative">
           <div class="flex items-center space-x-4 min-w-0 flex-1">
             <div
-              class="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl"
+              class="brand-revenue-menu"
+              :class="{ 'brand-revenue-menu--disabled': !isAdmin }"
+              @pointerenter="isAdmin && handleBrandRevenuePointerEnter()"
+              @pointerleave="isAdmin && handleBrandRevenuePointerLeave()"
             >
-              <Icon icon="mdi:chart-line" class="w-6 h-6 text-white" />
-            </div>
-            <div v-if="isMobile && mobileUserLabels.length > 0" class="min-w-0 flex items-center">
-              <button
-                v-for="label in mobileUserLabels"
-                :key="`mobile-${label}`"
-                type="button"
-                class="user-label-badge user-label-badge--mobile"
-              >
-                <span class="user-label-badge__text">{{ label }}</span>
-              </button>
-            </div>
-            <div class="min-w-0" v-if="!isMobile">
-              <div class="flex items-center gap-2">
-                <h1
-                  class="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent"
+              <div class="brand-revenue-trigger">
+                <div
+                  class="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl"
                 >
-                  {{ dynamicTitle }}
-                </h1>
-                <button
-                  v-for="label in desktopUserLabels"
-                  :key="label"
-                  type="button"
-                  class="user-label-badge"
+                  <Icon icon="mdi:chart-line" class="w-6 h-6 text-white" />
+                </div>
+                <div
+                  v-if="isMobile && mobileUserLabels.length > 0"
+                  class="min-w-0 flex items-center"
                 >
-                  <span class="user-label-badge__text">{{ label }}</span>
-                </button>
+                  <button
+                    v-for="label in mobileUserLabels"
+                    :key="`mobile-${label}`"
+                    type="button"
+                    class="user-label-badge user-label-badge--mobile"
+                  >
+                    <span class="user-label-badge__text">{{ label }}</span>
+                  </button>
+                </div>
+                <div class="min-w-0" v-if="!isMobile">
+                  <div class="flex items-center gap-2">
+                    <h1
+                      class="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent"
+                    >
+                      {{ dynamicTitle }}
+                    </h1>
+                    <button
+                      v-for="label in desktopUserLabels"
+                      :key="label"
+                      type="button"
+                      class="user-label-badge"
+                    >
+                      <span class="user-label-badge__text">{{ label }}</span>
+                    </button>
+                  </div>
+                  <p class="text-xs text-gray-500 hidden sm:block">{{ dashboardSubtitle }}</p>
+                </div>
               </div>
-              <p class="text-xs text-gray-500 hidden sm:block">{{ dashboardSubtitle }}</p>
+              <div v-if="isAdmin" class="brand-revenue-popover">
+                <div class="brand-revenue-popover__header">
+                  <h3 class="brand-revenue-popover__hero">小型淘金站</h3>
+                  <button
+                    type="button"
+                    class="brand-revenue-popover__refresh"
+                    :class="{ 'brand-revenue-popover__refresh--loading': thirdPartyRevenueLoading }"
+                    :disabled="thirdPartyRevenueLoading"
+                    title="刷新数据"
+                    @click.stop="refreshThirdPartyRevenue"
+                  >
+                    <Icon icon="mdi:refresh" class="brand-revenue-popover__refresh-icon" />
+                  </button>
+                </div>
+                <div v-if="thirdPartyRevenueLoading" class="brand-revenue-state">
+                  <span class="brand-revenue-spinner"></span>
+                  <span>正在拉取每日金额...</span>
+                </div>
+                <div
+                  v-else-if="thirdPartyRevenueError"
+                  class="brand-revenue-state brand-revenue-state--error"
+                >
+                  {{ thirdPartyRevenueError }}
+                </div>
+                <div v-else class="brand-revenue-table-shell">
+                  <table class="brand-revenue-table">
+                    <thead>
+                      <tr>
+                        <th>日期</th>
+                        <th>金额</th>
+                        <th>分成</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="row in thirdPartyRevenueRows" :key="row.date">
+                        <td>{{ formatThirdPartyRevenueDate(row.date) }}</td>
+                        <td>{{ formatYuanAmount(row.amount) }}</td>
+                        <td>{{ formatYuanAmount(getRevenueShare(row.amount)) }}</td>
+                      </tr>
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <td>总计</td>
+                        <td>{{ formatYuanAmount(thirdPartyRevenueTotal) }}</td>
+                        <td>{{ formatYuanAmount(thirdPartyRevenueShareTotal) }}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
             </div>
 
             <div v-if="hasChannelTabs" class="hidden md:flex items-center min-w-0 flex-1">
@@ -661,7 +723,13 @@ import { useUserAuth } from '@/composables/useUserAuth'
 import { useDynamicTitle } from '@/composables/useDynamicTitle'
 import { useSessionStore } from '@/stores/session'
 import { useSettingsStore } from '@/stores/settings'
-import { getDataOverviewV1, getMonthlyRechargeAnalyze, getOrders, getReport } from '@/api'
+import {
+  getDataOverviewV1,
+  getMonthlyRechargeAnalyze,
+  getOrders,
+  getReport,
+  getThirdPartyRevenue,
+} from '@/api'
 import type {
   ReportData,
   ReportRow,
@@ -730,6 +798,10 @@ interface OrderUserCardItem {
   scope: OrderUserCardScope
   aliases?: string[]
 }
+interface ThirdPartyRevenueRow {
+  date: string
+  amount: number
+}
 
 const DEFAULT_RUNTIME_WEB_MENUS: RuntimeWebMenus = {
   dashboard: true,
@@ -747,8 +819,15 @@ const dashboardRequestControllers = new Map<DashboardRequestScope, AbortControll
 let dashboardRequestGeneration = 0
 let channelSwitchController: AbortController | null = null
 let channelSwitchSerial = 0
+let brandRevenueHoverTimer: number | null = null
+const THIRD_PARTY_REVENUE_START_DATE = '2026-05-05'
 const reportDateRange = ref<DateRangeValue>(null)
 const orderDateRange = ref<DateRangeValue>(null)
+const thirdPartyRevenueRows = ref<ThirdPartyRevenueRow[]>([])
+const thirdPartyRevenueLoading = ref(false)
+const thirdPartyRevenueError = ref('')
+const thirdPartyRevenueLoadedKey = ref('')
+const thirdPartyRevenueRequestedKey = ref('')
 const changePasswordForm = reactive({
   currentPassword: '',
   newPassword: '',
@@ -834,6 +913,16 @@ const hasAccountTableId = computed(() => {
   )
 })
 const dashboardSubtitle = computed(() => '数据驱动，精准运营')
+const thirdPartyRevenueTotal = computed(() =>
+  thirdPartyRevenueRows.value.reduce((sum, row) => sum + row.amount, 0)
+)
+const thirdPartyRevenueShareTotal = computed(() =>
+  thirdPartyRevenueRows.value.reduce((sum, row) => sum + getRevenueShare(row.amount), 0)
+)
+
+function getRevenueShare(amount: number) {
+  return Number(amount || 0) * 0.1
+}
 const hasActiveChannel = computed(() =>
   isAdmin.value ? Boolean(sessionStore.activeChannelId) : Boolean(sessionStore.currentChannel?.id)
 )
@@ -1650,6 +1739,15 @@ function formatCurrency(amountInCent: number) {
   return `¥${(amountInCent / 100).toFixed(1)}`
 }
 
+function formatYuanAmount(amount: number) {
+  return `¥${Number(amount || 0).toFixed(2)}`
+}
+
+function formatThirdPartyRevenueDate(date: string) {
+  const [, month, day] = date.split('-')
+  return `${Number(month || 0)}月${Number(day || 0)}日`
+}
+
 function formatOverviewAmount(amountInCent: number) {
   return (amountInCent / 100).toFixed(1)
 }
@@ -1691,6 +1789,107 @@ function getCurrentMonthDateRange() {
     begin: formatDate(firstDay),
     end: formatDate(now),
   }
+}
+
+function getDateRangeList(begin: string, end: string) {
+  const beginDate = new Date(`${begin} 00:00:00`)
+  const endDate = new Date(`${end} 00:00:00`)
+  if (Number.isNaN(beginDate.getTime()) || Number.isNaN(endDate.getTime()) || endDate < beginDate) {
+    return []
+  }
+
+  const dates: string[] = []
+  const cursor = new Date(beginDate)
+  while (cursor <= endDate) {
+    dates.push(formatDate(cursor))
+    cursor.setDate(cursor.getDate() + 1)
+  }
+  return dates
+}
+
+async function fetchThirdPartyRevenueByDate(date: string): Promise<ThirdPartyRevenueRow> {
+  const result = await getThirdPartyRevenue(date)
+  if (result.code !== 0) {
+    throw new Error(result.message || `请求 ${date} 金额失败`)
+  }
+
+  const amountInCent = Number(result.data?.total || 0)
+  return {
+    date,
+    amount: Number.isFinite(amountInCent) ? amountInCent / 100 : 0,
+  }
+}
+
+async function loadThirdPartyRevenue(forceRefresh = false) {
+  if (!isAdmin.value) {
+    return
+  }
+
+  const today = formatDate(new Date())
+  if (thirdPartyRevenueLoading.value) {
+    return
+  }
+
+  if (
+    !forceRefresh &&
+    (thirdPartyRevenueLoadedKey.value === today || thirdPartyRevenueRequestedKey.value === today)
+  ) {
+    return
+  }
+
+  thirdPartyRevenueRequestedKey.value = today
+  if (forceRefresh) {
+    thirdPartyRevenueError.value = ''
+  }
+
+  const dates = getDateRangeList(THIRD_PARTY_REVENUE_START_DATE, today)
+  if (dates.length === 0) {
+    thirdPartyRevenueRows.value = []
+    thirdPartyRevenueLoadedKey.value = today
+    return
+  }
+
+  thirdPartyRevenueLoading.value = true
+  thirdPartyRevenueError.value = ''
+  try {
+    thirdPartyRevenueRows.value = await Promise.all(dates.map(fetchThirdPartyRevenueByDate))
+    thirdPartyRevenueLoadedKey.value = today
+  } catch (error) {
+    console.error('获取第三方金额失败:', error)
+    thirdPartyRevenueError.value = error instanceof Error ? error.message : '获取第三方金额失败'
+  } finally {
+    thirdPartyRevenueLoading.value = false
+  }
+}
+
+function refreshThirdPartyRevenue() {
+  if (!isAdmin.value || thirdPartyRevenueLoading.value) {
+    return
+  }
+
+  thirdPartyRevenueLoadedKey.value = ''
+  thirdPartyRevenueRequestedKey.value = ''
+  loadThirdPartyRevenue(true)
+}
+
+function handleBrandRevenuePointerEnter() {
+  if (brandRevenueHoverTimer !== null) {
+    window.clearTimeout(brandRevenueHoverTimer)
+  }
+
+  brandRevenueHoverTimer = window.setTimeout(() => {
+    brandRevenueHoverTimer = null
+    loadThirdPartyRevenue()
+  }, 350)
+}
+
+function handleBrandRevenuePointerLeave() {
+  if (brandRevenueHoverTimer === null) {
+    return
+  }
+
+  window.clearTimeout(brandRevenueHoverTimer)
+  brandRevenueHoverTimer = null
 }
 
 function formatReportDate(value: string | number) {
@@ -2282,6 +2481,7 @@ watch(
 )
 
 onUnmounted(() => {
+  handleBrandRevenuePointerLeave()
   channelSwitchController?.abort()
   cancelDashboardRequests()
   window.removeEventListener('resize', handleWindowResize)
@@ -2289,6 +2489,207 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.brand-revenue-menu {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.brand-revenue-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 1rem;
+  min-height: 3.5rem;
+  padding-right: 0.4rem;
+  border-radius: 1rem;
+  cursor: default;
+}
+
+.brand-revenue-popover {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: -0.25rem;
+  width: min(22rem, calc(100vw - 2rem));
+  padding: 0.85rem;
+  border-radius: 1.15rem;
+  border: 1px solid rgba(191, 219, 254, 0.86);
+  background:
+    radial-gradient(circle at top left, rgba(59, 130, 246, 0.16), transparent 42%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96));
+  box-shadow:
+    0 28px 70px -34px rgba(15, 23, 42, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-0.35rem) scale(0.98);
+  transform-origin: top left;
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease,
+    visibility 0.18s ease;
+  z-index: 80;
+}
+
+.brand-revenue-menu--disabled:hover .brand-revenue-popover {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-0.35rem) scale(0.98);
+}
+
+.brand-revenue-menu:not(.brand-revenue-menu--disabled):hover .brand-revenue-popover {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+}
+
+.brand-revenue-popover__header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+}
+
+.brand-revenue-popover__hero {
+  margin: 0;
+  font-size: 1.45rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  background: linear-gradient(120deg, #f97316 0%, #f59e0b 35%, #ef4444 70%, #db2777 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 6px 18px rgba(249, 115, 22, 0.18);
+}
+
+.brand-revenue-popover__refresh {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  padding: 0;
+  border-radius: 9999px;
+  border: 1px solid rgba(249, 115, 22, 0.32);
+  background: rgba(255, 255, 255, 0.92);
+  color: rgb(234 88 12);
+  cursor: pointer;
+  box-shadow: 0 6px 14px -8px rgba(249, 115, 22, 0.45);
+  transition:
+    transform 0.18s ease,
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease;
+}
+
+.brand-revenue-popover__refresh:hover {
+  transform: translateY(-50%) rotate(60deg);
+  background: rgba(255, 247, 237, 0.96);
+  border-color: rgba(234, 88, 12, 0.55);
+  color: rgb(194 65 12);
+}
+
+.brand-revenue-popover__refresh:disabled {
+  cursor: progress;
+  opacity: 0.85;
+}
+
+.brand-revenue-popover__refresh-icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+.brand-revenue-popover__refresh--loading .brand-revenue-popover__refresh-icon {
+  animation: brand-revenue-spin 0.9s linear infinite;
+}
+
+.brand-revenue-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 8rem;
+  border-radius: 0.9rem;
+  background: rgba(239, 246, 255, 0.72);
+  color: rgb(71 85 105);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.brand-revenue-state--error {
+  background: rgba(254, 242, 242, 0.82);
+  color: rgb(185 28 28);
+}
+
+.brand-revenue-spinner {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 9999px;
+  border: 2px solid rgba(59, 130, 246, 0.24);
+  border-top-color: rgb(37 99 235);
+  animation: brand-revenue-spin 0.8s linear infinite;
+}
+
+.brand-revenue-table-shell {
+  overflow: hidden;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(226, 232, 240, 0.96);
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.brand-revenue-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: rgb(30 41 59);
+  font-size: 0.86rem;
+}
+
+.brand-revenue-table th,
+.brand-revenue-table td {
+  padding: 0.56rem 0.72rem;
+  text-align: left;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.82);
+}
+
+.brand-revenue-table th {
+  background: rgba(239, 246, 255, 0.82);
+  color: rgb(71 85 105);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.brand-revenue-table th:last-child,
+.brand-revenue-table td:last-child {
+  text-align: right;
+}
+
+.brand-revenue-table tbody tr:nth-child(even) td {
+  background: rgba(248, 250, 252, 0.72);
+}
+
+.brand-revenue-table tbody td:last-child {
+  color: rgb(15 23 42);
+  font-weight: 800;
+}
+
+.brand-revenue-table tfoot td {
+  border-bottom: 0;
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.1), rgba(14, 165, 233, 0.1));
+  color: rgb(30 64 175);
+  font-weight: 900;
+}
+
+@keyframes brand-revenue-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .channel-tabs-shell {
   display: inline-flex;
   align-items: center;

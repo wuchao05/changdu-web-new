@@ -22,6 +22,7 @@ import type {
   DataOverviewV1Params,
   MonthlyRechargeAnalyzeResponse,
   MonthlyRechargeAnalyzeParams,
+  ThirdPartyRevenueResponse,
 } from './types'
 
 /**
@@ -63,6 +64,18 @@ export function getOrders(
     .get('/novelsale/distributor/promotion/detail/v2', {
       ...config,
       params: finalParams,
+    })
+    .then(res => res.data)
+}
+
+export function getThirdPartyRevenue(
+  date: string,
+  config: Pick<AxiosRequestConfig, 'signal'> = {}
+): Promise<ThirdPartyRevenueResponse> {
+  return httpInstance
+    .get('/jcyb/get-info', {
+      ...config,
+      params: { date },
     })
     .then(res => res.data)
 }

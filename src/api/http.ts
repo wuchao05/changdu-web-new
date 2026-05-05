@@ -29,6 +29,7 @@ function getApiType(url: string | undefined) {
   if (!url) return 'default'
   if (url.includes('/download_center/get_url')) return 'download_center'
   if (url.includes('/download_center/task_list')) return 'task_list'
+  if (url.includes('/jcyb/')) return 'third_party_pure'
   return 'default'
 }
 
@@ -89,7 +90,7 @@ httpInstance.interceptors.request.use(
       config.headers['X-Studio-Channel-Id'] = selectedChannelId
     }
 
-    if (apiConfig.cookie) {
+    if (apiConfig.cookie && apiType !== 'third_party_pure') {
       addCookieToRequest(config, apiConfig.cookie)
     }
 

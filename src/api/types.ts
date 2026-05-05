@@ -157,6 +157,15 @@ export interface ReportData {
   rows?: ReportRow[]
 }
 
+export interface ThirdPartyRevenueResponse {
+  code: number
+  message?: string
+  currentTime?: number
+  data?: {
+    total?: string | number
+  }
+}
+
 // 短剧排行榜相关类型
 export interface DramaRankingData {
   code: number

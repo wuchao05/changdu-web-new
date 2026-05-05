@@ -30,6 +30,11 @@ export default defineConfig(async ({ mode }) => {
       port: 5178,
       strictPort: true,
       proxy: {
+        '/api/jcyb': {
+          target: 'http://localhost:3000',
+          changeOrigin: true,
+          secure: false,
+        },
         '/api': {
           target: apiProxyTarget,
           changeOrigin: true,
