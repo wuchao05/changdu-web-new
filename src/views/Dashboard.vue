@@ -386,11 +386,11 @@
                     :key="tab.key"
                     class="order-user-tab"
                     :class="{
-                      active: !ordersLoading && activePromotionUserName === tab.key,
+                      active: !ordersLoading && isOrderUserCardActive(tab),
                       'order-user-tab--all': tab.key === '' || tab.key === '__loading_all__',
                       'order-user-tab--loading': ordersLoading,
                     }"
-                    @click="!ordersLoading && handlePromotionUserTabChange(tab.key)"
+                    @click="!ordersLoading && handleOrderUserCardChange(tab)"
                   >
                     <div class="order-user-tab__body">
                       <div class="order-user-tab__head">
@@ -714,11 +714,21 @@ const changePasswordFormRef = ref<FormInst | null>(null)
 type DateRangeValue = [string, string] | null
 type DashboardRequestScope = 'overview' | 'report' | 'orders' | 'material'
 type RuntimeWebMenus = adminApi.UserChannelBindingConfig['permissions']['webMenus']
+type OrderUserCardScope = 'all' | 'summary' | 'branch' | 'loading'
 interface DashboardRequestContext {
   scope: DashboardRequestScope
   controller: AbortController
   generation: number
   signal: AbortSignal
+}
+interface OrderUserCardItem {
+  key: string
+  label: string
+  total: number
+  totalAmount: number
+  meta: string
+  scope: OrderUserCardScope
+  aliases?: string[]
 }
 
 const DEFAULT_RUNTIME_WEB_MENUS: RuntimeWebMenus = {
@@ -1189,7 +1199,7 @@ const orderBranchCardItems = computed(() => {
     ? ordersData.value.promotion_user_branch_summaries
     : []
 
-  return summaries.map((summary: PromotionUserSummary) => ({
+  const branchCards = summaries.map((summary: PromotionUserSummary) => ({
     key: summary.username,
     label: summary.username,
     total: Number(summary.total || 0),
@@ -1197,6 +1207,29 @@ const orderBranchCardItems = computed(() => {
     paidOrderCount: Number(summary.paid_order_count || 0),
     aliases: Array.isArray(summary.aliases) ? summary.aliases : [],
   }))
+
+  if (orderUserSortMode.value === 'amount_desc') {
+    return [...branchCards].sort((left, right) => {
+      const amountDiff = right.totalAmount - left.totalAmount
+      if (amountDiff !== 0) {
+        return amountDiff
+      }
+      return right.paidOrderCount - left.paidOrderCount
+    })
+  }
+
+  return branchCards
+})
+
+const shouldFlattenOrderBranch = computed(() => {
+  const summaries = Array.isArray(ordersData.value?.promotion_user_summaries)
+    ? ordersData.value.promotion_user_summaries
+    : []
+  return (
+    summaries.length === 1 &&
+    orderStatsChildUserIds.value.length > 0 &&
+    orderBranchCardItems.value.length > 0
+  )
 })
 
 const activeBranchCard = computed(
@@ -1205,12 +1238,19 @@ const activeBranchCard = computed(
 
 const shouldShowOrderBranch = computed(
   () =>
+    !shouldFlattenOrderBranch.value &&
     orderStatsChildUserIds.value.length > 0 &&
     activePromotionUserName.value === orderStatsParentUserName.value &&
     orderBranchCardItems.value.length > 0
 )
 
 const orderRows = computed<OrderItem[]>(() => {
+  if (shouldFlattenOrderBranch.value) {
+    return activeBranchCard.value
+      ? matchOrdersByAliases(allOrderRows.value, activeBranchCard.value.aliases || [])
+      : allOrderRows.value
+  }
+
   if (shouldShowOrderBranch.value && activeBranchCard.value) {
     return matchOrdersByAliases(rootPromotionOrders.value, activeBranchCard.value?.aliases || [])
   }
@@ -1266,7 +1306,7 @@ const pagedOrderRows = computed<OrderItem[]>(() => {
   return orderRows.value.slice(startIndex, startIndex + pageSize)
 })
 
-const orderUserTabs = computed(() => {
+const orderUserTabs = computed<OrderUserCardItem[]>(() => {
   const summaries = Array.isArray(ordersData.value?.promotion_user_summaries)
     ? ordersData.value?.promotion_user_summaries || []
     : []
@@ -1286,6 +1326,47 @@ const orderUserTabs = computed(() => {
     })
   }
 
+  if (shouldFlattenOrderBranch.value) {
+    return [
+      {
+        key: '',
+        label: '全部',
+        total:
+          typeof ordersData.value?.all_total === 'number'
+            ? ordersData.value.all_total
+            : (ordersData.value?.data || []).length,
+        totalAmount:
+          typeof ordersData.value?.all_total_amount === 'number'
+            ? ordersData.value.all_total_amount
+            : calculateOrderRechargeAmount(ordersData.value?.data || []),
+        meta: '当前时间段全部订单汇总',
+        scope: 'all' as const,
+      },
+      ...orderBranchCardItems.value.map(branchUser => ({
+        key: branchUser.key,
+        label: branchUser.label,
+        total: branchUser.total,
+        totalAmount: branchUser.totalAmount,
+        meta: `支付成功 ${formatNumberValue(branchUser.paidOrderCount || 0)} 单`,
+        scope: 'branch' as const,
+        aliases: branchUser.aliases,
+      })),
+    ]
+  }
+
+  const summaryCards = sortedSummaries.map((summary: PromotionUserSummary) => ({
+    key: summary.username,
+    label: summary.username,
+    total: Number(summary.total || 0),
+    totalAmount: Number(summary.total_amount || 0),
+    meta: `支付成功 ${formatNumberValue(summary.paid_order_count || 0)} 单`,
+    scope: 'summary' as const,
+  }))
+
+  if (summaries.length === 1) {
+    return summaryCards
+  }
+
   return [
     {
       key: '',
@@ -1299,24 +1380,32 @@ const orderUserTabs = computed(() => {
           ? ordersData.value.all_total_amount
           : calculateOrderRechargeAmount(ordersData.value?.data || []),
       meta: '当前时间段全部订单汇总',
+      scope: 'all' as const,
     },
-    ...sortedSummaries.map((summary: PromotionUserSummary) => ({
-      key: summary.username,
-      label: summary.username,
-      total: Number(summary.total || 0),
-      totalAmount: Number(summary.total_amount || 0),
-      meta: `支付成功 ${formatNumberValue(summary.paid_order_count || 0)} 单`,
-    })),
+    ...summaryCards,
   ]
 })
 
-const orderUserCardItems = computed(() => {
+const orderUserCardItems = computed<OrderUserCardItem[]>(() => {
   if (orderUserTabs.value.length > 0) {
     return orderUserTabs.value
   }
 
   if (!ordersLoading.value || configuredOrderUsernames.value.length === 0) {
     return []
+  }
+
+  const loadingUserCards = configuredOrderUsernames.value.map(username => ({
+    key: `__loading_${username}`,
+    label: username,
+    total: 0,
+    totalAmount: 0,
+    meta: '加载中',
+    scope: 'loading' as const,
+  }))
+
+  if (configuredOrderUsernames.value.length === 1 && orderStatsChildUserIds.value.length === 0) {
+    return loadingUserCards
   }
 
   return [
@@ -1326,14 +1415,9 @@ const orderUserCardItems = computed(() => {
       total: 0,
       totalAmount: 0,
       meta: '当前时间段全部订单汇总',
+      scope: 'loading' as const,
     },
-    ...configuredOrderUsernames.value.map(username => ({
-      key: `__loading_${username}`,
-      label: username,
-      total: 0,
-      totalAmount: 0,
-      meta: '加载中',
-    })),
+    ...loadingUserCards,
   ]
 })
 
@@ -1810,7 +1894,9 @@ async function fetchOrdersData() {
       : []
     activePromotionUserName.value = nextSummaryUsernames.includes(previousActivePromotionUserName)
       ? previousActivePromotionUserName
-      : ''
+      : nextSummaryUsernames.length === 1
+        ? nextSummaryUsernames[0]
+        : ''
     ordersCurrentPage.value = 1
     ordersPagination.page = 1
   } catch (error) {
@@ -2000,6 +2086,38 @@ function handlePayStatusChange() {
   fetchOrdersData()
 }
 
+function isOrderUserCardActive(tab: OrderUserCardItem) {
+  if (tab.scope === 'all') {
+    return !activePromotionUserName.value && !activeBranchUserId.value
+  }
+
+  if (tab.scope === 'branch') {
+    return activeBranchUserId.value === tab.key
+  }
+
+  return activePromotionUserName.value === tab.key
+}
+
+function handleOrderUserCardChange(tab: OrderUserCardItem) {
+  if (tab.scope === 'branch') {
+    handleBranchUserChange(tab.key)
+    if (activePromotionUserName.value) {
+      activePromotionUserName.value = ''
+    }
+    return
+  }
+
+  if (tab.scope === 'all') {
+    if (activeBranchUserId.value) {
+      activeBranchUserId.value = ''
+      ordersCurrentPage.value = 1
+      ordersPagination.page = 1
+    }
+  }
+
+  handlePromotionUserTabChange(tab.key)
+}
+
 function handlePromotionUserTabChange(username: string) {
   if (activePromotionUserName.value === username) {
     return
@@ -2124,8 +2242,26 @@ function handleOrdersPageChange(page: number) {
 }
 
 watch(
-  [activePromotionUserName, orderBranchCardItems],
-  ([activeUsername, branchCards]) => {
+  [activePromotionUserName, orderBranchCardItems, shouldFlattenOrderBranch],
+  ([activeUsername, branchCards, shouldFlatten]) => {
+    if (shouldFlatten) {
+      if (activePromotionUserName.value) {
+        activePromotionUserName.value = ''
+      }
+
+      const hasActiveBranchUser = branchCards.some(item => item.key === activeBranchUserId.value)
+      if (hasActiveBranchUser) {
+        return
+      }
+
+      if (activeBranchUserId.value) {
+        activeBranchUserId.value = ''
+        ordersCurrentPage.value = 1
+        ordersPagination.page = 1
+      }
+      return
+    }
+
     if (activeUsername !== orderStatsParentUserName.value || branchCards.length === 0) {
       if (activeBranchUserId.value) {
         activeBranchUserId.value = ''

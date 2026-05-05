@@ -15,7 +15,12 @@
 
     <!-- 购物车面板 -->
     <transition name="slide-fade">
-      <div v-if="isOpen" ref="cartPanelRef" class="cart-panel">
+      <div
+        v-if="isOpen"
+        ref="cartPanelRef"
+        class="cart-panel"
+        :style="{ '--cart-panel-max-height': `${panelMaxHeight}px` }"
+      >
         <div class="cart-header">
           <h3 class="cart-title">待提交剧集</h3>
           <div class="cart-header-actions">
@@ -102,14 +107,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useMessage } from 'naive-ui'
 import { batchSubmitDownload } from '@/api/index'
 
 const message = useMessage()
 
-defineProps<{
+const props = defineProps<{
   inline?: boolean
 }>()
 
@@ -137,6 +142,7 @@ const submittingIds = ref<Set<string>>(new Set())
 const isSubmitting = ref(false)
 const cartTriggerRef = ref<HTMLElement | null>(null)
 const cartPanelRef = ref<HTMLElement | null>(null)
+const panelMaxHeight = ref(400)
 
 // 计算属性
 const submittingCount = computed(() => submittingIds.value.size)
@@ -150,11 +156,29 @@ function emitItemsChanged() {
 
 // 切换购物车显示
 function toggleCart() {
-  isOpen.value = !isOpen.value
+  const nextOpen = !isOpen.value
+  isOpen.value = nextOpen
+  if (nextOpen) {
+    nextTick(updatePanelMaxHeight)
+  }
 }
 
 function closeCart() {
   isOpen.value = false
+}
+
+function updatePanelMaxHeight() {
+  if (!isOpen.value || !cartTriggerRef.value) return
+
+  const triggerRect = cartTriggerRef.value.getBoundingClientRect()
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight
+  const panelGap = 8
+  const viewportPadding = 16
+  const availableHeight = props.inline
+    ? viewportHeight - triggerRect.bottom - panelGap - viewportPadding
+    : triggerRect.top - panelGap - viewportPadding
+
+  panelMaxHeight.value = Math.max(220, Math.min(400, Math.floor(availableHeight)))
 }
 
 function handleDocumentPointerDown(event: PointerEvent) {
@@ -170,10 +194,14 @@ function handleDocumentPointerDown(event: PointerEvent) {
 
 onMounted(() => {
   document.addEventListener('pointerdown', handleDocumentPointerDown)
+  window.addEventListener('resize', updatePanelMaxHeight)
+  window.addEventListener('scroll', updatePanelMaxHeight, true)
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', handleDocumentPointerDown)
+  window.removeEventListener('resize', updatePanelMaxHeight)
+  window.removeEventListener('scroll', updatePanelMaxHeight, true)
 })
 
 // 添加剧集到购物车（带抛物线动画）
@@ -282,6 +310,7 @@ async function submitAll() {
       cartItems.value = []
       submittingIds.value.clear()
       emitItemsChanged()
+      closeCart()
     } else {
       throw new Error(response.message || '批量提交失败')
     }
@@ -314,6 +343,7 @@ function finishSubmitting(success: boolean, successCount?: number, failedCount?:
     cartItems.value = []
     submittingIds.value.clear()
     emitItemsChanged()
+    closeCart()
 
     if (successCount !== undefined) {
       if (failedCount && failedCount > 0) {
@@ -436,7 +466,7 @@ defineExpose({
   bottom: 58px;
   right: 0;
   width: 300px;
-  max-height: 600px;
+  max-height: min(400px, var(--cart-panel-max-height, calc(100dvh - 120px)));
   background: white;
   border-radius: 12px;
   border: 1px solid rgba(148, 163, 184, 0.18);
@@ -475,7 +505,7 @@ defineExpose({
     right: 12px;
     bottom: 12px;
     width: auto;
-    height: min(78dvh, 560px);
+    height: min(64dvh, 440px);
     max-height: calc(100dvh - 24px);
     border-radius: 20px;
   }
@@ -557,10 +587,9 @@ defineExpose({
 
 /* 内容区 */
 .cart-body {
-  flex: 1;
+  flex: 1 1 auto;
   overflow-y: auto;
-  min-height: 200px;
-  max-height: 400px;
+  min-height: 0;
 }
 
 .empty-cart {

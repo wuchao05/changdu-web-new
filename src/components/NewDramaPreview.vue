@@ -1433,7 +1433,11 @@ const currentDateDramas = computed(() => {
 })
 
 function canAddDownloadDrama(drama: NewDramaItem | RankingDramaItem) {
-  return !drama.feishu_downloaded && !drama.feishu_exists
+  return (
+    !drama.feishu_downloaded &&
+    !drama.feishu_exists &&
+    !submittedForDownloadSet.value.has(drama.book_id)
+  )
 }
 
 function buildCartItem(drama: NewDramaItem | RankingDramaItem): CartItem {
@@ -1865,6 +1869,11 @@ function handleAddToCart(payload: {
   sourceElement: HTMLElement
 }) {
   const { drama } = payload
+
+  if (!canAddDownloadDrama(drama)) {
+    message.info('该剧已提交待下载，无需重复加入')
+    return
+  }
 
   if (!dramaCartRef.value) {
     message.error('购物车组件未加载')
