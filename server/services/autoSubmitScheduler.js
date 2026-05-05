@@ -378,6 +378,7 @@ function getRuntimeJuliangConfig(instanceKey) {
   return {
     cookie: String(runtime.juliang.cookie || '').trim(),
     csrfToken: String(runtime.juliang.csrfToken || '').trim(),
+    buildConfig: runtime.buildConfig || {},
   }
 }
 
@@ -1287,18 +1288,33 @@ async function getDownloadTaskList(channelId, startTime, endTime) {
  */
 async function editJuliangAccountRemark(channelId, accountId, remark) {
   const juliangConfig = getRuntimeJuliangConfig(channelId)
-  const response = await fetch(
-    'https://business.oceanengine.com/nbs/api/bm/promotion/edit_account_remark',
-    {
-      method: 'POST',
-      headers: {
+  const useNewJuliangFlow = Boolean(juliangConfig.buildConfig?.useNewMicroAppAssetFlow)
+  const ebpid = String(juliangConfig.buildConfig?.ebpid || '').trim()
+
+  if (useNewJuliangFlow && !ebpid) {
+    throw new Error('当前渠道已启用新版巨量，但未配置 ebpid')
+  }
+
+  const requestUrl = useNewJuliangFlow
+    ? `https://business.oceanengine.com/api/ebp/promotion/common/edit_account_remark?ebpid=${ebpid}`
+    : 'https://business.oceanengine.com/nbs/api/bm/promotion/edit_account_remark'
+  const requestHeaders = useNewJuliangFlow
+    ? {
+        Cookie: juliangConfig.cookie,
+        'Content-Type': 'application/json',
+      }
+    : {
         'Content-Type': 'application/json',
         Cookie: juliangConfig.cookie,
         'X-CSRFToken': juliangConfig.csrfToken,
-      },
-      body: JSON.stringify({ account_id: accountId, remark }),
-    }
-  )
+      }
+  const requestBody = useNewJuliangFlow ? { accountId, remark } : { account_id: accountId, remark }
+
+  const response = await fetch(requestUrl, {
+    method: 'POST',
+    headers: requestHeaders,
+    body: JSON.stringify(requestBody),
+  })
 
   return safeJsonParse(response, '更新巨量账户备注')
 }
