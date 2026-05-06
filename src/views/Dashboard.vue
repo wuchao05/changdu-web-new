@@ -52,7 +52,7 @@
               </div>
               <div v-if="isAdmin" class="brand-revenue-popover">
                 <div class="brand-revenue-popover__header">
-                  <h3 class="brand-revenue-popover__hero">小型淘金站</h3>
+                  <h3 class="brand-revenue-popover__hero">妍宇小金库</h3>
                   <button
                     type="button"
                     class="brand-revenue-popover__refresh"
