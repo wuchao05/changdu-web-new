@@ -8,9 +8,9 @@
           <div class="flex items-center space-x-4 min-w-0 flex-1">
             <div
               class="brand-revenue-menu"
-              :class="{ 'brand-revenue-menu--disabled': !isAdmin }"
-              @pointerenter="isAdmin && handleBrandRevenuePointerEnter()"
-              @pointerleave="isAdmin && handleBrandRevenuePointerLeave()"
+              :class="{ 'brand-revenue-menu--disabled': !showBrandRevenue || !isAdmin }"
+              @pointerenter="showBrandRevenue && isAdmin && handleBrandRevenuePointerEnter()"
+              @pointerleave="showBrandRevenue && isAdmin && handleBrandRevenuePointerLeave()"
             >
               <div class="brand-revenue-trigger">
                 <div
@@ -50,7 +50,7 @@
                   <p class="text-xs text-gray-500 hidden sm:block">{{ dashboardSubtitle }}</p>
                 </div>
               </div>
-              <div v-if="isAdmin" class="brand-revenue-popover">
+              <div v-if="showBrandRevenue && isAdmin" class="brand-revenue-popover">
                 <div class="brand-revenue-popover__header">
                   <h3 class="brand-revenue-popover__hero">妍宇小金库</h3>
                   <button
@@ -820,6 +820,7 @@ let dashboardRequestGeneration = 0
 let channelSwitchController: AbortController | null = null
 let channelSwitchSerial = 0
 let brandRevenueHoverTimer: number | null = null
+const showBrandRevenue = false
 const THIRD_PARTY_REVENUE_START_DATE = '2026-05-05'
 const reportDateRange = ref<DateRangeValue>(null)
 const orderDateRange = ref<DateRangeValue>(null)
