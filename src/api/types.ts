@@ -166,6 +166,28 @@ export interface ThirdPartyRevenueResponse {
   }
 }
 
+export interface ThirdPartyRevenueShareRecord {
+  actualShare: number | null
+  updatedAt?: string
+}
+
+export interface ThirdPartyRevenueSharesResponse {
+  code: number
+  message?: string
+  data?: {
+    records?: Record<string, ThirdPartyRevenueShareRecord>
+    updatedAt?: string
+  }
+}
+
+export interface SaveThirdPartyRevenueShareResponse {
+  code: number
+  message?: string
+  data?: ThirdPartyRevenueShareRecord & {
+    date: string
+  }
+}
+
 // 短剧排行榜相关类型
 export interface DramaRankingData {
   code: number

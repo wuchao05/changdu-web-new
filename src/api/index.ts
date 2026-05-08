@@ -23,6 +23,8 @@ import type {
   MonthlyRechargeAnalyzeResponse,
   MonthlyRechargeAnalyzeParams,
   ThirdPartyRevenueResponse,
+  ThirdPartyRevenueSharesResponse,
+  SaveThirdPartyRevenueShareResponse,
 } from './types'
 
 /**
@@ -77,6 +79,21 @@ export function getThirdPartyRevenue(
       ...config,
       params: { date },
     })
+    .then(res => res.data)
+}
+
+export function getThirdPartyRevenueShares(
+  config: Pick<AxiosRequestConfig, 'signal'> = {}
+): Promise<ThirdPartyRevenueSharesResponse> {
+  return httpInstance.get('/jcyb/revenue-shares', config).then(res => res.data)
+}
+
+export function saveThirdPartyRevenueShare(
+  date: string,
+  actualShare: number | null
+): Promise<SaveThirdPartyRevenueShareResponse> {
+  return httpInstance
+    .put(`/jcyb/revenue-shares/${encodeURIComponent(date)}`, { actualShare })
     .then(res => res.data)
 }
 

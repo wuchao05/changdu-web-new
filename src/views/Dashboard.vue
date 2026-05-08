@@ -52,7 +52,7 @@
               </div>
               <div v-if="showBrandRevenue && isAdmin" class="brand-revenue-popover">
                 <div class="brand-revenue-popover__header">
-                  <h3 class="brand-revenue-popover__hero">妍宇小金库</h3>
+                  <h3 class="brand-revenue-popover__hero">看天吃饭发财池</h3>
                   <button
                     type="button"
                     class="brand-revenue-popover__refresh"
@@ -80,7 +80,8 @@
                       <tr>
                         <th>日期</th>
                         <th>金额</th>
-                        <th>分成</th>
+                        <th>账面分成</th>
+                        <th>实际分成</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -88,6 +89,35 @@
                         <td>{{ formatThirdPartyRevenueDate(row.date) }}</td>
                         <td>{{ formatYuanAmount(row.amount) }}</td>
                         <td>{{ formatYuanAmount(getRevenueShare(row.amount)) }}</td>
+                        <td>
+                          <input
+                            v-if="editingRevenueShareDate === row.date"
+                            :ref="setRevenueShareInputRef"
+                            v-model="editingRevenueShareValue"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            class="brand-revenue-share-input"
+                            :disabled="Boolean(revenueShareSavingDates[row.date])"
+                            autofocus
+                            @blur="commitThirdPartyRevenueShare(row)"
+                            @keydown.enter.prevent="commitThirdPartyRevenueShare(row)"
+                            @keydown.esc.stop.prevent="cancelThirdPartyRevenueShareEdit"
+                          />
+                          <button
+                            v-else
+                            type="button"
+                            class="brand-revenue-share-display"
+                            :disabled="Boolean(revenueShareSavingDates[row.date])"
+                            @click.stop="startThirdPartyRevenueShareEdit(row)"
+                          >
+                            {{
+                              revenueShareSavingDates[row.date]
+                                ? '保存中...'
+                                : formatOptionalYuanAmount(row.actualShare)
+                            }}
+                          </button>
+                        </td>
                       </tr>
                     </tbody>
                     <tfoot>
@@ -95,6 +125,7 @@
                         <td>总计</td>
                         <td>{{ formatYuanAmount(thirdPartyRevenueTotal) }}</td>
                         <td>{{ formatYuanAmount(thirdPartyRevenueShareTotal) }}</td>
+                        <td>{{ formatOptionalYuanAmount(thirdPartyRevenueActualShareTotal) }}</td>
                       </tr>
                     </tfoot>
                   </table>
@@ -729,6 +760,8 @@ import {
   getOrders,
   getReport,
   getThirdPartyRevenue,
+  getThirdPartyRevenueShares,
+  saveThirdPartyRevenueShare,
 } from '@/api'
 import type {
   ReportData,
@@ -739,6 +772,7 @@ import type {
   OrderParams,
   ReportParams,
   DataOverviewV1Response,
+  ThirdPartyRevenueShareRecord,
 } from '@/api/types'
 
 defineOptions({
@@ -801,6 +835,7 @@ interface OrderUserCardItem {
 interface ThirdPartyRevenueRow {
   date: string
   amount: number
+  actualShare: number | null
 }
 
 const DEFAULT_RUNTIME_WEB_MENUS: RuntimeWebMenus = {
@@ -830,6 +865,10 @@ const thirdPartyRevenueLoading = ref(false)
 const thirdPartyRevenueError = ref('')
 const thirdPartyRevenueLoadedKey = ref('')
 const thirdPartyRevenueRequestedKey = ref('')
+const editingRevenueShareDate = ref('')
+const editingRevenueShareValue = ref('')
+const revenueShareInputRef = ref<HTMLInputElement | null>(null)
+const revenueShareSavingDates = reactive<Record<string, boolean>>({})
 const changePasswordForm = reactive({
   currentPassword: '',
   newPassword: '',
@@ -924,6 +963,13 @@ const thirdPartyRevenueTotal = computed(() =>
 const thirdPartyRevenueShareTotal = computed(() =>
   thirdPartyRevenueRows.value.reduce((sum, row) => sum + getRevenueShare(row.amount), 0)
 )
+const thirdPartyRevenueActualShareTotal = computed(() => {
+  const values = thirdPartyRevenueRows.value
+    .map(row => row.actualShare)
+    .filter((value): value is number => value !== null)
+
+  return values.length > 0 ? values.reduce((sum, value) => sum + value, 0) : null
+})
 
 function getRevenueShare(amount: number) {
   return Number(amount || 0) * 0.1
@@ -1748,6 +1794,10 @@ function formatYuanAmount(amount: number) {
   return `¥${Number(amount || 0).toFixed(2)}`
 }
 
+function formatOptionalYuanAmount(amount: number | null) {
+  return amount === null ? '-' : formatYuanAmount(amount)
+}
+
 function formatThirdPartyRevenueDate(date: string) {
   const [, month, day] = date.split('-')
   return `${Number(month || 0)}月${Number(day || 0)}日`
@@ -1812,6 +1862,25 @@ function getDateRangeList(begin: string, end: string) {
   return dates
 }
 
+function normalizeRevenueShareAmount(value: unknown) {
+  if (value === null || value === undefined || value === '') {
+    return null
+  }
+
+  const amount = Number(value)
+  return Number.isFinite(amount) && amount >= 0 ? Math.round(amount * 100) / 100 : null
+}
+
+function normalizeRevenueShareInput(value: string) {
+  const trimmedValue = value.trim()
+  if (!trimmedValue) {
+    return null
+  }
+
+  const amount = Number(trimmedValue)
+  return Number.isFinite(amount) && amount >= 0 ? Math.round(amount * 100) / 100 : undefined
+}
+
 async function fetchThirdPartyRevenueByDate(date: string): Promise<ThirdPartyRevenueRow> {
   const result = await getThirdPartyRevenue(date)
   if (result.code !== 0) {
@@ -1822,7 +1891,19 @@ async function fetchThirdPartyRevenueByDate(date: string): Promise<ThirdPartyRev
   return {
     date,
     amount: Number.isFinite(amountInCent) ? amountInCent / 100 : 0,
+    actualShare: null,
   }
+}
+
+async function loadThirdPartyRevenueShareRecords(): Promise<
+  Record<string, ThirdPartyRevenueShareRecord>
+> {
+  const result = await getThirdPartyRevenueShares()
+  if (result.code !== 0) {
+    throw new Error(result.message || '获取实际分成失败')
+  }
+
+  return result.data?.records || {}
 }
 
 async function loadThirdPartyRevenue(forceRefresh = false) {
@@ -1857,13 +1938,72 @@ async function loadThirdPartyRevenue(forceRefresh = false) {
   thirdPartyRevenueLoading.value = true
   thirdPartyRevenueError.value = ''
   try {
-    thirdPartyRevenueRows.value = await Promise.all(dates.map(fetchThirdPartyRevenueByDate))
+    const [rows, shareRecords] = await Promise.all([
+      Promise.all(dates.map(fetchThirdPartyRevenueByDate)),
+      loadThirdPartyRevenueShareRecords(),
+    ])
+    thirdPartyRevenueRows.value = rows.map(row => ({
+      ...row,
+      actualShare: normalizeRevenueShareAmount(shareRecords[row.date]?.actualShare),
+    }))
     thirdPartyRevenueLoadedKey.value = today
   } catch (error) {
     console.error('获取第三方金额失败:', error)
     thirdPartyRevenueError.value = error instanceof Error ? error.message : '获取第三方金额失败'
   } finally {
     thirdPartyRevenueLoading.value = false
+  }
+}
+
+async function startThirdPartyRevenueShareEdit(row: ThirdPartyRevenueRow) {
+  if (revenueShareSavingDates[row.date]) {
+    return
+  }
+
+  editingRevenueShareDate.value = row.date
+  editingRevenueShareValue.value = row.actualShare === null ? '' : String(row.actualShare)
+  await nextTick()
+  revenueShareInputRef.value?.focus()
+  revenueShareInputRef.value?.select()
+}
+
+function cancelThirdPartyRevenueShareEdit() {
+  editingRevenueShareDate.value = ''
+  editingRevenueShareValue.value = ''
+}
+
+function setRevenueShareInputRef(element: unknown) {
+  revenueShareInputRef.value = element instanceof HTMLInputElement ? element : null
+}
+
+async function commitThirdPartyRevenueShare(row: ThirdPartyRevenueRow) {
+  if (editingRevenueShareDate.value !== row.date || revenueShareSavingDates[row.date]) {
+    return
+  }
+
+  const actualShare = normalizeRevenueShareInput(editingRevenueShareValue.value)
+  if (actualShare === undefined) {
+    message.error('请输入有效的实际分成金额')
+    return
+  }
+
+  revenueShareSavingDates[row.date] = true
+  try {
+    const result = await saveThirdPartyRevenueShare(row.date, actualShare)
+    if (result.code !== 0) {
+      throw new Error(result.message || '保存实际分成失败')
+    }
+
+    const savedShare = normalizeRevenueShareAmount(result.data?.actualShare)
+    thirdPartyRevenueRows.value = thirdPartyRevenueRows.value.map(item =>
+      item.date === row.date ? { ...item, actualShare: savedShare } : item
+    )
+    cancelThirdPartyRevenueShareEdit()
+  } catch (error) {
+    console.error('保存实际分成失败:', error)
+    message.error(error instanceof Error ? error.message : '保存实际分成失败')
+  } finally {
+    revenueShareSavingDates[row.date] = false
   }
 }
 
@@ -2514,7 +2654,7 @@ onUnmounted(() => {
   position: absolute;
   top: calc(100% + 0.35rem);
   left: -0.25rem;
-  width: min(22rem, calc(100vw - 2rem));
+  width: min(28rem, calc(100vw - 2rem));
   padding: 0.85rem;
   border-radius: 1.15rem;
   border: 1px solid rgba(191, 219, 254, 0.86);
@@ -2668,8 +2808,8 @@ onUnmounted(() => {
   font-weight: 800;
 }
 
-.brand-revenue-table th:last-child,
-.brand-revenue-table td:last-child {
+.brand-revenue-table th:nth-child(n + 2),
+.brand-revenue-table td:nth-child(n + 2) {
   text-align: right;
 }
 
@@ -2677,9 +2817,51 @@ onUnmounted(() => {
   background: rgba(248, 250, 252, 0.72);
 }
 
-.brand-revenue-table tbody td:last-child {
+.brand-revenue-table tbody td:nth-child(n + 3) {
   color: rgb(15 23 42);
   font-weight: 800;
+}
+
+.brand-revenue-share-display {
+  display: inline-flex;
+  justify-content: flex-end;
+  min-width: 4.8rem;
+  padding: 0.16rem 0.28rem;
+  border-radius: 0.45rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  cursor: pointer;
+}
+
+.brand-revenue-share-display:hover:not(:disabled) {
+  background: rgba(219, 234, 254, 0.76);
+  color: rgb(30 64 175);
+}
+
+.brand-revenue-share-display:disabled {
+  cursor: progress;
+  opacity: 0.72;
+}
+
+.brand-revenue-share-input {
+  width: 5.8rem;
+  padding: 0.22rem 0.36rem;
+  border-radius: 0.45rem;
+  border: 1px solid rgba(59, 130, 246, 0.42);
+  background: rgba(255, 255, 255, 0.96);
+  color: rgb(15 23 42);
+  font: inherit;
+  font-weight: 800;
+  text-align: right;
+  outline: none;
+}
+
+.brand-revenue-share-input:focus {
+  border-color: rgba(37, 99, 235, 0.86);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.16);
 }
 
 .brand-revenue-table tfoot td {
