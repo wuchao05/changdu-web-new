@@ -820,7 +820,8 @@ let dashboardRequestGeneration = 0
 let channelSwitchController: AbortController | null = null
 let channelSwitchSerial = 0
 let brandRevenueHoverTimer: number | null = null
-const showBrandRevenue = true
+const BRAND_REVENUE_ROUTE_FLAG = 'yy_vault'
+const BRAND_REVENUE_ROUTE_FLAG_VALUE = '1'
 const THIRD_PARTY_REVENUE_START_DATE = '2026-05-05'
 const reportDateRange = ref<DateRangeValue>(null)
 const orderDateRange = ref<DateRangeValue>(null)
@@ -914,6 +915,9 @@ const hasAccountTableId = computed(() => {
   )
 })
 const dashboardSubtitle = computed(() => '数据驱动，精准运营')
+const showBrandRevenue = computed(
+  () => isAdmin.value && route.query[BRAND_REVENUE_ROUTE_FLAG] === BRAND_REVENUE_ROUTE_FLAG_VALUE
+)
 const thirdPartyRevenueTotal = computed(() =>
   thirdPartyRevenueRows.value.reduce((sum, row) => sum + row.amount, 0)
 )
