@@ -13,7 +13,6 @@
                 'brand-revenue-menu--editing': Boolean(editingRevenueShareDate),
               }"
               @pointerenter="showBrandRevenue && isAdmin && handleBrandRevenuePointerEnter()"
-              @pointerleave="showBrandRevenue && isAdmin && handleBrandRevenuePointerLeave()"
             >
               <div class="brand-revenue-trigger">
                 <div
@@ -878,7 +877,6 @@ const dashboardRequestControllers = new Map<DashboardRequestScope, AbortControll
 let dashboardRequestGeneration = 0
 let channelSwitchController: AbortController | null = null
 let channelSwitchSerial = 0
-let brandRevenueHoverTimer: number | null = null
 const BRAND_REVENUE_ROUTE_FLAG = 'yy_vault'
 const BRAND_REVENUE_ROUTE_FLAG_VALUE = '1'
 const THIRD_PARTY_REVENUE_START_DATE = '2026-05-05'
@@ -2094,23 +2092,7 @@ function refreshThirdPartyRevenue() {
 }
 
 function handleBrandRevenuePointerEnter() {
-  if (brandRevenueHoverTimer !== null) {
-    window.clearTimeout(brandRevenueHoverTimer)
-  }
-
-  brandRevenueHoverTimer = window.setTimeout(() => {
-    brandRevenueHoverTimer = null
-    loadThirdPartyRevenue()
-  }, 350)
-}
-
-function handleBrandRevenuePointerLeave() {
-  if (brandRevenueHoverTimer === null) {
-    return
-  }
-
-  window.clearTimeout(brandRevenueHoverTimer)
-  brandRevenueHoverTimer = null
+  void loadThirdPartyRevenue()
 }
 
 function formatReportDate(value: string | number) {
@@ -2703,7 +2685,6 @@ watch(
 )
 
 onUnmounted(() => {
-  handleBrandRevenuePointerLeave()
   channelSwitchController?.abort()
   cancelDashboardRequests()
   window.removeEventListener('pointerdown', handleRevenueShareGlobalPointerDown, true)
