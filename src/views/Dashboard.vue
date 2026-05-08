@@ -67,9 +67,33 @@
                     <Icon icon="mdi:refresh" class="brand-revenue-popover__refresh-icon" />
                   </button>
                 </div>
-                <div v-if="thirdPartyRevenueLoading" class="brand-revenue-state">
-                  <span class="brand-revenue-spinner"></span>
-                  <span>正在拉取每日金额...</span>
+                <div v-if="thirdPartyRevenueLoading" class="brand-revenue-table-shell">
+                  <table class="brand-revenue-table brand-revenue-skeleton-table">
+                    <thead>
+                      <tr>
+                        <th>日期</th>
+                        <th>金额</th>
+                        <th>账面分成</th>
+                        <th>实际分成</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="rowIndex in 4" :key="`revenue-skeleton-${rowIndex}`">
+                        <td><span class="brand-revenue-skeleton-line short"></span></td>
+                        <td><span class="brand-revenue-skeleton-line"></span></td>
+                        <td><span class="brand-revenue-skeleton-line"></span></td>
+                        <td><span class="brand-revenue-skeleton-line compact"></span></td>
+                      </tr>
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <td><span class="brand-revenue-skeleton-line short strong"></span></td>
+                        <td><span class="brand-revenue-skeleton-line strong"></span></td>
+                        <td><span class="brand-revenue-skeleton-line strong"></span></td>
+                        <td><span class="brand-revenue-skeleton-line compact strong"></span></td>
+                      </tr>
+                    </tfoot>
+                  </table>
                 </div>
                 <div
                   v-else-if="thirdPartyRevenueError"
@@ -2877,6 +2901,47 @@ onUnmounted(() => {
   font-weight: 800;
 }
 
+.brand-revenue-skeleton-table th {
+  color: rgba(71, 85, 105, 0.84);
+}
+
+.brand-revenue-skeleton-table tbody tr:nth-child(even) td {
+  background: rgba(248, 250, 252, 0.64);
+}
+
+.brand-revenue-skeleton-line {
+  position: relative;
+  display: inline-flex;
+  width: 4.7rem;
+  height: 0.82rem;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, rgba(226, 232, 240, 0.8), rgba(219, 234, 254, 0.92));
+  vertical-align: middle;
+}
+
+.brand-revenue-skeleton-line::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-110%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.86), transparent);
+  animation: brand-revenue-skeleton-shimmer 1.25s ease-in-out infinite;
+}
+
+.brand-revenue-skeleton-line.short {
+  width: 3.45rem;
+}
+
+.brand-revenue-skeleton-line.compact {
+  width: 3.2rem;
+}
+
+.brand-revenue-skeleton-line.strong {
+  height: 0.92rem;
+  background: linear-gradient(90deg, rgba(191, 219, 254, 0.95), rgba(219, 234, 254, 0.96));
+}
+
 .brand-revenue-share-display {
   display: inline-flex;
   justify-content: flex-end;
@@ -2928,6 +2993,12 @@ onUnmounted(() => {
 @keyframes brand-revenue-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes brand-revenue-skeleton-shimmer {
+  to {
+    transform: translateX(110%);
   }
 }
 
