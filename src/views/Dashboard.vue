@@ -8,7 +8,10 @@
           <div class="flex items-center space-x-4 min-w-0 flex-1">
             <div
               class="brand-revenue-menu"
-              :class="{ 'brand-revenue-menu--disabled': !showBrandRevenue || !isAdmin }"
+              :class="{
+                'brand-revenue-menu--disabled': !showBrandRevenue || !isAdmin,
+                'brand-revenue-menu--editing': Boolean(editingRevenueShareDate),
+              }"
               @pointerenter="showBrandRevenue && isAdmin && handleBrandRevenuePointerEnter()"
               @pointerleave="showBrandRevenue && isAdmin && handleBrandRevenuePointerLeave()"
             >
@@ -52,7 +55,7 @@
               </div>
               <div v-if="showBrandRevenue && isAdmin" class="brand-revenue-popover">
                 <div class="brand-revenue-popover__header">
-                  <h3 class="brand-revenue-popover__hero">看天吃饭发财池</h3>
+                  <h3 class="brand-revenue-popover__hero">看天吃饭造富池</h3>
                   <button
                     type="button"
                     class="brand-revenue-popover__refresh"
@@ -100,8 +103,9 @@
                             class="brand-revenue-share-input"
                             :disabled="Boolean(revenueShareSavingDates[row.date])"
                             autofocus
-                            @blur="commitThirdPartyRevenueShare(row)"
-                            @keydown.enter.prevent="commitThirdPartyRevenueShare(row)"
+                            @blur="handleRevenueShareInputBlur(row, $event)"
+                            @change="handleRevenueShareInputBlur(row, $event)"
+                            @keydown.enter.prevent="handleRevenueShareInputBlur(row, $event)"
                             @keydown.esc.stop.prevent="cancelThirdPartyRevenueShareEdit"
                           />
                           <button
@@ -1956,6 +1960,10 @@ async function startThirdPartyRevenueShareEdit(row: ThirdPartyRevenueRow) {
     return
   }
 
+  if (editingRevenueShareDate.value && editingRevenueShareDate.value !== row.date) {
+    commitCurrentThirdPartyRevenueShareEdit()
+  }
+
   editingRevenueShareDate.value = row.date
   editingRevenueShareValue.value = row.actualShare === null ? '' : String(row.actualShare)
   await nextTick()
@@ -1970,6 +1978,47 @@ function cancelThirdPartyRevenueShareEdit() {
 
 function setRevenueShareInputRef(element: unknown) {
   revenueShareInputRef.value = element instanceof HTMLInputElement ? element : null
+}
+
+function updateRevenueShareInputValue(event?: Event) {
+  const target = event?.target
+  if (target instanceof HTMLInputElement) {
+    editingRevenueShareValue.value = target.value
+    return
+  }
+
+  if (revenueShareInputRef.value) {
+    editingRevenueShareValue.value = revenueShareInputRef.value.value
+  }
+}
+
+function handleRevenueShareInputBlur(row: ThirdPartyRevenueRow, event?: Event) {
+  updateRevenueShareInputValue(event)
+  void commitThirdPartyRevenueShare(row)
+}
+
+function commitCurrentThirdPartyRevenueShareEdit() {
+  updateRevenueShareInputValue()
+
+  const row = thirdPartyRevenueRows.value.find(item => item.date === editingRevenueShareDate.value)
+  if (!row) {
+    cancelThirdPartyRevenueShareEdit()
+    return
+  }
+
+  void commitThirdPartyRevenueShare(row)
+}
+
+function handleRevenueShareGlobalPointerDown(event: PointerEvent) {
+  if (!editingRevenueShareDate.value) {
+    return
+  }
+
+  if (event.target instanceof Node && revenueShareInputRef.value?.contains(event.target)) {
+    return
+  }
+
+  commitCurrentThirdPartyRevenueShareEdit()
 }
 
 async function commitThirdPartyRevenueShare(row: ThirdPartyRevenueRow) {
@@ -2496,6 +2545,7 @@ function handleWindowResize() {
 onMounted(async () => {
   checkMobile()
   window.addEventListener('resize', handleWindowResize)
+  window.addEventListener('pointerdown', handleRevenueShareGlobalPointerDown, true)
   reportDateRange.value = getDefaultDateRange()
   orderDateRange.value = getDefaultDateRange()
   await refreshDashboardContext()
@@ -2632,6 +2682,7 @@ onUnmounted(() => {
   handleBrandRevenuePointerLeave()
   channelSwitchController?.abort()
   cancelDashboardRequests()
+  window.removeEventListener('pointerdown', handleRevenueShareGlobalPointerDown, true)
   window.removeEventListener('resize', handleWindowResize)
 })
 </script>
@@ -2684,7 +2735,8 @@ onUnmounted(() => {
   transform: translateY(-0.35rem) scale(0.98);
 }
 
-.brand-revenue-menu:not(.brand-revenue-menu--disabled):hover .brand-revenue-popover {
+.brand-revenue-menu:not(.brand-revenue-menu--disabled):hover .brand-revenue-popover,
+.brand-revenue-menu--editing:not(.brand-revenue-menu--disabled) .brand-revenue-popover {
   opacity: 1;
   visibility: visible;
   transform: translateY(0) scale(1);
