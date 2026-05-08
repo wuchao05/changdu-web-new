@@ -111,11 +111,7 @@
                             :disabled="Boolean(revenueShareSavingDates[row.date])"
                             @click.stop="startThirdPartyRevenueShareEdit(row)"
                           >
-                            {{
-                              revenueShareSavingDates[row.date]
-                                ? '保存中...'
-                                : formatOptionalYuanAmount(row.actualShare)
-                            }}
+                            {{ formatOptionalYuanAmount(row.actualShare) }}
                           </button>
                         </td>
                       </tr>
@@ -1987,6 +1983,11 @@ async function commitThirdPartyRevenueShare(row: ThirdPartyRevenueRow) {
     return
   }
 
+  const previousShare = row.actualShare
+  thirdPartyRevenueRows.value = thirdPartyRevenueRows.value.map(item =>
+    item.date === row.date ? { ...item, actualShare } : item
+  )
+  cancelThirdPartyRevenueShareEdit()
   revenueShareSavingDates[row.date] = true
   try {
     const result = await saveThirdPartyRevenueShare(row.date, actualShare)
@@ -1998,8 +1999,10 @@ async function commitThirdPartyRevenueShare(row: ThirdPartyRevenueRow) {
     thirdPartyRevenueRows.value = thirdPartyRevenueRows.value.map(item =>
       item.date === row.date ? { ...item, actualShare: savedShare } : item
     )
-    cancelThirdPartyRevenueShareEdit()
   } catch (error) {
+    thirdPartyRevenueRows.value = thirdPartyRevenueRows.value.map(item =>
+      item.date === row.date ? { ...item, actualShare: previousShare } : item
+    )
     console.error('保存实际分成失败:', error)
     message.error(error instanceof Error ? error.message : '保存实际分成失败')
   } finally {
@@ -2843,7 +2846,6 @@ onUnmounted(() => {
 
 .brand-revenue-share-display:disabled {
   cursor: progress;
-  opacity: 0.72;
 }
 
 .brand-revenue-share-input {
