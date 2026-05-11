@@ -266,7 +266,6 @@
                 ref="dramaCartRef"
                 inline
                 :scope-key="currentChannelStateScopeKey"
-                :extra-submit-target-options="extraSubmitTargetOptions"
                 @batch-submitted="handleBatchSubmitted"
                 @items-changed="handleCartItemsChanged"
               />
@@ -853,7 +852,7 @@ import {
   getDownloadUrl,
   feishuApi,
 } from '@/api'
-import { getCurrentSession, reportPageVisit, type UserChannelBindingConfig } from '@/api/admin'
+import { getCurrentSession, reportPageVisit } from '@/api/admin'
 import {
   startAutoSubmit as startAutoSubmitApi,
   stopAutoSubmit as stopAutoSubmitApi,
@@ -868,7 +867,7 @@ import dayjs from 'dayjs'
 import DatePicker from './DatePicker.vue'
 import DramaCard from './DramaCard.vue'
 import AdxRankingDrawer from './AdxRankingDrawer.vue'
-import DramaCart, { type CartItem, type ExtraSubmitTargetOption } from './DramaCart.vue'
+import DramaCart, { type CartItem } from './DramaCart.vue'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
 
@@ -1131,47 +1130,6 @@ const feishuTableGroupOptions = computed(() => [
     value: group.id,
   })),
 ])
-function getEnabledFeishuTableGroupsFromConfig(config?: UserChannelBindingConfig) {
-  const groups = Array.isArray(config?.feishuTableGroups) ? config.feishuTableGroups : []
-  if (groups.length > 0) {
-    return groups.filter(group => group.enabled !== false)
-  }
-
-  if (config?.feishu) {
-    return [
-      {
-        id: 'default',
-        name: '默认表格',
-        enabled: true,
-        feishu: config.feishu,
-        douyinMaterialMatches: [],
-      },
-    ]
-  }
-
-  return []
-}
-
-const extraSubmitTargetOptions = computed<ExtraSubmitTargetOption[]>(() => {
-  const currentChannelId = String(
-    sessionStore.activeChannelId || apiConfigStore.config.channelId || ''
-  )
-  const channelConfigs = sessionStore.currentUser?.channelConfigs || {}
-
-  return sessionStore.availableChannels.flatMap(channel => {
-    if (!channel.id || channel.id === currentChannelId) {
-      return []
-    }
-
-    const groups = getEnabledFeishuTableGroupsFromConfig(channelConfigs[channel.id])
-    return groups.map(group => ({
-      label: `${channel.name} / ${group.name || '默认表格'}`,
-      value: `${channel.id}:${group.id || 'default'}`,
-      channelId: channel.id,
-      feishuTableGroupId: group.id || 'default',
-    }))
-  })
-})
 const currentDramaListTableId = computed(
   () =>
     activeFeishuTableGroup.value?.feishu?.dramaListTableId ||

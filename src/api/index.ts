@@ -259,11 +259,6 @@ export interface BatchSubmitItem {
   feishuTableGroupName?: string
 }
 
-export interface BatchSubmitExtraTarget {
-  channelId: string
-  feishuTableGroupId: string
-}
-
 export interface BatchSubmitResponse {
   code: number
   message: string
@@ -271,18 +266,12 @@ export interface BatchSubmitResponse {
     taskId: string
     status: string
     total: number
-    extraTargetCount?: number
     message: string
   }
 }
 
-export function batchSubmitDownload(
-  items: BatchSubmitItem[],
-  extraTargets: BatchSubmitExtraTarget[] = []
-): Promise<BatchSubmitResponse> {
-  return httpInstance
-    .post('/auto-submit/batch-submit', { items, extraTargets })
-    .then(res => res.data)
+export function batchSubmitDownload(items: BatchSubmitItem[]): Promise<BatchSubmitResponse> {
+  return httpInstance.post('/auto-submit/batch-submit', { items }).then(res => res.data)
 }
 
 /**

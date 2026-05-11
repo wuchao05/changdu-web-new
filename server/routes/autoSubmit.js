@@ -21,84 +21,6 @@ const router = new Router({
 
 router.use(createSessionRuntimeContextMiddleware('autoSubmitContext'))
 
-function normalizeBatchSubmitExtraTargets(extraTargets) {
-  if (typeof extraTargets === 'undefined' || extraTargets === null) {
-    return []
-  }
-
-  if (!Array.isArray(extraTargets)) {
-    const error = new Error('extraTargets 必须是数组')
-    error.status = 400
-    throw error
-  }
-
-  return extraTargets
-    .map(target => ({
-      channelId: String(target?.channelId || '').trim(),
-      feishuTableGroupId: String(target?.feishuTableGroupId || '').trim(),
-    }))
-    .filter(target => target.channelId && target.feishuTableGroupId)
-}
-
-async function resolveBatchSubmitExtraTargetContexts(ctx, extraTargets) {
-  const normalizedTargets = normalizeBatchSubmitExtraTargets(extraTargets)
-  const sessionUser = ctx.state.sessionUser
-  const currentChannelId = String(ctx.state.autoSubmitContext?.channel?.id || '').trim()
-  const targetContexts = []
-  const seen = new Set()
-
-  for (const target of normalizedTargets) {
-    if (target.channelId === currentChannelId) {
-      continue
-    }
-
-    const dedupeKey = `${target.channelId}:${target.feishuTableGroupId}`
-    if (seen.has(dedupeKey)) {
-      continue
-    }
-    seen.add(dedupeKey)
-
-    const runtimeContext = await resolveRuntimeContext(sessionUser, target.channelId)
-    if (!runtimeContext.channel?.id || runtimeContext.channel.id !== target.channelId) {
-      const error = new Error(`无权访问目标渠道 ${target.channelId}`)
-      error.status = 403
-      throw error
-    }
-
-    const runtimeUser = runtimeContext.runtimeUser || {}
-    const groups = Array.isArray(runtimeUser.feishuTableGroups) ? runtimeUser.feishuTableGroups : []
-    const hasTargetGroup = groups.some(
-      group =>
-        group?.enabled !== false && String(group?.id || '').trim() === target.feishuTableGroupId
-    )
-
-    if (!hasTargetGroup) {
-      const error = new Error(
-        `目标渠道 ${runtimeContext.channel.name} 未找到表格组 ${target.feishuTableGroupId}`
-      )
-      error.status = 400
-      throw error
-    }
-
-    targetContexts.push({
-      channelId: target.channelId,
-      feishuTableGroupId: target.feishuTableGroupId,
-      runtimeContext: {
-        requestedChannelId: target.channelId,
-        channel: runtimeContext.channel,
-        availableChannels: runtimeContext.availableChannels,
-        runtimeUser: runtimeContext.runtimeUser,
-        channelRuntime: normalizeChannelRuntime({
-          channel: runtimeContext.channel,
-          runtimeUser: runtimeContext.runtimeUser,
-        }),
-      },
-    })
-  }
-
-  return targetContexts
-}
-
 /**
  * 启动自动提交调度器
  * POST /api/auto-submit/start
@@ -304,7 +226,7 @@ router.post('/reset-stats', async ctx => {
  */
 router.post('/batch-submit', async ctx => {
   try {
-    const { items, extraTargets } = ctx.request.body || {}
+    const { items } = ctx.request.body || {}
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       ctx.status = 400
@@ -327,14 +249,10 @@ router.post('/batch-submit', async ctx => {
       }
     }
 
-    const extraTargetContexts = await resolveBatchSubmitExtraTargetContexts(ctx, extraTargets)
-
-    console.log(
-      `[批量提交API] 收到批量提交请求，共 ${items.length} 部剧集，额外同步目标 ${extraTargetContexts.length} 个`
-    )
+    console.log(`[批量提交API] 收到批量提交请求，共 ${items.length} 部剧集`)
 
     // 调用批量提交函数（立即返回，后台异步执行）
-    const result = batchSubmitDramas(items, ctx.state.autoSubmitContext, extraTargetContexts)
+    const result = batchSubmitDramas(items, ctx.state.autoSubmitContext)
 
     ctx.body = {
       code: 0,
@@ -343,7 +261,7 @@ router.post('/batch-submit', async ctx => {
     }
   } catch (error) {
     console.error('[批量提交API] 批量提交失败:', error)
-    ctx.status = error.status || 500
+    ctx.status = 500
     ctx.body = {
       code: -1,
       message: error.message || '批量提交失败',
