@@ -265,6 +265,8 @@
               <DramaCart
                 ref="dramaCartRef"
                 inline
+                :scope-key="currentChannelStateScopeKey"
+                :extra-submit-target-options="extraSubmitTargetOptions"
                 @batch-submitted="handleBatchSubmitted"
                 @items-changed="handleCartItemsChanged"
               />
@@ -283,8 +285,8 @@
               :is-processing="clipProcessingDramaId === drama.book_id"
               :is-any-syncing="isAnyOperationBlocked"
               :is-downloaded="isDramaDownloaded(drama.series_name)"
-              :is-submitted-for-download="submittedForDownloadSet.has(drama.book_id)"
-              :is-submitted-for-clip="submittedForClipSet.has(drama.book_id)"
+              :is-submitted-for-download="isSubmittedForDownload(drama.book_id)"
+              :is-submitted-for-clip="isSubmittedForClip(drama.book_id)"
               :is-manual-red-flag="isManualRedFlag(drama.book_id)"
               :is-in-cart="isDramaInCart(drama.book_id)"
               @show-image="showDramaImage"
@@ -393,8 +395,8 @@
               :is-processing="clipProcessingDramaId === drama.book_id"
               :is-any-syncing="isAnyOperationBlocked"
               :is-downloaded="isDramaDownloaded(drama.series_name)"
-              :is-submitted-for-download="submittedForDownloadSet.has(drama.book_id)"
-              :is-submitted-for-clip="submittedForClipSet.has(drama.book_id)"
+              :is-submitted-for-download="isSubmittedForDownload(drama.book_id)"
+              :is-submitted-for-clip="isSubmittedForClip(drama.book_id)"
               :is-new-drama="comparedNewDramas.has(drama.book_id)"
               :is-manual-red-flag="isManualRedFlag(drama.book_id)"
               :is-in-cart="isDramaInCart(drama.book_id)"
@@ -424,8 +426,8 @@
               :is-processing="clipProcessingDramaId === drama.book_id"
               :is-any-syncing="isAnyOperationBlocked"
               :is-downloaded="isRankingDramaDownloaded(drama.book_name)"
-              :is-submitted-for-download="submittedForDownloadSet.has(drama.book_id)"
-              :is-submitted-for-clip="submittedForClipSet.has(drama.book_id)"
+              :is-submitted-for-download="isSubmittedForDownload(drama.book_id)"
+              :is-submitted-for-clip="isSubmittedForClip(drama.book_id)"
               :ranking="rankingPageIndex * rankingPageSize + index + 1"
               :show-ranking="true"
               :is-manual-red-flag="isManualRedFlag(drama.book_id)"
@@ -851,7 +853,7 @@ import {
   getDownloadUrl,
   feishuApi,
 } from '@/api'
-import { getCurrentSession, reportPageVisit } from '@/api/admin'
+import { getCurrentSession, reportPageVisit, type UserChannelBindingConfig } from '@/api/admin'
 import {
   startAutoSubmit as startAutoSubmitApi,
   stopAutoSubmit as stopAutoSubmitApi,
@@ -866,7 +868,7 @@ import dayjs from 'dayjs'
 import DatePicker from './DatePicker.vue'
 import DramaCard from './DramaCard.vue'
 import AdxRankingDrawer from './AdxRankingDrawer.vue'
-import DramaCart, { type CartItem } from './DramaCart.vue'
+import DramaCart, { type CartItem, type ExtraSubmitTargetOption } from './DramaCart.vue'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
 
@@ -918,6 +920,17 @@ function resetChannelScopedData() {
   rankingPageIndex.value = 0
   rankingListCache.clear()
   downloadList.value = []
+  cartBookIds.value = new Set()
+  submittedForDownloadSet.value = new Set()
+  submittedForClipSet.value = new Set()
+  manualRedFlagSet.value = new Set()
+  syncingDramaSet.clear()
+  syncingDramaId.value = null
+  isAnyDramaSyncing.value = false
+  clipProcessingDramaId.value = null
+  showDatePicker.value = false
+  currentClipDrama.value = null
+  dramaCartRef.value?.resetForScopeChange?.()
 }
 
 async function reloadChannelScopedData() {
@@ -995,7 +1008,9 @@ async function searchDramaStatusRecordInConfiguredGroups(dramaName: string, time
 // 使用 Naive UI 的 message API
 const message = useMessage()
 
-const dramaCartRef = ref<InstanceType<typeof DramaCart> | null>(null)
+const dramaCartRef = ref<
+  (InstanceType<typeof DramaCart> & { resetForScopeChange?: () => void }) | null
+>(null)
 const cartBookIds = ref<Set<string>>(new Set())
 
 // ===== 请求代际:用于 Tab 切换时丢弃在途请求结果 =====
@@ -1059,7 +1074,6 @@ const isAnyOperationBlocked = computed(() => {
   )
 })
 
-const currentChannelLabel = computed(() => apiConfigStore.config.channelName || '当前渠道')
 const feishuTableGroups = computed<RuntimeFeishuTableGroup[]>(() => {
   const groups = Array.isArray(apiConfigStore.config.feishuTableGroups)
     ? apiConfigStore.config.feishuTableGroups
@@ -1117,6 +1131,47 @@ const feishuTableGroupOptions = computed(() => [
     value: group.id,
   })),
 ])
+function getEnabledFeishuTableGroupsFromConfig(config?: UserChannelBindingConfig) {
+  const groups = Array.isArray(config?.feishuTableGroups) ? config.feishuTableGroups : []
+  if (groups.length > 0) {
+    return groups.filter(group => group.enabled !== false)
+  }
+
+  if (config?.feishu) {
+    return [
+      {
+        id: 'default',
+        name: '默认表格',
+        enabled: true,
+        feishu: config.feishu,
+        douyinMaterialMatches: [],
+      },
+    ]
+  }
+
+  return []
+}
+
+const extraSubmitTargetOptions = computed<ExtraSubmitTargetOption[]>(() => {
+  const currentChannelId = String(
+    sessionStore.activeChannelId || apiConfigStore.config.channelId || ''
+  )
+  const channelConfigs = sessionStore.currentUser?.channelConfigs || {}
+
+  return sessionStore.availableChannels.flatMap(channel => {
+    if (!channel.id || channel.id === currentChannelId) {
+      return []
+    }
+
+    const groups = getEnabledFeishuTableGroupsFromConfig(channelConfigs[channel.id])
+    return groups.map(group => ({
+      label: `${channel.name} / ${group.name || '默认表格'}`,
+      value: `${channel.id}:${group.id || 'default'}`,
+      channelId: channel.id,
+      feishuTableGroupId: group.id || 'default',
+    }))
+  })
+})
 const currentDramaListTableId = computed(
   () =>
     activeFeishuTableGroup.value?.feishu?.dramaListTableId ||
@@ -1135,6 +1190,23 @@ const currentAccountTableId = computed(
     apiConfigStore.config.accountTableId ||
     ''
 )
+const currentChannelStateScopeKey = computed(() =>
+  [
+    sessionStore.selectedChannelId ||
+      sessionStore.activeChannelId ||
+      apiConfigStore.config.channelId,
+    getSelectedFeishuTableGroupId(),
+    currentDramaListTableId.value,
+    currentDramaStatusTableId.value,
+    currentAccountTableId.value,
+  ]
+    .map(value => String(value || ''))
+    .join('|')
+)
+
+function getChannelScopedBookKey(bookId: string, scopeKey = currentChannelStateScopeKey.value) {
+  return `${scopeKey}:${bookId}`
+}
 
 watch(
   feishuTableGroups,
@@ -1433,11 +1505,7 @@ const currentDateDramas = computed(() => {
 })
 
 function canAddDownloadDrama(drama: NewDramaItem | RankingDramaItem) {
-  return (
-    !drama.feishu_downloaded &&
-    !drama.feishu_exists &&
-    !submittedForDownloadSet.value.has(drama.book_id)
-  )
+  return !drama.feishu_downloaded && !drama.feishu_exists && !isSubmittedForDownload(drama.book_id)
 }
 
 function buildCartItem(drama: NewDramaItem | RankingDramaItem): CartItem {
@@ -1826,7 +1894,7 @@ function closeImageModal() {
 const syncingDramaSet = new Set<string>()
 
 function getManualRedFlagScopeKey() {
-  return currentChannelLabel.value
+  return currentChannelStateScopeKey.value
 }
 
 function getManualRedFlagKey(bookId: string) {
@@ -1835,6 +1903,14 @@ function getManualRedFlagKey(bookId: string) {
 
 function isManualRedFlag(bookId: string) {
   return manualRedFlagSet.value.has(getManualRedFlagKey(bookId))
+}
+
+function isSubmittedForDownload(bookId: string) {
+  return submittedForDownloadSet.value.has(getChannelScopedBookKey(bookId))
+}
+
+function isSubmittedForClip(bookId: string) {
+  return submittedForClipSet.value.has(getChannelScopedBookKey(bookId))
 }
 
 function isDramaInCart(bookId: string) {
@@ -1903,10 +1979,16 @@ function handleAddCurrentDateToCart() {
 }
 
 // 处理批量提交完成
-function handleBatchSubmitted(bookIds: string[]) {
+function handleBatchSubmitted(bookIds: string[], scopeKey: string) {
+  if (scopeKey && scopeKey !== currentChannelStateScopeKey.value) {
+    return
+  }
+
+  const targetScopeKey = scopeKey || currentChannelStateScopeKey.value
+
   // 将所有提交的剧集标记为"已提交下载"
   bookIds.forEach(bookId => {
-    submittedForDownloadSet.value.add(bookId)
+    submittedForDownloadSet.value.add(getChannelScopedBookKey(bookId, targetScopeKey))
   })
   console.log(`[批量提交] 已标记 ${bookIds.length} 部剧集为"已提交下载"`)
 }
@@ -1976,6 +2058,7 @@ async function handleDateConfirm(selectedDate: string) {
   try {
     // 设置处理状态
     clipProcessingDramaId.value = currentClipDrama.value.book_id
+    const operationScopeKey = currentChannelStateScopeKey.value
 
     // 将选择的日期转换为时间戳
     const date = new Date(selectedDate)
@@ -2046,7 +2129,11 @@ async function handleDateConfirm(selectedDate: string) {
 
           // 标记为已提交待剪辑
           if (currentClipDrama.value) {
-            submittedForClipSet.value.add(currentClipDrama.value.book_id)
+            if (operationScopeKey === currentChannelStateScopeKey.value) {
+              submittedForClipSet.value.add(
+                getChannelScopedBookKey(currentClipDrama.value.book_id, operationScopeKey)
+              )
+            }
           }
         } else {
           // 没有可用账户，终止流程
@@ -2372,6 +2459,7 @@ async function handleAddDownload(
     // 设置同步状态
     syncingDramaId.value = drama.book_id
     isAnyDramaSyncing.value = true
+    const operationScopeKey = currentChannelStateScopeKey.value
 
     const targetGroups = getTargetFeishuTableGroupsForDownload()
     if (targetGroups.length === 0) {
@@ -2388,7 +2476,9 @@ async function handleAddDownload(
 
     const successResults = results.filter(result => result.success)
     if (successResults.length > 0) {
-      submittedForDownloadSet.value.add(drama.book_id)
+      if (operationScopeKey === currentChannelStateScopeKey.value) {
+        submittedForDownloadSet.value.add(getChannelScopedBookKey(drama.book_id, operationScopeKey))
+      }
 
       if (isAllFeishuTableGroupsSelected()) {
         showSuccessToast(

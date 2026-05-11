@@ -75,6 +75,20 @@
         </div>
 
         <div class="cart-footer" v-if="cartItems.length > 0">
+          <div v-if="extraSubmitTargetOptions.length > 0" class="extra-target-section">
+            <div class="extra-target-label">额外同步到其他渠道</div>
+            <NSelect
+              v-model:value="selectedExtraTargetValues"
+              multiple
+              clearable
+              size="small"
+              :options="extraSubmitSelectOptions"
+              :disabled="isSubmitting"
+              placeholder="可选目标表格组"
+              max-tag-count="responsive"
+            />
+            <p class="extra-target-hint">不影响当前渠道提交，会额外写入所选渠道表格组。</p>
+          </div>
           <div class="footer-info">
             <div class="footer-counts">
               <span class="total-count">共 {{ cartItems.length }} 部剧</span>
@@ -107,16 +121,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
 import { Icon } from '@iconify/vue'
-import { useMessage } from 'naive-ui'
-import { batchSubmitDownload } from '@/api/index'
+import { NSelect, useMessage, type SelectOption } from 'naive-ui'
+import { batchSubmitDownload, type BatchSubmitExtraTarget } from '@/api/index'
 
 const message = useMessage()
 
 const props = defineProps<{
   inline?: boolean
+  scopeKey?: string
+  extraSubmitTargetOptions?: ExtraSubmitTargetOption[]
 }>()
+
+export interface ExtraSubmitTargetOption {
+  label: string
+  value: string
+  channelId: string
+  feishuTableGroupId: string
+}
 
 // 购物车项类型
 export interface CartItem {
@@ -131,7 +154,7 @@ export interface CartItem {
 
 // 定义 emits
 const emit = defineEmits<{
-  'batch-submitted': [bookIds: string[]]
+  'batch-submitted': [bookIds: string[], scopeKey: string]
   'items-changed': [bookIds: string[]]
 }>()
 
@@ -143,9 +166,33 @@ const isSubmitting = ref(false)
 const cartTriggerRef = ref<HTMLElement | null>(null)
 const cartPanelRef = ref<HTMLElement | null>(null)
 const panelMaxHeight = ref(400)
+const selectedExtraTargetValues = ref<string[]>([])
 
 // 计算属性
 const submittingCount = computed(() => submittingIds.value.size)
+const extraSubmitTargetOptions = computed(() => props.extraSubmitTargetOptions || [])
+const extraSubmitSelectOptions = computed<SelectOption[]>(() =>
+  extraSubmitTargetOptions.value.map(option => ({
+    label: option.label,
+    value: option.value,
+  }))
+)
+const selectedExtraTargets = computed<BatchSubmitExtraTarget[]>(() => {
+  const selectedValues = new Set(selectedExtraTargetValues.value)
+  return extraSubmitTargetOptions.value
+    .filter(option => selectedValues.has(String(option.value)))
+    .map(option => ({
+      channelId: option.channelId,
+      feishuTableGroupId: option.feishuTableGroupId,
+    }))
+})
+
+watch(extraSubmitTargetOptions, options => {
+  const validValues = new Set(options.map(option => String(option.value)))
+  selectedExtraTargetValues.value = selectedExtraTargetValues.value.filter(value =>
+    validValues.has(value)
+  )
+})
 
 function emitItemsChanged() {
   emit(
@@ -280,6 +327,15 @@ function clearAll() {
   message.info('已清空待提交列表')
 }
 
+function resetForScopeChange() {
+  cartItems.value = []
+  submittingIds.value.clear()
+  isSubmitting.value = false
+  selectedExtraTargetValues.value = []
+  closeCart()
+  emitItemsChanged()
+}
+
 // 批量提交
 async function submitAll() {
   if (cartItems.value.length === 0) return
@@ -288,13 +344,19 @@ async function submitAll() {
   submittingIds.value.clear()
 
   try {
-    message.info(`正在提交 ${cartItems.value.length} 部剧集到服务端...`)
+    const extraTargetCount = selectedExtraTargets.value.length
+    message.info(
+      extraTargetCount > 0
+        ? `正在提交 ${cartItems.value.length} 部剧集，并额外同步到 ${extraTargetCount} 个表格组...`
+        : `正在提交 ${cartItems.value.length} 部剧集到服务端...`
+    )
 
     // 保存提交的 book_id 列表
     const submittedBookIds = cartItems.value.map(item => item.book_id)
+    const submitScopeKey = props.scopeKey || ''
 
     // 调用服务端批量提交接口（立即返回，后台异步执行）
-    const response = await batchSubmitDownload(cartItems.value)
+    const response = await batchSubmitDownload(cartItems.value, selectedExtraTargets.value)
 
     if (response.code === 0) {
       const { taskId, total } = response.data
@@ -304,11 +366,12 @@ async function submitAll() {
       console.log(`[批量提交] 可在服务端日志中查看处理进度: ~/.pm2/logs/changdu-web-out.log`)
 
       // 触发事件，通知父组件更新已提交状态
-      emit('batch-submitted', submittedBookIds)
+      emit('batch-submitted', submittedBookIds, submitScopeKey)
 
       // 清空购物车
       cartItems.value = []
       submittingIds.value.clear()
+      selectedExtraTargetValues.value = []
       emitItemsChanged()
       closeCart()
     } else {
@@ -365,6 +428,7 @@ defineExpose({
   hasItem,
   updateItemRedFlag,
   clearAll,
+  resetForScopeChange,
   closeCart,
   startSubmitting,
   markSubmitting,
@@ -465,7 +529,7 @@ defineExpose({
   position: absolute;
   bottom: 58px;
   right: 0;
-  width: 300px;
+  width: 340px;
   max-height: min(400px, var(--cart-panel-max-height, calc(100dvh - 120px)));
   background: white;
   border-radius: 12px;
@@ -713,6 +777,28 @@ defineExpose({
   padding: 16px;
   border-top: 1px solid #e5e7eb;
   background: #f9fafb;
+}
+
+.extra-target-section {
+  margin-bottom: 12px;
+  padding: 10px;
+  border: 1px solid rgba(14, 165, 233, 0.14);
+  border-radius: 10px;
+  background: #f0f9ff;
+}
+
+.extra-target-label {
+  margin-bottom: 8px;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.extra-target-hint {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 .footer-info {

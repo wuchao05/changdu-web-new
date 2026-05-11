@@ -2153,8 +2153,46 @@ export async function initScheduler() {
  * 批量提交剧集（购物车使用）- 实际执行函数
  * @param {Array} items - 剧集列表
  */
-async function executeBatchSubmit(items, runtimeContext = null) {
-  serviceConsole.log(`[批量提交] 开始处理 ${items.length} 部剧集`)
+async function processBatchSubmitItemForTarget(item, target, dateRanges, downloadListCache) {
+  const dramaName = item.series_name
+  const channelId = target.channelId
+
+  await ensureSchedulerRuntime(channelId, target.runtimeContext)
+
+  if (!downloadListCache[channelId]) {
+    const downloadResult = await getDownloadTaskList(
+      channelId,
+      dateRanges.startTime,
+      dateRanges.endTime
+    )
+    downloadListCache[channelId] = downloadResult.data || []
+  }
+
+  const drama = {
+    book_id: item.book_id,
+    series_name: item.series_name,
+    publish_time: item.publish_time,
+  }
+
+  const result = await processDrama(channelId, drama, downloadListCache[channelId], new Set(), {
+    manualRedFlag: item.manualRedFlag,
+    fromSearchResult: item.fromSearchResult,
+    feishuTableGroupId: target.feishuTableGroupId,
+    logScope: '批量提交',
+  })
+
+  return {
+    channelId,
+    feishuTableGroupId: target.feishuTableGroupId,
+    dramaName,
+    result,
+  }
+}
+
+async function executeBatchSubmit(items, runtimeContext = null, extraTargets = []) {
+  serviceConsole.log(
+    `[批量提交] 开始处理 ${items.length} 部剧集，额外同步目标 ${extraTargets.length} 个`
+  )
 
   const results = []
   let successCount = 0
@@ -2164,6 +2202,7 @@ async function executeBatchSubmit(items, runtimeContext = null) {
   const dateRanges = getDateRanges()
   const channelId = runtimeContext?.channelRuntime?.channelId || 'default'
   const downloadListCache = {}
+  const normalizedExtraTargets = Array.isArray(extraTargets) ? extraTargets : []
 
   for (let i = 0; i < items.length; i++) {
     const item = items[i]
@@ -2171,34 +2210,35 @@ async function executeBatchSubmit(items, runtimeContext = null) {
 
     try {
       serviceConsole.log(`[批量提交] 处理第 ${i + 1}/${items.length} 部：${dramaName}`)
-
-      await ensureSchedulerRuntime(channelId, runtimeContext)
-
-      if (!downloadListCache[channelId]) {
-        const downloadResult = await getDownloadTaskList(
+      const targetResults = []
+      const primaryTargetResult = await processBatchSubmitItemForTarget(
+        item,
+        {
           channelId,
-          dateRanges.startTime,
-          dateRanges.endTime
+          feishuTableGroupId: item.feishuTableGroupId,
+          runtimeContext,
+        },
+        dateRanges,
+        downloadListCache
+      )
+      targetResults.push(primaryTargetResult)
+
+      for (const extraTarget of normalizedExtraTargets) {
+        targetResults.push(
+          await processBatchSubmitItemForTarget(
+            item,
+            {
+              channelId: extraTarget.channelId,
+              feishuTableGroupId: extraTarget.feishuTableGroupId,
+              runtimeContext: extraTarget.runtimeContext,
+            },
+            dateRanges,
+            downloadListCache
+          )
         )
-        downloadListCache[channelId] = downloadResult.data || []
       }
 
-      const downloadList = downloadListCache[channelId]
-
-      // 构造剧集对象
-      const drama = {
-        book_id: item.book_id,
-        series_name: item.series_name,
-        publish_time: item.publish_time,
-      }
-
-      // 调用处理单部剧的函数
-      const result = await processDrama(channelId, drama, downloadList, new Set(), {
-        manualRedFlag: item.manualRedFlag,
-        fromSearchResult: item.fromSearchResult,
-        feishuTableGroupId: item.feishuTableGroupId,
-        logScope: '批量提交',
-      })
+      const result = primaryTargetResult.result
 
       if (result.success) {
         successCount++
@@ -2206,8 +2246,11 @@ async function executeBatchSubmit(items, runtimeContext = null) {
           book_id: item.book_id,
           series_name: item.series_name,
           success: true,
+          targetResults,
         })
-        serviceConsole.log(`[批量提交] ✓ ${dramaName} 提交成功`)
+        serviceConsole.log(
+          `[批量提交] ✓ ${dramaName} 提交成功，额外目标 ${targetResults.filter(target => target !== primaryTargetResult && target.result.success).length}/${normalizedExtraTargets.length} 个成功`
+        )
       } else {
         failedCount++
         results.push({
@@ -2215,6 +2258,7 @@ async function executeBatchSubmit(items, runtimeContext = null) {
           series_name: item.series_name,
           success: false,
           error: result.reason || result.error || '提交失败',
+          targetResults,
         })
         serviceConsole.log(`[批量提交] ✗ ${dramaName} 提交失败: ${result.reason || result.error}`)
       }
@@ -2252,18 +2296,21 @@ async function executeBatchSubmit(items, runtimeContext = null) {
  * @param {Array} items - 剧集列表
  * @returns {Object} 任务ID和状态
  */
-export function batchSubmitDramas(items, runtimeContext = null) {
+export function batchSubmitDramas(items, runtimeContext = null, extraTargets = []) {
   const taskId = `batch-${Date.now()}`
   const channelId = runtimeContext?.channelRuntime?.channelId || 'default'
   const logContext = buildAutoSubmitLogContext(channelId, runtimeContext)
+  const normalizedExtraTargets = Array.isArray(extraTargets) ? extraTargets : []
 
   runWithAutoSubmitLogContext(logContext, () => {
-    serviceConsole.log(`[批量提交] 创建任务 ${taskId}，共 ${items.length} 部剧集`)
+    serviceConsole.log(
+      `[批量提交] 创建任务 ${taskId}，共 ${items.length} 部剧集，额外同步目标 ${normalizedExtraTargets.length} 个`
+    )
   })
 
   // 异步执行，不等待结果
   runWithAutoSubmitLogContext(logContext, () =>
-    executeBatchSubmit(items, runtimeContext)
+    executeBatchSubmit(items, runtimeContext, normalizedExtraTargets)
       .then(result => {
         serviceConsole.log(`[批量提交] 任务 ${taskId} 完成:`, result)
       })
@@ -2277,6 +2324,7 @@ export function batchSubmitDramas(items, runtimeContext = null) {
     taskId,
     status: 'processing',
     total: items.length,
+    extraTargetCount: normalizedExtraTargets.length,
     message: '任务已提交，正在后台处理',
   }
 }
