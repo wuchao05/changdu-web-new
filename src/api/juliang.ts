@@ -125,7 +125,7 @@ export async function getJuliangAccountList(
       },
       platform_version: '2.0',
       ocean_white: true,
-      is_active: true,
+      is_active: false,
     }),
   })
 

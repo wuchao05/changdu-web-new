@@ -2,7 +2,7 @@
 
 ## 仓库定位
 
-这是一个基于 Vue 3 + TypeScript + Koa 的长读工作台仓库。
+这是一个基于 Vue 3 + TypeScript + Koa 的常读工作台仓库。
 当前模型只有两层：
 
 1. 当前登录用户

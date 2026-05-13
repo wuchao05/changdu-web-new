@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# 长读工作台部署脚本
+# 常读工作台部署脚本
 
 set -e
 
@@ -74,7 +74,7 @@ fetch(url, { signal: controller.signal })
 
 # 检查是否为本地部署
 if [ "$1" = "local" ]; then
-    echo "🚀 开始本地部署长读工作台..."
+    echo "🚀 开始本地部署常读工作台..."
     
     # 检查Node.js和pnpm
     echo "📋 检查环境..."
