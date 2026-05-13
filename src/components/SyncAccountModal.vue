@@ -16,6 +16,18 @@
       <div v-else-if="loadingCount" class="text-sm text-gray-500">正在查询可用账户数量...</div>
 
       <div class="flex items-center gap-2">
+        <span>从第</span>
+        <n-input-number v-model:value="startPage" :min="1" :max="10000" style="width: 120px" />
+        <span>页开始</span>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <span>每页拉取</span>
+        <n-select v-model:value="pageSize" :options="pageSizeOptions" style="width: 120px" />
+        <span>条</span>
+      </div>
+
+      <div class="flex items-center gap-2">
         <span>需要拉取</span>
         <n-input-number v-model:value="accountCount" :min="1" :max="1000" style="width: 120px" />
         <span>个账户</span>
@@ -56,8 +68,20 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { NModal, NButton, NInputNumber, NDataTable, useMessage, type DataTableColumns } from 'naive-ui'
-import { getJuliangAccountList, editJuliangAccountRemark, type JuliangAccountItem } from '@/api/juliang'
+import {
+  NModal,
+  NButton,
+  NInputNumber,
+  NSelect,
+  NDataTable,
+  useMessage,
+  type DataTableColumns,
+} from 'naive-ui'
+import {
+  getJuliangAccountList,
+  editJuliangAccountRemark,
+  type JuliangAccountItem,
+} from '@/api/juliang'
 import { feishuApi } from '@/api/feishu'
 import * as adminApi from '@/api/admin'
 
@@ -77,6 +101,8 @@ const visible = computed({
 })
 
 const step = ref(1)
+const startPage = ref(1)
+const pageSize = ref(100)
 const accountCount = ref(10)
 const loading = ref(false)
 const remarkLoading = ref(false)
@@ -91,6 +117,11 @@ const currentAccountTableId = ref('')
 const currentChannelName = ref('')
 const currentAdvertiserName = ref('')
 const currentBrandName = ref('小红')
+const pageSizeValues = [10, 20, 50, 100]
+const pageSizeOptions = pageSizeValues.map(value => ({
+  label: String(value),
+  value,
+}))
 
 const columns: DataTableColumns<JuliangAccountItem> = [
   {
@@ -121,7 +152,9 @@ const columns: DataTableColumns<JuliangAccountItem> = [
 
 const allAccountsHaveRemark = computed(() => {
   if (matchedAccounts.value.length === 0) return false
-  return matchedAccounts.value.every(account => account.advertiser_remark === currentBrandName.value)
+  return matchedAccounts.value.every(
+    account => account.advertiser_remark === currentBrandName.value
+  )
 })
 
 async function fetchAvailableAccountCount() {
@@ -132,7 +165,9 @@ async function fetchAvailableAccountCount() {
       return
     }
 
-    availableAccountCount.value = await feishuApi.getAvailableAccountCount(currentAccountTableId.value)
+    availableAccountCount.value = await feishuApi.getAvailableAccountCount(
+      currentAccountTableId.value
+    )
   } catch (error) {
     console.error('获取可用账户数量失败:', error)
     availableAccountCount.value = null
@@ -147,7 +182,8 @@ async function loadCurrentChannelAccountTableId() {
   currentChannelName.value = String(sessionData?.channel?.name || '').trim()
   currentAdvertiserName.value = String(sessionData?.buildConfig?.advertiserName || '').trim()
   currentBrandName.value =
-    String(sessionData?.runtimeUser?.brandName || sessionData?.user?.brandName || '小红').trim() || '小红'
+    String(sessionData?.runtimeUser?.brandName || sessionData?.user?.brandName || '小红').trim() ||
+    '小红'
 }
 
 function ensureCurrentAccountTableId() {
@@ -170,19 +206,18 @@ async function fetchAccounts() {
 
   loading.value = true
   matchedAccounts.value = []
-  let offset = 1
-  const targetCount = accountCount.value
+  let offset = Math.max(1, Number(startPage.value) || 1)
+  const targetCount = Math.max(1, Number(accountCount.value) || 1)
+  const selectedPageSize = Number(pageSize.value)
+  const limit = pageSizeValues.includes(selectedPageSize) ? selectedPageSize : 100
 
   abortController.value = new AbortController()
 
   try {
     while (matchedAccounts.value.length < targetCount) {
-      progressText.value = `正在拉取第 ${offset} 页，已找到 ${matchedAccounts.value.length} 个符合条件的账户...`
+      progressText.value = `正在拉取第 ${offset} 页（每页 ${limit} 条），已找到 ${matchedAccounts.value.length} 个符合条件的账户...`
 
-      const response = await getJuliangAccountList(
-        { offset, limit: 100 },
-        abortController.value.signal
-      )
+      const response = await getJuliangAccountList({ offset, limit }, abortController.value.signal)
 
       if (response.code !== 0) {
         throw new Error(response.msg || '获取账户列表失败')
@@ -315,6 +350,8 @@ async function syncToFeishu() {
 
 function resetModal() {
   step.value = 1
+  startPage.value = 1
+  pageSize.value = 100
   accountCount.value = 10
   matchedAccounts.value = []
   progressText.value = ''
