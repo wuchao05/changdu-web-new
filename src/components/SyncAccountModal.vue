@@ -32,7 +32,12 @@
         <n-input-number v-model:value="accountCount" :min="1" :max="1000" style="width: 120px" />
         <span>个账户</span>
       </div>
-      <n-button type="primary" :loading="loading" @click="fetchAccounts">开始拉取</n-button>
+      <div class="flex gap-2">
+        <n-button type="primary" :loading="loading" @click="fetchAccounts">开始拉取</n-button>
+        <n-button v-if="loading" type="warning" secondary @click="confirmAbortFetch"
+          >中断拉取</n-button
+        >
+      </div>
       <div v-if="progressText" class="text-sm text-gray-500">{{ progressText }}</div>
     </div>
 
@@ -74,6 +79,7 @@ import {
   NInputNumber,
   NSelect,
   NDataTable,
+  useDialog,
   useMessage,
   type DataTableColumns,
 } from 'naive-ui'
@@ -94,6 +100,7 @@ const emit = defineEmits<{
 }>()
 
 const message = useMessage()
+const dialog = useDialog()
 
 const visible = computed({
   get: () => props.visible,
@@ -111,6 +118,7 @@ const progressText = ref('')
 const remarkProgress = ref('')
 const matchedAccounts = ref<JuliangAccountItem[]>([])
 const abortController = ref<AbortController | null>(null)
+const usePartialAccountsAfterAbort = ref(false)
 const availableAccountCount = ref<number | null>(null)
 const loadingCount = ref(false)
 const currentAccountTableId = ref('')
@@ -199,6 +207,53 @@ function ensureCurrentAccountTableId() {
   return false
 }
 
+function normalizeTargetCount() {
+  return Math.max(1, Number(accountCount.value) || 1)
+}
+
+function showMatchedAccountsResult(targetCount: number, interrupted = false) {
+  if (matchedAccounts.value.length > targetCount) {
+    matchedAccounts.value = matchedAccounts.value.slice(0, targetCount)
+  }
+
+  const foundCount = matchedAccounts.value.length
+
+  if (foundCount > 0) {
+    if (interrupted) {
+      message.info(`已中断拉取，将使用当前找到的 ${foundCount} 个账户`)
+    } else if (foundCount < targetCount) {
+      message.warning(`已拉到最后一页，仅找到 ${foundCount} 个符合条件的账户`)
+    } else {
+      message.success(`成功找到 ${foundCount} 个符合条件的账户`)
+    }
+    step.value = 2
+    return
+  }
+
+  message.warning(interrupted ? '已中断拉取，当前未找到符合条件的账户' : '未找到符合条件的账户')
+}
+
+function confirmAbortFetch() {
+  if (!loading.value || !abortController.value) {
+    return
+  }
+
+  const foundCount = matchedAccounts.value.length
+  const targetCount = normalizeTargetCount()
+  const missingCount = Math.max(targetCount - foundCount, 0)
+
+  dialog.warning({
+    title: '确认中断拉取',
+    content: `当前已找到符合条件的账户 ${foundCount} 个，还缺 ${missingCount} 个。是否中断拉取并使用已拉取账户？`,
+    positiveText: '中断并使用',
+    negativeText: '继续拉取',
+    onPositiveClick: () => {
+      usePartialAccountsAfterAbort.value = true
+      abortController.value?.abort()
+    },
+  })
+}
+
 async function fetchAccounts() {
   if (!ensureCurrentAccountTableId()) {
     return
@@ -206,8 +261,9 @@ async function fetchAccounts() {
 
   loading.value = true
   matchedAccounts.value = []
+  usePartialAccountsAfterAbort.value = false
   let offset = Math.max(1, Number(startPage.value) || 1)
-  const targetCount = Math.max(1, Number(accountCount.value) || 1)
+  const targetCount = normalizeTargetCount()
   const selectedPageSize = Number(pageSize.value)
   const limit = pageSizeValues.includes(selectedPageSize) ? selectedPageSize : 100
 
@@ -243,20 +299,15 @@ async function fetchAccounts() {
       offset += 1
     }
 
-    if (matchedAccounts.value.length > targetCount) {
-      matchedAccounts.value = matchedAccounts.value.slice(0, targetCount)
-    }
-
-    if (matchedAccounts.value.length > 0) {
-      message.success(`成功找到 ${matchedAccounts.value.length} 个符合条件的账户`)
-      step.value = 2
-    } else {
-      message.warning('未找到符合条件的账户')
-    }
+    showMatchedAccountsResult(targetCount)
   } catch (err) {
     const error = err as Error
     if (error.name === 'AbortError') {
-      message.info('已取消拉取账户')
+      if (usePartialAccountsAfterAbort.value) {
+        showMatchedAccountsResult(targetCount, true)
+      } else {
+        message.info('已取消拉取账户')
+      }
     } else {
       message.error(error.message || '拉取账户失败')
     }
@@ -264,6 +315,7 @@ async function fetchAccounts() {
     loading.value = false
     progressText.value = ''
     abortController.value = null
+    usePartialAccountsAfterAbort.value = false
   }
 }
 
@@ -359,6 +411,7 @@ function resetModal() {
 }
 
 function cancelRequests() {
+  usePartialAccountsAfterAbort.value = false
   if (abortController.value) {
     abortController.value.abort()
     abortController.value = null
