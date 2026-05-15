@@ -13,6 +13,8 @@ const SECONDS_PER_DAY = 24 * 60 * 60
 const MAX_ORDER_RANGE_DAYS = 10
 const AUTO_RED_FLAG_START_HOUR = 0
 const AUTO_RED_FLAG_END_HOUR = 1
+const FEISHU_DRAMA_STATUS_CHUNK_SIZE = 40
+const feishuDramaStatusInflightMap = new Map()
 
 function getPublishHour(publishTime) {
   if (!publishTime) return null
@@ -30,6 +32,210 @@ function isAutoRedFlagPublishTime(publishTime) {
   if (!Number.isInteger(publishHour)) return false
 
   return publishHour >= AUTO_RED_FLAG_START_HOUR && publishHour <= AUTO_RED_FLAG_END_HOUR
+}
+
+function normalizeDramaName(name) {
+  return String(name || '').trim()
+}
+
+function getFeishuTextFieldValue(field) {
+  if (typeof field === 'string') {
+    return field.trim()
+  }
+
+  if (Array.isArray(field)) {
+    return field
+      .map(item => String(item?.text || ''))
+      .join('')
+      .trim()
+  }
+
+  if (field?.value) {
+    if (typeof field.value === 'string') {
+      return field.value.trim()
+    }
+    if (Array.isArray(field.value)) {
+      return field.value
+        .map(item => String(item?.text || ''))
+        .join('')
+        .trim()
+    }
+  }
+
+  return ''
+}
+
+function isFeishuDownloadedField(field) {
+  return getFeishuTextFieldValue(field) === '是'
+}
+
+function normalizeFeishuStatusDramas(dramas = []) {
+  const seenBookIds = new Set()
+  return (Array.isArray(dramas) ? dramas : [])
+    .map(item => ({
+      book_id: String(item?.book_id || '').trim(),
+      series_name: normalizeDramaName(item?.series_name || item?.book_name),
+    }))
+    .filter(item => item.book_id && item.series_name)
+    .filter(item => {
+      if (seenBookIds.has(item.book_id)) {
+        return false
+      }
+      seenBookIds.add(item.book_id)
+      return true
+    })
+}
+
+function buildFeishuDramaStatusKey(tableId, dramas) {
+  const names = dramas.map(item => normalizeDramaName(item.series_name)).sort()
+  return `${String(tableId || '').trim()}::${names.join('|')}`
+}
+
+async function getFeishuAccessToken() {
+  const tokenResponse = await fetch(
+    `${FEISHU_CONFIG.api_base_url}${FEISHU_CONFIG.token_endpoint}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        app_id: FEISHU_CONFIG.app_id,
+        app_secret: FEISHU_CONFIG.app_secret,
+      }),
+    }
+  )
+
+  const tokenData = await tokenResponse.text()
+  let tokenJson
+  try {
+    tokenJson = JSON.parse(tokenData)
+  } catch {
+    throw new Error('飞书 token 响应解析失败')
+  }
+
+  if (tokenJson.code !== 0) {
+    throw new Error(tokenJson.msg || '获取飞书 access token 失败')
+  }
+
+  return tokenJson.tenant_access_token
+}
+
+async function searchFeishuDramaListByNames(accessToken, tableId, dramaNames) {
+  const names = dramaNames.map(normalizeDramaName).filter(Boolean)
+  if (names.length === 0) {
+    return []
+  }
+
+  let pageToken = ''
+  const items = []
+
+  do {
+    const searchUrl = new URL(
+      `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.app_token}/tables/${tableId}/records/search`
+    )
+    if (pageToken) {
+      searchUrl.searchParams.set('page_token', pageToken)
+    }
+
+    const response = await fetch(searchUrl.toString(), {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        field_names: ['剧名', '是否已下载'],
+        filter: {
+          conjunction: 'or',
+          conditions: names.map(name => ({
+            field_name: '剧名',
+            operator: 'contains',
+            value: [name],
+          })),
+        },
+        page_size: 500,
+      }),
+    })
+
+    const text = await response.text()
+    let json
+    try {
+      json = JSON.parse(text)
+    } catch {
+      throw new Error('飞书剧集清单响应解析失败')
+    }
+
+    if (json.code !== 0) {
+      throw new Error(json.msg || json.message || '飞书剧集清单查询失败')
+    }
+
+    items.push(...(Array.isArray(json.data?.items) ? json.data.items : []))
+    pageToken = String(json.data?.page_token || '')
+  } while (pageToken)
+
+  return items
+}
+
+async function queryFeishuDramaStatusByNames(tableId, dramas) {
+  const normalizedDramas = normalizeFeishuStatusDramas(dramas)
+  if (normalizedDramas.length === 0) {
+    return []
+  }
+
+  const accessToken = await getFeishuAccessToken()
+  const statusByName = new Map()
+  const uniqueNames = [...new Set(normalizedDramas.map(item => item.series_name))]
+
+  for (let index = 0; index < uniqueNames.length; index += FEISHU_DRAMA_STATUS_CHUNK_SIZE) {
+    const chunkNames = uniqueNames.slice(index, index + FEISHU_DRAMA_STATUS_CHUNK_SIZE)
+    const items = await searchFeishuDramaListByNames(accessToken, tableId, chunkNames)
+
+    items.forEach(item => {
+      const dramaName = normalizeDramaName(getFeishuTextFieldValue(item.fields?.['剧名']))
+      if (!dramaName || !chunkNames.includes(dramaName)) {
+        return
+      }
+
+      const current = statusByName.get(dramaName) || {
+        feishu_exists: false,
+        feishu_downloaded: false,
+      }
+
+      statusByName.set(dramaName, {
+        feishu_exists: true,
+        feishu_downloaded:
+          current.feishu_downloaded || isFeishuDownloadedField(item.fields?.['是否已下载']),
+      })
+    })
+  }
+
+  return normalizedDramas.map(drama => {
+    const status = statusByName.get(drama.series_name)
+    return {
+      book_id: drama.book_id,
+      series_name: drama.series_name,
+      feishu_exists: status?.feishu_exists === true,
+      feishu_downloaded: status?.feishu_downloaded === true,
+    }
+  })
+}
+
+async function queryFeishuDramaStatusShared(tableId, dramas) {
+  const normalizedDramas = normalizeFeishuStatusDramas(dramas)
+  const key = buildFeishuDramaStatusKey(tableId, normalizedDramas)
+  const inflight = feishuDramaStatusInflightMap.get(key)
+
+  if (inflight) {
+    return inflight
+  }
+
+  const promise = queryFeishuDramaStatusByNames(tableId, normalizedDramas).finally(() => {
+    feishuDramaStatusInflightMap.delete(key)
+  })
+  feishuDramaStatusInflightMap.set(key, promise)
+
+  return promise
 }
 
 /**
@@ -719,7 +925,47 @@ router.post('/a-bogus', async ctx => {
   }
 })
 
-// 系列列表 - 通过服务端直连常读内部接口，同步获取飞书剧集清单数据
+router.post('/distributor/content/series/feishu-status/v1', async ctx => {
+  try {
+    const runtimeFeishuConfig = await resolveRuntimeFeishuConfig(ctx)
+    const targetDramaListTableId = resolveDramaListTableId(
+      runtimeFeishuConfig,
+      ctx.request.body?.drama_list_table_id
+    )
+    const dramas = normalizeFeishuStatusDramas(ctx.request.body?.dramas)
+
+    if (dramas.length === 0) {
+      ctx.status = 200
+      ctx.body = {
+        code: 0,
+        message: 'success',
+        data: [],
+      }
+      return
+    }
+
+    const data = await queryFeishuDramaStatusShared(targetDramaListTableId, dramas)
+    ctx.status = 200
+    ctx.body = {
+      code: 0,
+      message: 'success',
+      data,
+    }
+  } catch (error) {
+    console.error('[新剧抢跑] 批量查询飞书剧集状态失败:', {
+      message: error.message,
+      stack: error.stack,
+    })
+    ctx.status = 200
+    ctx.body = {
+      code: 500,
+      message: error.message || '批量查询飞书剧集状态失败',
+      data: [],
+    }
+  }
+})
+
+// 系列列表 - 通过服务端直连常读内部接口，可按参数跳过飞书状态补齐
 router.get('/distributor/content/series/list/v1', async ctx => {
   try {
     const runtimeFeishuConfig = await resolveRuntimeFeishuConfig(ctx)
@@ -866,7 +1112,8 @@ router.get('/distributor/content/series/list/v1', async ctx => {
     }
 
     // 如果新剧抢跑列表获取成功，继续获取飞书剧集清单数据
-    if (ctx.body && ctx.body.code === 0) {
+    const skipFeishuStatus = String(ctx.query.skip_feishu_status || '') === '1'
+    if (ctx.body && ctx.body.code === 0 && !skipFeishuStatus) {
       try {
         // 获取飞书访问令牌
         const tokenResponse = await fetch(

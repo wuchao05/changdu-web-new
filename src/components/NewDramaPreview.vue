@@ -848,6 +848,7 @@ import { useDouyinMaterialStore } from '@/stores/douyinMaterial'
 import { useSessionStore } from '@/stores/session'
 import {
   getNewDramaList,
+  getNewDramaFeishuStatus,
   searchNewDramaList,
   getDownloadTaskList,
   getDownloadUrl,
@@ -933,6 +934,7 @@ function resetChannelScopedData() {
   submittedForDownloadSet.value = new Set()
   submittedForClipSet.value = new Set()
   manualRedFlagSet.value = new Set()
+  disabledRedFlagSet.value = new Set()
   syncingDramaSet.clear()
   syncingDramaId.value = null
   isAnyDramaSyncing.value = false
@@ -1050,6 +1052,7 @@ const isAnyDramaSyncing = ref(false)
 const submittedForDownloadSet = ref<Set<string>>(new Set())
 const submittedForClipSet = ref<Set<string>>(new Set())
 const manualRedFlagSet = ref<Set<string>>(new Set())
+const disabledRedFlagSet = ref<Set<string>>(new Set())
 
 // 增剧对比相关状态
 const showingComparedDramas = ref(false)
@@ -1482,8 +1485,7 @@ function buildCartItem(drama: NewDramaItem | RankingDramaItem): CartItem {
     series_name: (drama as any).series_name || (drama as any).book_name || '未知剧名',
     publish_time: drama.publish_time || '',
     manualRedFlag: isManualRedFlag(drama.book_id),
-    autoRedFlag:
-      (drama as any).auto_red_flag === true || isAutoRedFlagPublishTime(drama.publish_time),
+    autoRedFlag: isRedFlagDrama(drama) && !isManualRedFlag(drama.book_id),
     fromSearchResult: searchKeyword.value.trim().length > 0,
     feishuTableGroupId: getSelectedFeishuTableGroupId(),
     feishuTableGroupName: getSelectedFeishuTableGroupName(),
@@ -1875,7 +1877,15 @@ function isManualRedFlag(bookId: string) {
   return manualRedFlagSet.value.has(getManualRedFlagKey(bookId))
 }
 
+function isDisabledRedFlag(bookId: string) {
+  return disabledRedFlagSet.value.has(getManualRedFlagKey(bookId))
+}
+
 function isRedFlagDrama(drama: NewDramaItem | RankingDramaItem) {
+  if (isDisabledRedFlag(drama.book_id)) {
+    return false
+  }
+
   return (
     isManualRedFlag(drama.book_id) ||
     (drama as any).auto_red_flag === true ||
@@ -1906,16 +1916,24 @@ function handleManualRedFlagChange(payload: {
 }) {
   const { drama, value } = payload
   const key = getManualRedFlagKey(drama.book_id)
-  const next = new Set(manualRedFlagSet.value)
+  const nextManual = new Set(manualRedFlagSet.value)
+  const nextDisabled = new Set(disabledRedFlagSet.value)
 
   if (value) {
-    next.add(key)
+    nextManual.add(key)
+    nextDisabled.delete(key)
   } else {
-    next.delete(key)
+    nextManual.delete(key)
+    nextDisabled.add(key)
   }
 
-  manualRedFlagSet.value = next
-  dramaCartRef.value?.updateItemRedFlag?.(drama.book_id, value)
+  manualRedFlagSet.value = nextManual
+  disabledRedFlagSet.value = nextDisabled
+  dramaCartRef.value?.updateItemRedFlag?.(
+    drama.book_id,
+    isManualRedFlag(drama.book_id),
+    isRedFlagDrama(drama) && !isManualRedFlag(drama.book_id)
+  )
 }
 
 // 添加到购物车
@@ -2313,6 +2331,10 @@ function resolveDramaRating(
   drama: NewDramaItem | RankingDramaItem,
   options: AddDownloadOptions = {}
 ) {
+  if (isDisabledRedFlag(drama.book_id)) {
+    return options.fromSearchResult === true ? '绿标' : '黄标'
+  }
+
   const shouldMarkRedFlag =
     options.manualRedFlag === true ||
     (drama as any).auto_red_flag === true ||
@@ -2585,6 +2607,85 @@ function mergeDownloadTasks(base: DownloadTask[], incoming: DownloadTask[]): Dow
   return Array.from(map.values())
 }
 
+async function hydrateNewDramaStatuses(
+  requestGen: number,
+  dramaSnapshot: NewDramaItem[],
+  timeRange: { startTime: number; endTime: number }
+) {
+  if (dramaSnapshot.length === 0) {
+    downloadList.value = []
+    return
+  }
+
+  const feishuStatusTask = getNewDramaFeishuStatus({
+    drama_list_table_id: currentDramaListTableId.value,
+    dramas: dramaSnapshot.map(drama => ({
+      book_id: drama.book_id,
+      series_name: drama.series_name,
+    })),
+  })
+    .then(result => {
+      if (isListRequestStale(requestGen) || result.code !== 0) {
+        return
+      }
+
+      const statusMap = new Map(
+        result.data.map(item => [
+          item.book_id,
+          {
+            series_name: item.series_name.trim(),
+            feishu_downloaded: item.feishu_downloaded,
+            feishu_exists: item.feishu_exists,
+          },
+        ])
+      )
+
+      dramaList.value = dramaList.value.map(drama => {
+        const status = statusMap.get(drama.book_id)
+        if (!status || status.series_name !== drama.series_name.trim()) {
+          return drama
+        }
+
+        return {
+          ...drama,
+          feishu_downloaded: status.feishu_downloaded,
+          feishu_exists: status.feishu_exists,
+        }
+      })
+    })
+    .catch(err => {
+      if (!isListRequestStale(requestGen)) {
+        console.error('Failed to hydrate Feishu drama status:', err)
+      }
+    })
+
+  const downloadStatusTask = getDownloadTaskList({
+    start_time: timeRange.startTime,
+    end_time: timeRange.endTime,
+    page_index: 0,
+    page_size: 20000,
+  })
+    .then(result => {
+      if (isListRequestStale(requestGen)) {
+        return
+      }
+
+      if (result.data && Array.isArray(result.data)) {
+        downloadList.value = filterDownloadData(result.data, dramaList.value)
+      } else {
+        downloadList.value = []
+      }
+    })
+    .catch(err => {
+      if (!isListRequestStale(requestGen)) {
+        downloadList.value = []
+        console.error('Failed to hydrate download status:', err)
+      }
+    })
+
+  await Promise.allSettled([feishuStatusTask, downloadStatusTask])
+}
+
 // 根据剧名获取对应的下载数据，兼容榜单列表的下载集合
 function getDownloadDataForDrama(dramaName: string): DownloadTask | null {
   const name = dramaName?.trim()
@@ -2631,14 +2732,6 @@ async function fetchDramaListByPageCount(
     const safePageCount = Math.max(1, pageCount)
     const { sequential = false, pageIntervalMs = 0 } = options
 
-    // 下载任务列表（获取所有状态）
-    const downloadTaskPromise = getDownloadTaskList({
-      start_time: startTime,
-      end_time: endTime,
-      page_index: 0,
-      page_size: 20000,
-    })
-
     let dramaResults: Awaited<ReturnType<typeof getNewDramaList>>[] = []
 
     if (sequential) {
@@ -2649,6 +2742,7 @@ async function fetchDramaListByPageCount(
           permission_statuses: '3,4',
           page_index: pageIndex + 1,
           drama_list_table_id: currentDramaListTableId.value,
+          skip_feishu_status: 1,
         })
         dramaResults.push(pageResult)
 
@@ -2665,12 +2759,11 @@ async function fetchDramaListByPageCount(
           permission_statuses: '3,4',
           page_index: pageIndex + 1,
           drama_list_table_id: currentDramaListTableId.value,
+          skip_feishu_status: 1,
         })
       )
       dramaResults = await Promise.all(dramaRequests)
     }
-
-    const downloadResult = await downloadTaskPromise
 
     // 若期间用户切走了 Tab,丢弃这次响应,不更新 UI
     if (isListRequestStale(requestGen)) return
@@ -2708,14 +2801,14 @@ async function fetchDramaListByPageCount(
     })
 
     dramaList.value = filteredDramaData
-
-    // 处理下载数据
-    if (downloadResult.data && Array.isArray(downloadResult.data)) {
-      downloadList.value = filterDownloadData(downloadResult.data, filteredDramaData)
-    } else {
-      downloadList.value = []
-    }
-    console.log('downloadList.value', downloadList.value)
+    downloadList.value = []
+    void hydrateNewDramaStatuses(requestGen, filteredDramaData, { startTime, endTime }).catch(
+      err => {
+        if (!isListRequestStale(requestGen)) {
+          console.error('Failed to hydrate new drama statuses:', err)
+        }
+      }
+    )
 
     // 刷新后检查当前页面是否还有数据，如果没有则重置到第一页
     const totalPages = Math.ceil(filteredDramaData.length / pageSize.value)

@@ -308,6 +308,19 @@ export interface NewDramaData {
   }
 }
 
+export interface NewDramaFeishuStatusItem {
+  book_id: string
+  series_name: string
+  feishu_downloaded: boolean
+  feishu_exists: boolean
+}
+
+export interface NewDramaFeishuStatusResponse {
+  code: number
+  message: string
+  data: NewDramaFeishuStatusItem[]
+}
+
 export interface NewDramaItem {
   album_id_dy: string
   amount_limit_status: number
@@ -377,6 +390,7 @@ export interface NewDramaParams {
   creation_status?: number // 短剧连载状态：0 = 完结，1 = 连载中
   delivery_status?: number // 投放状态筛选：0 = 不可投放，1 = 可投放，2 = 即将下架
   drama_list_table_id?: string // 飞书剧集清单表ID
+  skip_feishu_status?: 0 | 1 // 是否跳过同步飞书状态补齐
 }
 
 // 下载任务相关类型

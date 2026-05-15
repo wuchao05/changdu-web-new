@@ -76,12 +76,12 @@
                 type="button"
                 class="manual-red-flag-toggle"
                 :class="{
-                  active: isManualRedFlag,
+                  active: isRedFlagActive,
                   disabled: isSyncing || isProcessing,
                 }"
                 :disabled="isSyncing || isProcessing"
                 :title="
-                  isManualRedFlag
+                  isRedFlagActive
                     ? `取消红标: ${drama.series_name || drama.book_name}`
                     : `设为红标: ${drama.series_name || drama.book_name}`
                 "
@@ -680,7 +680,7 @@ function toggleManualRedFlag() {
 
   emit('red-flag-change', {
     drama: props.drama,
-    value: !props.isManualRedFlag,
+    value: !isRedFlagActive.value,
   })
 }
 
@@ -835,6 +835,8 @@ watch(
 const canAddDownload = computed(() => {
   return !props.drama.feishu_downloaded && !props.drama.feishu_exists
 })
+
+const isRedFlagActive = computed(() => props.isNewDrama || props.isManualRedFlag)
 
 onMounted(() => {
   document.addEventListener('click', handleDocumentClick)

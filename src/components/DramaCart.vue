@@ -260,13 +260,14 @@ function removeItem(bookId: string) {
 }
 
 // 更新购物车中剧集的红标状态
-function updateItemRedFlag(bookId: string, manualRedFlag: boolean) {
+function updateItemRedFlag(bookId: string, manualRedFlag: boolean, autoRedFlag = false) {
   const targetItem = cartItems.value.find(item => item.book_id === bookId)
   if (!targetItem) {
     return
   }
 
   targetItem.manualRedFlag = manualRedFlag
+  targetItem.autoRedFlag = autoRedFlag
 }
 
 function hasItem(bookId: string) {

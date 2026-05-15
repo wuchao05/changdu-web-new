@@ -12,7 +12,9 @@ import type {
   DramaRankingParams,
   DistributorData,
   NewDramaData,
+  NewDramaFeishuStatusResponse,
   NewDramaParams,
+  NewDramaItem,
   DownloadTaskResponse,
   DownloadTaskParams,
   DownloadUrlResponse,
@@ -163,6 +165,15 @@ export function searchNewDramaList(params: NewDramaParams = {}): Promise<NewDram
         search_type: resolvedSearchType,
       },
     })
+    .then(res => res.data)
+}
+
+export function getNewDramaFeishuStatus(params: {
+  dramas: Pick<NewDramaItem, 'book_id' | 'series_name'>[]
+  drama_list_table_id?: string
+}): Promise<NewDramaFeishuStatusResponse> {
+  return httpInstance
+    .post('/novelsale/distributor/content/series/feishu-status/v1', params)
     .then(res => res.data)
 }
 
