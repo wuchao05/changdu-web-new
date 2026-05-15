@@ -8,12 +8,6 @@
       <div :class="getRankingClass(ranking)" class="ranking-number">{{ ranking }}</div>
     </div>
 
-    <!-- 增剧标识 -->
-    <div v-if="isNewDrama" class="new-drama-badge">
-      <Icon icon="mdi:fire" class="badge-icon" />
-      <span class="badge-text">红标剧·优先剪辑</span>
-    </div>
-
     <div class="drama-content">
       <!-- 封面图片 -->
       <div class="drama-poster">
@@ -981,37 +975,6 @@ async function handleDownload() {
     0 1px 2px -1px rgba(0, 0, 0, 0.06);
 }
 
-/* 增剧样式 */
-.drama-card.is-new-drama {
-  @apply border-red-400;
-  background: linear-gradient(135deg, #fff5f5 0%, #ffe4e6 100%);
-  box-shadow:
-    0 4px 12px -1px rgba(239, 68, 68, 0.2),
-    0 2px 6px -1px rgba(239, 68, 68, 0.1);
-}
-
-.drama-card.is-new-drama:hover {
-  @apply border-red-500 shadow-2xl;
-  box-shadow:
-    0 8px 20px -2px rgba(239, 68, 68, 0.25),
-    0 4px 8px -2px rgba(239, 68, 68, 0.15);
-}
-
-/* 增剧标识 */
-.new-drama-badge {
-  @apply absolute -top-3 -right-3 z-20 bg-gradient-to-r from-red-500 to-orange-500 text-white px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5;
-  animation: pulse-glow 2s ease-in-out infinite;
-}
-
-.badge-icon {
-  @apply w-4 h-4;
-  animation: fire-flicker 1.5s ease-in-out infinite;
-}
-
-.badge-text {
-  @apply text-xs font-bold tracking-wide;
-}
-
 .manual-red-flag-toggle {
   @apply inline-flex items-center gap-2 rounded-full pl-2.5 pr-2 py-1.5 text-xs font-semibold transition-all duration-300;
   border: 1px solid #f5d0d6;
@@ -1083,32 +1046,6 @@ async function handleDownload() {
 
 .manual-red-flag-toggle.active .manual-red-flag-thumb {
   transform: translateX(16px);
-}
-
-@keyframes pulse-glow {
-  0%,
-  100% {
-    box-shadow:
-      0 0 15px rgba(239, 68, 68, 0.6),
-      0 0 30px rgba(239, 68, 68, 0.3);
-  }
-  50% {
-    box-shadow:
-      0 0 25px rgba(239, 68, 68, 0.8),
-      0 0 45px rgba(239, 68, 68, 0.5);
-  }
-}
-
-@keyframes fire-flicker {
-  0%,
-  100% {
-    transform: scale(1);
-    filter: brightness(1);
-  }
-  50% {
-    transform: scale(1.1);
-    filter: brightness(1.3);
-  }
 }
 
 /* 排名徽章样式 */
