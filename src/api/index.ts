@@ -254,6 +254,7 @@ export interface BatchSubmitItem {
   series_name: string
   publish_time: string
   manualRedFlag?: boolean
+  autoRedFlag?: boolean
   fromSearchResult?: boolean
   feishuTableGroupId?: string
   feishuTableGroupName?: string

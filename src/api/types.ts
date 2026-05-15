@@ -330,6 +330,7 @@ export interface NewDramaItem {
   publish_time: string
   series_name: string
   thumb_url: string
+  auto_red_flag?: boolean
   // 飞书剧集清单中的下载状态
   feishu_downloaded?: boolean
   // 是否在飞书剧集清单中存在

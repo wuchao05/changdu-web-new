@@ -91,6 +91,8 @@ const serviceConsole = createScopedConsole(
   args => resolveLogScope(args)
 )
 const ALL_FEISHU_TABLE_GROUP_ID = '__all__'
+const AUTO_RED_FLAG_START_HOUR = 0
+const AUTO_RED_FLAG_END_HOUR = 1
 
 /**
  * 将 ISO 时间字符串转换为北京时间格式
@@ -109,6 +111,47 @@ function toBeijingTime(isoString) {
   const minutes = String(beijingDate.getUTCMinutes()).padStart(2, '0')
   const seconds = String(beijingDate.getUTCSeconds()).padStart(2, '0')
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+}
+
+function getBeijingPublishHour(publishTime) {
+  if (!publishTime) return null
+
+  const publishText = String(publishTime).trim()
+  const hasExplicitTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(publishText)
+
+  if (hasExplicitTimezone) {
+    const date = new Date(publishText)
+    if (Number.isNaN(date.getTime())) return null
+
+    const hourText = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Shanghai',
+      hour: '2-digit',
+      hourCycle: 'h23',
+    }).format(date)
+    return Number(hourText)
+  }
+
+  const timeMatch = publishText.match(/(?:T|\s)(\d{1,2}):\d{2}(?::\d{2})?/)
+  if (!timeMatch) return null
+
+  return Number(timeMatch[1])
+}
+
+function isAutoRedFlagPublishTime(publishTime) {
+  const publishHour = getBeijingPublishHour(publishTime)
+  if (!Number.isInteger(publishHour)) return false
+
+  return publishHour >= AUTO_RED_FLAG_START_HOUR && publishHour <= AUTO_RED_FLAG_END_HOUR
+}
+
+function isRedFlagDrama(drama, newDramaSet = new Set(), options = {}) {
+  return (
+    options.manualRedFlag === true ||
+    options.autoRedFlag === true ||
+    drama?.auto_red_flag === true ||
+    newDramaSet.has(drama?.book_id) ||
+    isAutoRedFlagPublishTime(drama?.publish_time)
+  )
 }
 
 // 抖音素材配置文件路径（与 douyinMaterial 路由保持一致）
@@ -1056,11 +1099,9 @@ async function createDramaStatusRecord(channelId, params) {
 }
 
 function resolveDramaRating(drama, newDramaSet, options = {}) {
-  const manualRedFlag = options.manualRedFlag === true
   const fromSearchResult = options.fromSearchResult === true
-  const isRedFlagDrama = manualRedFlag || newDramaSet.has(drama.book_id)
 
-  if (isRedFlagDrama) {
+  if (isRedFlagDrama(drama, newDramaSet, options)) {
     return '红标'
   }
 
@@ -1484,10 +1525,10 @@ function getDownloadDataForDrama(downloadList, drama) {
  */
 function sortDramasByPriority(dramas, downloadList, newDramaSet) {
   return [...dramas].sort((a, b) => {
-    // 优先级 1：红标剧（增剧）
-    const aIsNew = newDramaSet.has(a.book_id)
-    const bIsNew = newDramaSet.has(b.book_id)
-    if (aIsNew !== bIsNew) return aIsNew ? -1 : 1
+    // 优先级 1：红标剧（增剧或首发时间命中 0 点至 1 点）
+    const aIsRedFlag = isRedFlagDrama(a, newDramaSet)
+    const bIsRedFlag = isRedFlagDrama(b, newDramaSet)
+    if (aIsRedFlag !== bIsRedFlag) return aIsRedFlag ? -1 : 1
 
     // 优先级 2：飞书清单中不存在 && 下载中心有完成的任务
     const aDownloadData = getDownloadDataForDrama(downloadList, a)
@@ -1767,7 +1808,7 @@ async function runAutoSubmitCycle(channelId) {
         const downloadData = getDownloadDataForDrama(downloadList, d)
         if (!downloadData || downloadData.task_status !== 2) return false
 
-        if (state.onlyRedFlag && !newDramaSet.has(d.book_id)) return false
+        if (state.onlyRedFlag && !isRedFlagDrama(d, newDramaSet)) return false
 
         return true
       })
@@ -1798,7 +1839,7 @@ async function runAutoSubmitCycle(channelId) {
         state.progress.currentDrama = drama.series_name
         await saveState(channelId)
 
-        const redFlagLabel = newDramaSet.has(drama.book_id) ? ' [红标]' : ''
+        const redFlagLabel = isRedFlagDrama(drama, newDramaSet) ? ' [红标]' : ''
         serviceConsole.log(
           `[自动提交-${channelId}] 处理第 ${i + 1}/${sortedDramas.length} 部：${drama.series_name}${redFlagLabel}`
         )
@@ -2195,6 +2236,7 @@ async function executeBatchSubmit(items, runtimeContext = null) {
       // 调用处理单部剧的函数
       const result = await processDrama(channelId, drama, downloadList, new Set(), {
         manualRedFlag: item.manualRedFlag,
+        autoRedFlag: item.autoRedFlag,
         fromSearchResult: item.fromSearchResult,
         feishuTableGroupId: item.feishuTableGroupId,
         logScope: '批量提交',

@@ -286,6 +286,7 @@
               :is-downloaded="isDramaDownloaded(drama.series_name)"
               :is-submitted-for-download="isSubmittedForDownload(drama.book_id)"
               :is-submitted-for-clip="isSubmittedForClip(drama.book_id)"
+              :is-new-drama="isRedFlagDrama(drama)"
               :is-manual-red-flag="isManualRedFlag(drama.book_id)"
               :is-in-cart="isDramaInCart(drama.book_id)"
               @show-image="showDramaImage"
@@ -396,7 +397,7 @@
               :is-downloaded="isDramaDownloaded(drama.series_name)"
               :is-submitted-for-download="isSubmittedForDownload(drama.book_id)"
               :is-submitted-for-clip="isSubmittedForClip(drama.book_id)"
-              :is-new-drama="comparedNewDramas.has(drama.book_id)"
+              :is-new-drama="isRedFlagDrama(drama)"
               :is-manual-red-flag="isManualRedFlag(drama.book_id)"
               :is-in-cart="isDramaInCart(drama.book_id)"
               @show-image="showDramaImage"
@@ -789,7 +790,7 @@
                     />
                     <div>
                       <div class="auto-submit-radio-title">只提交红标剧</div>
-                      <div class="auto-submit-radio-desc">仅提交增剧（红标剧集）</div>
+                      <div class="auto-submit-radio-desc">仅提交红标剧集</div>
                     </div>
                   </label>
                 </div>
@@ -805,7 +806,7 @@
                       <li v-if="isAutoSubmitRunOnce">仅执行当前这一轮，完成后自动停止</li>
                       <li v-else>按所选轮询间隔持续执行</li>
                       <li v-if="autoSubmitOnlyRedFlag" class="auto-submit-help-danger">
-                        只处理红标剧（增剧）
+                        只处理红标剧（含首发 0 点至 1 点自动红标）
                       </li>
                       <li v-else>处理所有符合条件的剧集</li>
                       <li>自动提交符合条件的剧集到待下载流程</li>
@@ -891,6 +892,15 @@ const currentBrandName = computed(
 )
 const accountRecycleEnabled = ref(false)
 const ALL_FEISHU_TABLE_GROUP_ID = '__all__'
+const AUTO_RED_FLAG_START_HOUR = 0
+const AUTO_RED_FLAG_END_HOUR = 1
+
+function isAutoRedFlagPublishTime(publishTime?: string) {
+  if (!publishTime) return false
+
+  const publishHour = dayjs.tz(publishTime, 'Asia/Shanghai').hour()
+  return publishHour >= AUTO_RED_FLAG_START_HOUR && publishHour <= AUTO_RED_FLAG_END_HOUR
+}
 
 async function syncCurrentChannelConfig() {
   try {
@@ -1472,6 +1482,8 @@ function buildCartItem(drama: NewDramaItem | RankingDramaItem): CartItem {
     series_name: (drama as any).series_name || (drama as any).book_name || '未知剧名',
     publish_time: drama.publish_time || '',
     manualRedFlag: isManualRedFlag(drama.book_id),
+    autoRedFlag:
+      (drama as any).auto_red_flag === true || isAutoRedFlagPublishTime(drama.publish_time),
     fromSearchResult: searchKeyword.value.trim().length > 0,
     feishuTableGroupId: getSelectedFeishuTableGroupId(),
     feishuTableGroupName: getSelectedFeishuTableGroupName(),
@@ -1863,6 +1875,15 @@ function isManualRedFlag(bookId: string) {
   return manualRedFlagSet.value.has(getManualRedFlagKey(bookId))
 }
 
+function isRedFlagDrama(drama: NewDramaItem | RankingDramaItem) {
+  return (
+    isManualRedFlag(drama.book_id) ||
+    (drama as any).auto_red_flag === true ||
+    comparedNewDramas.value.has(drama.book_id) ||
+    isAutoRedFlagPublishTime(drama.publish_time)
+  )
+}
+
 function isSubmittedForDownload(bookId: string) {
   return submittedForDownloadSet.value.has(getChannelScopedBookKey(bookId))
 }
@@ -1969,9 +1990,8 @@ async function syncToFeishu(payload: { drama: NewDramaItem | RankingDramaItem })
       return
     }
 
-    // 判断是否为增剧（红标剧）
-    // 优先使用页面增剧对比结果，如果没有则不传递（使用默认逻辑）
-    const isRedFlag = comparedNewDramas.value.has(drama.book_id) ? true : undefined
+    // 判断是否为红标剧，包含手动红标和首发时间 0 点至 1 点的自动红标。
+    const isRedFlag = isRedFlagDrama(drama) ? true : undefined
     await handleAddDownload(drama, {
       overrideIsRedFlag: isRedFlag,
       manualRedFlag: isManualRedFlag(drama.book_id),
@@ -2293,13 +2313,15 @@ function resolveDramaRating(
   drama: NewDramaItem | RankingDramaItem,
   options: AddDownloadOptions = {}
 ) {
-  const isRedFlagDrama =
+  const shouldMarkRedFlag =
     options.manualRedFlag === true ||
+    (drama as any).auto_red_flag === true ||
+    isAutoRedFlagPublishTime(drama.publish_time) ||
     (options.overrideIsRedFlag !== undefined
       ? options.overrideIsRedFlag
       : comparedNewDramas.value.has(drama.book_id))
 
-  if (isRedFlagDrama) {
+  if (shouldMarkRedFlag) {
     return '红标'
   }
 

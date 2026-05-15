@@ -220,6 +220,7 @@ router.post('/reset-stats', async ctx => {
  *     series_name: string,
  *     publish_time: string,
  *     manualRedFlag?: boolean,
+ *     autoRedFlag?: boolean,
  *     fromSearchResult?: boolean
  *   }>
  * }

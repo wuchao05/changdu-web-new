@@ -57,7 +57,9 @@
                 <div class="item-name">{{ item.series_name }}</div>
                 <div class="item-meta">
                   <span class="item-date">{{ item.publish_time.split(' ')[0] }}</span>
-                  <span v-if="item.manualRedFlag" class="item-red-flag">红标</span>
+                  <span v-if="item.manualRedFlag || item.autoRedFlag" class="item-red-flag"
+                    >红标</span
+                  >
                   <span v-if="item.feishuTableGroupName" class="item-date">
                     {{ item.feishuTableGroupName }}
                   </span>
@@ -125,6 +127,7 @@ export interface CartItem {
   series_name: string
   publish_time: string
   manualRedFlag?: boolean // 是否手动开启红标
+  autoRedFlag?: boolean // 是否命中首发时间自动红标
   fromSearchResult?: boolean // 是否来自搜索结果
   feishuTableGroupId?: string
   feishuTableGroupName?: string

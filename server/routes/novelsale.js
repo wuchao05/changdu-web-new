@@ -11,6 +11,26 @@ import { getSessionUser } from '../utils/studioSession.js'
 const router = new Router()
 const SECONDS_PER_DAY = 24 * 60 * 60
 const MAX_ORDER_RANGE_DAYS = 10
+const AUTO_RED_FLAG_START_HOUR = 0
+const AUTO_RED_FLAG_END_HOUR = 1
+
+function getPublishHour(publishTime) {
+  if (!publishTime) return null
+
+  const timeMatch = String(publishTime)
+    .trim()
+    .match(/(?:T|\s)(\d{1,2}):\d{2}(?::\d{2})?/)
+  if (!timeMatch) return null
+
+  return Number(timeMatch[1])
+}
+
+function isAutoRedFlagPublishTime(publishTime) {
+  const publishHour = getPublishHour(publishTime)
+  if (!Number.isInteger(publishHour)) return false
+
+  return publishHour >= AUTO_RED_FLAG_START_HOUR && publishHour <= AUTO_RED_FLAG_END_HOUR
+}
 
 /**
  * 根据抖音号列表过滤订单数据，推广链包含任一抖音号即命中。
@@ -817,13 +837,17 @@ router.get('/distributor/content/series/list/v1', async ctx => {
     // 转换数据格式以保持前端兼容性
     if (apiResult.code === 0) {
       const dramaList = Array.isArray(apiResult.data?.data) ? apiResult.data.data : []
+      const markedDramaList = dramaList.map(drama => ({
+        ...drama,
+        auto_red_flag: isAutoRedFlagPublishTime(drama?.publish_time),
+      }))
       const total = apiResult.data?.total || dramaList.length
       ctx.status = 200
       ctx.body = {
         code: 0,
         message: apiResult.message || 'success',
         data: {
-          data: dramaList,
+          data: markedDramaList,
           total,
         },
       }
