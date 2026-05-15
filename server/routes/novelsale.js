@@ -34,6 +34,23 @@ function isAutoRedFlagPublishTime(publishTime) {
   return publishHour >= AUTO_RED_FLAG_START_HOUR && publishHour <= AUTO_RED_FLAG_END_HOUR
 }
 
+function isChangduServiceError(result) {
+  return result?.code === 5000 && result?.message === 'Service Error'
+}
+
+function summarizeChangduListResult(result, response) {
+  const list = Array.isArray(result?.data?.data) ? result.data.data : []
+
+  return {
+    httpStatus: response?.status,
+    ok: response?.ok,
+    code: result?.code,
+    message: result?.message || '',
+    count: list.length,
+    total: result?.data?.total,
+  }
+}
+
 function normalizeDramaName(name) {
   return String(name || '').trim()
 }
@@ -1038,12 +1055,46 @@ router.get('/distributor/content/series/list/v1', async ctx => {
 
     // console.log('[新剧抢跑] 转发常读参数:', params)
 
-    const directResult = await requestChangduInternalApi({
+    let directResult = await requestChangduInternalApi({
       method: 'GET',
       pathname: '/novelsale/distributor/content/series/list/v1/',
       query: params,
       ctx,
     })
+    console.log('[新剧抢跑] 常读列表响应摘要:', {
+      pageIndex,
+      pageSize: params.page_size,
+      isSearchRequest,
+      ...summarizeChangduListResult(directResult.data, directResult.response),
+    })
+
+    if (!isSearchRequest && pageIndex > 0 && isChangduServiceError(directResult.data)) {
+      const fallbackParams = {
+        ...params,
+        page_index: 0,
+      }
+      const fallbackResult = await requestChangduInternalApi({
+        method: 'GET',
+        pathname: '/novelsale/distributor/content/series/list/v1/',
+        query: fallbackParams,
+        ctx,
+      })
+      console.log('[新剧抢跑] 常读列表兜底响应摘要:', {
+        requestedPageIndex: pageIndex,
+        fallbackPageIndex: fallbackParams.page_index,
+        pageSize: fallbackParams.page_size,
+        ...summarizeChangduListResult(fallbackResult.data, fallbackResult.response),
+      })
+
+      if (fallbackResult.data?.code === 0) {
+        console.warn('[新剧抢跑] 常读分页返回 Service Error，已回退到首页参数:', {
+          requestedPageIndex: pageIndex,
+          fallbackPageIndex: 0,
+        })
+        directResult = fallbackResult
+      }
+    }
+
     let apiResult = directResult.data
 
     if (
