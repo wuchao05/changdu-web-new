@@ -2713,7 +2713,10 @@ onUnmounted(() => {
   position: absolute;
   top: calc(100% + 0.35rem);
   left: -0.25rem;
+  display: flex;
+  flex-direction: column;
   width: min(28rem, calc(100vw - 2rem));
+  max-height: min(34rem, calc(100dvh - 5.25rem));
   padding: 0.85rem;
   border-radius: 1.15rem;
   border: 1px solid rgba(191, 219, 254, 0.86);
@@ -2841,14 +2844,30 @@ onUnmounted(() => {
 }
 
 .brand-revenue-table-shell {
-  overflow: hidden;
+  min-height: 0;
+  max-height: min(26rem, calc(100dvh - 10rem));
+  overflow: auto;
+  overscroll-behavior: contain;
   border-radius: 0.9rem;
   border: 1px solid rgba(226, 232, 240, 0.96);
   background: rgba(255, 255, 255, 0.86);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.55) transparent;
+}
+
+.brand-revenue-table-shell::-webkit-scrollbar {
+  width: 0.42rem;
+  height: 0.42rem;
+}
+
+.brand-revenue-table-shell::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: rgba(148, 163, 184, 0.5);
 }
 
 .brand-revenue-table {
   width: 100%;
+  min-width: 25rem;
   border-collapse: collapse;
   color: rgb(30 41 59);
   font-size: 0.86rem;
@@ -2862,6 +2881,9 @@ onUnmounted(() => {
 }
 
 .brand-revenue-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   background: rgba(239, 246, 255, 0.82);
   color: rgb(71 85 105);
   font-size: 0.74rem;
@@ -2965,6 +2987,9 @@ onUnmounted(() => {
 }
 
 .brand-revenue-table tfoot td {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
   border-bottom: 0;
   background: linear-gradient(90deg, rgba(37, 99, 235, 0.1), rgba(14, 165, 233, 0.1));
   color: rgb(30 64 175);
@@ -3733,6 +3758,51 @@ onUnmounted(() => {
 }
 
 @media (max-width: 640px) {
+  .brand-revenue-popover {
+    position: fixed;
+    top: 4.35rem;
+    left: 0.75rem;
+    right: 0.75rem;
+    width: auto;
+    max-height: calc(100dvh - 5.1rem);
+    padding: 0.75rem;
+    transform-origin: top left;
+  }
+
+  .brand-revenue-menu:not(.brand-revenue-menu--disabled):hover .brand-revenue-popover,
+  .brand-revenue-menu--editing:not(.brand-revenue-menu--disabled) .brand-revenue-popover {
+    transform: translateY(0) scale(1);
+  }
+
+  .brand-revenue-popover__header {
+    margin-bottom: 0.62rem;
+    padding-right: 2.2rem;
+    justify-content: flex-start;
+  }
+
+  .brand-revenue-popover__hero {
+    font-size: 1.18rem;
+    letter-spacing: 0.04em;
+  }
+
+  .brand-revenue-table-shell {
+    max-height: calc(100dvh - 10.25rem);
+    border-radius: 0.8rem;
+  }
+
+  .brand-revenue-table {
+    font-size: 0.8rem;
+  }
+
+  .brand-revenue-table th,
+  .brand-revenue-table td {
+    padding: 0.52rem 0.58rem;
+  }
+
+  .brand-revenue-share-input {
+    width: 5.25rem;
+  }
+
   .order-user-tabs {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
