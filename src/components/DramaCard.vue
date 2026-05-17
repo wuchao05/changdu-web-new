@@ -91,7 +91,8 @@
               </button>
 
               <!-- 下载状态标签 -->
-              <div v-if="downloadData" class="status-label-wrapper">
+              <div v-if="statusLoading" class="card-status-skeleton" aria-hidden="true"></div>
+              <div v-else-if="downloadData" class="status-label-wrapper">
                 <div :class="['status-label', getDownloadStatusClass(downloadData.task_status)]">
                   <Icon
                     :icon="getDownloadStatusIcon(downloadData.task_status)"
@@ -107,344 +108,352 @@
 
             <!-- 操作按钮区域 -->
             <div class="action-buttons action-buttons-stack">
-              <!-- 下载按钮 - 只在状态为完成(2)时显示，且飞书未显示已下载状态时显示 -->
-              <template v-if="downloadData?.task_status === 2 && !drama.feishu_downloaded">
-                <button
-                  @click="handleDownload"
-                  :disabled="isDownloaded || isDownloadTriggered"
-                  :class="[
-                    'action-button',
-                    isDownloaded || isDownloadTriggered
-                      ? 'action-button-downloaded'
-                      : 'action-button-download',
-                  ]"
-                  :title="
-                    isDownloaded
-                      ? `已下载: ${drama.series_name}`
-                      : isDownloadTriggered
-                        ? '已触发下载'
-                        : `下载: ${drama.series_name}`
-                  "
-                >
-                  <Icon
-                    :icon="
-                      isDownloaded || isDownloadTriggered ? 'mdi:check-circle' : 'mdi:download'
-                    "
-                    class="button-icon"
-                  />
-                  <span>{{
-                    isDownloaded ? '已下载' : isDownloadTriggered ? '已触发下载' : '下载'
-                  }}</span>
-                </button>
-              </template>
-
-              <!-- 新增待下载按钮 - 只有当飞书剧集清单表中不存在这部剧时才显示 -->
-              <!-- 已提交待下载状态 -->
-              <div
-                v-if="canAddDownload && isSubmittedForDownload"
-                class="status-badge status-submitted"
-              >
-                <Icon icon="mdi:check-circle" class="status-icon" />
-                <span>已提交待下载</span>
+              <div v-if="statusLoading" class="action-status-skeleton" aria-hidden="true">
+                <span class="action-status-skeleton__button"></span>
+                <span class="action-status-skeleton__text"></span>
               </div>
-
-              <!-- 新增待下载按钮 -->
-              <div
-                v-else-if="canAddDownload"
-                ref="productConfigWrapperRef"
-                class="product-config-wrapper"
-              >
-                <div class="action-button-group">
-                  <!-- 加入购物车按钮 -->
+              <template v-else>
+                <!-- 下载按钮 - 只在状态为完成(2)时显示，且飞书未显示已下载状态时显示 -->
+                <template v-if="downloadData?.task_status === 2 && !drama.feishu_downloaded">
                   <button
-                    @click="handleAddToCart"
-                    :disabled="isSyncing || isProcessing || isInCart"
-                    class="action-button action-button-cart"
-                    :class="{ 'is-in-cart': isInCart }"
-                    :title="isInCart ? '已加入购物车' : `加入购物车: ${drama.series_name}`"
-                  >
-                    <Icon
-                      :icon="isInCart ? 'mdi:check' : 'mdi:playlist-plus'"
-                      class="button-icon"
-                    />
-                  </button>
-
-                  <!-- 新增待下载按钮 -->
-                  <button
-                    @click="handleSyncClick"
-                    :disabled="isSyncing || isProcessing || isInCart"
-                    class="action-button action-button-sync action-button-sync-download"
-                    :class="{
-                      'opacity-50 cursor-not-allowed': isInCart || (isAnySyncing && !isSyncing),
-                    }"
+                    @click="handleDownload"
+                    :disabled="isDownloaded || isDownloadTriggered"
+                    :class="[
+                      'action-button',
+                      isDownloaded || isDownloadTriggered
+                        ? 'action-button-downloaded'
+                        : 'action-button-download',
+                    ]"
                     :title="
-                      isInCart
-                        ? '已加入购物车'
-                        : isAnySyncing && !isSyncing
-                          ? '其他剧集正在同步中，请稍候...'
-                          : `新增待下载: ${drama.series_name}`
+                      isDownloaded
+                        ? `已下载: ${drama.series_name}`
+                        : isDownloadTriggered
+                          ? '已触发下载'
+                          : `下载: ${drama.series_name}`
                     "
                   >
                     <Icon
                       :icon="
-                        isInCart
-                          ? 'mdi:check'
-                          : isSyncing || isProcessing
-                            ? 'mdi:loading'
-                            : 'mdi:cloud-sync'
+                        isDownloaded || isDownloadTriggered ? 'mdi:check-circle' : 'mdi:download'
                       "
-                      :class="['button-icon', isSyncing || isProcessing ? 'animate-spin' : '']"
+                      class="button-icon"
                     />
                     <span>{{
-                      isInCart
-                        ? '已加入购物车'
-                        : isSyncing
-                          ? '同步中...'
-                          : isProcessing
-                            ? '处理中...'
-                            : '新增待下载'
+                      isDownloaded ? '已下载' : isDownloadTriggered ? '已触发下载' : '下载'
                     }}</span>
                   </button>
-                </div>
+                </template>
 
-                <transition name="fade-scale">
-                  <div v-if="showProductConfig && !isMobile" class="product-popover" @click.stop>
-                    <div class="product-popover-header">
-                      <div>
-                        <p class="popover-title">新增商品配置</p>
-                        <p class="popover-subtitle">选择分类并填写男女频后提交</p>
-                      </div>
-                    </div>
-
-                    <div class="product-popover-section">
-                      <p class="section-title">商品分类</p>
-                      <div class="space-y-3">
-                        <div class="field-group">
-                          <label class="field-label">剧集标签</label>
-                          <div class="product-tags">
-                            <span
-                              v-for="tag in getCategoryTags(drama)"
-                              :key="tag"
-                              class="product-tag"
-                            >
-                              {{ tag }}
-                            </span>
-                            <span v-if="!getCategoryTags(drama).length" class="product-tag muted">
-                              暂无标签
-                            </span>
-                          </div>
-                        </div>
-                        <div class="field-group">
-                          <label class="field-label">请选择二级 / 三级分类</label>
-                          <NCascader
-                            v-model:value="productForm.categoryValue"
-                            :options="cascaderOptions"
-                            :show-path="true"
-                            :expand-trigger="'hover'"
-                            :clearable="false"
-                            size="small"
-                            placeholder="请选择二级 / 三级分类"
-                            @update:value="handleCategoryValueChange"
-                            class="product-cascader"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div class="product-popover-section">
-                      <p class="section-title">男女频</p>
-                      <div class="gender-options">
-                        <label
-                          v-for="option in genderOptions"
-                          :key="option.value"
-                          :class="[
-                            'gender-option',
-                            productForm.playletGender === option.value ? 'active' : '',
-                          ]"
-                        >
-                          <input
-                            v-model="productForm.playletGender"
-                            type="radio"
-                            class="sr-only"
-                            :value="option.value"
-                          />
-                          {{ option.label }}
-                        </label>
-                      </div>
-                    </div>
-
-                    <p v-if="productFormError" class="product-form-error">
-                      {{ productFormError }}
-                    </p>
-
-                    <div class="popover-actions">
-                      <button
-                        type="button"
-                        class="popover-button muted"
-                        @click="cancelProductSelection"
-                      >
-                        取消
-                      </button>
-                      <button
-                        type="button"
-                        class="popover-button primary"
-                        @click="confirmProductSelection"
-                      >
-                        确认
-                      </button>
-                    </div>
-                  </div>
-                </transition>
-
-                <!-- 移动端弹窗 -->
+                <!-- 新增待下载按钮 - 只有当飞书剧集清单表中不存在这部剧时才显示 -->
+                <!-- 已提交待下载状态 -->
                 <div
-                  v-if="showProductConfig && isMobile"
-                  class="product-modal-overlay"
-                  @click="closeProductConfig"
+                  v-if="canAddDownload && isSubmittedForDownload"
+                  class="status-badge status-submitted"
                 >
-                  <div class="product-modal" @click.stop>
-                    <div class="product-popover-header">
-                      <div>
-                        <p class="popover-title">新增商品配置</p>
-                        <p class="popover-subtitle">选择分类并填写男女频后提交</p>
-                      </div>
-                      <button class="modal-close" @click="closeProductConfig">×</button>
-                    </div>
+                  <Icon icon="mdi:check-circle" class="status-icon" />
+                  <span>已提交待下载</span>
+                </div>
 
-                    <div class="product-popover-section">
-                      <p class="section-title">商品分类</p>
-                      <div class="space-y-3">
-                        <div class="field-group">
-                          <label class="field-label">剧集标签</label>
-                          <div class="product-tags">
-                            <span
-                              v-for="tag in getCategoryTags(drama)"
-                              :key="tag"
-                              class="product-tag"
-                            >
-                              {{ tag }}
-                            </span>
-                            <span v-if="!getCategoryTags(drama).length" class="product-tag muted">
-                              暂无标签
-                            </span>
+                <!-- 新增待下载按钮 -->
+                <div
+                  v-else-if="canAddDownload"
+                  ref="productConfigWrapperRef"
+                  class="product-config-wrapper"
+                >
+                  <div class="action-button-group">
+                    <!-- 加入购物车按钮 -->
+                    <button
+                      @click="handleAddToCart"
+                      :disabled="isSyncing || isProcessing || isInCart"
+                      class="action-button action-button-cart"
+                      :class="{ 'is-in-cart': isInCart }"
+                      :title="isInCart ? '已加入购物车' : `加入购物车: ${drama.series_name}`"
+                    >
+                      <Icon
+                        :icon="isInCart ? 'mdi:check' : 'mdi:playlist-plus'"
+                        class="button-icon"
+                      />
+                    </button>
+
+                    <!-- 新增待下载按钮 -->
+                    <button
+                      @click="handleSyncClick"
+                      :disabled="isSyncing || isProcessing || isInCart"
+                      class="action-button action-button-sync action-button-sync-download"
+                      :class="{
+                        'opacity-50 cursor-not-allowed': isInCart || (isAnySyncing && !isSyncing),
+                      }"
+                      :title="
+                        isInCart
+                          ? '已加入购物车'
+                          : isAnySyncing && !isSyncing
+                            ? '其他剧集正在同步中，请稍候...'
+                            : `新增待下载: ${drama.series_name}`
+                      "
+                    >
+                      <Icon
+                        :icon="
+                          isInCart
+                            ? 'mdi:check'
+                            : isSyncing || isProcessing
+                              ? 'mdi:loading'
+                              : 'mdi:cloud-sync'
+                        "
+                        :class="['button-icon', isSyncing || isProcessing ? 'animate-spin' : '']"
+                      />
+                      <span>{{
+                        isInCart
+                          ? '已加入购物车'
+                          : isSyncing
+                            ? '同步中...'
+                            : isProcessing
+                              ? '处理中...'
+                              : '新增待下载'
+                      }}</span>
+                    </button>
+                  </div>
+
+                  <transition name="fade-scale">
+                    <div v-if="showProductConfig && !isMobile" class="product-popover" @click.stop>
+                      <div class="product-popover-header">
+                        <div>
+                          <p class="popover-title">新增商品配置</p>
+                          <p class="popover-subtitle">选择分类并填写男女频后提交</p>
+                        </div>
+                      </div>
+
+                      <div class="product-popover-section">
+                        <p class="section-title">商品分类</p>
+                        <div class="space-y-3">
+                          <div class="field-group">
+                            <label class="field-label">剧集标签</label>
+                            <div class="product-tags">
+                              <span
+                                v-for="tag in getCategoryTags(drama)"
+                                :key="tag"
+                                class="product-tag"
+                              >
+                                {{ tag }}
+                              </span>
+                              <span v-if="!getCategoryTags(drama).length" class="product-tag muted">
+                                暂无标签
+                              </span>
+                            </div>
+                          </div>
+                          <div class="field-group">
+                            <label class="field-label">请选择二级 / 三级分类</label>
+                            <NCascader
+                              v-model:value="productForm.categoryValue"
+                              :options="cascaderOptions"
+                              :show-path="true"
+                              :expand-trigger="'hover'"
+                              :clearable="false"
+                              size="small"
+                              placeholder="请选择二级 / 三级分类"
+                              @update:value="handleCategoryValueChange"
+                              class="product-cascader"
+                            />
                           </div>
                         </div>
-                        <div class="field-group">
-                          <label class="field-label">请选择二级 / 三级分类</label>
-                          <NCascader
-                            v-model:value="productForm.categoryValue"
-                            :options="cascaderOptions"
-                            :show-path="true"
-                            :expand-trigger="'click'"
-                            :clearable="false"
-                            size="medium"
-                            placeholder="请选择二级 / 三级分类"
-                            @update:value="handleCategoryValueChange"
-                            class="product-cascader"
-                          />
+                      </div>
+
+                      <div class="product-popover-section">
+                        <p class="section-title">男女频</p>
+                        <div class="gender-options">
+                          <label
+                            v-for="option in genderOptions"
+                            :key="option.value"
+                            :class="[
+                              'gender-option',
+                              productForm.playletGender === option.value ? 'active' : '',
+                            ]"
+                          >
+                            <input
+                              v-model="productForm.playletGender"
+                              type="radio"
+                              class="sr-only"
+                              :value="option.value"
+                            />
+                            {{ option.label }}
+                          </label>
                         </div>
                       </div>
-                    </div>
 
-                    <div class="product-popover-section">
-                      <p class="section-title">男女频</p>
-                      <div class="gender-options">
-                        <label
-                          v-for="option in genderOptions"
-                          :key="option.value"
-                          :class="[
-                            'gender-option',
-                            productForm.playletGender === option.value ? 'active' : '',
-                          ]"
+                      <p v-if="productFormError" class="product-form-error">
+                        {{ productFormError }}
+                      </p>
+
+                      <div class="popover-actions">
+                        <button
+                          type="button"
+                          class="popover-button muted"
+                          @click="cancelProductSelection"
                         >
-                          <input
-                            v-model="productForm.playletGender"
-                            type="radio"
-                            class="sr-only"
-                            :value="option.value"
-                          />
-                          {{ option.label }}
-                        </label>
+                          取消
+                        </button>
+                        <button
+                          type="button"
+                          class="popover-button primary"
+                          @click="confirmProductSelection"
+                        >
+                          确认
+                        </button>
                       </div>
                     </div>
+                  </transition>
 
-                    <div v-if="productFormError" class="product-form-error">
-                      {{ productFormError }}
-                    </div>
+                  <!-- 移动端弹窗 -->
+                  <div
+                    v-if="showProductConfig && isMobile"
+                    class="product-modal-overlay"
+                    @click="closeProductConfig"
+                  >
+                    <div class="product-modal" @click.stop>
+                      <div class="product-popover-header">
+                        <div>
+                          <p class="popover-title">新增商品配置</p>
+                          <p class="popover-subtitle">选择分类并填写男女频后提交</p>
+                        </div>
+                        <button class="modal-close" @click="closeProductConfig">×</button>
+                      </div>
 
-                    <div class="product-popover-actions modal-actions">
-                      <button class="btn-cancel" @click.stop="cancelProductSelection">取消</button>
-                      <button class="btn-confirm" @click.stop="confirmProductSelection">
-                        确认
-                      </button>
+                      <div class="product-popover-section">
+                        <p class="section-title">商品分类</p>
+                        <div class="space-y-3">
+                          <div class="field-group">
+                            <label class="field-label">剧集标签</label>
+                            <div class="product-tags">
+                              <span
+                                v-for="tag in getCategoryTags(drama)"
+                                :key="tag"
+                                class="product-tag"
+                              >
+                                {{ tag }}
+                              </span>
+                              <span v-if="!getCategoryTags(drama).length" class="product-tag muted">
+                                暂无标签
+                              </span>
+                            </div>
+                          </div>
+                          <div class="field-group">
+                            <label class="field-label">请选择二级 / 三级分类</label>
+                            <NCascader
+                              v-model:value="productForm.categoryValue"
+                              :options="cascaderOptions"
+                              :show-path="true"
+                              :expand-trigger="'click'"
+                              :clearable="false"
+                              size="medium"
+                              placeholder="请选择二级 / 三级分类"
+                              @update:value="handleCategoryValueChange"
+                              class="product-cascader"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="product-popover-section">
+                        <p class="section-title">男女频</p>
+                        <div class="gender-options">
+                          <label
+                            v-for="option in genderOptions"
+                            :key="option.value"
+                            :class="[
+                              'gender-option',
+                              productForm.playletGender === option.value ? 'active' : '',
+                            ]"
+                          >
+                            <input
+                              v-model="productForm.playletGender"
+                              type="radio"
+                              class="sr-only"
+                              :value="option.value"
+                            />
+                            {{ option.label }}
+                          </label>
+                        </div>
+                      </div>
+
+                      <div v-if="productFormError" class="product-form-error">
+                        {{ productFormError }}
+                      </div>
+
+                      <div class="product-popover-actions modal-actions">
+                        <button class="btn-cancel" @click.stop="cancelProductSelection">
+                          取消
+                        </button>
+                        <button class="btn-confirm" @click.stop="confirmProductSelection">
+                          确认
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              <!-- 新增待剪辑按钮 - 不受feishu_exists限制 -->
-              <!-- 已提交待剪辑状态 -->
-              <div
-                v-if="drama.feishu_downloaded && isSubmittedForClip"
-                class="status-badge status-submitted"
-              >
-                <Icon icon="mdi:check-circle" class="status-icon" />
-                <span>已提交待剪辑</span>
-              </div>
+                <!-- 新增待剪辑按钮 - 不受feishu_exists限制 -->
+                <!-- 已提交待剪辑状态 -->
+                <div
+                  v-if="drama.feishu_downloaded && isSubmittedForClip"
+                  class="status-badge status-submitted"
+                >
+                  <Icon icon="mdi:check-circle" class="status-icon" />
+                  <span>已提交待剪辑</span>
+                </div>
 
-              <!-- 新增待剪辑按钮 -->
-              <button
-                v-else-if="drama.feishu_downloaded"
-                @click="handleDirectSync"
-                :disabled="isSyncing || isProcessing"
-                class="action-button action-button-sync action-button-sync-clip"
-                :class="{
-                  'opacity-50 cursor-not-allowed': isAnySyncing && !isSyncing,
-                }"
-                :title="
-                  isAnySyncing && !isSyncing
-                    ? '其他剧集正在同步中，请稍候...'
-                    : `同步到飞书: ${drama.series_name}`
-                "
-              >
-                <Icon
-                  :icon="isSyncing || isProcessing ? 'mdi:loading' : 'mdi:cloud-sync'"
-                  :class="['button-icon', isSyncing || isProcessing ? 'animate-spin' : '']"
-                />
-                <span>{{
-                  isSyncing ? '同步中...' : isProcessing ? '处理中...' : '新增待剪辑'
-                }}</span>
-              </button>
+                <!-- 新增待剪辑按钮 -->
+                <button
+                  v-else-if="drama.feishu_downloaded"
+                  @click="handleDirectSync"
+                  :disabled="isSyncing || isProcessing"
+                  class="action-button action-button-sync action-button-sync-clip"
+                  :class="{
+                    'opacity-50 cursor-not-allowed': isAnySyncing && !isSyncing,
+                  }"
+                  :title="
+                    isAnySyncing && !isSyncing
+                      ? '其他剧集正在同步中，请稍候...'
+                      : `同步到飞书: ${drama.series_name}`
+                  "
+                >
+                  <Icon
+                    :icon="isSyncing || isProcessing ? 'mdi:loading' : 'mdi:cloud-sync'"
+                    :class="['button-icon', isSyncing || isProcessing ? 'animate-spin' : '']"
+                  />
+                  <span>{{
+                    isSyncing ? '同步中...' : isProcessing ? '处理中...' : '新增待剪辑'
+                  }}</span>
+                </button>
 
-              <!-- 提示文案 - 当剧集已下载时显示 -->
-              <div
-                v-if="drama.feishu_downloaded"
-                class="flex items-center gap-2 text-sm text-green-600 bg-green-50 px-3 py-2 rounded-lg border border-green-200"
-              >
-                <svg class="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                  <path
-                    fill-rule="evenodd"
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                    clip-rule="evenodd"
-                  ></path>
-                </svg>
-                <span class="font-medium">该剧已下载</span>
-              </div>
+                <!-- 提示文案 - 当剧集已下载时显示 -->
+                <div
+                  v-if="drama.feishu_downloaded"
+                  class="flex items-center gap-2 text-sm text-green-600 bg-green-50 px-3 py-2 rounded-lg border border-green-200"
+                >
+                  <svg class="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path
+                      fill-rule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                      clip-rule="evenodd"
+                    ></path>
+                  </svg>
+                  <span class="font-medium">该剧已下载</span>
+                </div>
 
-              <!-- 提示文案 - 当剧集已存在但未下载时显示 -->
-              <div
-                v-if="!drama.feishu_downloaded && drama.feishu_exists"
-                class="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-lg border border-blue-200"
-              >
-                <svg class="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-                  <path
-                    fill-rule="evenodd"
-                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                    clip-rule="evenodd"
-                  ></path>
-                </svg>
-                <span class="font-medium">该剧已在飞书清单中</span>
-              </div>
+                <!-- 提示文案 - 当剧集已存在但未下载时显示 -->
+                <div
+                  v-if="!drama.feishu_downloaded && drama.feishu_exists"
+                  class="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-lg border border-blue-200"
+                >
+                  <svg class="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path
+                      fill-rule="evenodd"
+                      d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                      clip-rule="evenodd"
+                    ></path>
+                  </svg>
+                  <span class="font-medium">该剧已在飞书清单中</span>
+                </div>
+              </template>
             </div>
           </div>
         </div>
@@ -506,6 +515,7 @@ interface Props {
   isNewDrama?: boolean // 是否为增剧（红标剧）
   isManualRedFlag?: boolean // 是否手动开启红标
   isInCart?: boolean // 是否已加入购物车
+  statusLoading?: boolean // 飞书和下载状态是否加载中
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -522,6 +532,7 @@ const props = withDefaults(defineProps<Props>(), {
   isNewDrama: false,
   isManualRedFlag: false,
   isInCart: false,
+  statusLoading: false,
 })
 
 // 事件定义
@@ -1220,6 +1231,15 @@ async function handleDownload() {
   @apply w-3 h-3 mr-1.5;
 }
 
+.card-status-skeleton {
+  width: 76px;
+  height: 28px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #e5e7eb 0%, #f8fafc 48%, #e5e7eb 100%);
+  background-size: 220% 100%;
+  animation: status-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
 .drama-id {
   @apply text-xs text-gray-500 font-mono bg-gray-100 px-2.5 py-1 rounded-md;
 }
@@ -1289,6 +1309,42 @@ async function handleDownload() {
 /* 按钮组 */
 .action-button-group {
   @apply flex items-center gap-2;
+}
+
+.action-status-skeleton {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.action-status-skeleton__button,
+.action-status-skeleton__text {
+  display: block;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #e5e7eb 0%, #f8fafc 48%, #e5e7eb 100%);
+  background-size: 220% 100%;
+  animation: status-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.action-status-skeleton__button {
+  width: 132px;
+  height: 36px;
+}
+
+.action-status-skeleton__text {
+  width: 116px;
+  height: 32px;
+}
+
+@keyframes status-skeleton-shimmer {
+  0% {
+    background-position: 160% 0;
+  }
+
+  100% {
+    background-position: -60% 0;
+  }
 }
 
 /* 购物车按钮 */

@@ -2868,7 +2868,8 @@ onUnmounted(() => {
 .brand-revenue-table {
   width: 100%;
   min-width: 25rem;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   color: rgb(30 41 59);
   font-size: 0.86rem;
 }
@@ -2883,8 +2884,11 @@ onUnmounted(() => {
 .brand-revenue-table th {
   position: sticky;
   top: 0;
-  z-index: 2;
-  background: rgba(239, 246, 255, 0.82);
+  z-index: 4;
+  background: #eff6ff;
+  box-shadow:
+    0 1px 0 rgba(226, 232, 240, 0.96),
+    0 8px 18px rgba(15, 23, 42, 0.08);
   color: rgb(71 85 105);
   font-size: 0.74rem;
   font-weight: 800;
@@ -2989,9 +2993,12 @@ onUnmounted(() => {
 .brand-revenue-table tfoot td {
   position: sticky;
   bottom: 0;
-  z-index: 2;
+  z-index: 4;
   border-bottom: 0;
-  background: linear-gradient(90deg, rgba(37, 99, 235, 0.1), rgba(14, 165, 233, 0.1));
+  background: #eaf2ff;
+  box-shadow:
+    0 -1px 0 rgba(191, 219, 254, 0.92),
+    0 -10px 22px rgba(15, 23, 42, 0.08);
   color: rgb(30 64 175);
   font-weight: 900;
 }

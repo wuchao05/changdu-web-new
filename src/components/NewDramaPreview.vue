@@ -248,8 +248,17 @@
               </button>
             </div>
             <div class="date-cart-actions">
+              <div
+                v-if="activeTab === 'new-drama' && !isSearching && newDramaStatusLoading"
+                class="bulk-cart-skeleton"
+                aria-hidden="true"
+              >
+                <span class="bulk-cart-skeleton__icon"></span>
+                <span class="bulk-cart-skeleton__text"></span>
+                <span class="bulk-cart-skeleton__count"></span>
+              </div>
               <button
-                v-if="activeTab === 'new-drama' && !isSearching"
+                v-else-if="activeTab === 'new-drama' && !isSearching"
                 type="button"
                 class="bulk-cart-button"
                 :class="{ 'is-ready': currentDateAddableNotInCartCount > 0 }"
@@ -273,7 +282,10 @@
           </div>
 
           <!-- 搜索结果列表 - 保留筛选行和购物车常驻 -->
-          <div v-if="isSearching && !searchLoading && searchResults.length > 0" class="drama-list">
+          <div
+            v-if="isSearching && !searchLoading && !error && searchResults.length > 0"
+            class="drama-list"
+          >
             <DramaCard
               v-for="drama in searchResults"
               :key="drama.book_id"
@@ -302,7 +314,7 @@
             <h3 class="empty-title">搜索中...</h3>
             <p class="empty-description">正在匹配短剧，请稍候</p>
           </div>
-          <div v-else-if="isSearching && !searchLoading" class="empty-state">
+          <div v-else-if="isSearching && !searchLoading && !error" class="empty-state">
             <Icon icon="mdi:magnify" class="empty-icon" />
             <h3 class="empty-title">未找到相关短剧</h3>
             <p class="empty-description">请尝试其他关键词或清空搜索</p>
@@ -400,6 +412,7 @@
               :is-new-drama="isRedFlagDrama(drama)"
               :is-manual-red-flag="isManualRedFlag(drama.book_id)"
               :is-in-cart="isDramaInCart(drama.book_id)"
+              :status-loading="newDramaStatusLoading"
               @show-image="showDramaImage"
               @copy-name="copyDramaName"
               @sync-to-feishu="syncToFeishu"
@@ -930,6 +943,7 @@ function resetChannelScopedData() {
   rankingPageIndex.value = 0
   rankingListCache.clear()
   downloadList.value = []
+  newDramaStatusLoading.value = false
   cartBookIds.value = new Set()
   submittedForDownloadSet.value = new Set()
   submittedForClipSet.value = new Set()
@@ -1042,6 +1056,7 @@ const error = ref('')
 const dramaList = ref<NewDramaItem[]>([])
 const downloadList = ref<DownloadTask[]>([])
 const listSkeletonLoading = ref(false)
+const newDramaStatusLoading = ref(false)
 const selectedDate = ref('today')
 const showCopyToast = ref(false)
 const copyToastMessage = ref('')
@@ -1493,7 +1508,9 @@ function buildCartItem(drama: NewDramaItem | RankingDramaItem): CartItem {
 }
 
 const currentDateAddableDramas = computed(() =>
-  currentDateDramas.value.filter(drama => canAddDownloadDrama(drama))
+  newDramaStatusLoading.value
+    ? []
+    : currentDateDramas.value.filter(drama => canAddDownloadDrama(drama))
 )
 
 const currentDateAddableNotInCartCount = computed(
@@ -1501,6 +1518,10 @@ const currentDateAddableNotInCartCount = computed(
 )
 
 const bulkCartButtonTitle = computed(() => {
+  if (newDramaStatusLoading.value) {
+    return `${selectedDateLabel.value}状态加载中`
+  }
+
   if (currentDateAddableDramas.value.length === 0) {
     return `${selectedDateLabel.value}暂无可加入购物车的剧`
   }
@@ -1524,6 +1545,10 @@ const filteredDramas = computed(() => {
 
   // 没有搜索关键词时，返回当前日期tab下的短剧
   const dramas = currentDateDramas.value
+
+  if (newDramaStatusLoading.value) {
+    return dramas
+  }
 
   // 判断是否可以新增待下载
   // 判断下载状态是否为完成
@@ -1958,6 +1983,11 @@ function handleAddToCart(payload: {
 }
 
 function handleAddCurrentDateToCart() {
+  if (newDramaStatusLoading.value) {
+    message.info('新剧状态还在加载中，请稍后再加入购物车')
+    return
+  }
+
   if (!dramaCartRef.value) {
     message.error('购物车组件未加载')
     return
@@ -2607,6 +2637,39 @@ function mergeDownloadTasks(base: DownloadTask[], incoming: DownloadTask[]): Dow
   return Array.from(map.values())
 }
 
+function getRequestErrorMessage(prefix: string, result?: { message?: string }) {
+  return `${prefix}${result?.message ? `：${result.message}` : ''}`
+}
+
+function assertNewDramaListResult(result: Awaited<ReturnType<typeof getNewDramaList>>) {
+  if (result.code !== 0) {
+    throw new Error(getRequestErrorMessage('获取新剧列表失败', result))
+  }
+
+  if (!Array.isArray(result.data?.data)) {
+    throw new Error('获取新剧列表失败：返回数据格式异常')
+  }
+}
+
+function normalizeDownloadTaskList(result: Awaited<ReturnType<typeof getDownloadTaskList>>) {
+  if (result.code !== 0) {
+    throw new Error(getRequestErrorMessage('获取下载状态失败', result))
+  }
+
+  const responseData = result.data as any
+  const taskList = Array.isArray(responseData?.data)
+    ? responseData.data
+    : Array.isArray(responseData)
+      ? responseData
+      : null
+
+  if (!taskList) {
+    throw new Error('获取下载状态失败：返回数据格式异常')
+  }
+
+  return taskList as DownloadTask[]
+}
+
 async function hydrateNewDramaStatuses(
   requestGen: number,
   dramaSnapshot: NewDramaItem[],
@@ -2623,67 +2686,58 @@ async function hydrateNewDramaStatuses(
       book_id: drama.book_id,
       series_name: drama.series_name,
     })),
+  }).then(result => {
+    if (result.code !== 0) {
+      throw new Error(getRequestErrorMessage('获取飞书剧集状态失败', result))
+    }
+
+    if (!Array.isArray(result.data)) {
+      throw new Error('获取飞书剧集状态失败：返回数据格式异常')
+    }
+
+    if (isListRequestStale(requestGen)) {
+      return
+    }
+
+    const statusMap = new Map(
+      result.data.map(item => [
+        item.book_id,
+        {
+          series_name: item.series_name.trim(),
+          feishu_downloaded: item.feishu_downloaded,
+          feishu_exists: item.feishu_exists,
+        },
+      ])
+    )
+
+    dramaList.value = dramaList.value.map(drama => {
+      const status = statusMap.get(drama.book_id)
+      if (!status || status.series_name !== drama.series_name.trim()) {
+        return drama
+      }
+
+      return {
+        ...drama,
+        feishu_downloaded: status.feishu_downloaded,
+        feishu_exists: status.feishu_exists,
+      }
+    })
   })
-    .then(result => {
-      if (isListRequestStale(requestGen) || result.code !== 0) {
-        return
-      }
-
-      const statusMap = new Map(
-        result.data.map(item => [
-          item.book_id,
-          {
-            series_name: item.series_name.trim(),
-            feishu_downloaded: item.feishu_downloaded,
-            feishu_exists: item.feishu_exists,
-          },
-        ])
-      )
-
-      dramaList.value = dramaList.value.map(drama => {
-        const status = statusMap.get(drama.book_id)
-        if (!status || status.series_name !== drama.series_name.trim()) {
-          return drama
-        }
-
-        return {
-          ...drama,
-          feishu_downloaded: status.feishu_downloaded,
-          feishu_exists: status.feishu_exists,
-        }
-      })
-    })
-    .catch(err => {
-      if (!isListRequestStale(requestGen)) {
-        console.error('Failed to hydrate Feishu drama status:', err)
-      }
-    })
 
   const downloadStatusTask = getDownloadTaskList({
     start_time: timeRange.startTime,
     end_time: timeRange.endTime,
     page_index: 0,
     page_size: 20000,
+  }).then(result => {
+    if (isListRequestStale(requestGen)) {
+      return
+    }
+
+    downloadList.value = filterDownloadData(normalizeDownloadTaskList(result), dramaList.value)
   })
-    .then(result => {
-      if (isListRequestStale(requestGen)) {
-        return
-      }
 
-      if (result.data && Array.isArray(result.data)) {
-        downloadList.value = filterDownloadData(result.data, dramaList.value)
-      } else {
-        downloadList.value = []
-      }
-    })
-    .catch(err => {
-      if (!isListRequestStale(requestGen)) {
-        downloadList.value = []
-        console.error('Failed to hydrate download status:', err)
-      }
-    })
-
-  await Promise.allSettled([feishuStatusTask, downloadStatusTask])
+  await Promise.all([feishuStatusTask, downloadStatusTask])
 }
 
 // 根据剧名获取对应的下载数据，兼容榜单列表的下载集合
@@ -2721,7 +2775,10 @@ async function fetchDramaListByPageCount(
   const requestGen = beginListRequest()
   loading.value = true
   listSkeletonLoading.value = true
+  newDramaStatusLoading.value = false
   error.value = ''
+  dramaList.value = []
+  downloadList.value = []
 
   try {
     // 计算时间范围（过去30天到未来30天，使用北京时间）
@@ -2744,6 +2801,7 @@ async function fetchDramaListByPageCount(
           drama_list_table_id: currentDramaListTableId.value,
           skip_feishu_status: 1,
         })
+        assertNewDramaListResult(pageResult)
         dramaResults.push(pageResult)
 
         if (pageIndex < safePageCount - 1 && pageIntervalMs > 0) {
@@ -2763,6 +2821,7 @@ async function fetchDramaListByPageCount(
         })
       )
       dramaResults = await Promise.all(dramaRequests)
+      dramaResults.forEach(assertNewDramaListResult)
     }
 
     // 若期间用户切走了 Tab,丢弃这次响应,不更新 UI
@@ -2802,13 +2861,22 @@ async function fetchDramaListByPageCount(
 
     dramaList.value = filteredDramaData
     downloadList.value = []
-    void hydrateNewDramaStatuses(requestGen, filteredDramaData, { startTime, endTime }).catch(
-      err => {
+    newDramaStatusLoading.value = filteredDramaData.length > 0
+    void hydrateNewDramaStatuses(requestGen, filteredDramaData, { startTime, endTime })
+      .then(() => {
+        if (!isListRequestStale(requestGen)) {
+          newDramaStatusLoading.value = false
+        }
+      })
+      .catch(err => {
         if (!isListRequestStale(requestGen)) {
           console.error('Failed to hydrate new drama statuses:', err)
+          error.value = err instanceof Error ? err.message : '获取新剧状态失败'
+          dramaList.value = []
+          downloadList.value = []
+          newDramaStatusLoading.value = false
         }
-      }
-    )
+      })
 
     // 刷新后检查当前页面是否还有数据，如果没有则重置到第一页
     const totalPages = Math.ceil(filteredDramaData.length / pageSize.value)
@@ -2819,6 +2887,9 @@ async function fetchDramaListByPageCount(
     if (isListRequestStale(requestGen)) return
     console.error('Failed to fetch data:', err)
     error.value = err instanceof Error ? err.message : '获取数据失败'
+    dramaList.value = []
+    downloadList.value = []
+    newDramaStatusLoading.value = false
   } finally {
     if (!isListRequestStale(requestGen)) {
       loading.value = false
@@ -2986,6 +3057,7 @@ async function performSearch(keyword: string, page: number) {
   const requestGen = beginListRequest()
   try {
     searchLoading.value = true
+    error.value = ''
     searchCurrentPage.value = page
 
     // 计算时间范围（过去30天到未来30天，使用北京时间）
@@ -3014,15 +3086,18 @@ async function performSearch(keyword: string, page: number) {
 
     if (isListRequestStale(requestGen)) return
 
-    if (searchResult.code === 0 && searchResult.data) {
+    assertNewDramaListResult(searchResult)
+
+    if (searchResult.data) {
       const searchDramaData = searchResult.data.data || []
       searchResults.value = searchDramaData
       searchTotal.value = searchDramaData.length
 
       // 处理下载数据，为搜索结果关联下载状态
-      if (downloadResult.data && Array.isArray(downloadResult.data)) {
+      const downloadTasks = normalizeDownloadTaskList(downloadResult)
+      if (downloadTasks.length > 0) {
         // 使用与页面初始化相同的逻辑处理下载数据
-        const searchDownloadList = filterDownloadData(downloadResult.data, searchDramaData)
+        const searchDownloadList = filterDownloadData(downloadTasks, searchDramaData)
 
         // 将搜索结果的下载数据合并到全局下载列表中
         // 这样可以确保 getDownloadDataForDrama 函数能找到对应的下载状态
@@ -3039,13 +3114,11 @@ async function performSearch(keyword: string, page: number) {
           downloadStatus: getDownloadDataForDrama(d.series_name)?.task_status,
         }))
       )
-    } else {
-      searchResults.value = []
-      searchTotal.value = 0
     }
-  } catch (error) {
+  } catch (err) {
     if (isListRequestStale(requestGen)) return
-    console.error('搜索失败:', error)
+    console.error('搜索失败:', err)
+    error.value = err instanceof Error ? err.message : '搜索失败'
     searchResults.value = []
     searchTotal.value = 0
   } finally {
@@ -3396,6 +3469,7 @@ function cancelAllListRequests() {
   listRequestGeneration += 1
   loading.value = false
   listSkeletonLoading.value = false
+  newDramaStatusLoading.value = false
   searchLoading.value = false
   rankingLoading.value = false
   fullDramaLoading.value = false
@@ -3816,6 +3890,55 @@ watch(
   font-size: 12px;
   font-weight: 800;
   box-shadow: 0 6px 14px rgba(249, 115, 22, 0.26);
+}
+
+.bulk-cart-skeleton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 46px;
+  min-width: 126px;
+  padding: 0 13px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 16px;
+  background: rgba(248, 250, 252, 0.82);
+  overflow: hidden;
+}
+
+.bulk-cart-skeleton__icon,
+.bulk-cart-skeleton__text,
+.bulk-cart-skeleton__count {
+  display: inline-block;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #e5e7eb 0%, #f8fafc 48%, #e5e7eb 100%);
+  background-size: 220% 100%;
+  animation: status-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.bulk-cart-skeleton__icon {
+  width: 20px;
+  height: 20px;
+}
+
+.bulk-cart-skeleton__text {
+  width: 54px;
+  height: 13px;
+}
+
+.bulk-cart-skeleton__count {
+  width: 24px;
+  height: 22px;
+}
+
+@keyframes status-skeleton-shimmer {
+  0% {
+    background-position: 160% 0;
+  }
+
+  100% {
+    background-position: -60% 0;
+  }
 }
 
 .new-drama-preview-page.is-embedded .drama-list {

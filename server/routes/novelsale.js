@@ -1055,7 +1055,7 @@ router.get('/distributor/content/series/list/v1', async ctx => {
 
     // console.log('[新剧抢跑] 转发常读参数:', params)
 
-    let directResult = await requestChangduInternalApi({
+    const directResult = await requestChangduInternalApi({
       method: 'GET',
       pathname: '/novelsale/distributor/content/series/list/v1/',
       query: params,
@@ -1069,30 +1069,10 @@ router.get('/distributor/content/series/list/v1', async ctx => {
     })
 
     if (!isSearchRequest && pageIndex > 0 && isChangduServiceError(directResult.data)) {
-      const fallbackParams = {
-        ...params,
-        page_index: 0,
-      }
-      const fallbackResult = await requestChangduInternalApi({
-        method: 'GET',
-        pathname: '/novelsale/distributor/content/series/list/v1/',
-        query: fallbackParams,
-        ctx,
-      })
-      console.log('[新剧抢跑] 常读列表兜底响应摘要:', {
+      console.warn('[新剧抢跑] 常读分页返回 Service Error，停止兜底并交给前端报错:', {
         requestedPageIndex: pageIndex,
-        fallbackPageIndex: fallbackParams.page_index,
-        pageSize: fallbackParams.page_size,
-        ...summarizeChangduListResult(fallbackResult.data, fallbackResult.response),
+        pageSize: params.page_size,
       })
-
-      if (fallbackResult.data?.code === 0) {
-        console.warn('[新剧抢跑] 常读分页返回 Service Error，已回退到首页参数:', {
-          requestedPageIndex: pageIndex,
-          fallbackPageIndex: 0,
-        })
-        directResult = fallbackResult
-      }
     }
 
     let apiResult = directResult.data
