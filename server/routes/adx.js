@@ -405,9 +405,9 @@ router.post('/ranking', async ctx => {
     if (rankingSource === 'adx') {
       const credentials = resolveAdxCredentials(adxConfig)
       if (!credentials.cookie) {
-        ctx.status = 400
+        ctx.status = 401
         ctx.body = {
-          code: -1,
+          code: 401,
           message: '未配置 ADX 平台 Cookie，请先配置',
         }
         return
@@ -424,9 +424,9 @@ router.post('/ranking', async ctx => {
     } else {
       const credentials = resolveDataeyeCredentials(adxConfig)
       if (!credentials.authentication || !credentials.loginUserId) {
-        ctx.status = 400
+        ctx.status = 401
         ctx.body = {
-          code: -1,
+          code: 401,
           message: '未配置剧查查小程序凭证，请配置 authentication 和 loginUserId',
         }
         return

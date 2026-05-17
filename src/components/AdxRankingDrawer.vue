@@ -451,6 +451,17 @@ function normalizeRankingList(data: AdxResponse): AdxRankingItem[] {
   }))
 }
 
+function isCredentialError(response: Response, data: AdxResponse) {
+  const errorText = `${data?.msg || ''} ${data?.message || ''}`
+  return (
+    response.status === 401 ||
+    data?.statusCode === 401 ||
+    data?.code === 401 ||
+    data?.msg === 'Unauthorized' ||
+    /未配置|凭证|登录态|Cookie/i.test(errorText)
+  )
+}
+
 function formatHotValue(value: number): string {
   if (!Number.isFinite(value)) return '-'
   if (value >= 10000) {
@@ -573,7 +584,7 @@ async function fetchRanking() {
     })
     const data: AdxResponse = await response.json()
 
-    if (response.status === 401 || data?.statusCode === 401 || data?.msg === 'Unauthorized') {
+    if (isCredentialError(response, data)) {
       unauthorized.value = true
       return
     }
