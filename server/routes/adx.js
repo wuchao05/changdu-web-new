@@ -6,12 +6,16 @@ const router = new Router()
 
 router.use(requireSession)
 
+const ADX_RANKING_URL = 'https://adxray-app.dataeye.com/api/app/playlet/listHotRanking'
 const DATAEYE_RANKING_URL = 'https://playlet-applet.dataeye.com/playlet/listHotRanking'
 const DATAEYE_REQUIRED_COMPANY = '番茄'
 const DATAEYE_MAX_FETCH_PAGES = 20
+const ADX_DEFAULT_USER_AGENT =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
 const DATAEYE_DEFAULT_USER_AGENT =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.69(0x18004539) NetType/WIFI Language/zh_CN'
 const DATAEYE_DEFAULT_REFERER = 'https://servicewechat.com/wxa4d39034d8eeffe7/212/page-frame.html'
+const ADX_DATA_SOURCES = new Set(['adx', 'dataeye'])
 
 function getTextConfigValue(text, key) {
   const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -45,22 +49,56 @@ function parseDataeyeConfigText(text = '') {
 
 function resolveDataeyeCredentials(adxConfig = {}) {
   const textConfig = parseDataeyeConfigText(adxConfig.cookie)
+  const dataeyeConfig =
+    adxConfig.dataeye && typeof adxConfig.dataeye === 'object' ? adxConfig.dataeye : {}
 
   return {
     authentication: String(
       process.env.DATAEYE_AUTHENTICATION ||
         process.env.DATAEYE_AUTH_TOKEN ||
+        dataeyeConfig.authentication ||
         textConfig.authentication ||
         ''
     ).trim(),
-    loginUserId: String(process.env.DATAEYE_LOGIN_USER_ID || textConfig.loginUserId || '').trim(),
+    loginUserId: String(
+      process.env.DATAEYE_LOGIN_USER_ID || dataeyeConfig.loginUserId || textConfig.loginUserId || ''
+    ).trim(),
     userAgent: String(
-      process.env.DATAEYE_USER_AGENT || textConfig.userAgent || DATAEYE_DEFAULT_USER_AGENT
+      process.env.DATAEYE_USER_AGENT ||
+        dataeyeConfig.userAgent ||
+        textConfig.userAgent ||
+        DATAEYE_DEFAULT_USER_AGENT
     ).trim(),
     referer: String(
-      process.env.DATAEYE_REFERER || textConfig.referer || DATAEYE_DEFAULT_REFERER
+      process.env.DATAEYE_REFERER ||
+        dataeyeConfig.referer ||
+        textConfig.referer ||
+        DATAEYE_DEFAULT_REFERER
     ).trim(),
   }
+}
+
+function resolveAdxCredentials(adxConfig = {}) {
+  const adxSourceConfig = adxConfig.adx && typeof adxConfig.adx === 'object' ? adxConfig.adx : {}
+  const textConfig = parseDataeyeConfigText(adxConfig.cookie)
+  const legacyCookie = textConfig.authentication ? '' : adxConfig.cookie
+
+  return {
+    cookie: String(process.env.ADX_COOKIE || adxSourceConfig.cookie || legacyCookie || '').trim(),
+    userAgent: String(
+      process.env.ADX_USER_AGENT || adxSourceConfig.userAgent || ADX_DEFAULT_USER_AGENT
+    ).trim(),
+  }
+}
+
+function resolveRankingSource(source, adxConfig = {}) {
+  const normalizedSource = String(source || '').trim()
+  if (ADX_DATA_SOURCES.has(normalizedSource)) return normalizedSource
+
+  const configSource = String(adxConfig.source || '').trim()
+  if (ADX_DATA_SOURCES.has(configSource)) return configSource
+
+  return 'dataeye'
 }
 
 function appendPeriodParam(params, type, periodValue) {
@@ -195,20 +233,69 @@ async function fetchFilteredDataeyeRanking({ credentials, type, periodValue, pag
   }
 }
 
+async function fetchAdxRanking({ credentials, type, periodValue, searchKey, pageId, pageSize }) {
+  const params = new URLSearchParams()
+  appendPeriodParam(params, type, periodValue)
+  params.append('searchKey', searchKey)
+  params.append('pageId', String(pageId))
+  params.append('pageSize', String(pageSize))
+
+  const response = await fetch(ADX_RANKING_URL, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json, text/plain, */*',
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Cookie: credentials.cookie,
+      Origin: 'https://adxray-app.dataeye.com',
+      Referer: 'https://adxray-app.dataeye.com/',
+      'User-Agent': credentials.userAgent,
+    },
+    body: params.toString(),
+  })
+
+  const data = await response.json()
+  return { status: response.status, body: data }
+}
+
 router.get('/config', async ctx => {
   const config = await readAdxConfig()
   const storedCredentials = parseDataeyeConfigText(config.cookie)
   const resolvedCredentials = resolveDataeyeCredentials(config)
+  const adxCredentials = resolveAdxCredentials(config)
   const isAdmin = ctx.state.sessionUser?.userType === 'admin'
 
   ctx.body = {
     code: 0,
     message: 'success',
     data: {
+      source: resolveRankingSource(config.source, config),
       cookie: isAdmin ? config.cookie : '',
-      authentication: isAdmin ? storedCredentials.authentication || '' : '',
-      loginUserId: isAdmin ? storedCredentials.loginUserId || '' : '',
-      configured: Boolean(resolvedCredentials.authentication && resolvedCredentials.loginUserId),
+      adx: {
+        cookie: isAdmin ? adxCredentials.cookie || '' : '',
+        userAgent: isAdmin ? config.adx?.userAgent || '' : '',
+        configured: Boolean(adxCredentials.cookie),
+      },
+      dataeye: {
+        authentication: isAdmin
+          ? config.dataeye?.authentication || storedCredentials.authentication || ''
+          : '',
+        loginUserId: isAdmin
+          ? config.dataeye?.loginUserId || storedCredentials.loginUserId || ''
+          : '',
+        userAgent: isAdmin ? config.dataeye?.userAgent || '' : '',
+        referer: isAdmin ? config.dataeye?.referer || '' : '',
+        configured: Boolean(resolvedCredentials.authentication && resolvedCredentials.loginUserId),
+      },
+      authentication: isAdmin
+        ? config.dataeye?.authentication || storedCredentials.authentication || ''
+        : '',
+      loginUserId: isAdmin
+        ? config.dataeye?.loginUserId || storedCredentials.loginUserId || ''
+        : '',
+      configured: {
+        adx: Boolean(adxCredentials.cookie),
+        dataeye: Boolean(resolvedCredentials.authentication && resolvedCredentials.loginUserId),
+      },
       updatedAt: config.updatedAt,
     },
   }
@@ -219,15 +306,23 @@ router.put('/config', async ctx => {
     ctx.status = 403
     ctx.body = {
       code: 403,
-      message: '无权配置 DataEye 凭证',
+      message: '无权配置 ADX 数据源',
     }
     return
   }
 
+  const currentConfig = await readAdxConfig()
   const requestBody = ctx.request.body || {}
-  const authentication = String(requestBody.authentication || '').trim()
-  const loginUserId = String(requestBody.loginUserId || '').trim()
+  const requestDataeye =
+    requestBody.dataeye && typeof requestBody.dataeye === 'object' ? requestBody.dataeye : {}
+  const requestAdx = requestBody.adx && typeof requestBody.adx === 'object' ? requestBody.adx : {}
+  const authentication = String(
+    requestDataeye.authentication || requestBody.authentication || ''
+  ).trim()
+  const loginUserId = String(requestDataeye.loginUserId || requestBody.loginUserId || '').trim()
   const hasDataeyeCredentials = authentication || loginUserId
+  const source = resolveRankingSource(requestBody.source, currentConfig)
+  const legacyAdxCookie = hasDataeyeCredentials ? '' : requestBody.cookie
   const cookie = hasDataeyeCredentials
     ? JSON.stringify(
         {
@@ -238,14 +333,41 @@ router.put('/config', async ctx => {
         2
       )
     : String(requestBody.cookie || '').trim()
-  const config = await writeAdxConfig({ cookie })
+  const config = await writeAdxConfig({
+    ...currentConfig,
+    source,
+    cookie,
+    adx: {
+      ...currentConfig.adx,
+      cookie: String(
+        requestAdx.cookie ||
+          requestBody.adxCookie ||
+          legacyAdxCookie ||
+          currentConfig.adx?.cookie ||
+          ''
+      ).trim(),
+      userAgent: String(requestAdx.userAgent || currentConfig.adx?.userAgent || '').trim(),
+    },
+    dataeye: {
+      ...currentConfig.dataeye,
+      authentication,
+      loginUserId,
+      userAgent: String(requestDataeye.userAgent || currentConfig.dataeye?.userAgent || '').trim(),
+      referer: String(requestDataeye.referer || currentConfig.dataeye?.referer || '').trim(),
+    },
+  })
   const credentials = resolveDataeyeCredentials(config)
+  const adxCredentials = resolveAdxCredentials(config)
 
   ctx.body = {
     code: 0,
-    message: 'DataEye 凭证保存成功',
+    message: 'ADX 数据源配置保存成功',
     data: {
-      configured: Boolean(credentials.authentication && credentials.loginUserId),
+      source: resolveRankingSource(config.source, config),
+      configured: {
+        adx: Boolean(adxCredentials.cookie),
+        dataeye: Boolean(credentials.authentication && credentials.loginUserId),
+      },
       updatedAt: config.updatedAt,
     },
   }
@@ -258,25 +380,17 @@ router.put('/config', async ctx => {
 router.post('/ranking', async ctx => {
   try {
     const adxConfig = await readAdxConfig()
-    const credentials = resolveDataeyeCredentials(adxConfig)
-
-    if (!credentials.authentication || !credentials.loginUserId) {
-      ctx.status = 400
-      ctx.body = {
-        code: -1,
-        message: '未配置 DataEye 访问凭证，请配置 authentication 和 loginUserId',
-      }
-      return
-    }
-
     const {
+      source = '',
       type = 'day',
       periodValue = '',
       dateValue = '', // 兼容旧参数
+      searchKey = '番茄',
       pageId = 1,
       pageSize = 50,
     } = ctx.request.body
 
+    const rankingSource = resolveRankingSource(source, adxConfig)
     const finalPeriodValue = periodValue || dateValue
     if (!finalPeriodValue) {
       ctx.status = 400
@@ -287,22 +401,54 @@ router.post('/ranking', async ctx => {
       return
     }
 
-    const result = await fetchFilteredDataeyeRanking({
-      credentials,
-      type,
-      periodValue: finalPeriodValue,
-      pageId,
-      pageSize,
-    })
+    let result
+    if (rankingSource === 'adx') {
+      const credentials = resolveAdxCredentials(adxConfig)
+      if (!credentials.cookie) {
+        ctx.status = 400
+        ctx.body = {
+          code: -1,
+          message: '未配置 ADX 平台 Cookie，请先配置',
+        }
+        return
+      }
+
+      result = await fetchAdxRanking({
+        credentials,
+        type,
+        periodValue: finalPeriodValue,
+        searchKey,
+        pageId,
+        pageSize,
+      })
+    } else {
+      const credentials = resolveDataeyeCredentials(adxConfig)
+      if (!credentials.authentication || !credentials.loginUserId) {
+        ctx.status = 400
+        ctx.body = {
+          code: -1,
+          message: '未配置剧查查小程序凭证，请配置 authentication 和 loginUserId',
+        }
+        return
+      }
+
+      result = await fetchFilteredDataeyeRanking({
+        credentials,
+        type,
+        periodValue: finalPeriodValue,
+        pageId,
+        pageSize,
+      })
+    }
 
     ctx.status = result.status
     ctx.body = result.body
   } catch (error) {
-    console.error('DataEye 榜单代理请求失败:', error)
+    console.error('ADX 榜单代理请求失败:', error)
     ctx.status = 500
     ctx.body = {
       code: -1,
-      message: 'DataEye 榜单请求失败',
+      message: 'ADX 榜单请求失败',
       error: error.message,
     }
   }

@@ -12,7 +12,7 @@
         <div class="adx-panel-title-wrap">
           <div class="adx-panel-eyebrow">ADX 热力</div>
           <h3 class="adx-panel-title">短剧热力榜</h3>
-          <p class="adx-panel-subtitle">点击“搜索”即可在爆剧爆剪中联动查询</p>
+          <p class="adx-panel-subtitle">{{ activeSourceDescription }}</p>
         </div>
         <div class="adx-panel-actions">
           <n-button
@@ -20,7 +20,7 @@
             size="small"
             @click="showCredentialModal = true"
           >
-            配置凭证
+            配置数据源
           </n-button>
           <button class="adx-panel-close" title="收起热力榜" @click="closePanel">
             <Icon icon="mdi:chevron-right" />
@@ -29,6 +29,21 @@
       </div>
 
       <div class="adx-panel-body">
+        <div class="adx-source-switcher">
+          <button
+            v-for="option in dataSourceOptions"
+            :key="option.value"
+            type="button"
+            class="adx-source-option"
+            :class="{ active: activeDataSource === option.value }"
+            :disabled="loading"
+            @click="handleDataSourceChange(option.value)"
+          >
+            <Icon :icon="option.icon" class="adx-source-option__icon" />
+            <span>{{ option.label }}</span>
+          </button>
+        </div>
+
         <!-- 401 未授权：全屏提示 -->
         <div v-if="unauthorized" class="unauthorized-tip">
           <div class="unauthorized-icon">
@@ -47,8 +62,8 @@
               />
             </svg>
           </div>
-          <p class="unauthorized-title">DataEye 凭证已失效</p>
-          <p class="unauthorized-desc">请联系管理员更新访问凭证</p>
+          <p class="unauthorized-title">{{ unauthorizedTitle }}</p>
+          <p class="unauthorized-desc">{{ unauthorizedDescription }}</p>
           <n-button
             v-if="isAdmin"
             type="warning"
@@ -102,7 +117,7 @@
                   </span>
                 </div>
                 <div class="adx-loading-copy">
-                  <p class="adx-loading-title">正在拉取 ADX 热力榜</p>
+                  <p class="adx-loading-title">正在拉取{{ activeSourceLabel }}热力榜</p>
                   <p class="adx-loading-desc">同步榜期数据与热力变化，请稍候</p>
                 </div>
                 <div class="adx-loading-bars" aria-hidden="true">
@@ -164,21 +179,40 @@
     </aside>
   </Transition>
 
-  <n-modal v-model:show="showCredentialModal" preset="dialog" title="配置 DataEye 凭证">
+  <n-modal v-model:show="showCredentialModal" preset="dialog" title="配置 ADX 热力榜数据源">
     <div class="credential-form">
       <label class="credential-field">
-        <span class="credential-label">authentication</span>
-        <n-input
-          v-model:value="authenticationInput"
-          type="textarea"
-          :rows="3"
-          placeholder="请输入 authentication"
-        />
+        <span class="credential-label">默认数据源</span>
+        <n-select v-model:value="activeDataSource" :options="credentialSourceOptions" />
       </label>
-      <label class="credential-field">
-        <span class="credential-label">loginUserId</span>
-        <n-input v-model:value="loginUserIdInput" placeholder="请输入 loginUserId" />
-      </label>
+      <div class="credential-section">
+        <div class="credential-section-title">ADX 平台数据</div>
+        <label class="credential-field">
+          <span class="credential-label">ADX Cookie</span>
+          <n-input
+            v-model:value="adxCookieInput"
+            type="textarea"
+            :rows="4"
+            placeholder="请输入 PC 端 ADX 平台 Cookie"
+          />
+        </label>
+      </div>
+      <div class="credential-section">
+        <div class="credential-section-title">剧查查小程序数据</div>
+        <label class="credential-field">
+          <span class="credential-label">authentication</span>
+          <n-input
+            v-model:value="authenticationInput"
+            type="textarea"
+            :rows="3"
+            placeholder="请输入 authentication"
+          />
+        </label>
+        <label class="credential-field">
+          <span class="credential-label">loginUserId</span>
+          <n-input v-model:value="loginUserIdInput" placeholder="请输入 loginUserId" />
+        </label>
+      </div>
     </div>
     <template #action>
       <n-button type="primary" :loading="savingCredentials" @click="saveCredentials">保存</n-button>
@@ -205,6 +239,7 @@ import { useUserAuth } from '@/composables/useUserAuth'
 import { buildSessionHeaders } from '@/utils/sessionToken'
 
 type RankingTab = 'day' | 'week' | 'month'
+type RankingDataSource = 'adx' | 'dataeye'
 
 interface PeriodOption {
   label: string
@@ -230,6 +265,21 @@ interface AdxResponse {
   message?: string
   content?: RawAdxRankingItem[]
   data?: AdxResponseData
+}
+
+interface AdxConfigResponse {
+  source?: RankingDataSource
+  adx?: {
+    cookie?: string
+    configured?: boolean
+  }
+  dataeye?: {
+    authentication?: string
+    loginUserId?: string
+    configured?: boolean
+  }
+  authentication?: string
+  loginUserId?: string
 }
 
 interface AdxRankingItem {
@@ -270,12 +320,51 @@ const monthPeriodOptions = ref<PeriodOption[]>([])
 const loading = ref(false)
 const rankingList = ref<AdxRankingItem[]>([])
 const unauthorized = ref(false)
+const activeDataSource = ref<RankingDataSource>('dataeye')
+const dataSourceOptions: Array<{
+  label: string
+  value: RankingDataSource
+  icon: string
+  description: string
+}> = [
+  {
+    label: 'ADX 平台',
+    value: 'adx',
+    icon: 'mdi:monitor-dashboard',
+    description: '使用 PC 端 ADX 平台登录态和接口，点击“搜索”可联动查询',
+  },
+  {
+    label: '剧查查小程序',
+    value: 'dataeye',
+    icon: 'mdi:cellphone-link',
+    description: '使用 DataEye 剧查查小程序登录态和接口，点击“搜索”可联动查询',
+  },
+]
+const credentialSourceOptions = dataSourceOptions.map(option => ({
+  label: option.label,
+  value: option.value,
+}))
 
-// DataEye 凭证配置
+// 数据源凭证配置
 const showCredentialModal = ref(false)
+const adxCookieInput = ref('')
 const authenticationInput = ref('')
 const loginUserIdInput = ref('')
 const savingCredentials = ref(false)
+
+const activeSourceOption = computed(
+  () =>
+    dataSourceOptions.find(option => option.value === activeDataSource.value) ||
+    dataSourceOptions[1]
+)
+const activeSourceLabel = computed(() => activeSourceOption.value.label)
+const activeSourceDescription = computed(() => activeSourceOption.value.description)
+const unauthorizedTitle = computed(() =>
+  activeDataSource.value === 'adx' ? 'ADX 平台登录态已失效' : '剧查查小程序凭证已失效'
+)
+const unauthorizedDescription = computed(() =>
+  activeDataSource.value === 'adx' ? '请联系管理员更新 ADX Cookie' : '请联系管理员更新访问凭证'
+)
 
 const currentPeriodOptions = computed(() => {
   if (activeTab.value === 'day') return dayPeriodOptions.value
@@ -403,21 +492,28 @@ function closePanel() {
   visible.value = false
 }
 
-// 加载已有 DataEye 凭证
+function normalizeDataSource(source?: string): RankingDataSource {
+  return source === 'adx' ? 'adx' : 'dataeye'
+}
+
+// 加载已有数据源凭证
 async function loadCredentials() {
   try {
     const res = await fetch('/api/adx/config', {
       headers: buildSessionHeaders(),
     })
-    const data = await res.json()
+    const data: { code?: number; data?: AdxConfigResponse } = await res.json()
     if (data?.code === 0) {
-      authenticationInput.value = data.data?.authentication || ''
-      loginUserIdInput.value = data.data?.loginUserId || ''
+      const config = data.data || {}
+      activeDataSource.value = normalizeDataSource(config.source)
+      adxCookieInput.value = config.adx?.cookie || ''
+      authenticationInput.value = config.dataeye?.authentication || config.authentication || ''
+      loginUserIdInput.value = config.dataeye?.loginUserId || config.loginUserId || ''
     }
   } catch {}
 }
 
-// 保存 DataEye 凭证
+// 保存数据源凭证
 async function saveCredentials() {
   savingCredentials.value = true
   try {
@@ -427,8 +523,14 @@ async function saveCredentials() {
         'Content-Type': 'application/json',
       }),
       body: JSON.stringify({
-        authentication: authenticationInput.value,
-        loginUserId: loginUserIdInput.value,
+        source: activeDataSource.value,
+        adx: {
+          cookie: adxCookieInput.value,
+        },
+        dataeye: {
+          authentication: authenticationInput.value,
+          loginUserId: loginUserIdInput.value,
+        },
       }),
     })
 
@@ -437,11 +539,11 @@ async function saveCredentials() {
       throw new Error(result?.message || '保存失败')
     }
 
-    message.success('DataEye 凭证已保存为全局配置')
+    message.success('ADX 热力榜数据源配置已保存')
     showCredentialModal.value = false
     fetchRanking()
   } catch (error) {
-    console.error('保存 DataEye 凭证失败:', error)
+    console.error('保存 ADX 数据源配置失败:', error)
     message.error(error instanceof Error ? error.message : '保存失败')
   } finally {
     savingCredentials.value = false
@@ -461,6 +563,7 @@ async function fetchRanking() {
       method: 'POST',
       headers: buildSessionHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
+        source: activeDataSource.value,
         type: activeTab.value,
         periodValue,
         pageId: 1,
@@ -481,11 +584,18 @@ async function fetchRanking() {
       message.warning(data?.msg || data?.message || '获取榜单失败')
     }
   } catch (error) {
-    console.error('请求 ADX 榜单失败:', error)
-    message.error('请求 ADX 榜单失败')
+    console.error(`请求${activeSourceLabel.value}热力榜失败:`, error)
+    message.error(`请求${activeSourceLabel.value}热力榜失败`)
   } finally {
     loading.value = false
   }
+}
+
+function handleDataSourceChange(source: RankingDataSource) {
+  if (activeDataSource.value === source) return
+  activeDataSource.value = source
+  unauthorized.value = false
+  fetchRanking()
 }
 
 function handleTabChange() {
@@ -510,20 +620,23 @@ function getRankClass(rank: number) {
   return ''
 }
 
+async function initializePanelData() {
+  initPeriodOptions()
+  await loadCredentials()
+  await fetchRanking()
+}
+
 // 抽屉打开时加载数据
 watch(visible, v => {
   if (v) {
-    initPeriodOptions()
-    loadCredentials()
-    fetchRanking()
+    initializePanelData()
   }
 })
 
 onMounted(() => {
   initPeriodOptions()
   if (props.show) {
-    loadCredentials()
-    fetchRanking()
+    initializePanelData()
   }
 })
 </script>
@@ -545,6 +658,22 @@ onMounted(() => {
   color: #475569;
   font-size: 13px;
   font-weight: 600;
+}
+
+.credential-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.credential-section-title {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .adx-ranking-panel {
@@ -639,6 +768,58 @@ onMounted(() => {
   min-height: 0;
   overflow: hidden;
   padding: 14px;
+}
+
+.adx-source-switcher {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.adx-source-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.adx-source-option:hover:not(:disabled) {
+  border-color: rgba(37, 99, 235, 0.35);
+  background: #f8fafc;
+  color: #1d4ed8;
+}
+
+.adx-source-option.active {
+  border-color: rgba(37, 99, 235, 0.38);
+  background: #eff6ff;
+  color: #1d4ed8;
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.12);
+}
+
+.adx-source-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.adx-source-option__icon {
+  flex-shrink: 0;
+  font-size: 16px;
 }
 
 .ranking-scroll-area {

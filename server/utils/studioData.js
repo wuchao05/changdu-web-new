@@ -210,15 +210,72 @@ function defaultDownloadCenterConfig() {
 
 function defaultAdxConfig() {
   return {
+    source: 'dataeye',
     cookie: '',
+    adx: {
+      cookie: '',
+      userAgent: '',
+    },
+    dataeye: {
+      authentication: '',
+      loginUserId: '',
+      userAgent: '',
+      referer: '',
+    },
     updatedAt: nowIso(),
+  }
+}
+
+function parseAdxLegacyCookieConfig(cookie = '') {
+  const trimmed = String(cookie || '').trim()
+  if (!trimmed) return { adxCookie: '', dataeye: {} }
+
+  try {
+    const parsed = JSON.parse(trimmed)
+    if (parsed && typeof parsed === 'object') {
+      return {
+        adxCookie: '',
+        dataeye: {
+          authentication: parsed.authentication || '',
+          loginUserId: parsed.loginUserId || '',
+          userAgent: parsed.userAgent || '',
+          referer: parsed.referer || '',
+        },
+      }
+    }
+  } catch {}
+
+  return {
+    adxCookie: trimmed,
+    dataeye: {},
   }
 }
 
 function normalizeAdxConfig(config = {}) {
   const base = defaultAdxConfig()
+  const legacyConfig = parseAdxLegacyCookieConfig(config.cookie)
+  const fallbackSource = legacyConfig.adxCookie ? 'adx' : base.source
+  const source = ['adx', 'dataeye'].includes(config.source) ? config.source : fallbackSource
+  const dataeyeConfig = config.dataeye && typeof config.dataeye === 'object' ? config.dataeye : {}
+  const adxConfig = config.adx && typeof config.adx === 'object' ? config.adx : {}
+
   return {
+    source,
     cookie: String(config.cookie || '').trim(),
+    adx: {
+      cookie: String(adxConfig.cookie || legacyConfig.adxCookie || '').trim(),
+      userAgent: String(adxConfig.userAgent || '').trim(),
+    },
+    dataeye: {
+      authentication: String(
+        dataeyeConfig.authentication || legacyConfig.dataeye.authentication || ''
+      ).trim(),
+      loginUserId: String(
+        dataeyeConfig.loginUserId || legacyConfig.dataeye.loginUserId || ''
+      ).trim(),
+      userAgent: String(dataeyeConfig.userAgent || legacyConfig.dataeye.userAgent || '').trim(),
+      referer: String(dataeyeConfig.referer || legacyConfig.dataeye.referer || '').trim(),
+    },
     updatedAt: config.updatedAt || base.updatedAt,
   }
 }
