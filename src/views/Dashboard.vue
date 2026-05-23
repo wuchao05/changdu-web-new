@@ -10,7 +10,6 @@
               class="brand-revenue-menu"
               :class="{
                 'brand-revenue-menu--disabled': !showBrandRevenue || !isAdmin,
-                'brand-revenue-menu--editing': Boolean(editingRevenueShareDate),
               }"
               @pointerenter="showBrandRevenue && isAdmin && handleBrandRevenuePointerEnter()"
             >
@@ -66,14 +65,47 @@
                     <Icon icon="mdi:refresh" class="brand-revenue-popover__refresh-icon" />
                   </button>
                 </div>
+                <div class="brand-revenue-toolbar" @click.stop>
+                  <div class="brand-revenue-field brand-revenue-field--token">
+                    <span class="brand-revenue-field__label">Token</span>
+                    <n-input
+                      v-model:value="jcybAdReportTokenInput"
+                      type="password"
+                      show-password-on="click"
+                      size="small"
+                      clearable
+                      placeholder="请输入 token"
+                      @blur="saveJcybAdReportToken"
+                      @keyup.enter="saveJcybAdReportToken"
+                    />
+                  </div>
+                  <div class="brand-revenue-field">
+                    <span class="brand-revenue-field__label">小程序</span>
+                    <n-select
+                      v-model:value="selectedJcybAppIds"
+                      multiple
+                      filterable
+                      clearable
+                      size="small"
+                      :max-tag-count="1"
+                      :options="jcybAppSelectOptions"
+                      :loading="jcybAppsLoading"
+                      :to="false"
+                      placeholder="请选择小程序"
+                      @update:value="handleJcybAppChange"
+                    />
+                  </div>
+                </div>
                 <div v-if="thirdPartyRevenueLoading" class="brand-revenue-table-shell">
                   <table class="brand-revenue-table brand-revenue-skeleton-table">
                     <thead>
                       <tr>
                         <th>日期</th>
-                        <th>金额</th>
-                        <th>账面分成</th>
-                        <th>实际分成</th>
+                        <th>实际消耗</th>
+                        <th>付费ROI</th>
+                        <th>时速</th>
+                        <th>实际收入</th>
+                        <th>分成</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -82,12 +114,16 @@
                         <td><span class="brand-revenue-skeleton-line"></span></td>
                         <td><span class="brand-revenue-skeleton-line"></span></td>
                         <td><span class="brand-revenue-skeleton-line compact"></span></td>
+                        <td><span class="brand-revenue-skeleton-line"></span></td>
+                        <td><span class="brand-revenue-skeleton-line compact"></span></td>
                       </tr>
                     </tbody>
                     <tfoot>
                       <tr>
                         <td><span class="brand-revenue-skeleton-line short strong"></span></td>
                         <td><span class="brand-revenue-skeleton-line strong"></span></td>
+                        <td><span class="brand-revenue-skeleton-line strong"></span></td>
+                        <td><span class="brand-revenue-skeleton-line compact strong"></span></td>
                         <td><span class="brand-revenue-skeleton-line strong"></span></td>
                         <td><span class="brand-revenue-skeleton-line compact strong"></span></td>
                       </tr>
@@ -105,50 +141,31 @@
                     <thead>
                       <tr>
                         <th>日期</th>
-                        <th>金额</th>
-                        <th>账面分成</th>
-                        <th>实际分成</th>
+                        <th>实际消耗</th>
+                        <th>付费ROI</th>
+                        <th>时速</th>
+                        <th>实际收入</th>
+                        <th>分成</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr v-for="row in thirdPartyRevenueRows" :key="row.date">
                         <td>{{ formatThirdPartyRevenueDate(row.date) }}</td>
-                        <td>{{ formatYuanAmount(row.amount) }}</td>
-                        <td>{{ formatYuanAmount(getRevenueShare(row.amount)) }}</td>
-                        <td>
-                          <input
-                            v-if="editingRevenueShareDate === row.date"
-                            :ref="setRevenueShareInputRef"
-                            v-model="editingRevenueShareValue"
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            class="brand-revenue-share-input"
-                            :disabled="Boolean(revenueShareSavingDates[row.date])"
-                            autofocus
-                            @blur="handleRevenueShareInputBlur(row, $event)"
-                            @change="handleRevenueShareInputBlur(row, $event)"
-                            @keydown.enter.prevent="handleRevenueShareInputBlur(row, $event)"
-                            @keydown.esc.stop.prevent="cancelThirdPartyRevenueShareEdit"
-                          />
-                          <button
-                            v-else
-                            type="button"
-                            class="brand-revenue-share-display"
-                            :disabled="Boolean(revenueShareSavingDates[row.date])"
-                            @click.stop="startThirdPartyRevenueShareEdit(row)"
-                          >
-                            {{ formatOptionalYuanAmount(row.actualShare) }}
-                          </button>
-                        </td>
+                        <td>{{ formatYuanAmount(row.realCost) }}</td>
+                        <td>{{ formatRatioValue(row.payRoi) }}</td>
+                        <td>{{ formatSpeedValue(row.costSpeed) }}</td>
+                        <td>{{ formatNullableYuanAmount(row.actualIncome) }}</td>
+                        <td>{{ formatNullableYuanAmount(row.revenueShare) }}</td>
                       </tr>
                     </tbody>
                     <tfoot>
                       <tr>
                         <td>总计</td>
                         <td>{{ formatYuanAmount(thirdPartyRevenueTotal) }}</td>
-                        <td>{{ formatYuanAmount(thirdPartyRevenueShareTotal) }}</td>
-                        <td>{{ formatOptionalYuanAmount(thirdPartyRevenueActualShareTotal) }}</td>
+                        <td>{{ formatRatioValue(thirdPartyRevenuePayRoiAverage) }}</td>
+                        <td>-</td>
+                        <td>{{ formatNullableYuanAmount(thirdPartyActualIncomeTotal) }}</td>
+                        <td>{{ formatNullableYuanAmount(thirdPartyRevenueShareTotal) }}</td>
                       </tr>
                     </tfoot>
                   </table>
@@ -779,12 +796,11 @@ import { useSessionStore } from '@/stores/session'
 import { useSettingsStore } from '@/stores/settings'
 import {
   getDataOverviewV1,
+  getJcybAdInfo,
+  getJcybApps,
   getMonthlyRechargeAnalyze,
   getOrders,
   getReport,
-  getThirdPartyRevenue,
-  getThirdPartyRevenueShares,
-  saveThirdPartyRevenueShare,
 } from '@/api'
 import type {
   ReportData,
@@ -795,7 +811,8 @@ import type {
   OrderParams,
   ReportParams,
   DataOverviewV1Response,
-  ThirdPartyRevenueShareRecord,
+  JcybAdInfoRow,
+  JcybAppOption,
 } from '@/api/types'
 
 defineOptions({
@@ -857,8 +874,11 @@ interface OrderUserCardItem {
 }
 interface ThirdPartyRevenueRow {
   date: string
-  amount: number
-  actualShare: number | null
+  realCost: number
+  payRoi: number | null
+  costSpeed: string
+  actualIncome: number | null
+  revenueShare: number | null
 }
 
 const DEFAULT_RUNTIME_WEB_MENUS: RuntimeWebMenus = {
@@ -879,7 +899,27 @@ let channelSwitchController: AbortController | null = null
 let channelSwitchSerial = 0
 const BRAND_REVENUE_ROUTE_FLAG = 'yy_vault'
 const BRAND_REVENUE_ROUTE_FLAG_VALUE = '1'
-const THIRD_PARTY_REVENUE_START_DATE = '2026-05-05'
+const THIRD_PARTY_REVENUE_START_DATE = '2026-05-22'
+const THIRD_PARTY_LOW_SHARE_DATES = new Set(['2026-05-22', '2026-05-23', '2026-05-24'])
+const THIRD_PARTY_LOW_SHARE_RATE = 0.025
+const THIRD_PARTY_DEFAULT_SHARE_RATE = 0.05
+const JCYB_AD_REPORT_TOKEN_STORAGE_KEY = 'jcybAdReportToken'
+const FALLBACK_JCYB_APP_IDS = [
+  '374',
+  '373',
+  '372',
+  '371',
+  '370',
+  '369',
+  '368',
+  '367',
+  '366',
+  '365',
+  '364',
+  '363',
+  '362',
+  '361',
+]
 const reportDateRange = ref<DateRangeValue>(null)
 const orderDateRange = ref<DateRangeValue>(null)
 const thirdPartyRevenueRows = ref<ThirdPartyRevenueRow[]>([])
@@ -887,10 +927,10 @@ const thirdPartyRevenueLoading = ref(false)
 const thirdPartyRevenueError = ref('')
 const thirdPartyRevenueLoadedKey = ref('')
 const thirdPartyRevenueRequestedKey = ref('')
-const editingRevenueShareDate = ref('')
-const editingRevenueShareValue = ref('')
-const revenueShareInputRef = ref<HTMLInputElement | null>(null)
-const revenueShareSavingDates = reactive<Record<string, boolean>>({})
+const jcybAdReportTokenInput = ref('')
+const jcybAppsLoading = ref(false)
+const jcybAppOptions = ref<JcybAppOption[]>([])
+const selectedJcybAppIds = ref<string[]>([])
 const changePasswordForm = reactive({
   currentPassword: '',
   newPassword: '',
@@ -979,23 +1019,39 @@ const dashboardSubtitle = computed(() => '数据驱动，精准运营')
 const showBrandRevenue = computed(
   () => isAdmin.value && route.query[BRAND_REVENUE_ROUTE_FLAG] === BRAND_REVENUE_ROUTE_FLAG_VALUE
 )
+const jcybAppSelectOptions = computed(() => {
+  const options = jcybAppOptions.value.map(app => ({
+    label: app.app_name || `小程序 ${app.id}`,
+    value: String(app.id),
+  }))
+
+  if (options.length > 0) {
+    return options
+  }
+
+  return FALLBACK_JCYB_APP_IDS.map(id => ({
+    label: `小程序 ${id}`,
+    value: id,
+  }))
+})
 const thirdPartyRevenueTotal = computed(() =>
-  thirdPartyRevenueRows.value.reduce((sum, row) => sum + row.amount, 0)
+  thirdPartyRevenueRows.value.reduce((sum, row) => sum + row.realCost, 0)
 )
-const thirdPartyRevenueShareTotal = computed(() =>
-  thirdPartyRevenueRows.value.reduce((sum, row) => sum + getRevenueShare(row.amount), 0)
-)
-const thirdPartyRevenueActualShareTotal = computed(() => {
+const thirdPartyRevenuePayRoiAverage = computed(() => {
   const values = thirdPartyRevenueRows.value
-    .map(row => row.actualShare)
+    .map(row => row.payRoi)
     .filter((value): value is number => value !== null)
 
-  return values.length > 0 ? values.reduce((sum, value) => sum + value, 0) : null
+  return values.length > 0
+    ? values.reduce((sum, value) => sum + value, 0) / values.length
+    : null
 })
-
-function getRevenueShare(amount: number) {
-  return Number(amount || 0) * 0.1
-}
+const thirdPartyActualIncomeTotal = computed(() =>
+  sumNullableNumbers(thirdPartyRevenueRows.value.map(row => row.actualIncome))
+)
+const thirdPartyRevenueShareTotal = computed(() =>
+  sumNullableNumbers(thirdPartyRevenueRows.value.map(row => row.revenueShare))
+)
 const hasActiveChannel = computed(() =>
   isAdmin.value ? Boolean(sessionStore.activeChannelId) : Boolean(sessionStore.currentChannel?.id)
 )
@@ -1816,13 +1872,21 @@ function formatYuanAmount(amount: number) {
   return `¥${Number(amount || 0).toFixed(2)}`
 }
 
-function formatOptionalYuanAmount(amount: number | null) {
+function formatNullableYuanAmount(amount: number | null) {
   return amount === null ? '-' : formatYuanAmount(amount)
 }
 
 function formatThirdPartyRevenueDate(date: string) {
   const [, month, day] = date.split('-')
   return `${Number(month || 0)}月${Number(day || 0)}日`
+}
+
+function formatRatioValue(value: number | null) {
+  return value === null ? '-' : Number(value || 0).toFixed(2)
+}
+
+function formatSpeedValue(value: string) {
+  return value || '-'
 }
 
 function formatOverviewAmount(amountInCent: number) {
@@ -1884,48 +1948,126 @@ function getDateRangeList(begin: string, end: string) {
   return dates
 }
 
-function normalizeRevenueShareAmount(value: unknown) {
+function normalizeJcybNumber(value: unknown) {
   if (value === null || value === undefined || value === '') {
     return null
   }
 
-  const amount = Number(value)
-  return Number.isFinite(amount) && amount >= 0 ? Math.round(amount * 100) / 100 : null
-}
-
-function normalizeRevenueShareInput(value: string) {
-  const trimmedValue = value.trim()
-  if (!trimmedValue) {
+  const normalizedValue = String(value).replace(/[,%¥,\s]/g, '')
+  if (!normalizedValue) {
     return null
   }
 
-  const amount = Number(trimmedValue)
-  return Number.isFinite(amount) && amount >= 0 ? Math.round(amount * 100) / 100 : undefined
+  const amount = Number(normalizedValue)
+  return Number.isFinite(amount) ? Math.round(amount * 100) / 100 : null
+}
+
+function roundMoneyAmount(value: number) {
+  return Math.round(value * 100) / 100
+}
+
+function sumNullableNumbers(values: Array<number | null>) {
+  const validValues = values.filter((value): value is number => value !== null)
+  return validValues.length > 0
+    ? roundMoneyAmount(validValues.reduce((sum, value) => sum + value, 0))
+    : null
+}
+
+function getThirdPartyShareRate(date: string) {
+  return THIRD_PARTY_LOW_SHARE_DATES.has(date)
+    ? THIRD_PARTY_LOW_SHARE_RATE
+    : THIRD_PARTY_DEFAULT_SHARE_RATE
+}
+
+function getJcybAdReportToken() {
+  return jcybAdReportTokenInput.value.trim()
+}
+
+function buildJcybRevenueRequestKey(today: string) {
+  return [today, getJcybAdReportToken(), selectedJcybAppIds.value.join(',')].join('::')
+}
+
+function normalizeJcybAdInfoRow(date: string, row?: JcybAdInfoRow): ThirdPartyRevenueRow {
+  const realCost = normalizeJcybNumber(row?.real_cost) ?? 0
+  const payRoi = normalizeJcybNumber(row?.pay_roi)
+  const actualIncome = payRoi === null ? null : roundMoneyAmount(realCost * payRoi - realCost)
+  const revenueShare =
+    actualIncome === null ? null : roundMoneyAmount(actualIncome * getThirdPartyShareRate(date))
+
+  return {
+    date,
+    realCost,
+    payRoi,
+    costSpeed: String(row?.cost_speed || ''),
+    actualIncome,
+    revenueShare,
+  }
 }
 
 async function fetchThirdPartyRevenueByDate(date: string): Promise<ThirdPartyRevenueRow> {
-  const result = await getThirdPartyRevenue(date)
+  const token = getJcybAdReportToken()
+  const result = await getJcybAdInfo(
+    {
+      team_id: 500015,
+      app_id: selectedJcybAppIds.value.join(','),
+      dimension: 'app,agent',
+      end_date: date,
+      page: 1,
+      page_size: 20,
+      start_date: date,
+      time_type: 2,
+      order: 'real_cost desc',
+    },
+    token
+  )
   if (result.code !== 0) {
-    throw new Error(result.message || `请求 ${date} 金额失败`)
+    throw new Error(result.message || `请求 ${date} 报表失败`)
   }
 
-  const amountInCent = Number(result.data?.total || 0)
-  return {
-    date,
-    amount: Number.isFinite(amountInCent) ? amountInCent / 100 : 0,
-    actualShare: null,
+  return normalizeJcybAdInfoRow(date, result.data?.all_list)
+}
+
+function applyFallbackJcybApps() {
+  if (selectedJcybAppIds.value.length === 0) {
+    selectedJcybAppIds.value = [...FALLBACK_JCYB_APP_IDS]
   }
 }
 
-async function loadThirdPartyRevenueShareRecords(): Promise<
-  Record<string, ThirdPartyRevenueShareRecord>
-> {
-  const result = await getThirdPartyRevenueShares()
-  if (result.code !== 0) {
-    throw new Error(result.message || '获取实际分成失败')
+async function loadJcybApps() {
+  const token = getJcybAdReportToken()
+  if (!token) {
+    jcybAppOptions.value = []
+    selectedJcybAppIds.value = []
+    return
   }
 
-  return result.data?.records || {}
+  jcybAppsLoading.value = true
+  try {
+    const result = await getJcybApps(token)
+    if (result.code !== 0) {
+      throw new Error(result.message || '获取小程序列表失败')
+    }
+
+    const apps = Array.isArray(result.data?.list) ? result.data.list : []
+    jcybAppOptions.value = apps
+
+    if (selectedJcybAppIds.value.length === 0) {
+      const enabledApps = apps.filter(app => app.status === 1)
+      const defaultApps = enabledApps.length > 0 ? enabledApps : apps
+      selectedJcybAppIds.value = defaultApps.map(app => String(app.id))
+    }
+
+    if (selectedJcybAppIds.value.length === 0) {
+      applyFallbackJcybApps()
+    }
+  } catch (error) {
+    console.error('获取聚财有宝小程序列表失败:', error)
+    jcybAppOptions.value = []
+    applyFallbackJcybApps()
+    message.warning(error instanceof Error ? error.message : '获取小程序列表失败，已使用默认小程序')
+  } finally {
+    jcybAppsLoading.value = false
+  }
 }
 
 async function loadThirdPartyRevenue(forceRefresh = false) {
@@ -1933,19 +2075,34 @@ async function loadThirdPartyRevenue(forceRefresh = false) {
     return
   }
 
+  const token = getJcybAdReportToken()
+  if (!token) {
+    thirdPartyRevenueRows.value = []
+    thirdPartyRevenueError.value = '请先配置聚财有宝 token'
+    return
+  }
+
+  if (selectedJcybAppIds.value.length === 0) {
+    thirdPartyRevenueRows.value = []
+    thirdPartyRevenueError.value = '请至少选择一个小程序'
+    return
+  }
+
   const today = formatDate(new Date())
+  const requestKey = buildJcybRevenueRequestKey(today)
   if (thirdPartyRevenueLoading.value) {
     return
   }
 
   if (
     !forceRefresh &&
-    (thirdPartyRevenueLoadedKey.value === today || thirdPartyRevenueRequestedKey.value === today)
+    (thirdPartyRevenueLoadedKey.value === requestKey ||
+      thirdPartyRevenueRequestedKey.value === requestKey)
   ) {
     return
   }
 
-  thirdPartyRevenueRequestedKey.value = today
+  thirdPartyRevenueRequestedKey.value = requestKey
   if (forceRefresh) {
     thirdPartyRevenueError.value = ''
   }
@@ -1953,132 +2110,35 @@ async function loadThirdPartyRevenue(forceRefresh = false) {
   const dates = getDateRangeList(THIRD_PARTY_REVENUE_START_DATE, today)
   if (dates.length === 0) {
     thirdPartyRevenueRows.value = []
-    thirdPartyRevenueLoadedKey.value = today
+    thirdPartyRevenueLoadedKey.value = requestKey
     return
   }
 
   thirdPartyRevenueLoading.value = true
   thirdPartyRevenueError.value = ''
   try {
-    const [rows, shareRecords] = await Promise.all([
-      Promise.all(dates.map(fetchThirdPartyRevenueByDate)),
-      loadThirdPartyRevenueShareRecords(),
-    ])
-    thirdPartyRevenueRows.value = rows.map(row => ({
-      ...row,
-      actualShare: normalizeRevenueShareAmount(shareRecords[row.date]?.actualShare),
-    }))
-    thirdPartyRevenueLoadedKey.value = today
+    thirdPartyRevenueRows.value = await Promise.all(dates.map(fetchThirdPartyRevenueByDate))
+    thirdPartyRevenueLoadedKey.value = requestKey
   } catch (error) {
-    console.error('获取第三方金额失败:', error)
-    thirdPartyRevenueError.value = error instanceof Error ? error.message : '获取第三方金额失败'
+    console.error('获取聚财有宝报表失败:', error)
+    thirdPartyRevenueError.value = error instanceof Error ? error.message : '获取聚财有宝报表失败'
   } finally {
     thirdPartyRevenueLoading.value = false
   }
 }
 
-async function startThirdPartyRevenueShareEdit(row: ThirdPartyRevenueRow) {
-  if (revenueShareSavingDates[row.date]) {
-    return
+async function saveJcybAdReportToken() {
+  const token = getJcybAdReportToken()
+  if (token) {
+    localStorage.setItem(JCYB_AD_REPORT_TOKEN_STORAGE_KEY, token)
+  } else {
+    localStorage.removeItem(JCYB_AD_REPORT_TOKEN_STORAGE_KEY)
   }
 
-  if (editingRevenueShareDate.value && editingRevenueShareDate.value !== row.date) {
-    commitCurrentThirdPartyRevenueShareEdit()
-  }
-
-  editingRevenueShareDate.value = row.date
-  editingRevenueShareValue.value = row.actualShare === null ? '' : String(row.actualShare)
-  await nextTick()
-  revenueShareInputRef.value?.focus()
-  revenueShareInputRef.value?.select()
-}
-
-function cancelThirdPartyRevenueShareEdit() {
-  editingRevenueShareDate.value = ''
-  editingRevenueShareValue.value = ''
-}
-
-function setRevenueShareInputRef(element: unknown) {
-  revenueShareInputRef.value = element instanceof HTMLInputElement ? element : null
-}
-
-function updateRevenueShareInputValue(event?: Event) {
-  const target = event?.target
-  if (target instanceof HTMLInputElement) {
-    editingRevenueShareValue.value = target.value
-    return
-  }
-
-  if (revenueShareInputRef.value) {
-    editingRevenueShareValue.value = revenueShareInputRef.value.value
-  }
-}
-
-function handleRevenueShareInputBlur(row: ThirdPartyRevenueRow, event?: Event) {
-  updateRevenueShareInputValue(event)
-  void commitThirdPartyRevenueShare(row)
-}
-
-function commitCurrentThirdPartyRevenueShareEdit() {
-  updateRevenueShareInputValue()
-
-  const row = thirdPartyRevenueRows.value.find(item => item.date === editingRevenueShareDate.value)
-  if (!row) {
-    cancelThirdPartyRevenueShareEdit()
-    return
-  }
-
-  void commitThirdPartyRevenueShare(row)
-}
-
-function handleRevenueShareGlobalPointerDown(event: PointerEvent) {
-  if (!editingRevenueShareDate.value) {
-    return
-  }
-
-  if (event.target instanceof Node && revenueShareInputRef.value?.contains(event.target)) {
-    return
-  }
-
-  commitCurrentThirdPartyRevenueShareEdit()
-}
-
-async function commitThirdPartyRevenueShare(row: ThirdPartyRevenueRow) {
-  if (editingRevenueShareDate.value !== row.date || revenueShareSavingDates[row.date]) {
-    return
-  }
-
-  const actualShare = normalizeRevenueShareInput(editingRevenueShareValue.value)
-  if (actualShare === undefined) {
-    message.error('请输入有效的实际分成金额')
-    return
-  }
-
-  const previousShare = row.actualShare
-  thirdPartyRevenueRows.value = thirdPartyRevenueRows.value.map(item =>
-    item.date === row.date ? { ...item, actualShare } : item
-  )
-  cancelThirdPartyRevenueShareEdit()
-  revenueShareSavingDates[row.date] = true
-  try {
-    const result = await saveThirdPartyRevenueShare(row.date, actualShare)
-    if (result.code !== 0) {
-      throw new Error(result.message || '保存实际分成失败')
-    }
-
-    const savedShare = normalizeRevenueShareAmount(result.data?.actualShare)
-    thirdPartyRevenueRows.value = thirdPartyRevenueRows.value.map(item =>
-      item.date === row.date ? { ...item, actualShare: savedShare } : item
-    )
-  } catch (error) {
-    thirdPartyRevenueRows.value = thirdPartyRevenueRows.value.map(item =>
-      item.date === row.date ? { ...item, actualShare: previousShare } : item
-    )
-    console.error('保存实际分成失败:', error)
-    message.error(error instanceof Error ? error.message : '保存实际分成失败')
-  } finally {
-    revenueShareSavingDates[row.date] = false
-  }
+  thirdPartyRevenueLoadedKey.value = ''
+  thirdPartyRevenueRequestedKey.value = ''
+  await loadJcybApps()
+  await loadThirdPartyRevenue(true)
 }
 
 function refreshThirdPartyRevenue() {
@@ -2091,8 +2151,22 @@ function refreshThirdPartyRevenue() {
   loadThirdPartyRevenue(true)
 }
 
-function handleBrandRevenuePointerEnter() {
-  void loadThirdPartyRevenue()
+function handleJcybAppChange() {
+  thirdPartyRevenueLoadedKey.value = ''
+  thirdPartyRevenueRequestedKey.value = ''
+  void loadThirdPartyRevenue(true)
+}
+
+async function handleBrandRevenuePointerEnter() {
+  if (!getJcybAdReportToken()) {
+    jcybAdReportTokenInput.value = localStorage.getItem(JCYB_AD_REPORT_TOKEN_STORAGE_KEY) || ''
+  }
+
+  if (jcybAppOptions.value.length === 0 && !jcybAppsLoading.value) {
+    await loadJcybApps()
+  }
+
+  await loadThirdPartyRevenue()
 }
 
 function formatReportDate(value: string | number) {
@@ -2550,8 +2624,8 @@ function handleWindowResize() {
 
 onMounted(async () => {
   checkMobile()
+  jcybAdReportTokenInput.value = localStorage.getItem(JCYB_AD_REPORT_TOKEN_STORAGE_KEY) || ''
   window.addEventListener('resize', handleWindowResize)
-  window.addEventListener('pointerdown', handleRevenueShareGlobalPointerDown, true)
   reportDateRange.value = getDefaultDateRange()
   orderDateRange.value = getDefaultDateRange()
   await refreshDashboardContext()
@@ -2687,7 +2761,6 @@ watch(
 onUnmounted(() => {
   channelSwitchController?.abort()
   cancelDashboardRequests()
-  window.removeEventListener('pointerdown', handleRevenueShareGlobalPointerDown, true)
   window.removeEventListener('resize', handleWindowResize)
 })
 </script>
@@ -2743,8 +2816,7 @@ onUnmounted(() => {
   transform: translateY(-0.35rem) scale(0.98);
 }
 
-.brand-revenue-menu:not(.brand-revenue-menu--disabled):hover .brand-revenue-popover,
-.brand-revenue-menu--editing:not(.brand-revenue-menu--disabled) .brand-revenue-popover {
+.brand-revenue-menu:not(.brand-revenue-menu--disabled):hover .brand-revenue-popover {
   opacity: 1;
   visibility: visible;
   transform: translateY(0) scale(1);
@@ -2816,6 +2888,25 @@ onUnmounted(() => {
   animation: brand-revenue-spin 0.9s linear infinite;
 }
 
+.brand-revenue-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 0.62rem;
+  margin-bottom: 0.75rem;
+}
+
+.brand-revenue-field {
+  min-width: 0;
+}
+
+.brand-revenue-field__label {
+  display: block;
+  margin-bottom: 0.28rem;
+  color: rgb(71 85 105);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
 .brand-revenue-state {
   display: flex;
   align-items: center;
@@ -2867,7 +2958,7 @@ onUnmounted(() => {
 
 .brand-revenue-table {
   width: 100%;
-  min-width: 25rem;
+  min-width: 38rem;
   border-collapse: separate;
   border-spacing: 0;
   color: rgb(30 41 59);
@@ -2947,47 +3038,6 @@ onUnmounted(() => {
 .brand-revenue-skeleton-line.strong {
   height: 0.92rem;
   background: linear-gradient(90deg, rgba(191, 219, 254, 0.95), rgba(219, 234, 254, 0.96));
-}
-
-.brand-revenue-share-display {
-  display: inline-flex;
-  justify-content: flex-end;
-  min-width: 4.8rem;
-  padding: 0.16rem 0.28rem;
-  border-radius: 0.45rem;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-weight: inherit;
-  cursor: pointer;
-}
-
-.brand-revenue-share-display:hover:not(:disabled) {
-  background: rgba(219, 234, 254, 0.76);
-  color: rgb(30 64 175);
-}
-
-.brand-revenue-share-display:disabled {
-  cursor: progress;
-}
-
-.brand-revenue-share-input {
-  width: 5.8rem;
-  padding: 0.22rem 0.36rem;
-  border-radius: 0.45rem;
-  border: 1px solid rgba(59, 130, 246, 0.42);
-  background: rgba(255, 255, 255, 0.96);
-  color: rgb(15 23 42);
-  font: inherit;
-  font-weight: 800;
-  text-align: right;
-  outline: none;
-}
-
-.brand-revenue-share-input:focus {
-  border-color: rgba(37, 99, 235, 0.86);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.16);
 }
 
 .brand-revenue-table tfoot td {
@@ -3776,8 +3826,7 @@ onUnmounted(() => {
     transform-origin: top left;
   }
 
-  .brand-revenue-menu:not(.brand-revenue-menu--disabled):hover .brand-revenue-popover,
-  .brand-revenue-menu--editing:not(.brand-revenue-menu--disabled) .brand-revenue-popover {
+  .brand-revenue-menu:not(.brand-revenue-menu--disabled):hover .brand-revenue-popover {
     transform: translateY(0) scale(1);
   }
 
@@ -3792,6 +3841,11 @@ onUnmounted(() => {
     letter-spacing: 0.04em;
   }
 
+  .brand-revenue-toolbar {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+  }
+
   .brand-revenue-table-shell {
     max-height: calc(100dvh - 10.25rem);
     border-radius: 0.8rem;
@@ -3804,10 +3858,6 @@ onUnmounted(() => {
   .brand-revenue-table th,
   .brand-revenue-table td {
     padding: 0.52rem 0.58rem;
-  }
-
-  .brand-revenue-share-input {
-    width: 5.25rem;
   }
 
   .order-user-tabs {

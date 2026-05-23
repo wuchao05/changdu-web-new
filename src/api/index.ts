@@ -24,6 +24,9 @@ import type {
   DataOverviewV1Params,
   MonthlyRechargeAnalyzeResponse,
   MonthlyRechargeAnalyzeParams,
+  JcybAdInfoParams,
+  JcybAdInfoResponse,
+  JcybAppsResponse,
   ThirdPartyRevenueResponse,
   ThirdPartyRevenueSharesResponse,
   SaveThirdPartyRevenueShareResponse,
@@ -80,6 +83,40 @@ export function getThirdPartyRevenue(
     .get('/jcyb/get-info', {
       ...config,
       params: { date },
+    })
+    .then(res => res.data)
+}
+
+export function getJcybAdInfo(
+  params: JcybAdInfoParams,
+  token: string,
+  config: Pick<AxiosRequestConfig, 'signal'> = {}
+): Promise<JcybAdInfoResponse> {
+  return httpInstance
+    .get('/jcyb/ad-info', {
+      ...config,
+      params,
+      headers: {
+        token,
+      },
+    })
+    .then(res => res.data)
+}
+
+export function getJcybApps(
+  token: string,
+  config: Pick<AxiosRequestConfig, 'signal'> = {}
+): Promise<JcybAppsResponse> {
+  return httpInstance
+    .get('/jcyb/apps', {
+      ...config,
+      params: {
+        page: 1,
+        page_size: 1000,
+      },
+      headers: {
+        token,
+      },
     })
     .then(res => res.data)
 }

@@ -10,6 +10,7 @@ const router = new Router({
 
 const JCYB_GET_INFO_URL = 'https://jcyb-admin.nbjcyb.cn/config/getInfo'
 const JCYB_DEBUG_HEADER = 'ewrwerr343t4t5f'
+const JCYB_ADMIN_BASE_URL = 'https://jcyb-admin.njba.xyz'
 const REVENUE_SHARES_FILE_NAME = 'jcyb-revenue-shares.json'
 
 function normalizeDate(value) {
@@ -28,6 +29,69 @@ function normalizeActualShare(value) {
 
   const amount = Number(value)
   return Number.isFinite(amount) && amount >= 0 ? Math.round(amount * 100) / 100 : null
+}
+
+function getJcybToken(ctx) {
+  return String(ctx.get('token') || ctx.query.token || '').trim()
+}
+
+function copyQueryParams(ctx, targetUrl) {
+  Object.entries(ctx.query || {}).forEach(([key, value]) => {
+    if (key === 'token') {
+      return
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach(item => targetUrl.searchParams.append(key, String(item)))
+      return
+    }
+
+    if (value !== undefined && value !== null) {
+      targetUrl.searchParams.set(key, String(value))
+    }
+  })
+}
+
+async function proxyJcybAdminGet(ctx, pathname) {
+  const token = getJcybToken(ctx)
+  if (!token) {
+    ctx.status = 400
+    ctx.body = {
+      code: 400,
+      message: '请先配置聚财有宝 token',
+    }
+    return
+  }
+
+  const targetUrl = new URL(pathname, JCYB_ADMIN_BASE_URL)
+  copyQueryParams(ctx, targetUrl)
+
+  try {
+    const response = await fetch(targetUrl.toString(), {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        token,
+      },
+    })
+
+    const rawText = await response.text()
+    ctx.status = response.status
+    ctx.type = response.headers.get('content-type') || 'application/json'
+
+    try {
+      ctx.body = rawText ? JSON.parse(rawText) : {}
+    } catch {
+      ctx.body = rawText
+    }
+  } catch (error) {
+    console.error(`[jcyb] 请求聚财有宝接口失败 pathname=${pathname}:`, error)
+    ctx.status = 502
+    ctx.body = {
+      code: 502,
+      message: error instanceof Error ? error.message : '请求聚财有宝接口失败',
+    }
+  }
 }
 
 function normalizeRevenueShareRecord(record = {}) {
@@ -128,6 +192,14 @@ router.get('/get-info', async ctx => {
       message: error instanceof Error ? error.message : '请求第三方金额接口失败',
     }
   }
+})
+
+router.get('/ad-info', async ctx => {
+  await proxyJcybAdminGet(ctx, '/tf/ad/info')
+})
+
+router.get('/apps', async ctx => {
+  await proxyJcybAdminGet(ctx, '/tf/app/list')
 })
 
 router.get('/revenue-shares', requireAdmin, async ctx => {

@@ -60,6 +60,7 @@ app.use(
       'Content-Type',
       'Authorization',
       'X-Requested-With',
+      'token',
       'distributorid',
       'appid',
       'apptype',

@@ -166,6 +166,47 @@ export interface ThirdPartyRevenueResponse {
   }
 }
 
+export interface JcybAdInfoRow {
+  date?: string | number
+  real_cost?: string | number
+  pay_roi?: string | number
+  cost_speed?: string | number
+}
+
+export interface JcybAdInfoParams {
+  team_id: number
+  app_id: string
+  dimension: string
+  start_date: string
+  end_date: string
+  page: number
+  page_size: number
+  time_type: number
+  order: string
+}
+
+export interface JcybAdInfoResponse {
+  code: number
+  message?: string
+  data?: {
+    all_list?: JcybAdInfoRow
+  }
+}
+
+export interface JcybAppOption {
+  id: number
+  app_name: string
+  status?: number
+}
+
+export interface JcybAppsResponse {
+  code: number
+  message?: string
+  data?: {
+    list?: JcybAppOption[]
+  }
+}
+
 export interface ThirdPartyRevenueShareRecord {
   actualShare: number | null
   updatedAt?: string
