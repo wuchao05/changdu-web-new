@@ -1882,7 +1882,7 @@ function formatThirdPartyRevenueDate(date: string) {
 }
 
 function formatRatioValue(value: number | null) {
-  return value === null ? '-' : Number(value || 0).toFixed(2)
+  return value === null ? '-' : `${Number(value || 0).toFixed(2)}%`
 }
 
 function formatSpeedValue(value: string) {
@@ -1990,7 +1990,8 @@ function buildJcybRevenueRequestKey(today: string) {
 function normalizeJcybAdInfoRow(date: string, row?: JcybAdInfoRow): ThirdPartyRevenueRow {
   const realCost = normalizeJcybNumber(row?.real_cost) ?? 0
   const payRoi = normalizeJcybNumber(row?.pay_roi)
-  const actualIncome = payRoi === null ? null : roundMoneyAmount(realCost * payRoi - realCost)
+  const actualIncome =
+    payRoi === null ? null : roundMoneyAmount(realCost * (payRoi / 100) - realCost)
   const revenueShare =
     actualIncome === null ? null : roundMoneyAmount(actualIncome * getThirdPartyShareRate(date))
 
