@@ -115,9 +115,9 @@
                         <th>日期</th>
                         <th>实际消耗</th>
                         <th>付费ROI</th>
-                        <th>时速</th>
                         <th>实际收入</th>
                         <th>分成</th>
+                        <th>时速</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -125,8 +125,8 @@
                         <td><span class="brand-revenue-skeleton-line short"></span></td>
                         <td><span class="brand-revenue-skeleton-line"></span></td>
                         <td><span class="brand-revenue-skeleton-line"></span></td>
-                        <td><span class="brand-revenue-skeleton-line compact"></span></td>
                         <td><span class="brand-revenue-skeleton-line"></span></td>
+                        <td><span class="brand-revenue-skeleton-line compact"></span></td>
                         <td><span class="brand-revenue-skeleton-line compact"></span></td>
                       </tr>
                     </tbody>
@@ -135,8 +135,8 @@
                         <td><span class="brand-revenue-skeleton-line short strong"></span></td>
                         <td><span class="brand-revenue-skeleton-line strong"></span></td>
                         <td><span class="brand-revenue-skeleton-line strong"></span></td>
-                        <td><span class="brand-revenue-skeleton-line compact strong"></span></td>
                         <td><span class="brand-revenue-skeleton-line strong"></span></td>
+                        <td><span class="brand-revenue-skeleton-line compact strong"></span></td>
                         <td><span class="brand-revenue-skeleton-line compact strong"></span></td>
                       </tr>
                     </tfoot>
@@ -155,9 +155,9 @@
                         <th>日期</th>
                         <th>实际消耗</th>
                         <th>付费ROI</th>
-                        <th>时速</th>
                         <th>实际收入</th>
                         <th>分成</th>
+                        <th>时速</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -165,9 +165,9 @@
                         <td>{{ formatThirdPartyRevenueDate(row.date) }}</td>
                         <td>{{ formatYuanAmount(row.realCost) }}</td>
                         <td>{{ formatRatioValue(row.payRoi) }}</td>
-                        <td>{{ formatSpeedValue(row.costSpeed) }}</td>
                         <td>{{ formatNullableYuanAmount(row.actualIncome) }}</td>
                         <td>{{ formatNullableYuanAmount(row.revenueShare) }}</td>
+                        <td>{{ formatSpeedValue(row.costSpeed) }}</td>
                       </tr>
                     </tbody>
                     <tfoot>
@@ -175,9 +175,9 @@
                         <td>总计</td>
                         <td>{{ formatYuanAmount(thirdPartyRevenueTotal) }}</td>
                         <td>{{ formatRatioValue(thirdPartyRevenuePayRoiAverage) }}</td>
-                        <td>-</td>
                         <td>{{ formatNullableYuanAmount(thirdPartyActualIncomeTotal) }}</td>
                         <td>{{ formatNullableYuanAmount(thirdPartyRevenueShareTotal) }}</td>
+                        <td>-</td>
                       </tr>
                     </tfoot>
                   </table>
