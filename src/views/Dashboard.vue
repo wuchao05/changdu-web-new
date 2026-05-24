@@ -10,10 +10,18 @@
               class="brand-revenue-menu"
               :class="{
                 'brand-revenue-menu--disabled': !showBrandRevenue || !isAdmin,
+                'brand-revenue-menu--open': brandRevenuePopoverOpen,
               }"
-              @pointerenter="showBrandRevenue && isAdmin && handleBrandRevenuePointerEnter()"
+              @pointerdown.stop
             >
-              <div class="brand-revenue-trigger">
+              <div
+                role="button"
+                tabindex="0"
+                class="brand-revenue-trigger"
+                @click="toggleBrandRevenuePopover"
+                @keydown.enter.prevent="toggleBrandRevenuePopover"
+                @keydown.space.prevent="toggleBrandRevenuePopover"
+              >
                 <div
                   class="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl"
                 >
@@ -51,7 +59,11 @@
                   <p class="text-xs text-gray-500 hidden sm:block">{{ dashboardSubtitle }}</p>
                 </div>
               </div>
-              <div v-if="showBrandRevenue && isAdmin" class="brand-revenue-popover">
+              <div
+                v-if="showBrandRevenue && isAdmin"
+                class="brand-revenue-popover"
+                @pointerdown.stop
+              >
                 <div class="brand-revenue-popover__header">
                   <h3 class="brand-revenue-popover__hero">看天吃饭造富池</h3>
                   <button
@@ -927,6 +939,7 @@ const thirdPartyRevenueLoading = ref(false)
 const thirdPartyRevenueError = ref('')
 const thirdPartyRevenueLoadedKey = ref('')
 const thirdPartyRevenueRequestedKey = ref('')
+const brandRevenuePopoverOpen = ref(false)
 const jcybAdReportTokenInput = ref('')
 const jcybAppsLoading = ref(false)
 const jcybAppOptions = ref<JcybAppOption[]>([])
@@ -2158,7 +2171,12 @@ function handleJcybAppChange() {
   void loadThirdPartyRevenue(true)
 }
 
-async function handleBrandRevenuePointerEnter() {
+async function openBrandRevenuePopover() {
+  if (!showBrandRevenue.value || !isAdmin.value) {
+    return
+  }
+
+  brandRevenuePopoverOpen.value = true
   if (!getJcybAdReportToken()) {
     jcybAdReportTokenInput.value = localStorage.getItem(JCYB_AD_REPORT_TOKEN_STORAGE_KEY) || ''
   }
@@ -2168,6 +2186,23 @@ async function handleBrandRevenuePointerEnter() {
   }
 
   await loadThirdPartyRevenue()
+}
+
+function closeBrandRevenuePopover() {
+  brandRevenuePopoverOpen.value = false
+}
+
+function toggleBrandRevenuePopover() {
+  if (brandRevenuePopoverOpen.value) {
+    closeBrandRevenuePopover()
+    return
+  }
+
+  void openBrandRevenuePopover()
+}
+
+function handleBrandRevenueGlobalPointerDown() {
+  closeBrandRevenuePopover()
 }
 
 function formatReportDate(value: string | number) {
@@ -2627,6 +2662,7 @@ onMounted(async () => {
   checkMobile()
   jcybAdReportTokenInput.value = localStorage.getItem(JCYB_AD_REPORT_TOKEN_STORAGE_KEY) || ''
   window.addEventListener('resize', handleWindowResize)
+  window.addEventListener('pointerdown', handleBrandRevenueGlobalPointerDown)
   reportDateRange.value = getDefaultDateRange()
   orderDateRange.value = getDefaultDateRange()
   await refreshDashboardContext()
@@ -2762,6 +2798,7 @@ watch(
 onUnmounted(() => {
   channelSwitchController?.abort()
   cancelDashboardRequests()
+  window.removeEventListener('pointerdown', handleBrandRevenueGlobalPointerDown)
   window.removeEventListener('resize', handleWindowResize)
 })
 </script>
@@ -2780,7 +2817,12 @@ onUnmounted(() => {
   min-height: 3.5rem;
   padding-right: 0.4rem;
   border-radius: 1rem;
-  cursor: default;
+  outline: none;
+  cursor: pointer;
+}
+
+.brand-revenue-trigger:focus-visible {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
 }
 
 .brand-revenue-popover {
@@ -2811,13 +2853,13 @@ onUnmounted(() => {
   z-index: 80;
 }
 
-.brand-revenue-menu--disabled:hover .brand-revenue-popover {
+.brand-revenue-menu--disabled .brand-revenue-popover {
   opacity: 0;
   visibility: hidden;
   transform: translateY(-0.35rem) scale(0.98);
 }
 
-.brand-revenue-menu:not(.brand-revenue-menu--disabled):hover .brand-revenue-popover {
+.brand-revenue-menu--open:not(.brand-revenue-menu--disabled) .brand-revenue-popover {
   opacity: 1;
   visibility: visible;
   transform: translateY(0) scale(1);
@@ -3827,7 +3869,7 @@ onUnmounted(() => {
     transform-origin: top left;
   }
 
-  .brand-revenue-menu:not(.brand-revenue-menu--disabled):hover .brand-revenue-popover {
+  .brand-revenue-menu--open:not(.brand-revenue-menu--disabled) .brand-revenue-popover {
     transform: translateY(0) scale(1);
   }
 
