@@ -85,11 +85,11 @@ async function proxyJcybAdminGet(ctx, pathname) {
       ctx.body = rawText
     }
   } catch (error) {
-    console.error(`[jcyb] 请求聚财有宝接口失败 pathname=${pathname}:`, error)
+    console.error(`[jcyb] 请求接口失败 pathname=${pathname}:`, error)
     ctx.status = 502
     ctx.body = {
       code: 502,
-      message: error instanceof Error ? error.message : '请求聚财有宝接口失败',
+      message: error instanceof Error ? error.message : '请求接口失败',
     }
   }
 }

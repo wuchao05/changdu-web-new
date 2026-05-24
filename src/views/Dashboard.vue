@@ -1055,9 +1055,7 @@ const thirdPartyRevenuePayRoiAverage = computed(() => {
     .map(row => row.payRoi)
     .filter((value): value is number => value !== null)
 
-  return values.length > 0
-    ? values.reduce((sum, value) => sum + value, 0) / values.length
-    : null
+  return values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : null
 })
 const thirdPartyActualIncomeTotal = computed(() =>
   sumNullableNumbers(thirdPartyRevenueRows.value.map(row => row.actualIncome))
@@ -2075,7 +2073,7 @@ async function loadJcybApps() {
       applyFallbackJcybApps()
     }
   } catch (error) {
-    console.error('获取聚财有宝小程序列表失败:', error)
+    console.error('获取小程序列表失败:', error)
     jcybAppOptions.value = []
     applyFallbackJcybApps()
     message.warning(error instanceof Error ? error.message : '获取小程序列表失败，已使用默认小程序')
@@ -2092,7 +2090,7 @@ async function loadThirdPartyRevenue(forceRefresh = false) {
   const token = getJcybAdReportToken()
   if (!token) {
     thirdPartyRevenueRows.value = []
-    thirdPartyRevenueError.value = '请先配置聚财有宝 token'
+    thirdPartyRevenueError.value = '请先配置系统鉴权 token'
     return
   }
 
@@ -2134,8 +2132,8 @@ async function loadThirdPartyRevenue(forceRefresh = false) {
     thirdPartyRevenueRows.value = await Promise.all(dates.map(fetchThirdPartyRevenueByDate))
     thirdPartyRevenueLoadedKey.value = requestKey
   } catch (error) {
-    console.error('获取聚财有宝报表失败:', error)
-    thirdPartyRevenueError.value = error instanceof Error ? error.message : '获取聚财有宝报表失败'
+    console.error('获取报表失败:', error)
+    thirdPartyRevenueError.value = error instanceof Error ? error.message : '获取报表失败'
   } finally {
     thirdPartyRevenueLoading.value = false
   }
