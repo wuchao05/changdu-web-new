@@ -1051,11 +1051,15 @@ const thirdPartyRevenueTotal = computed(() =>
   thirdPartyRevenueRows.value.reduce((sum, row) => sum + row.realCost, 0)
 )
 const thirdPartyRevenuePayRoiAverage = computed(() => {
-  const values = thirdPartyRevenueRows.value
-    .map(row => row.payRoi)
-    .filter((value): value is number => value !== null)
+  const rows = thirdPartyRevenueRows.value.filter(row => row.payRoi !== null && row.realCost > 0)
+  const totalCost = rows.reduce((sum, row) => sum + row.realCost, 0)
 
-  return values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : null
+  if (totalCost <= 0) {
+    return null
+  }
+
+  const totalPayAmount = rows.reduce((sum, row) => sum + row.realCost * (row.payRoi || 0), 0)
+  return totalPayAmount / totalCost
 })
 const thirdPartyActualIncomeTotal = computed(() =>
   sumNullableNumbers(thirdPartyRevenueRows.value.map(row => row.actualIncome))
@@ -3031,8 +3035,30 @@ onUnmounted(() => {
   text-align: right;
 }
 
+.brand-revenue-table th:first-child,
+.brand-revenue-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  min-width: 6.7rem;
+}
+
+.brand-revenue-table th:first-child {
+  z-index: 8;
+  background: #eff6ff;
+}
+
+.brand-revenue-table tbody td:first-child {
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 1px 0 0 rgba(226, 232, 240, 0.82);
+}
+
 .brand-revenue-table tbody tr:nth-child(even) td {
   background: rgba(248, 250, 252, 0.72);
+}
+
+.brand-revenue-table tbody tr:nth-child(even) td:first-child {
+  background: rgba(248, 250, 252, 0.96);
 }
 
 .brand-revenue-table tbody td:nth-child(n + 3) {
@@ -3092,6 +3118,11 @@ onUnmounted(() => {
     0 -10px 22px rgba(15, 23, 42, 0.08);
   color: rgb(30 64 175);
   font-weight: 900;
+}
+
+.brand-revenue-table tfoot td:first-child {
+  z-index: 8;
+  background: #eaf2ff;
 }
 
 @keyframes brand-revenue-spin {
