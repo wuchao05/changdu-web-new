@@ -58,7 +58,7 @@ async function proxyJcybAdminGet(ctx, pathname) {
     ctx.status = 400
     ctx.body = {
       code: 400,
-      message: '请先配置聚财有宝 token',
+      message: '请先配置鉴权 token',
     }
     return
   }
