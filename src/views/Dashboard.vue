@@ -65,7 +65,7 @@
                 @pointerdown.stop
               >
                 <div class="brand-revenue-popover__header">
-                  <h3 class="brand-revenue-popover__hero">看天吃饭造富池</h3>
+                  <h3 class="brand-revenue-popover__hero">永动印钞机</h3>
                   <button
                     type="button"
                     class="brand-revenue-popover__refresh"
