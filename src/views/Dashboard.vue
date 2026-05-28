@@ -177,7 +177,7 @@
                         <td>{{ formatRatioValue(thirdPartyRevenuePayRoiAverage) }}</td>
                         <td>{{ formatNullableYuanAmount(thirdPartyActualIncomeTotal) }}</td>
                         <td>{{ formatNullableYuanAmount(thirdPartyRevenueShareTotal) }}</td>
-                        <td>-</td>
+                        <td>{{ formatSpeedValue(thirdPartyCostSpeedTotal) }}</td>
                       </tr>
                     </tfoot>
                   </table>
@@ -916,22 +916,9 @@ const THIRD_PARTY_LOW_SHARE_DATES = new Set(['2026-05-22', '2026-05-23', '2026-0
 const THIRD_PARTY_LOW_SHARE_RATE = 0.025
 const THIRD_PARTY_DEFAULT_SHARE_RATE = 0.05
 const JCYB_AD_REPORT_TOKEN_STORAGE_KEY = 'jcybAdReportToken'
-const FALLBACK_JCYB_APP_IDS = [
-  '374',
-  '373',
-  '372',
-  '371',
-  '370',
-  '369',
-  '368',
-  '367',
-  '366',
-  '365',
-  '364',
-  '363',
-  '362',
-  '361',
-]
+const JCYB_TEAM_ID = 500015
+const JCYB_AD_INFO_DIMENSION = 'app,agent,ad_account_name,ad_account_id'
+const JCYB_AD_INFO_ORDER = 'real_cost desc'
 const reportDateRange = ref<DateRangeValue>(null)
 const orderDateRange = ref<DateRangeValue>(null)
 const thirdPartyRevenueRows = ref<ThirdPartyRevenueRow[]>([])
@@ -1033,18 +1020,9 @@ const showBrandRevenue = computed(
   () => isAdmin.value && route.query[BRAND_REVENUE_ROUTE_FLAG] === BRAND_REVENUE_ROUTE_FLAG_VALUE
 )
 const jcybAppSelectOptions = computed(() => {
-  const options = jcybAppOptions.value.map(app => ({
+  return jcybAppOptions.value.map(app => ({
     label: app.app_name || `小程序 ${app.id}`,
     value: String(app.id),
-  }))
-
-  if (options.length > 0) {
-    return options
-  }
-
-  return FALLBACK_JCYB_APP_IDS.map(id => ({
-    label: `小程序 ${id}`,
-    value: id,
   }))
 })
 const thirdPartyRevenueTotal = computed(() =>
@@ -1066,6 +1044,9 @@ const thirdPartyActualIncomeTotal = computed(() =>
 )
 const thirdPartyRevenueShareTotal = computed(() =>
   sumNullableNumbers(thirdPartyRevenueRows.value.map(row => row.revenueShare))
+)
+const thirdPartyCostSpeedTotal = computed(() =>
+  sumNullableNumbers(thirdPartyRevenueRows.value.map(row => normalizeJcybNumber(row.costSpeed)))
 )
 const hasActiveChannel = computed(() =>
   isAdmin.value ? Boolean(sessionStore.activeChannelId) : Boolean(sessionStore.currentChannel?.id)
@@ -1900,8 +1881,13 @@ function formatRatioValue(value: number | null) {
   return value === null ? '-' : `${Number(value || 0).toFixed(2)}%`
 }
 
-function formatSpeedValue(value: string) {
-  return value || '-'
+function formatSpeedValue(value: string | number | null) {
+  if (value === null || value === undefined || value === '') {
+    return '-'
+  }
+
+  const amount = normalizeJcybNumber(value)
+  return amount === null ? String(value) : amount.toFixed(2)
 }
 
 function formatOverviewAmount(amountInCent: number) {
@@ -2024,15 +2010,15 @@ async function fetchThirdPartyRevenueByDate(date: string): Promise<ThirdPartyRev
   const token = getJcybAdReportToken()
   const result = await getJcybAdInfo(
     {
-      team_id: 500015,
+      team_id: JCYB_TEAM_ID,
       app_id: selectedJcybAppIds.value.join(','),
-      dimension: 'app,agent',
+      dimension: JCYB_AD_INFO_DIMENSION,
       end_date: date,
       page: 1,
       page_size: 20,
       start_date: date,
       time_type: 2,
-      order: 'real_cost desc',
+      order: JCYB_AD_INFO_ORDER,
     },
     token
   )
@@ -2041,12 +2027,6 @@ async function fetchThirdPartyRevenueByDate(date: string): Promise<ThirdPartyRev
   }
 
   return normalizeJcybAdInfoRow(date, result.data?.all_list)
-}
-
-function applyFallbackJcybApps() {
-  if (selectedJcybAppIds.value.length === 0) {
-    selectedJcybAppIds.value = [...FALLBACK_JCYB_APP_IDS]
-  }
 }
 
 async function loadJcybApps() {
@@ -2059,28 +2039,26 @@ async function loadJcybApps() {
 
   jcybAppsLoading.value = true
   try {
-    const result = await getJcybApps(token)
+    const result = await getJcybApps(
+      {
+        team_id: JCYB_TEAM_ID,
+        page: 1,
+        page_size: 1000,
+      },
+      token
+    )
     if (result.code !== 0) {
       throw new Error(result.message || '获取小程序列表失败')
     }
 
     const apps = Array.isArray(result.data?.list) ? result.data.list : []
     jcybAppOptions.value = apps
-
-    if (selectedJcybAppIds.value.length === 0) {
-      const enabledApps = apps.filter(app => app.status === 1)
-      const defaultApps = enabledApps.length > 0 ? enabledApps : apps
-      selectedJcybAppIds.value = defaultApps.map(app => String(app.id))
-    }
-
-    if (selectedJcybAppIds.value.length === 0) {
-      applyFallbackJcybApps()
-    }
+    selectedJcybAppIds.value = apps.map(app => String(app.id))
   } catch (error) {
     console.error('获取小程序列表失败:', error)
     jcybAppOptions.value = []
-    applyFallbackJcybApps()
-    message.warning(error instanceof Error ? error.message : '获取小程序列表失败，已使用默认小程序')
+    selectedJcybAppIds.value = []
+    message.warning(error instanceof Error ? error.message : '获取小程序列表失败')
   } finally {
     jcybAppsLoading.value = false
   }

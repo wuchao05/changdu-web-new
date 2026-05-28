@@ -193,6 +193,12 @@ export interface JcybAdInfoResponse {
   }
 }
 
+export interface JcybAppsParams {
+  team_id: number
+  page: number
+  page_size: number
+}
+
 export interface JcybAppOption {
   id: number
   app_name: string

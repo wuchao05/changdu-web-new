@@ -26,6 +26,7 @@ import type {
   MonthlyRechargeAnalyzeParams,
   JcybAdInfoParams,
   JcybAdInfoResponse,
+  JcybAppsParams,
   JcybAppsResponse,
   ThirdPartyRevenueResponse,
   ThirdPartyRevenueSharesResponse,
@@ -104,16 +105,14 @@ export function getJcybAdInfo(
 }
 
 export function getJcybApps(
+  params: JcybAppsParams,
   token: string,
   config: Pick<AxiosRequestConfig, 'signal'> = {}
 ): Promise<JcybAppsResponse> {
   return httpInstance
     .get('/jcyb/apps', {
       ...config,
-      params: {
-        page: 1,
-        page_size: 1000,
-      },
+      params,
       headers: {
         token,
       },
