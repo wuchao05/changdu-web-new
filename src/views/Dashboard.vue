@@ -95,6 +95,7 @@
                     <span class="brand-revenue-field__label">小程序</span>
                     <n-select
                       v-model:value="selectedJcybAppIds"
+                      class="brand-revenue-app-select"
                       multiple
                       filterable
                       clearable
@@ -105,7 +106,33 @@
                       :to="false"
                       placeholder="请选择小程序"
                       @update:value="handleJcybAppChange"
-                    />
+                    >
+                      <template #header>
+                        <div class="brand-revenue-app-select-header" @mousedown.prevent>
+                          <div class="brand-revenue-app-select-tools">
+                            <button
+                              type="button"
+                              class="brand-revenue-app-select-command"
+                              :disabled="
+                                jcybAppOptions.length === 0 ||
+                                selectedJcybAppIds.length === jcybAppOptions.length
+                              "
+                              @click.stop="selectAllJcybApps"
+                            >
+                              全选
+                            </button>
+                            <button
+                              type="button"
+                              class="brand-revenue-app-select-command"
+                              :disabled="selectedJcybAppIds.length === 0"
+                              @click.stop="clearSelectedJcybApps"
+                            >
+                              清空
+                            </button>
+                          </div>
+                        </div>
+                      </template>
+                    </n-select>
                   </div>
                 </div>
                 <div v-if="thirdPartyRevenueLoading" class="brand-revenue-table-shell">
@@ -1990,7 +2017,7 @@ function buildJcybRevenueRequestKey(today: string) {
 
 function normalizeJcybAdInfoRow(date: string, row?: JcybAdInfoRow): ThirdPartyRevenueRow {
   const realCost = normalizeJcybNumber(row?.real_cost) ?? 0
-  const payRoi = normalizeJcybNumber(row?.pay_roi)
+  const payRoi = normalizeJcybNumber(row?.pay_amount_ratio_by_event_time_roi)
   const actualIncome =
     payRoi === null ? null : roundMoneyAmount(realCost * (payRoi / 100) - realCost)
   const revenueShare =
@@ -2149,6 +2176,25 @@ function handleJcybAppChange() {
   thirdPartyRevenueLoadedKey.value = ''
   thirdPartyRevenueRequestedKey.value = ''
   void loadThirdPartyRevenue(true)
+}
+
+function selectAllJcybApps() {
+  const appIds = jcybAppOptions.value.map(app => String(app.id))
+  if (appIds.length === 0 || selectedJcybAppIds.value.length === appIds.length) {
+    return
+  }
+
+  selectedJcybAppIds.value = appIds
+  handleJcybAppChange()
+}
+
+function clearSelectedJcybApps() {
+  if (selectedJcybAppIds.value.length === 0) {
+    return
+  }
+
+  selectedJcybAppIds.value = []
+  handleJcybAppChange()
 }
 
 async function openBrandRevenuePopover() {
@@ -2928,6 +2974,85 @@ onUnmounted(() => {
   color: rgb(71 85 105);
   font-size: 0.74rem;
   font-weight: 800;
+}
+
+:deep(.brand-revenue-app-select .n-base-selection) {
+  min-height: 1.75rem;
+}
+
+:deep(.brand-revenue-app-select .n-base-selection-tags) {
+  flex-wrap: nowrap;
+  overflow: hidden;
+  min-width: 0;
+}
+
+:deep(.brand-revenue-app-select .n-base-selection-tag-wrapper) {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: calc(100% - 5rem);
+}
+
+:deep(.brand-revenue-app-select .n-base-selection-tag-wrapper + .n-base-selection-tag-wrapper) {
+  flex: 0 0 auto;
+  max-width: none;
+}
+
+:deep(.brand-revenue-app-select .n-base-selection-tag-wrapper .n-tag) {
+  max-width: 100%;
+}
+
+:deep(.brand-revenue-app-select .n-tag__content) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.brand-revenue-app-select-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  min-height: 2.25rem;
+  padding: 0.38rem 0.55rem;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.92);
+  background: rgba(248, 250, 252, 0.96);
+}
+
+.brand-revenue-app-select-tools {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 0.25rem;
+}
+
+.brand-revenue-app-select-command {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.55rem;
+  padding: 0 0.45rem;
+  border: 0;
+  border-radius: 0.38rem;
+  background: transparent;
+  color: rgb(37 99 235);
+  font-size: 0.76rem;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.16s ease,
+    color 0.16s ease;
+}
+
+.brand-revenue-app-select-command:hover:not(:disabled) {
+  background: rgba(219, 234, 254, 0.86);
+  color: rgb(29 78 216);
+}
+
+.brand-revenue-app-select-command:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
 }
 
 .brand-revenue-state {

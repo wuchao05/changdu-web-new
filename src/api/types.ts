@@ -169,7 +169,7 @@ export interface ThirdPartyRevenueResponse {
 export interface JcybAdInfoRow {
   date?: string | number
   real_cost?: string | number
-  pay_roi?: string | number
+  pay_amount_ratio_by_event_time_roi?: string | number
   cost_speed?: string | number
 }
 
