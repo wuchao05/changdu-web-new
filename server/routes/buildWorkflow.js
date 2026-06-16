@@ -181,6 +181,39 @@ function resolveAssetEventConfig(input = null) {
   }
 }
 
+function findTargetAssetEvent(events = [], assetEventConfig) {
+  if (!Array.isArray(events)) {
+    return null
+  }
+
+  return (
+    events.find(event => {
+      const eventEnum = String(event?.event_enum ?? event?.eventEnum ?? '').trim()
+      const eventName = String(event?.event_name ?? event?.eventName ?? '').trim()
+      return eventEnum === assetEventConfig.eventEnum || eventName === assetEventConfig.eventName
+    }) || null
+  )
+}
+
+function hasTargetAssetEvent(result, assetEventConfig) {
+  return Boolean(findTargetAssetEvent(result?.data?.track_status, assetEventConfig))
+}
+
+async function fetchEventTrackStatus({ accountId, assetsId, cookie }) {
+  const response = await fetch(
+    `https://ad.oceanengine.com/event_manager/v2/api/event/track/status/${assetsId}?aadvid=${accountId}`,
+    {
+      method: 'GET',
+      headers: {
+        platform: 'ad',
+        Cookie: cookie,
+      },
+    }
+  )
+
+  return response.json()
+}
+
 function getJuliangCookie(input = null) {
   return String(getRuntimeContext(input)?.juliang?.cookie || '').trim()
 }
@@ -789,24 +822,15 @@ router.post('/check-event', async ctx => {
     console.log('account_id:', account_id)
     console.log('assets_id:', assets_id)
 
-    const response = await fetch(
-      `https://ad.oceanengine.com/event_manager/v2/api/event/track/status/${assets_id}?aadvid=${account_id}`,
-      {
-        method: 'GET',
-        headers: {
-          platform: 'ad',
-          Cookie: cookie,
-        },
-      }
-    )
-
-    const result = await response.json()
+    const result = await fetchEventTrackStatus({
+      accountId: account_id,
+      assetsId: assets_id,
+      cookie,
+    })
     console.log('查询事件状态结果:', JSON.stringify(result, null, 2))
 
     const assetEventConfig = resolveAssetEventConfig(ctx)
-    const hasPaymentEvent = result.data?.track_status?.some(
-      event => event.event_name === assetEventConfig.eventName
-    )
+    const hasPaymentEvent = hasTargetAssetEvent(result, assetEventConfig)
 
     console.log(`是否已存在${assetEventConfig.eventName}事件:`, hasPaymentEvent)
     console.log('====================================')
@@ -837,6 +861,27 @@ router.post('/add-event', async ctx => {
 
     const cookie = getJuliangCookie(ctx)
     const assetEventConfig = resolveAssetEventConfig(ctx)
+    const eventStatusResult = await fetchEventTrackStatus({
+      accountId: account_id,
+      assetsId: assets_id,
+      cookie,
+    })
+    const existingEvent = findTargetAssetEvent(
+      eventStatusResult?.data?.track_status,
+      assetEventConfig
+    )
+
+    if (existingEvent) {
+      console.log(`${assetEventConfig.eventName}事件已存在，跳过添加`)
+      ctx.body = {
+        ...eventStatusResult,
+        code: 0,
+        has_payment_event: true,
+        skipped: true,
+        message: `${assetEventConfig.eventName}事件已存在，跳过添加`,
+      }
+      return
+    }
 
     const response = await fetch(
       `https://ad.oceanengine.com/event_manager/v2/api/event/config/create?aadvid=${account_id}`,
