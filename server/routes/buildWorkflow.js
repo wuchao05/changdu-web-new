@@ -170,6 +170,7 @@ function resolveAssetEventConfig(input = null) {
     return {
       eventEnum: '8',
       eventName: '激活',
+      eventType: BUILD_WORKFLOW_CONFIG.event.eventType,
       externalAction: '8',
     }
   }
@@ -177,6 +178,7 @@ function resolveAssetEventConfig(input = null) {
   return {
     eventEnum: BUILD_WORKFLOW_CONFIG.event.eventEnum,
     eventName: BUILD_WORKFLOW_CONFIG.event.eventName,
+    eventType: BUILD_WORKFLOW_CONFIG.event.eventType,
     externalAction: BUILD_WORKFLOW_CONFIG.event.eventEnum,
   }
 }
@@ -190,7 +192,12 @@ function findTargetAssetEvent(events = [], assetEventConfig) {
     events.find(event => {
       const eventEnum = String(event?.event_enum ?? event?.eventEnum ?? '').trim()
       const eventName = String(event?.event_name ?? event?.eventName ?? '').trim()
-      return eventEnum === assetEventConfig.eventEnum || eventName === assetEventConfig.eventName
+      const eventType = String(event?.event_type ?? event?.eventType ?? '').trim()
+      return (
+        eventEnum === assetEventConfig.eventEnum ||
+        eventName === assetEventConfig.eventName ||
+        eventType === assetEventConfig.eventType
+      )
     }) || null
   )
 }
@@ -897,7 +904,7 @@ router.post('/add-event', async ctx => {
           events: [
             {
               event_enum: assetEventConfig.eventEnum,
-              event_type: BUILD_WORKFLOW_CONFIG.event.eventType,
+              event_type: assetEventConfig.eventType,
               event_name: assetEventConfig.eventName,
               track_types: BUILD_WORKFLOW_CONFIG.event.trackTypes,
               statistical_method_type: BUILD_WORKFLOW_CONFIG.event.statisticalMethodType,
