@@ -131,7 +131,7 @@ export async function createMicroAppAsset(params: {
 }
 
 /**
- * 添加付费事件
+ * 添加资产事件
  */
 export async function addPaymentEvent(params: {
   account_id: string
@@ -144,12 +144,12 @@ export async function addPaymentEvent(params: {
   })
 
   if (!response.ok) {
-    throw new Error(`添加付费事件失败: ${response.statusText}`)
+    throw new Error(`添加资产事件失败: ${response.statusText}`)
   }
 
   const result = await response.json()
   if (result.code !== 0) {
-    throw new Error(result.msg || result.error || result.message || '添加付费事件失败')
+    throw new Error(result.msg || result.error || result.message || '添加资产事件失败')
   }
 
   return result

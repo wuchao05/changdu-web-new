@@ -32,6 +32,7 @@ export const DEFAULT_BUILD_CONFIG = {
   ccId: '1849832732821859',
   rechargeTemplateId: String(BUILD_WORKFLOW_CONFIG.changdu.rechargeTemplateId),
   adCallbackConfigId: '',
+  assetEventType: 'pay',
   forbiddenAdvanceStartHour: '0',
   forbiddenAdvanceEndHour: '0',
   advanceBuildHours: '0',
@@ -43,6 +44,10 @@ function normalizeStringValue(value, fallback = '') {
 
 function normalizeBooleanValue(value, fallback = false) {
   return typeof value === 'boolean' ? value : fallback
+}
+
+function normalizeAssetEventType(value) {
+  return value === 'activate' ? 'activate' : DEFAULT_BUILD_CONFIG.assetEventType
 }
 
 export function normalizeBuildConfig(config = {}) {
@@ -92,6 +97,7 @@ export function normalizeBuildConfig(config = {}) {
       config.adCallbackConfigId,
       DEFAULT_BUILD_CONFIG.adCallbackConfigId
     ),
+    assetEventType: normalizeAssetEventType(config.assetEventType),
     forbiddenAdvanceStartHour: normalizeStringValue(
       config.forbiddenAdvanceStartHour,
       DEFAULT_BUILD_CONFIG.forbiddenAdvanceStartHour

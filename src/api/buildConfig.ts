@@ -20,6 +20,7 @@ export interface BuildConfig {
   ccId: string
   rechargeTemplateId: string
   adCallbackConfigId: string
+  assetEventType: 'pay' | 'activate'
   forbiddenAdvanceStartHour: string
   forbiddenAdvanceEndHour: string
   advanceBuildHours: string
@@ -51,6 +52,7 @@ export const DEFAULT_BUILD_CONFIG: BuildConfig = {
   ccId: '',
   rechargeTemplateId: '',
   adCallbackConfigId: '',
+  assetEventType: 'pay',
   forbiddenAdvanceStartHour: '0',
   forbiddenAdvanceEndHour: '0',
   advanceBuildHours: '0',
@@ -62,6 +64,10 @@ function normalizeStringValue(value: unknown, fallback = ''): string {
 
 function normalizeBooleanValue(value: unknown, fallback = false): boolean {
   return typeof value === 'boolean' ? value : fallback
+}
+
+function normalizeAssetEventType(value: unknown): BuildConfig['assetEventType'] {
+  return value === 'activate' ? 'activate' : 'pay'
 }
 
 function normalizeBuildConfig(payload: unknown): BuildConfig {
@@ -93,6 +99,7 @@ function normalizeBuildConfig(payload: unknown): BuildConfig {
     ccId: normalizeStringValue(config.ccId),
     rechargeTemplateId: normalizeStringValue(config.rechargeTemplateId),
     adCallbackConfigId: normalizeStringValue(config.adCallbackConfigId),
+    assetEventType: normalizeAssetEventType(config.assetEventType),
     forbiddenAdvanceStartHour: normalizeStringValue(config.forbiddenAdvanceStartHour, '0'),
     forbiddenAdvanceEndHour: normalizeStringValue(config.forbiddenAdvanceEndHour, '0'),
     advanceBuildHours: normalizeStringValue(config.advanceBuildHours, '0'),

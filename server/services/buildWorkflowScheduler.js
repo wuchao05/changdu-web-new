@@ -808,11 +808,26 @@ function getBuildConfig() {
       typeof buildConfig.adCallbackConfigId === 'string'
         ? buildConfig.adCallbackConfigId.trim()
         : '',
+    assetEventType: buildConfig.assetEventType === 'activate' ? 'activate' : 'pay',
   }
 }
 
 function getBuildRuleConfig() {
   return getBuildConfig()
+}
+
+function resolveAssetEventConfig(buildConfig = getBuildConfig()) {
+  if (buildConfig.assetEventType === 'activate') {
+    return {
+      eventEnum: '8',
+      eventName: '激活',
+    }
+  }
+
+  return {
+    eventEnum: BUILD_WORKFLOW_CONFIG.event.eventEnum,
+    eventName: BUILD_WORKFLOW_CONFIG.event.eventName,
+  }
 }
 
 function getJuliangCookie() {
@@ -1044,6 +1059,7 @@ async function createMicroAppAsset(params) {
  */
 async function checkEventStatus(params) {
   const { account_id, assets_id } = params
+  const assetEventConfig = resolveAssetEventConfig()
 
   const response = await fetch(
     `https://ad.oceanengine.com/event_manager/v2/api/event/track/status/${assets_id}?aadvid=${account_id}`,
@@ -1057,16 +1073,19 @@ async function checkEventStatus(params) {
   )
 
   const result = await response.json()
-  const hasPaymentEvent = result.data?.track_status?.some(event => event.event_name === '付费')
+  const hasPaymentEvent = result.data?.track_status?.some(
+    event => event.event_name === assetEventConfig.eventName
+  )
 
   return { ...result, has_payment_event: hasPaymentEvent }
 }
 
 /**
- * 添加付费事件
+ * 添加资产事件
  */
 async function addPaymentEvent(params) {
   const { account_id, assets_id } = params
+  const assetEventConfig = resolveAssetEventConfig()
 
   const response = await fetch(
     `https://ad.oceanengine.com/event_manager/v2/api/event/config/create?aadvid=${account_id}`,
@@ -1081,9 +1100,9 @@ async function addPaymentEvent(params) {
         link_name: BUILD_WORKFLOW_CONFIG.event.linkName,
         events: [
           {
-            event_enum: BUILD_WORKFLOW_CONFIG.event.eventEnum,
+            event_enum: assetEventConfig.eventEnum,
             event_type: BUILD_WORKFLOW_CONFIG.event.eventType,
-            event_name: BUILD_WORKFLOW_CONFIG.event.eventName,
+            event_name: assetEventConfig.eventName,
             track_types: BUILD_WORKFLOW_CONFIG.event.trackTypes,
             statistical_method_type: BUILD_WORKFLOW_CONFIG.event.statisticalMethodType,
             discrimination_value: { value_type: 0, dimension: 0, groups: [] },
@@ -1096,7 +1115,7 @@ async function addPaymentEvent(params) {
 
   const result = await response.json()
   if (result.code !== 0) {
-    throw new Error(result.msg || '添加付费事件失败')
+    throw new Error(result.msg || '添加资产事件失败')
   }
   return result
 }
@@ -1562,17 +1581,19 @@ async function executeAssetization(drama) {
     start_page: '',
   }
 
-  // 步骤4: 检查并添加付费事件
-  buildConsole.log('[后台搭建] 步骤4: 检查并添加付费事件')
+  const assetEventConfig = resolveAssetEventConfig(buildConfig)
+
+  // 步骤4: 检查并添加资产事件
+  buildConsole.log(`[后台搭建] 步骤4: 检查并添加${assetEventConfig.eventName}事件`)
   const eventStatusResult = await checkEventStatus({
     account_id: accountId,
     assets_id: assetsId,
   })
 
   if (eventStatusResult.has_payment_event) {
-    buildConsole.log('[后台搭建] 付费事件已存在，跳过添加')
+    buildConsole.log(`[后台搭建] ${assetEventConfig.eventName}事件已存在，跳过添加`)
   } else {
-    buildConsole.log('[后台搭建] 付费事件不存在，开始添加')
+    buildConsole.log(`[后台搭建] ${assetEventConfig.eventName}事件不存在，开始添加`)
     await addPaymentEvent({ account_id: accountId, assets_id: assetsId })
   }
 

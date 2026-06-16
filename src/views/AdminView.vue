@@ -124,6 +124,9 @@
                           >
                             {{ getAdvanceRuleSummary(channel.juliang.buildConfig).tagLabel }}
                           </n-tag>
+                          <n-tag size="small" :bordered="false" round type="success">
+                            {{ getAssetEventTypeLabel(channel.juliang.buildConfig.assetEventType) }}
+                          </n-tag>
                         </div>
                       </div>
                     </div>
@@ -902,9 +905,7 @@
                                           match.materialRange || '--'
                                         }}</span>
                                         <span class="material-match-card__count">
-                                          {{
-                                            getMaterialRangeCount(match.materialRange) || 0
-                                          }}
+                                          {{ getMaterialRangeCount(match.materialRange) || 0 }}
                                           个素材
                                         </span>
                                       </div>
@@ -1642,6 +1643,27 @@
                     />
                   </n-form-item>
                 </n-form>
+
+                <div class="asset-event-config-block">
+                  <div class="asset-event-config-block__header">
+                    <div>
+                      <p class="asset-event-config-block__title">巨量资产化参数</p>
+                      <p class="asset-event-config-block__desc">
+                        选择资产化流程创建的事件类型，默认付费事件。
+                      </p>
+                    </div>
+                    <n-tag size="small" :bordered="false" round type="success">
+                      {{ getAssetEventTypeLabel(channelForm.juliang.buildConfig.assetEventType) }}
+                    </n-tag>
+                  </div>
+                  <n-radio-group
+                    v-model:value="channelForm.juliang.buildConfig.assetEventType"
+                    class="asset-event-config-block__control"
+                  >
+                    <n-radio-button value="pay">付费</n-radio-button>
+                    <n-radio-button value="activate">激活</n-radio-button>
+                  </n-radio-group>
+                </div>
               </section>
 
               <section class="drawer-panel drawer-panel--white">
@@ -1933,6 +1955,13 @@ const draggedOrderUsername = reactive({
   channelId: '',
   index: -1,
 })
+
+function getAssetEventTypeLabel(
+  value: adminApi.ChannelConfig['juliang']['buildConfig']['assetEventType']
+) {
+  return value === 'activate' ? '激活事件' : '付费事件'
+}
+
 const editingOrderUsername = reactive({
   channelId: '',
   index: -1,
@@ -3107,6 +3136,7 @@ function createDefaultChannelForm(): ChannelFormModel {
         ccId: '',
         rechargeTemplateId: '',
         adCallbackConfigId: '',
+        assetEventType: 'pay',
         forbiddenAdvanceStartHour: '0',
         forbiddenAdvanceEndHour: '0',
         advanceBuildHours: '0',
@@ -3929,6 +3959,8 @@ async function saveChannel() {
       channelForm.juliang.buildConfig.defaultBid = defaultBid
     }
     channelForm.juliang.buildConfig.secretKey = channelForm.changdu.secretKey || ''
+    channelForm.juliang.buildConfig.assetEventType =
+      channelForm.juliang.buildConfig.assetEventType === 'activate' ? 'activate' : 'pay'
     if (editingChannelId.value) {
       await adminApi.updateChannel(editingChannelId.value, channelForm)
       message.success('渠道已更新')
@@ -4917,6 +4949,39 @@ watch(
   font-size: 0.78rem;
   line-height: 1.6;
   color: #64748b;
+}
+
+.asset-event-config-block {
+  margin-top: 1rem;
+  padding: 0.95rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(187, 247, 208, 0.78);
+  background: linear-gradient(180deg, rgba(240, 253, 244, 0.72), rgba(255, 255, 255, 0.96));
+}
+
+.asset-event-config-block__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.85rem;
+  margin-bottom: 0.85rem;
+}
+
+.asset-event-config-block__title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #14532d;
+}
+
+.asset-event-config-block__desc {
+  margin-top: 0.25rem;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: #64748b;
+}
+
+.asset-event-config-block__control {
+  width: 100%;
 }
 
 .advance-config-time-range {

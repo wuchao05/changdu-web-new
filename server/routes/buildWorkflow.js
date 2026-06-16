@@ -160,6 +160,22 @@ function getBuildConfig(input = null) {
       typeof buildConfig.adCallbackConfigId === 'string'
         ? buildConfig.adCallbackConfigId.trim()
         : '',
+    assetEventType: buildConfig.assetEventType === 'activate' ? 'activate' : 'pay',
+  }
+}
+
+function resolveAssetEventConfig(input = null) {
+  const buildConfig = getBuildConfig(input)
+  if (buildConfig.assetEventType === 'activate') {
+    return {
+      eventEnum: '8',
+      eventName: '激活',
+    }
+  }
+
+  return {
+    eventEnum: BUILD_WORKFLOW_CONFIG.event.eventEnum,
+    eventName: BUILD_WORKFLOW_CONFIG.event.eventName,
   }
 }
 
@@ -785,10 +801,12 @@ router.post('/check-event', async ctx => {
     const result = await response.json()
     console.log('查询事件状态结果:', JSON.stringify(result, null, 2))
 
-    // 检查是否已存在"付费"事件
-    const hasPaymentEvent = result.data?.track_status?.some(event => event.event_name === '付费')
+    const assetEventConfig = resolveAssetEventConfig(ctx)
+    const hasPaymentEvent = result.data?.track_status?.some(
+      event => event.event_name === assetEventConfig.eventName
+    )
 
-    console.log('是否已存在付费事件:', hasPaymentEvent)
+    console.log(`是否已存在${assetEventConfig.eventName}事件:`, hasPaymentEvent)
     console.log('====================================')
 
     ctx.body = {
@@ -803,7 +821,7 @@ router.post('/check-event', async ctx => {
 })
 
 /**
- * 添加付费事件
+ * 添加资产事件
  */
 router.post('/add-event', async ctx => {
   try {
@@ -816,6 +834,7 @@ router.post('/add-event', async ctx => {
     }
 
     const cookie = getJuliangCookie(ctx)
+    const assetEventConfig = resolveAssetEventConfig(ctx)
 
     const response = await fetch(
       `https://ad.oceanengine.com/event_manager/v2/api/event/config/create?aadvid=${account_id}`,
@@ -830,9 +849,9 @@ router.post('/add-event', async ctx => {
           link_name: BUILD_WORKFLOW_CONFIG.event.linkName,
           events: [
             {
-              event_enum: BUILD_WORKFLOW_CONFIG.event.eventEnum,
+              event_enum: assetEventConfig.eventEnum,
               event_type: BUILD_WORKFLOW_CONFIG.event.eventType,
-              event_name: BUILD_WORKFLOW_CONFIG.event.eventName,
+              event_name: assetEventConfig.eventName,
               track_types: BUILD_WORKFLOW_CONFIG.event.trackTypes,
               statistical_method_type: BUILD_WORKFLOW_CONFIG.event.statisticalMethodType,
               discrimination_value: {
@@ -850,9 +869,9 @@ router.post('/add-event', async ctx => {
     const result = await response.json()
     ctx.body = result
   } catch (error) {
-    console.error('添加付费事件失败:', error)
+    console.error('添加资产事件失败:', error)
     ctx.status = 500
-    ctx.body = { error: error.message || '添加付费事件失败' }
+    ctx.body = { error: error.message || '添加资产事件失败' }
   }
 })
 

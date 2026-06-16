@@ -514,6 +514,10 @@ function getConfiguredMicroApp(
   }
 }
 
+function getAssetEventName(buildConfig: adminApi.ChannelConfig['juliang']['buildConfig'] | null) {
+  return buildConfig?.assetEventType === 'activate' ? '激活' : '付费'
+}
+
 function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
@@ -723,7 +727,7 @@ const assetizationSteps = computed(() => [
   },
   { key: 2, title: '使用指定小程序' },
   { key: 3, title: '创建小程序资产' },
-  { key: 4, title: '添加付费事件' },
+  { key: 4, title: `添加${getAssetEventName(currentBuildConfig.value)}事件` },
 ])
 
 // 获取步骤状态
@@ -2098,19 +2102,21 @@ async function executeAssetization(
     start_page: '',
   }
 
-  // 步骤4: 检查并添加付费事件
+  const assetEventName = getAssetEventName(buildConfig)
+
+  // 步骤4: 检查并添加资产事件
   currentAssetizationStep.value = 4
   record.assetizationStep = 4
-  console.log('步骤4: 检查并添加付费事件')
+  console.log(`步骤4: 检查并添加${assetEventName}事件`)
   const eventStatusResult = await buildWorkflowApi.checkEventStatus({
     account_id: accountId,
     assets_id: assetsId,
   })
 
   if (eventStatusResult.has_payment_event) {
-    console.log('付费事件已存在，跳过添加')
+    console.log(`${assetEventName}事件已存在，跳过添加`)
   } else {
-    console.log('付费事件不存在，开始添加')
+    console.log(`${assetEventName}事件不存在，开始添加`)
     await buildWorkflowApi.addPaymentEvent({
       account_id: accountId,
       assets_id: assetsId,
