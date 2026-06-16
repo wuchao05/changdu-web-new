@@ -821,12 +821,14 @@ function resolveAssetEventConfig(buildConfig = getBuildConfig()) {
     return {
       eventEnum: '8',
       eventName: '激活',
+      externalAction: '8',
     }
   }
 
   return {
     eventEnum: BUILD_WORKFLOW_CONFIG.event.eventEnum,
     eventName: BUILD_WORKFLOW_CONFIG.event.eventName,
+    externalAction: BUILD_WORKFLOW_CONFIG.event.eventEnum,
   }
 }
 
@@ -1221,6 +1223,7 @@ async function createProject(params) {
   } = params
   const projectConfig = BUILD_WORKFLOW_CONFIG.build.project
   const buildConfig = getBuildConfig()
+  const assetEventConfig = resolveAssetEventConfig(buildConfig)
   const bidConfig = resolveEffectiveBuildBid(
     buildConfig,
     getActiveSchedulerState().runtimeUserConfig
@@ -1271,7 +1274,7 @@ async function createProject(params) {
     hide_if_converted: '1',
     cdp_marketing_goal: 1,
     asset_ids: [assets_id.toString()],
-    external_action: '14',
+    external_action: assetEventConfig.externalAction,
     budget_mode: projectConfig.budget_mode,
     campaign_type: 1,
     micro_promotion_type: 4,
@@ -1340,6 +1343,7 @@ async function getDouyinAccountInfo(params) {
  */
 async function getMaterialList(params) {
   const { account_id, aweme_id, aweme_account } = params
+  const assetEventConfig = resolveAssetEventConfig()
 
   const queryParams = new URLSearchParams({
     aadvid: account_id,
@@ -1350,7 +1354,7 @@ async function getMaterialList(params) {
     aweme_account: aweme_account,
     'auth_level[]': '5',
     landing_type: '16',
-    external_action: '14',
+    external_action: assetEventConfig.externalAction,
     page: '1',
     limit: '100',
     version: 'v2',

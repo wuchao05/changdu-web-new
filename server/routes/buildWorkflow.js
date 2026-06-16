@@ -170,12 +170,14 @@ function resolveAssetEventConfig(input = null) {
     return {
       eventEnum: '8',
       eventName: '激活',
+      externalAction: '8',
     }
   }
 
   return {
     eventEnum: BUILD_WORKFLOW_CONFIG.event.eventEnum,
     eventName: BUILD_WORKFLOW_CONFIG.event.eventName,
+    externalAction: BUILD_WORKFLOW_CONFIG.event.eventEnum,
   }
 }
 
@@ -1225,6 +1227,7 @@ router.post('/create-project', async ctx => {
     const cookie = getJuliangCookie(runtime)
     const projectConfig = BUILD_WORKFLOW_CONFIG.build.project
     const buildConfig = getBuildConfig(runtime)
+    const assetEventConfig = resolveAssetEventConfig(runtime)
     const bidConfig = resolveEffectiveBuildBid(buildConfig, getRuntimeUser(ctx))
 
     console.log('========== 创建项目 ==========')
@@ -1282,7 +1285,7 @@ router.post('/create-project', async ctx => {
       hide_if_converted: '1',
       cdp_marketing_goal: 1,
       asset_ids: [assets_id.toString()],
-      external_action: '14',
+      external_action: assetEventConfig.externalAction,
       budget_mode: projectConfig.budget_mode,
       campaign_type: 1,
       micro_promotion_type: 4,
@@ -1334,7 +1337,8 @@ router.post('/get-douyin-account-info', async ctx => {
       return
     }
 
-    const cookie = getJuliangCookie(ctx)
+    const runtime = ctx.state.channelRuntime
+    const cookie = getJuliangCookie(runtime)
 
     console.log('========== 获取抖音号原始ID ==========')
     console.log('account_id:', account_id)
@@ -1391,7 +1395,9 @@ router.post('/get-material-list', async ctx => {
       return
     }
 
-    const cookie = getJuliangCookie(ctx)
+    const runtime = ctx.state.channelRuntime
+    const cookie = getJuliangCookie(runtime)
+    const assetEventConfig = resolveAssetEventConfig(runtime)
 
     console.log('========== 获取素材列表 ==========')
     console.log('account_id:', account_id)
@@ -1408,7 +1414,7 @@ router.post('/get-material-list', async ctx => {
       aweme_account: aweme_account,
       'auth_level[]': '5',
       landing_type: '16',
-      external_action: '14',
+      external_action: assetEventConfig.externalAction,
       page: '1',
       limit: '100',
       version: 'v2',
