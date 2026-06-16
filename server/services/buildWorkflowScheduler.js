@@ -821,7 +821,7 @@ function resolveAssetEventConfig(buildConfig = getBuildConfig()) {
     return {
       eventEnum: '8',
       eventName: '激活',
-      eventType: BUILD_WORKFLOW_CONFIG.event.eventType,
+      eventType: 'active',
       externalAction: '8',
     }
   }
