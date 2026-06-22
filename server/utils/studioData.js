@@ -451,11 +451,37 @@ function resolveDouyinAccountRefId(match = {}, douyinAccounts = []) {
   return findMatchingDouyinAccount(match, douyinAccounts)?.id || ''
 }
 
+function formatMaterialRangeNumber(value) {
+  return String(value).padStart(2, '0')
+}
+
+export function normalizeMaterialRange(materialRange = '') {
+  const normalizedRange = String(materialRange || '').trim()
+  if (!normalizedRange) {
+    return ''
+  }
+
+  const match = normalizedRange.match(/^(\d+)(?:-(\d+))?$/)
+  if (!match) {
+    return normalizedRange
+  }
+
+  const start = Number(match[1])
+  const end = match[2] ? Number(match[2]) : start
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start <= 0 || end < start) {
+    return normalizedRange
+  }
+
+  const startText = formatMaterialRangeNumber(start)
+  const endText = formatMaterialRangeNumber(end)
+  return match[2] ? `${startText}-${endText}` : startText
+}
+
 export function normalizeDouyinMaterialMatch(match = {}, douyinAccounts = []) {
   return {
     id: String(match.id || crypto.randomUUID()),
     douyinAccountRefId: resolveDouyinAccountRefId(match, douyinAccounts),
-    materialRange: String(match.materialRange || '').trim(),
+    materialRange: normalizeMaterialRange(match.materialRange),
     createdAt: match.createdAt || nowIso(),
     updatedAt: match.updatedAt || nowIso(),
   }

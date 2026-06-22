@@ -293,7 +293,9 @@
                     </div>
                   </div>
                   <div class="material-rule-card__bottom material-rule-card__bottom--compact">
-                    <span class="material-rule-card__range">{{ match.materialRange || '--' }}</span>
+                    <span class="material-rule-card__range">{{
+                      normalizeMaterialRange(match.materialRange) || '--'
+                    }}</span>
                     <span class="material-rule-card__count">
                       {{ getMaterialRangeCount(match.materialRange) || 0 }} 个素材
                     </span>
@@ -893,6 +895,28 @@ function formatMaterialRangeNumber(value: number) {
   return String(value).padStart(2, '0')
 }
 
+function normalizeMaterialRange(materialRange?: string) {
+  const normalizedRange = String(materialRange || '').trim()
+  if (!normalizedRange) {
+    return ''
+  }
+
+  const match = normalizedRange.match(/^(\d+)(?:-(\d+))?$/)
+  if (!match) {
+    return normalizedRange
+  }
+
+  const start = Number(match[1])
+  const end = match[2] ? Number(match[2]) : start
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start <= 0 || end < start) {
+    return normalizedRange
+  }
+
+  const startText = formatMaterialRangeNumber(start)
+  const endText = formatMaterialRangeNumber(end)
+  return match[2] ? `${startText}-${endText}` : startText
+}
+
 function getMaterialMatchAccountMeta(match: {
   douyinAccountRefId?: string
   douyinAccount?: string
@@ -1043,7 +1067,7 @@ async function saveAllMaterialMatches() {
   const targetMatches = materialMatches.value.map(match => ({
     ...match,
     douyinAccountRefId: String(match.douyinAccountRefId || '').trim(),
-    materialRange: String(match.materialRange || '').trim(),
+    materialRange: normalizeMaterialRange(match.materialRange),
   }))
   const originalMatches = douyinMaterialStore.matches.map(match => ({ ...match }))
   const targetMatchMap = new Map(targetMatches.map(match => [match.douyinAccountRefId, match]))

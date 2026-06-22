@@ -157,6 +157,32 @@ function isRedFlagDrama(drama, newDramaSet = new Set(), options = {}) {
   )
 }
 
+function formatMaterialRangeNumber(value) {
+  return String(value).padStart(2, '0')
+}
+
+function normalizeMaterialRange(materialRange = '') {
+  const normalizedRange = String(materialRange || '').trim()
+  if (!normalizedRange) {
+    return ''
+  }
+
+  const match = normalizedRange.match(/^(\d+)(?:-(\d+))?$/)
+  if (!match) {
+    return normalizedRange
+  }
+
+  const start = Number(match[1])
+  const end = match[2] ? Number(match[2]) : start
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start <= 0 || end < start) {
+    return normalizedRange
+  }
+
+  const startText = formatMaterialRangeNumber(start)
+  const endText = formatMaterialRangeNumber(end)
+  return match[2] ? `${startText}-${endText}` : startText
+}
+
 // 抖音素材配置文件路径（与 douyinMaterial 路由保持一致）
 const isProduction = process.env.NODE_ENV === 'production'
 /**
@@ -1208,7 +1234,10 @@ async function getDouyinMaterialConfig(channelId, tableGroupId = '') {
   const profile = getSchedulerFeishuTableGroupProfile(channelId, tableGroupId)
   return profile.douyinMaterialMatches
     .filter(match => match.douyinAccount && match.douyinAccountId && match.materialRange)
-    .map(match => `${match.douyinAccount} ${match.douyinAccountId} ${match.materialRange}`)
+    .map(
+      match =>
+        `${match.douyinAccount} ${match.douyinAccountId} ${normalizeMaterialRange(match.materialRange)}`
+    )
     .join('\n')
 }
 

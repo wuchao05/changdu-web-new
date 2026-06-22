@@ -975,6 +975,32 @@ async function reloadChannelScopedData() {
 }
 
 // 格式化抖音号素材配置
+function formatMaterialRangeNumber(value: number) {
+  return String(value).padStart(2, '0')
+}
+
+function normalizeMaterialRange(materialRange?: string) {
+  const normalizedRange = String(materialRange || '').trim()
+  if (!normalizedRange) {
+    return ''
+  }
+
+  const match = normalizedRange.match(/^(\d+)(?:-(\d+))?$/)
+  if (!match) {
+    return normalizedRange
+  }
+
+  const start = Number(match[1])
+  const end = match[2] ? Number(match[2]) : start
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start <= 0 || end < start) {
+    return normalizedRange
+  }
+
+  const startText = formatMaterialRangeNumber(start)
+  const endText = formatMaterialRangeNumber(end)
+  return match[2] ? `${startText}-${endText}` : startText
+}
+
 function formatDouyinMaterialConfig(
   group: RuntimeFeishuTableGroup | null | undefined = activeFeishuTableGroup.value
 ): string {
@@ -986,7 +1012,10 @@ function formatDouyinMaterialConfig(
 
   return matches
     .filter(match => match.douyinAccount && match.douyinAccountId && match.materialRange) // 过滤掉不完整的数据
-    .map(match => `${match.douyinAccount} ${match.douyinAccountId} ${match.materialRange}`)
+    .map(
+      match =>
+        `${match.douyinAccount} ${match.douyinAccountId} ${normalizeMaterialRange(match.materialRange)}`
+    )
     .join('\n')
 }
 

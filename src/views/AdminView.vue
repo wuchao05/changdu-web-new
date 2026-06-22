@@ -902,7 +902,7 @@
                                       </div>
                                       <div class="material-match-card__meta-row">
                                         <span class="material-match-card__range">{{
-                                          match.materialRange || '--'
+                                          normalizeMaterialRange(match.materialRange) || '--'
                                         }}</span>
                                         <span class="material-match-card__count">
                                           {{ getMaterialRangeCount(match.materialRange) || 0 }}
@@ -2908,7 +2908,7 @@ function normalizeFeishuTableGroups(
             douyinAccount: String(match?.douyinAccount || ''),
             douyinAccountId: String(match?.douyinAccountId || ''),
             cooperationCode: String(match?.cooperationCode || ''),
-            materialRange: String(match?.materialRange || ''),
+            materialRange: normalizeMaterialRange(match?.materialRange),
             createdAt: match?.createdAt,
             updatedAt: match?.updatedAt,
           }))
@@ -3251,6 +3251,28 @@ function formatMaterialRangeNumber(value: number) {
   return String(value).padStart(2, '0')
 }
 
+function normalizeMaterialRange(materialRange?: string) {
+  const normalizedRange = String(materialRange || '').trim()
+  if (!normalizedRange) {
+    return ''
+  }
+
+  const match = normalizedRange.match(/^(\d+)(?:-(\d+))?$/)
+  if (!match) {
+    return normalizedRange
+  }
+
+  const start = Number(match[1])
+  const end = match[2] ? Number(match[2]) : start
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start <= 0 || end < start) {
+    return normalizedRange
+  }
+
+  const startText = formatMaterialRangeNumber(start)
+  const endText = formatMaterialRangeNumber(end)
+  return match[2] ? `${startText}-${endText}` : startText
+}
+
 function getFeishuTableGroupKey(channelId: string, groupId: string) {
   return `${channelId}::${groupId || DEFAULT_FEISHU_TABLE_GROUP_ID}`
 }
@@ -3269,6 +3291,17 @@ function ensureUserChannelFeishuGroups(channelId: string) {
   config.douyinMaterialMatches = config.feishuTableGroups[0].douyinMaterialMatches
 
   return config.feishuTableGroups
+}
+
+function normalizeUserChannelMaterialRanges(channelId: string) {
+  const groups = ensureUserChannelFeishuGroups(channelId)
+  groups.forEach(group => {
+    group.douyinMaterialMatches = (group.douyinMaterialMatches || []).map(match => ({
+      ...match,
+      materialRange: normalizeMaterialRange(match.materialRange),
+    }))
+  })
+  syncDefaultUserChannelFeishuGroup(channelId)
 }
 
 function syncDefaultUserChannelFeishuGroup(channelId: string) {
@@ -3884,6 +3917,7 @@ async function saveUser() {
 
       const configuredMatchRefIds = new Set<string>()
       const feishuTableGroups = ensureUserChannelFeishuGroups(channelId)
+      normalizeUserChannelMaterialRanges(channelId)
 
       for (const group of feishuTableGroups) {
         if (group.enabled === false) {
