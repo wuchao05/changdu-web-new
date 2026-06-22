@@ -1368,6 +1368,7 @@ async function editJuliangAccountRemark(channelId, accountId, remark) {
 async function fetchAutoSubmitDramas(channelId, submitRangeDays = 3, feishuTableGroupId = '') {
   await ensureSchedulerRuntime(channelId)
   const dateRanges = getDateRanges(submitRangeDays)
+  const shouldDeferExistingCheck = isAllFeishuTableGroupTarget(feishuTableGroupId)
 
   serviceConsole.log(`[自动提交-${channelId}] ========== 获取剧集 ==========`)
   serviceConsole.log(`[自动提交-${channelId}] 今天:`, formatDate(dateRanges.today))
@@ -1430,12 +1431,33 @@ async function fetchAutoSubmitDramas(channelId, submitRangeDays = 3, feishuTable
 
   serviceConsole.log(`[自动提交-${channelId}] 过滤后的剧集总数:`, filteredDramas.length)
 
+  const candidateDramas = shouldDeferExistingCheck
+    ? filteredDramas
+    : filteredDramas.filter(drama => {
+        if (drama.feishu_downloaded || drama.feishu_exists) {
+          return false
+        }
+
+        const downloadData = getDownloadDataForDrama(downloadList, drama)
+        return downloadData?.task_status === 2
+      })
+
+  if (shouldDeferExistingCheck) {
+    serviceConsole.log(
+      `[自动提交-${channelId}] 所有表格组模式：保留逐表判断，暂不按默认表已存在状态前置过滤`
+    )
+  } else {
+    serviceConsole.log(
+      `[自动提交-${channelId}] 可新增待下载候选剧集数: ${candidateDramas.length}（已前置过滤飞书已存在/已下载/下载未完成）`
+    )
+  }
+
   // 按日期分组
   const todayDramas = []
   const tomorrowDramas = []
   const dayAfterTomorrowDramas = []
 
-  for (const drama of filteredDramas) {
+  for (const drama of candidateDramas) {
     if (!drama.publish_time) continue
 
     const publishTime = new Date(drama.publish_time)
@@ -1449,9 +1471,13 @@ async function fetchAutoSubmitDramas(channelId, submitRangeDays = 3, feishuTable
     }
   }
 
-  serviceConsole.log(`[自动提交-${channelId}] 今天的剧集数:`, todayDramas.length)
-  serviceConsole.log(`[自动提交-${channelId}] 明天的剧集数:`, tomorrowDramas.length)
-  serviceConsole.log(`[自动提交-${channelId}] 后天的剧集数:`, dayAfterTomorrowDramas.length)
+  const dateLogLabel = shouldDeferExistingCheck ? '剧集数' : '候选剧集数'
+  serviceConsole.log(`[自动提交-${channelId}] 今天的${dateLogLabel}:`, todayDramas.length)
+  serviceConsole.log(`[自动提交-${channelId}] 明天的${dateLogLabel}:`, tomorrowDramas.length)
+  serviceConsole.log(
+    `[自动提交-${channelId}] 后天的${dateLogLabel}:`,
+    dayAfterTomorrowDramas.length
+  )
 
   const newDramaSet = new Set()
 
