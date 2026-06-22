@@ -1982,15 +1982,7 @@ const dramaRankingColumns = computed<DataTableColumns<DramaRankingRow>>(() => [
             isHotDramaRankingRow(row) ? 'drama-ranking-title-cell--hot' : '',
           ],
         },
-        [
-          h('span', { class: 'drama-ranking-title-cell__name' }, row.dramaName),
-          isHotDramaRankingRow(row)
-            ? h('span', { class: 'drama-ranking-hot-corner' }, [
-                h('span', { class: 'drama-ranking-hot-corner__spark' }),
-                h('span', { class: 'drama-ranking-hot-corner__text' }, '爆'),
-              ])
-            : null,
-        ]
+        [h('span', { class: 'drama-ranking-title-cell__name' }, row.dramaName)]
       ),
   },
   {
@@ -4099,20 +4091,17 @@ onUnmounted(() => {
 }
 
 :deep(.drama-ranking-title-cell) {
-  position: relative;
   display: inline-flex;
   align-items: center;
-  width: 100%;
   max-width: 100%;
   min-width: 0;
-  padding-right: 2.45rem;
   box-sizing: border-box;
   overflow: visible;
 }
 
 :deep(.drama-ranking-title-cell__name) {
-  flex: 1 1 auto;
   min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4121,71 +4110,6 @@ onUnmounted(() => {
 :deep(.drama-ranking-title-cell--hot .drama-ranking-title-cell__name) {
   font-weight: 700;
   color: rgb(185 28 28);
-}
-
-:deep(.drama-ranking-hot-corner) {
-  position: absolute;
-  top: 0;
-  right: 0.08rem;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.95rem;
-  height: 1.35rem;
-  overflow: hidden;
-  clip-path: polygon(18% 0, 100% 0, 82% 100%, 0 100%);
-  background:
-    linear-gradient(
-      110deg,
-      transparent 0%,
-      transparent 38%,
-      rgba(255, 255, 255, 0.62) 48%,
-      transparent 58%
-    ),
-    radial-gradient(circle at 24% 18%, rgba(254, 240, 138, 0.92), transparent 26%),
-    linear-gradient(135deg, rgb(220 38 38) 0%, rgb(249 115 22) 58%, rgb(245 158 11) 100%);
-  background-position:
-    -2.4rem 0,
-    0 0,
-    0 0;
-  background-size:
-    2.4rem 100%,
-    100% 100%,
-    100% 100%;
-  color: #fff;
-  font-size: 0.68rem;
-  font-weight: 900;
-  line-height: 1;
-  letter-spacing: 0;
-  text-shadow: 0 1px 2px rgba(127, 29, 29, 0.55);
-  box-shadow:
-    0 8px 16px -10px rgba(220, 38, 38, 0.95),
-    0 0 0 1px rgba(255, 255, 255, 0.72) inset;
-  transform: rotate(9deg);
-  transform-origin: center;
-  pointer-events: none;
-  animation: drama-hot-corner-pop 1.7s ease-in-out infinite;
-}
-
-:deep(.drama-ranking-hot-corner__spark) {
-  position: absolute;
-  top: 0.16rem;
-  left: 0.34rem;
-  z-index: 1;
-  width: 0.28rem;
-  height: 0.28rem;
-  border-radius: 9999px;
-  background: rgb(254 240 138);
-  box-shadow:
-    0 0 0 3px rgba(254, 240, 138, 0.18),
-    0 0 10px rgba(254, 240, 138, 0.8);
-}
-
-:deep(.drama-ranking-hot-corner__text) {
-  position: relative;
-  z-index: 2;
-  transform: translateX(0.06rem);
 }
 
 :deep(.orders-table__hot-drama-row td:nth-child(2)) {
@@ -4207,25 +4131,6 @@ onUnmounted(() => {
   background:
     linear-gradient(90deg, rgba(255, 237, 213, 0.98), rgba(255, 255, 255, 0.98)),
     radial-gradient(circle at 0 50%, rgba(248, 113, 113, 0.26), transparent 34%) !important;
-}
-
-@keyframes drama-hot-corner-pop {
-  0%,
-  100% {
-    background-position:
-      -2.4rem 0,
-      0 0,
-      0 0;
-    transform: rotate(9deg) translateY(0) scale(1);
-  }
-
-  50% {
-    background-position:
-      2.4rem 0,
-      0 0,
-      0 0;
-    transform: rotate(9deg) translateY(-1px) scale(1.06);
-  }
 }
 
 @keyframes drama-hot-row-glow {
