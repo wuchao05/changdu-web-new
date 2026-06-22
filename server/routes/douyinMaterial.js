@@ -4,6 +4,7 @@ import { requireSession } from '../utils/studioSession.js'
 import {
   buildRuntimeUser,
   ensureUserChannelConfig,
+  normalizeMaterialRange,
   readUser,
   resolveRuntimeContext,
   writeUser,
@@ -50,10 +51,19 @@ function getResolvedMatches(user, channelId, feishuTableGroupId = '') {
           group => String(group?.id || '').trim() === normalizedGroupId
         )
       : null
-    return matchedGroup?.douyinMaterialMatches || []
+    return normalizeResolvedMatches(matchedGroup?.douyinMaterialMatches || [])
   }
 
-  return runtimeUser.douyinMaterialMatches || []
+  return normalizeResolvedMatches(runtimeUser.douyinMaterialMatches || [])
+}
+
+function normalizeResolvedMatches(matches = []) {
+  return Array.isArray(matches)
+    ? matches.map(match => ({
+        ...match,
+        materialRange: normalizeMaterialRange(match?.materialRange),
+      }))
+    : []
 }
 
 function getDefaultFeishuTableGroup(channelConfig) {
@@ -185,7 +195,7 @@ router.get('/config', async ctx => {
 router.post('/config', async ctx => {
   try {
     const rawDouyinAccountRefId = String(ctx.request.body?.douyinAccountRefId || '').trim()
-    const rawMaterialRange = String(ctx.request.body?.materialRange || '').trim()
+    const rawMaterialRange = normalizeMaterialRange(ctx.request.body?.materialRange)
 
     if (!rawDouyinAccountRefId || !rawMaterialRange) {
       ctx.status = 400
@@ -303,9 +313,9 @@ router.put('/config/:id', async ctx => {
     const nextDouyinAccountRefId = String(
       updates.douyinAccountRefId || matches[index].douyinAccountRefId || ''
     ).trim()
-    const nextMaterialRange = String(
+    const nextMaterialRange = normalizeMaterialRange(
       updates.materialRange || matches[index].materialRange || ''
-    ).trim()
+    )
 
     if (!nextDouyinAccountRefId || !nextMaterialRange) {
       ctx.status = 400

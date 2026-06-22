@@ -13,6 +13,7 @@ import {
   writeUser,
   normalizeDownloadCenterConfig,
   normalizeChannel,
+  normalizeMaterialRange,
   normalizeUser,
 } from '../utils/studioData.js'
 import {
@@ -437,7 +438,7 @@ function buildTaskSummary(tasks) {
 }
 
 function getMaterialRangeCount(materialRange = '') {
-  const normalizedRange = String(materialRange || '').trim()
+  const normalizedRange = normalizeMaterialRange(materialRange)
   if (!normalizedRange) {
     return 0
   }
@@ -463,7 +464,7 @@ function buildDouyinMaterialSummary(user = {}, channelId = '') {
             ? group.douyinMaterialMatches
                 .map(match => ({
                   douyinAccount: String(match?.douyinAccount || '').trim(),
-                  materialRange: String(match?.materialRange || '').trim(),
+                  materialRange: normalizeMaterialRange(match?.materialRange),
                   materialCount: getMaterialRangeCount(match?.materialRange),
                 }))
                 .filter(item => item.douyinAccount && item.materialRange)
@@ -481,7 +482,7 @@ function buildDouyinMaterialSummary(user = {}, channelId = '') {
     ? runtimeUser.douyinMaterialMatches
         .map(match => ({
           douyinAccount: String(match?.douyinAccount || '').trim(),
-          materialRange: String(match?.materialRange || '').trim(),
+          materialRange: normalizeMaterialRange(match?.materialRange),
           materialCount: getMaterialRangeCount(match?.materialRange),
         }))
         .filter(item => item.douyinAccount && item.materialRange)

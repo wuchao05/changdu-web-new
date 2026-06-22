@@ -15,13 +15,55 @@ export interface DouyinMaterialMatch {
 }
 
 const CACHE_KEY = 'douyin_material_matches_cache'
-const CACHE_VERSION = 2
+const CACHE_VERSION = 3
 const CACHE_TTL = 5 * 60 * 1000 // 5分钟缓存
 
 interface CacheData {
   version: number
   timestamp: number
   matches: DouyinMaterialMatch[]
+}
+
+function formatMaterialRangeNumber(value: number) {
+  return String(value).padStart(2, '0')
+}
+
+function normalizeMaterialRange(materialRange?: string) {
+  const normalizedRange = String(materialRange || '').trim()
+  if (!normalizedRange) {
+    return ''
+  }
+
+  const match = normalizedRange.match(/^(\d+)(?:-(\d+))?$/)
+  if (!match) {
+    return normalizedRange
+  }
+
+  const start = Number(match[1])
+  const end = match[2] ? Number(match[2]) : start
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start <= 0 || end < start) {
+    return normalizedRange
+  }
+
+  const startText = formatMaterialRangeNumber(start)
+  const endText = formatMaterialRangeNumber(end)
+  return match[2] ? `${startText}-${endText}` : startText
+}
+
+function normalizeMatches(list: DouyinMaterialMatch[]) {
+  return Array.isArray(list)
+    ? list.map(match => ({
+        ...match,
+        materialRange: normalizeMaterialRange(match.materialRange),
+      }))
+    : []
+}
+
+function normalizeMatch(match: DouyinMaterialMatch) {
+  return {
+    ...match,
+    materialRange: normalizeMaterialRange(match.materialRange),
+  }
 }
 
 function isRequestCanceled(error: unknown) {
@@ -70,7 +112,7 @@ export const useDouyinMaterialStore = defineStore('douyinMaterial', () => {
       }
 
       // 使用缓存
-      matches.value = cacheData.matches
+      matches.value = normalizeMatches(cacheData.matches)
       console.log('💾 已从缓存加载抖音号素材匹配配置')
       return true
     } catch (error) {
@@ -115,7 +157,7 @@ export const useDouyinMaterialStore = defineStore('douyinMaterial', () => {
       const list = await douyinMaterialApi.getDouyinMaterialConfig({ signal, feishuTableGroupId })
       // 确保返回的是数组
       if (Array.isArray(list)) {
-        matches.value = list
+        matches.value = normalizeMatches(list)
         // 保存到缓存
         saveToCache(feishuTableGroupId)
       } else {
@@ -154,12 +196,13 @@ export const useDouyinMaterialStore = defineStore('douyinMaterial', () => {
     try {
       const newMatch = await douyinMaterialApi.addDouyinMaterialMatch({
         douyinAccountRefId,
-        materialRange,
+        materialRange: normalizeMaterialRange(materialRange),
         feishuTableGroupId,
       })
-      matches.value.push(newMatch)
+      const normalizedMatch = normalizeMatch(newMatch)
+      matches.value.push(normalizedMatch)
       saveToCache(feishuTableGroupId)
-      return newMatch
+      return normalizedMatch
     } catch (error) {
       console.error('添加抖音号素材匹配规则失败:', error)
       throw error
@@ -178,15 +221,15 @@ export const useDouyinMaterialStore = defineStore('douyinMaterial', () => {
     try {
       const updatedMatch = await douyinMaterialApi.updateDouyinMaterialMatch(id, {
         douyinAccountRefId,
-        materialRange,
+        materialRange: normalizeMaterialRange(materialRange),
         feishuTableGroupId,
       })
       const index = matches.value.findIndex(m => m.id === id)
       if (index !== -1) {
-        matches.value[index] = updatedMatch
+        matches.value[index] = normalizeMatch(updatedMatch)
         saveToCache(feishuTableGroupId)
       }
-      return updatedMatch
+      return normalizeMatch(updatedMatch)
     } catch (error) {
       console.error('更新抖音号素材匹配规则失败:', error)
       throw error
