@@ -1479,7 +1479,7 @@ async function fetchAutoSubmitDramas(channelId, submitRangeDays = 3, feishuTable
     }
   }
 
-  const dateLogLabel = shouldDeferExistingCheck ? '剧集数' : '候选剧集数'
+  const dateLogLabel = '候选剧集数'
   serviceConsole.log(`[自动提交-${channelId}] 今天的${dateLogLabel}:`, todayDramas.length)
   serviceConsole.log(`[自动提交-${channelId}] 明天的${dateLogLabel}:`, tomorrowDramas.length)
   serviceConsole.log(
