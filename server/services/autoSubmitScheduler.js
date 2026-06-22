@@ -11,6 +11,7 @@ import { FEISHU_CONFIG } from '../config/feishu.js'
 import { AUTO_SUBMIT_CONFIG } from '../config/autoSubmit.js'
 import { buildChangduGetHeaders } from '../utils/changduSign.js'
 import { CHANGDU_BASE_URL, CHANGDU_DISTRIBUTOR_ID, CHANGDU_SECRET_KEY } from '../config/changdu.js'
+import { requestChangduInternalApi } from '../utils/changduInternalApi.js'
 import {
   getChannelLabel,
   normalizeChannelRuntime,
@@ -93,6 +94,8 @@ const serviceConsole = createScopedConsole(
 const ALL_FEISHU_TABLE_GROUP_ID = '__all__'
 const AUTO_RED_FLAG_START_HOUR = 0
 const AUTO_RED_FLAG_END_HOUR = 1
+const FEISHU_DRAMA_STATUS_CHUNK_SIZE = 40
+const CHANGDU_INTERNAL_NEW_DRAMA_PATH = '/novelsale/distributor/content/series/list/v1/'
 
 /**
  * 将 ISO 时间字符串转换为北京时间格式
@@ -473,6 +476,42 @@ function getOpenApiChannelConfig(channelId) {
   }
 }
 
+function buildSchedulerInternalRequestContext(channelId) {
+  const entry = ensureSchedulerEntry(channelId)
+  const runtime = getSchedulerRuntime(channelId)
+
+  return {
+    state: {
+      authContext: {
+        channel: {
+          id: runtime.channelId,
+          name: runtime.channelName,
+          changdu: {
+            cookie: runtime.changdu.cookie,
+            distributorId: runtime.changdu.distributorId,
+            adUserId: runtime.changdu.adUserId,
+            rootAdUserId: runtime.changdu.rootAdUserId,
+            appId: runtime.changdu.appId,
+            appType: runtime.changdu.appType,
+            agwJsConv: runtime.changdu.agwJsConv,
+          },
+          juliang: {
+            cookie: runtime.juliang.cookie,
+            buildConfig: runtime.buildConfig,
+          },
+        },
+        runtimeUser: entry.state.runtimeUserConfig,
+      },
+    },
+    get(headerName) {
+      if (String(headerName || '').toLowerCase() === 'x-studio-channel-id') {
+        return runtime.channelId
+      }
+      return ''
+    },
+  }
+}
+
 function getSchedulerBrandName(channelId) {
   return (
     String(ensureSchedulerEntry(channelId).state.runtimeUserConfig?.brandName || '小红').trim() ||
@@ -775,6 +814,220 @@ async function searchDramaList(channelId, dramaName, tableGroupId = '') {
   )
 
   return safeJsonParse(response, '搜索剧集清单')
+}
+
+function normalizeDramaName(name) {
+  return String(name || '').trim()
+}
+
+function getFeishuTextFieldValue(field) {
+  if (typeof field === 'string') {
+    return field.trim()
+  }
+
+  if (Array.isArray(field)) {
+    return field
+      .map(item => String(item?.text || ''))
+      .join('')
+      .trim()
+  }
+
+  if (field?.value) {
+    if (typeof field.value === 'string') {
+      return field.value.trim()
+    }
+
+    if (Array.isArray(field.value)) {
+      return field.value
+        .map(item => String(item?.text || ''))
+        .join('')
+        .trim()
+    }
+  }
+
+  return ''
+}
+
+function isFeishuDownloadedField(field) {
+  return getFeishuTextFieldValue(field) === '是'
+}
+
+function normalizeFeishuStatusDramas(dramas = []) {
+  const seenBookIds = new Set()
+
+  return (Array.isArray(dramas) ? dramas : [])
+    .map(item => ({
+      book_id: String(item?.book_id || '').trim(),
+      series_name: normalizeDramaName(item?.series_name || item?.book_name),
+    }))
+    .filter(item => item.book_id && item.series_name)
+    .filter(item => {
+      if (seenBookIds.has(item.book_id)) {
+        return false
+      }
+      seenBookIds.add(item.book_id)
+      return true
+    })
+}
+
+async function searchFeishuDramaListByNames(accessToken, tableId, dramaNames) {
+  const names = dramaNames.map(normalizeDramaName).filter(Boolean)
+  if (names.length === 0) {
+    return []
+  }
+
+  let pageToken = ''
+  const items = []
+
+  do {
+    const searchUrl = new URL(
+      `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.app_token}/tables/${tableId}/records/search`
+    )
+    if (pageToken) {
+      searchUrl.searchParams.set('page_token', pageToken)
+    }
+
+    const response = await fetch(searchUrl.toString(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        field_names: ['剧名', '是否已下载'],
+        filter: {
+          conjunction: 'or',
+          conditions: names.map(name => ({
+            field_name: '剧名',
+            operator: 'contains',
+            value: [name],
+          })),
+        },
+        page_size: 500,
+      }),
+    })
+
+    const result = await safeJsonParse(response, '批量查询飞书剧集清单')
+    if (result.code !== 0) {
+      throw new Error(result.msg || result.message || '批量查询飞书剧集清单失败')
+    }
+
+    items.push(...(Array.isArray(result.data?.items) ? result.data.items : []))
+    pageToken = String(result.data?.page_token || '')
+  } while (pageToken)
+
+  return items
+}
+
+async function queryFeishuDramaStatusByNames(tableId, dramas) {
+  const normalizedDramas = normalizeFeishuStatusDramas(dramas)
+  if (!tableId || normalizedDramas.length === 0) {
+    return []
+  }
+
+  const accessToken = await getFeishuAccessToken()
+  const statusByName = new Map()
+  const uniqueNames = [...new Set(normalizedDramas.map(item => item.series_name))]
+
+  for (let index = 0; index < uniqueNames.length; index += FEISHU_DRAMA_STATUS_CHUNK_SIZE) {
+    const chunkNames = uniqueNames.slice(index, index + FEISHU_DRAMA_STATUS_CHUNK_SIZE)
+    const items = await searchFeishuDramaListByNames(accessToken, tableId, chunkNames)
+
+    items.forEach(item => {
+      const dramaName = normalizeDramaName(getFeishuTextFieldValue(item.fields?.['剧名']))
+      if (!dramaName || !chunkNames.includes(dramaName)) {
+        return
+      }
+
+      const current = statusByName.get(dramaName) || {
+        feishu_exists: false,
+        feishu_downloaded: false,
+      }
+
+      statusByName.set(dramaName, {
+        feishu_exists: true,
+        feishu_downloaded:
+          current.feishu_downloaded || isFeishuDownloadedField(item.fields?.['是否已下载']),
+      })
+    })
+  }
+
+  return normalizedDramas.map(drama => {
+    const status = statusByName.get(drama.series_name)
+
+    return {
+      book_id: drama.book_id,
+      series_name: drama.series_name,
+      feishu_exists: status?.feishu_exists === true,
+      feishu_downloaded: status?.feishu_downloaded === true,
+    }
+  })
+}
+
+async function hydrateAutoSubmitFeishuStatus(channelId, dramas, feishuTableGroupId = '') {
+  const normalizedDramas = normalizeFeishuStatusDramas(dramas)
+  if (normalizedDramas.length === 0) {
+    return dramas
+  }
+
+  const groups = isAllFeishuTableGroupTarget(feishuTableGroupId)
+    ? getSchedulerFeishuTableGroups(channelId)
+    : feishuTableGroupId
+      ? [getSchedulerFeishuTableGroupById(channelId, feishuTableGroupId)].filter(Boolean)
+      : getSchedulerFeishuTableGroups(channelId)
+
+  if (groups.length === 0) {
+    return dramas
+  }
+
+  const statusResults = await Promise.all(
+    groups.map(async group => ({
+      group,
+      statuses: await queryFeishuDramaStatusByNames(group.dramaListTableId, normalizedDramas),
+    }))
+  )
+
+  const statusMapByGroup = statusResults.map(({ statuses }) => {
+    const map = new Map()
+    statuses.forEach(status => {
+      map.set(status.book_id, status)
+    })
+    return map
+  })
+
+  const hydratedDramas = dramas.map(drama => {
+    const bookId = String(drama?.book_id || '').trim()
+    const statuses = statusMapByGroup
+      .map(map => map.get(bookId))
+      .filter(status => status?.series_name === normalizeDramaName(drama?.series_name))
+
+    if (statuses.length === 0) {
+      return {
+        ...drama,
+        feishu_exists: false,
+        feishu_downloaded: false,
+      }
+    }
+
+    const existsFlags = statuses.map(status => status.feishu_exists === true)
+    const downloadedFlags = statuses.map(status => status.feishu_downloaded === true)
+    const shouldFilterWhenExists = isAllFeishuTableGroupTarget(feishuTableGroupId)
+      ? existsFlags.length === groups.length && existsFlags.every(Boolean)
+      : existsFlags.some(Boolean)
+
+    return {
+      ...drama,
+      feishu_exists: shouldFilterWhenExists,
+      feishu_downloaded: downloadedFlags.some(Boolean),
+    }
+  })
+
+  const skippedCount = hydratedDramas.filter(drama => drama.feishu_exists).length
+  serviceConsole.log(
+    `[自动提交-${channelId}] 飞书状态前置过滤: 已存在 ${skippedCount} 部，剩余 ${hydratedDramas.length - skippedCount} 部`
+  )
+
+  return hydratedDramas
 }
 async function createDramaRecord(
   channelId,
@@ -1175,14 +1428,62 @@ async function updateAccountUsedStatus(channelId, recordId, tableGroupId = '') {
  */
 async function getNewDramaList(params = {}) {
   const { pageIndex = 0, pageSize = 100, channelId, dramaListTableId } = params
+  const requestParams = {
+    permission_statuses: AUTO_SUBMIT_CONFIG.filter.permissionStatuses || '3,4',
+    aweme_user_new_version: 'false',
+    page_index: pageIndex,
+    page_size: pageSize,
+    sort_type: 1,
+    sort_field: 3,
+  }
 
+  if (dramaListTableId) {
+    requestParams.drama_list_table_id = dramaListTableId
+  }
+
+  try {
+    const directResult = await requestChangduInternalApi({
+      method: 'GET',
+      pathname: CHANGDU_INTERNAL_NEW_DRAMA_PATH,
+      query: requestParams,
+      ctx: buildSchedulerInternalRequestContext(channelId),
+    })
+    const apiResult = directResult.data
+
+    if (apiResult.code === 0) {
+      return {
+        code: 0,
+        message: apiResult.message || 'success',
+        data: {
+          data: Array.isArray(apiResult.data?.data) ? apiResult.data.data : [],
+          total: apiResult.data?.total || 0,
+        },
+      }
+    }
+
+    serviceConsole.warn(
+      `[自动提交-${channelId}] 内部新剧列表返回非成功，回退开放平台: ${apiResult.code} ${apiResult.message || ''}`
+    )
+  } catch (error) {
+    serviceConsole.warn(
+      `[自动提交-${channelId}] 内部新剧列表请求失败，回退开放平台: ${error.message}`
+    )
+  }
+
+  return getNewDramaListFromOpenApi({ pageIndex, pageSize, channelId, dramaListTableId })
+}
+
+async function getNewDramaListFromOpenApi(params = {}) {
+  const { pageIndex = 0, pageSize = 100, channelId, dramaListTableId } = params
   const { distributorId, secretKey } = getOpenApiChannelConfig(channelId)
 
-  // 构建请求参数（与手动刷新一致）
+  // 开放平台仅作为内部接口失败时的兜底。
   const requestParams = {
     distributor_id: distributorId,
     page_index: pageIndex,
     page_size: pageSize,
+    sort_type: 1,
+    sort_field: 3,
   }
 
   // 添加飞书清单表 ID（用于判断剧集是否已存在）
@@ -1452,12 +1753,18 @@ async function fetchAutoSubmitDramas(channelId, submitRangeDays = 3, feishuTable
 
   serviceConsole.log(`[自动提交-${channelId}] 过滤后的剧集总数:`, filteredDramas.length)
 
-  const candidateDramas = filteredDramas.filter(drama =>
+  const dramasWithFeishuStatus = await hydrateAutoSubmitFeishuStatus(
+    channelId,
+    filteredDramas,
+    feishuTableGroupId
+  )
+
+  const candidateDramas = dramasWithFeishuStatus.filter(drama =>
     isAutoSubmitCandidateDrama(drama, downloadList)
   )
 
   serviceConsole.log(
-    `[自动提交-${channelId}] 可新增待下载候选剧集数: ${candidateDramas.length}（与界面新增待下载 + 下载完成保持一致，飞书实时查重留到写入阶段）`
+    `[自动提交-${channelId}] 可新增待下载候选剧集数: ${candidateDramas.length}（已按目标飞书清单和下载完成状态前置过滤）`
   )
 
   // 按日期分组
@@ -1534,24 +1841,24 @@ function getDownloadDataForDrama(downloadList, drama) {
       ? drama.trim()
       : String(drama.series_name || drama.book_name || '').trim()
 
+  if (dramaName) {
+    const matchedByName = downloadList.filter(
+      item => String(item.book_name || '').trim() === dramaName
+    )
+    const bestByName = selectBestDownloadTask(matchedByName)
+    if (bestByName) {
+      return bestByName
+    }
+  }
+
   if (dramaBookId) {
     const matchedByBookId = downloadList.filter(
       item => String(item.book_id || '').trim() === dramaBookId
     )
-    const bestByBookId = selectBestDownloadTask(matchedByBookId)
-    if (bestByBookId) {
-      return bestByBookId
-    }
+    return selectBestDownloadTask(matchedByBookId)
   }
 
-  if (!dramaName) {
-    return null
-  }
-
-  const matchedByName = downloadList.filter(
-    item => String(item.book_name || '').trim() === dramaName
-  )
-  return selectBestDownloadTask(matchedByName)
+  return null
 }
 
 /**
