@@ -2227,11 +2227,27 @@ async function startAutoSubmit() {
 
     if (result.code === 0) {
       showAutoSubmitModal.value = false
-      message.success(runOnce ? '已完成本次自动提交' : '自动提交已启动（服务端运行）')
-      if (result.data) {
-        autoSubmitStatus.value = result.data
+      const startedStatus = {
+        ...(result.data || currentSchedulerStatus.value),
+        enabled: true,
+        running: true,
+        intervalMinutes: runOnce ? null : intervalMinutes,
+        onlyRedFlag: autoSubmitOnlyRedFlag.value,
+        runOnce,
+        submitRangeDays: autoSubmitRangeDays.value,
+        feishuTableGroupId: getSelectedFeishuTableGroupId(),
+        nextRunTime: result.data?.nextRunTime || null,
+        progress: result.data?.progress?.currentDate
+          ? result.data.progress
+          : { current: 0, total: 0, currentDate: '筛选候选', currentDrama: '' },
       }
-      if (result.data?.enabled) {
+      if (result.data) {
+        autoSubmitStatus.value = startedStatus
+      } else {
+        autoSubmitStatus.value = startedStatus
+      }
+      message.success(runOnce ? '已开始执行本次自动提交' : '自动提交已启动（服务端运行）')
+      if (currentSchedulerStatus.value.enabled) {
         startStatusPolling()
       } else {
         stopStatusPolling()

@@ -2045,10 +2045,16 @@ export async function startScheduler(channelId, options = {}, runtimeContext = n
 
       await saveState(channelId)
 
-      // 立即执行一次
-      await runAutoSubmitCycle(channelId)
+      // 启动请求不等待整轮自动提交完成，避免前端弹窗一直停留在“启动中”。
+      setTimeout(() => {
+        runWithAutoSubmitLogContext(buildAutoSubmitLogContext(channelId), () =>
+          runAutoSubmitCycle(channelId)
+        ).catch(error => {
+          serviceConsole.error(`[自动提交-${channelId}] 后台执行失败:`, error.message)
+        })
+      }, 0)
 
-      return { success: true, message: runOnce ? '单次执行已完成' : '调度器已启动' }
+      return { success: true, message: runOnce ? '单次执行已启动' : '调度器已启动' }
     }
   )
 }
