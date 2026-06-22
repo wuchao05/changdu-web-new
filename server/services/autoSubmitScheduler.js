@@ -558,6 +558,9 @@ function getDateRanges(submitRangeDays = 3) {
     tomorrow: tomorrowStart,
     dayAfterTomorrow: dayAfterTomorrowStart,
     dayAfterTomorrowEnd: dayAfterTomorrowEnd,
+    todayText: formatDate(todayStart),
+    tomorrowText: formatDate(tomorrowStart),
+    dayAfterTomorrowText: formatDate(dayAfterTomorrowStart),
     submitRangeDays: normalizedRangeDays,
     // 用于API请求的时间戳（秒）
     startTime: Math.floor((todayStart.getTime() - 30 * 24 * 60 * 60 * 1000) / 1000),
@@ -566,24 +569,39 @@ function getDateRanges(submitRangeDays = 3) {
 }
 
 /**
- * 判断两个日期是否是同一天（北京时间）
- */
-function isSameDay(date1, date2) {
-  const d1 = new Date(date1)
-  const d2 = new Date(date2)
-  return (
-    d1.getUTCFullYear() === d2.getUTCFullYear() &&
-    d1.getUTCMonth() === d2.getUTCMonth() &&
-    d1.getUTCDate() === d2.getUTCDate()
-  )
-}
-
-/**
  * 格式化日期为可读字符串
  */
 function formatDate(date) {
   const d = new Date(date)
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
+}
+
+function formatBeijingDate(date) {
+  const d = new Date(date)
+  if (Number.isNaN(d.getTime())) return ''
+
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(d)
+  const partMap = Object.fromEntries(parts.map(part => [part.type, part.value]))
+  return `${partMap.year}-${partMap.month}-${partMap.day}`
+}
+
+function getPublishDateText(publishTime) {
+  if (!publishTime) return ''
+
+  const publishText = String(publishTime).trim()
+  const plainDateMatch = publishText.match(/^(\d{4}-\d{2}-\d{2})(?:[ T]|$)/)
+  const hasExplicitTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(publishText)
+
+  if (plainDateMatch && !hasExplicitTimezone) {
+    return plainDateMatch[1]
+  }
+
+  return formatBeijingDate(publishText)
 }
 
 // ============== 状态持久化 ==============
@@ -1693,9 +1711,9 @@ async function fetchAutoSubmitDramas(channelId, submitRangeDays = 3, feishuTable
   const dateRanges = getDateRanges(submitRangeDays)
 
   serviceConsole.log(`[自动提交-${channelId}] ========== 获取剧集 ==========`)
-  serviceConsole.log(`[自动提交-${channelId}] 今天:`, formatDate(dateRanges.today))
-  serviceConsole.log(`[自动提交-${channelId}] 明天:`, formatDate(dateRanges.tomorrow))
-  serviceConsole.log(`[自动提交-${channelId}] 后天:`, formatDate(dateRanges.dayAfterTomorrow))
+  serviceConsole.log(`[自动提交-${channelId}] 今天:`, dateRanges.todayText)
+  serviceConsole.log(`[自动提交-${channelId}] 明天:`, dateRanges.tomorrowText)
+  serviceConsole.log(`[自动提交-${channelId}] 后天:`, dateRanges.dayAfterTomorrowText)
 
   const dramaListTableId = getSchedulerFeishuTableGroupProfile(
     channelId,
@@ -1771,18 +1789,25 @@ async function fetchAutoSubmitDramas(channelId, submitRangeDays = 3, feishuTable
   const todayDramas = []
   const tomorrowDramas = []
   const dayAfterTomorrowDramas = []
+  const unmatchedDateDramas = []
 
   for (const drama of candidateDramas) {
     if (!drama.publish_time) continue
 
-    const publishTime = new Date(drama.publish_time)
+    const publishDateText = getPublishDateText(drama.publish_time)
 
-    if (isSameDay(publishTime, dateRanges.today)) {
+    if (publishDateText === dateRanges.todayText) {
       todayDramas.push(drama)
-    } else if (isSameDay(publishTime, dateRanges.tomorrow)) {
+    } else if (publishDateText === dateRanges.tomorrowText) {
       tomorrowDramas.push(drama)
-    } else if (isSameDay(publishTime, dateRanges.dayAfterTomorrow)) {
+    } else if (publishDateText === dateRanges.dayAfterTomorrowText) {
       dayAfterTomorrowDramas.push(drama)
+    } else {
+      unmatchedDateDramas.push({
+        name: drama.series_name || drama.book_name || drama.book_id || '',
+        publishTime: drama.publish_time,
+        publishDate: publishDateText,
+      })
     }
   }
 
@@ -1793,6 +1818,12 @@ async function fetchAutoSubmitDramas(channelId, submitRangeDays = 3, feishuTable
     `[自动提交-${channelId}] 后天的${dateLogLabel}:`,
     dayAfterTomorrowDramas.length
   )
+  if (unmatchedDateDramas.length > 0) {
+    serviceConsole.log(
+      `[自动提交-${channelId}] 未归入提交日期范围的候选剧集数: ${unmatchedDateDramas.length}`,
+      unmatchedDateDramas.slice(0, 5)
+    )
+  }
 
   const newDramaSet = new Set()
 
