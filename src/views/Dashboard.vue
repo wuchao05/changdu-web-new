@@ -4124,24 +4124,13 @@ onUnmounted(() => {
   background:
     linear-gradient(90deg, rgba(255, 247, 237, 0.95), rgba(255, 255, 255, 0.98)),
     radial-gradient(circle at 0 50%, rgba(248, 113, 113, 0.2), transparent 34%) !important;
-  animation: drama-hot-row-glow 2.4s ease-in-out infinite;
+  box-shadow: none !important;
 }
 
 :deep(.orders-table__hot-drama-row:hover td) {
   background:
     linear-gradient(90deg, rgba(255, 237, 213, 0.98), rgba(255, 255, 255, 0.98)),
     radial-gradient(circle at 0 50%, rgba(248, 113, 113, 0.26), transparent 34%) !important;
-}
-
-@keyframes drama-hot-row-glow {
-  0%,
-  100% {
-    box-shadow: inset 3px 0 0 rgba(239, 68, 68, 0.48);
-  }
-
-  50% {
-    box-shadow: inset 3px 0 0 rgba(245, 158, 11, 0.72);
-  }
 }
 
 .order-user-tab.active .order-user-tab__label,
