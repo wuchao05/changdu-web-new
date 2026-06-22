@@ -108,6 +108,10 @@ class FeishuApiService {
     return apiConfigStore.config.accountTableId || ''
   }
 
+  private resolveAccountTableId(accountTableId?: string): string {
+    return String(accountTableId || this.getAccountTableId() || '').trim()
+  }
+
   private getFeishuTableGroups(): RuntimeFeishuTableGroup[] {
     const apiConfigStore = useApiConfigStore()
     const groups = Array.isArray(apiConfigStore.config.feishuTableGroups)
@@ -148,11 +152,16 @@ class FeishuApiService {
   }
 
   private async queryChannelAccounts(accountTableId?: string): Promise<any[]> {
+    const tableId = this.resolveAccountTableId(accountTableId)
+    if (!tableId) {
+      throw new Error('未配置账户池表 ID')
+    }
+
     const response = await fetch(`${ENV.BASE_URL}/feishu/bitable/channel-accounts`, {
       method: 'POST',
       headers: FEISHU_API_CONFIG.headers,
       body: JSON.stringify({
-        accountTableId: accountTableId || this.getAccountTableId(),
+        accountTableId: tableId,
       }),
     })
 
@@ -477,11 +486,16 @@ class FeishuApiService {
    * @returns 重置结果
    */
   async resetAllChannelAccountsUnused(accountTableId?: string): Promise<any> {
+    const tableId = this.resolveAccountTableId(accountTableId)
+    if (!tableId) {
+      throw new Error('未配置账户池表 ID')
+    }
+
     const response = await fetch(`${ENV.BASE_URL}/feishu/bitable/channel-accounts/reset-unused`, {
       method: 'PUT',
       headers: FEISHU_API_CONFIG.headers,
       body: JSON.stringify({
-        accountTableId: accountTableId || this.getAccountTableId(),
+        accountTableId: tableId,
       }),
     })
 
@@ -600,6 +614,11 @@ class FeishuApiService {
    * @returns 更新结果
    */
   async updateChannelAccountUsedStatus(recordId: string, accountTableId?: string): Promise<any> {
+    const tableId = this.resolveAccountTableId(accountTableId)
+    if (!tableId) {
+      throw new Error('未配置账户池表 ID')
+    }
+
     // 通过后端代理调用飞书API，避免CORS问题
     const response = await fetch(
       `${ENV.BASE_URL}/feishu/bitable/channel-accounts/${recordId}/used`,
@@ -607,7 +626,7 @@ class FeishuApiService {
         method: 'PUT',
         headers: FEISHU_API_CONFIG.headers,
         body: JSON.stringify({
-          accountTableId: accountTableId || this.getAccountTableId(),
+          accountTableId: tableId,
         }),
       }
     )
@@ -631,6 +650,11 @@ class FeishuApiService {
    * @returns 更新结果
    */
   async updateChannelAccountUnusedStatus(recordId: string, accountTableId?: string): Promise<any> {
+    const tableId = this.resolveAccountTableId(accountTableId)
+    if (!tableId) {
+      throw new Error('未配置账户池表 ID')
+    }
+
     // 通过后端代理调用飞书API，避免CORS问题
     const response = await fetch(
       `${ENV.BASE_URL}/feishu/bitable/channel-accounts/${recordId}/unused`,
@@ -638,7 +662,7 @@ class FeishuApiService {
         method: 'PUT',
         headers: FEISHU_API_CONFIG.headers,
         body: JSON.stringify({
-          accountTableId: accountTableId || this.getAccountTableId(),
+          accountTableId: tableId,
         }),
       }
     )
@@ -1348,7 +1372,7 @@ class FeishuApiService {
     accounts: Array<{ account: string; isUsed: string }>,
     accountTableId?: string
   ): Promise<FeishuApiResponse<any>> {
-    const tableId = accountTableId || this.getAccountTableId()
+    const tableId = this.resolveAccountTableId(accountTableId)
 
     if (!tableId) {
       throw new Error('当前渠道未配置账户表 table_id')

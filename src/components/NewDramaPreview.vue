@@ -2397,7 +2397,7 @@ interface AddDownloadToGroupResult {
   success: boolean
   groupName: string
   account?: string
-  reason?: 'already_exists' | 'no_account' | 'error'
+  reason?: 'already_exists' | 'missing_account_table' | 'no_account' | 'error'
   error?: string
 }
 
@@ -2443,7 +2443,17 @@ async function addDownloadToFeishuTableGroup(
       return { success: false, groupName, reason: 'already_exists' }
     }
 
-    const accountTableId = getAccountTableId(group)
+    const accountTableId = getAccountTableId(group).trim()
+    if (!accountTableId) {
+      console.warn(`表格组缺少账户池表 ID，跳过: ${groupName}`)
+      return {
+        success: false,
+        groupName,
+        reason: 'missing_account_table',
+        error: `表格组「${groupName}」未配置账户池表 ID`,
+      }
+    }
+
     const availableAccount = await feishuApi.getAvailableChannelAccount(
       accountTableId,
       accountRecycleEnabled.value
@@ -2574,6 +2584,8 @@ async function handleAddDownload(
 
     if (results.every(result => result.reason === 'already_exists')) {
       showSuccessToast(`剧集"${dramaName}"已在目标飞书剧集清单中，无需重复同步`)
+    } else if (results.every(result => result.reason === 'missing_account_table')) {
+      showSuccessToast('目标表格组未配置账户池表 ID，请联系管理员配置')
     } else if (results.every(result => result.reason === 'no_account')) {
       showSuccessToast('无可用账户，请联系管理员')
     } else {

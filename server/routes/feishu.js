@@ -24,6 +24,20 @@ const FEISHU_CONFIG = {
   },
 }
 
+function getRequiredAccountTableId(ctx) {
+  const accountTableId = String(ctx.request.body?.accountTableId || '').trim()
+  if (!accountTableId) {
+    ctx.status = 400
+    ctx.body = {
+      code: 400,
+      msg: '缺少账户池表 ID，请在当前渠道或表格组中配置账户池表 ID',
+    }
+    return ''
+  }
+
+  return accountTableId
+}
+
 // 飞书获取 tenant_access_token 代理API
 router.post('/token', async ctx => {
   try {
@@ -472,9 +486,9 @@ router.post('/bitable/records', async ctx => {
 // 飞书账户池查询代理 API（支持动态账户表）
 router.post('/bitable/channel-accounts', async ctx => {
   try {
-    // 从请求体获取账户表 ID，默认使用超琦账户表
-    const { accountTableId } = ctx.request.body || {}
-    const targetTableId = accountTableId || FEISHU_CONFIG.table_ids.account
+    const targetTableId = getRequiredAccountTableId(ctx)
+    if (!targetTableId) return
+
     console.log(
       '[爆剧爆剪-新增待下载] 查询飞书账户池:',
       JSON.stringify(
@@ -684,9 +698,9 @@ router.put('/bitable/records/:recordId/account', async ctx => {
 router.put('/bitable/channel-accounts/:recordId/used', async ctx => {
   try {
     const { recordId } = ctx.params
-    // 从请求体获取账户表 ID，默认使用超琦账户表
-    const { accountTableId } = ctx.request.body || {}
-    const targetTableId = accountTableId || FEISHU_CONFIG.table_ids.account
+    const targetTableId = getRequiredAccountTableId(ctx)
+    if (!targetTableId) return
+
     console.log(
       '[爆剧爆剪-新增待下载] 更新飞书账户已用状态:',
       JSON.stringify(
@@ -800,9 +814,8 @@ router.put('/bitable/channel-accounts/:recordId/used', async ctx => {
 router.put('/bitable/channel-accounts/:recordId/unused', async ctx => {
   try {
     const { recordId } = ctx.params
-    // 从请求体获取账户表 ID，默认使用超琦账户表
-    const { accountTableId } = ctx.request.body || {}
-    const targetTableId = accountTableId || FEISHU_CONFIG.table_ids.account
+    const targetTableId = getRequiredAccountTableId(ctx)
+    if (!targetTableId) return
 
     if (!recordId) {
       ctx.status = 400
@@ -890,8 +903,8 @@ router.put('/bitable/channel-accounts/:recordId/unused', async ctx => {
 // 飞书批量重置账户是否已用状态为"否"代理 API（支持动态账户表）
 router.put('/bitable/channel-accounts/reset-unused', async ctx => {
   try {
-    const { accountTableId } = ctx.request.body || {}
-    const targetTableId = accountTableId || FEISHU_CONFIG.table_ids.account
+    const targetTableId = getRequiredAccountTableId(ctx)
+    if (!targetTableId) return
 
     console.log(
       '[爆剧爆剪-新增待下载] 批量重置飞书账户未使用状态:',
