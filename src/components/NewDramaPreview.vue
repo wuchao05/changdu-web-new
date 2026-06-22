@@ -179,24 +179,23 @@
               <div class="auto-download-title">自动提交下载</div>
               <div class="auto-download-desc">
                 <span v-if="currentSchedulerStatus.running">
-                  正在处理【{{ currentSchedulerStatus.progress.currentDate }}】第
-                  {{ currentSchedulerStatus.progress.current }}/{{
-                    currentSchedulerStatus.progress.total
-                  }}
-                  部：{{ currentSchedulerStatus.progress.currentDrama }}
+                  <template v-if="currentSchedulerStatus.progress.total > 0">
+                    正在处理【{{ currentSchedulerStatus.progress.currentDate }}】第
+                    {{ currentSchedulerStatus.progress.current }}/{{
+                      currentSchedulerStatus.progress.total
+                    }}
+                    部：{{ currentSchedulerStatus.progress.currentDrama }}
+                  </template>
+                  <template v-else>
+                    正在{{ currentSchedulerStatus.progress.currentDate || '准备' }}...
+                  </template>
                 </span>
                 <span v-else> 下次运行倒计时：{{ formatCountdown(autoSubmitCountdown) }} </span>
               </div>
             </div>
           </div>
           <div class="auto-download-actions">
-            <button
-              class="auto-download-button stop"
-              :disabled="currentSchedulerStatus.running"
-              @click="stopAutoSubmit"
-            >
-              {{ currentSchedulerStatus.running ? '正在运行...' : '停止自动提交' }}
-            </button>
+            <button class="auto-download-button stop" @click="stopAutoSubmit">停止自动提交</button>
           </div>
         </div>
 

@@ -985,7 +985,7 @@ async function dramaExistsInFeishuTableGroup(channelId, dramaName, tableGroupId 
   return (result.data?.items || []).some(item => item.fields?.['剧名']?.[0]?.text === dramaName)
 }
 
-async function shouldSubmitDramaCandidate(channelId, drama, downloadList, tableGroupId = '') {
+function isAutoSubmitCandidateDrama(drama, downloadList) {
   if (!drama) {
     return false
   }
@@ -1004,7 +1004,7 @@ async function shouldSubmitDramaCandidate(channelId, drama, downloadList, tableG
     return false
   }
 
-  return !(await dramaExistsInFeishuTableGroup(channelId, dramaName, tableGroupId))
+  return true
 }
 
 async function selectFeishuTableGroupWithAccount(channelId, preferredGroupId = '') {
@@ -1390,7 +1390,6 @@ async function editJuliangAccountRemark(channelId, accountId, remark) {
 async function fetchAutoSubmitDramas(channelId, submitRangeDays = 3, feishuTableGroupId = '') {
   await ensureSchedulerRuntime(channelId)
   const dateRanges = getDateRanges(submitRangeDays)
-  const shouldDeferExistingCheck = isAllFeishuTableGroupTarget(feishuTableGroupId)
 
   serviceConsole.log(`[自动提交-${channelId}] ========== 获取剧集 ==========`)
   serviceConsole.log(`[自动提交-${channelId}] 今天:`, formatDate(dateRanges.today))
@@ -1418,7 +1417,7 @@ async function fetchAutoSubmitDramas(channelId, submitRangeDays = 3, feishuTable
     const batchEnd = Math.min(batchStart + batchSize, totalPages)
     const batchPromises = Array.from({ length: batchEnd - batchStart }, (_, i) =>
       getNewDramaListWithRetry({
-        pageIndex: batchStart + i,
+        pageIndex: batchStart + i + 1,
         pageSize: 100,
         channelId,
         dramaListTableId,
@@ -1453,26 +1452,13 @@ async function fetchAutoSubmitDramas(channelId, submitRangeDays = 3, feishuTable
 
   serviceConsole.log(`[自动提交-${channelId}] 过滤后的剧集总数:`, filteredDramas.length)
 
-  const targetTableGroupId = shouldDeferExistingCheck ? '' : feishuTableGroupId
-  const candidateDramas = shouldDeferExistingCheck ? filteredDramas : []
+  const candidateDramas = filteredDramas.filter(drama =>
+    isAutoSubmitCandidateDrama(drama, downloadList)
+  )
 
-  if (!shouldDeferExistingCheck) {
-    for (const drama of filteredDramas) {
-      if (await shouldSubmitDramaCandidate(channelId, drama, downloadList, targetTableGroupId)) {
-        candidateDramas.push(drama)
-      }
-    }
-  }
-
-  if (shouldDeferExistingCheck) {
-    serviceConsole.log(
-      `[自动提交-${channelId}] 所有表格组模式：保留逐表判断，暂不按默认表已存在状态前置过滤`
-    )
-  } else {
-    serviceConsole.log(
-      `[自动提交-${channelId}] 可新增待下载候选剧集数: ${candidateDramas.length}（已实时校验飞书未存在、下载完成）`
-    )
-  }
+  serviceConsole.log(
+    `[自动提交-${channelId}] 可新增待下载候选剧集数: ${candidateDramas.length}（与界面新增待下载 + 下载完成保持一致，飞书实时查重留到写入阶段）`
+  )
 
   // 按日期分组
   const todayDramas = []
@@ -1813,6 +1799,7 @@ async function runAutoSubmitCycle(channelId) {
     startTime: new Date().toISOString(),
     status: 'running',
   }
+  state.progress = { current: 0, total: 0, currentDate: '筛选候选', currentDrama: '' }
   await saveState(channelId)
 
   try {
