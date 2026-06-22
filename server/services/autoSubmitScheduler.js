@@ -985,6 +985,28 @@ async function dramaExistsInFeishuTableGroup(channelId, dramaName, tableGroupId 
   return (result.data?.items || []).some(item => item.fields?.['剧名']?.[0]?.text === dramaName)
 }
 
+async function shouldSubmitDramaCandidate(channelId, drama, downloadList, tableGroupId = '') {
+  if (!drama) {
+    return false
+  }
+
+  if (drama.feishu_downloaded || drama.feishu_exists) {
+    return false
+  }
+
+  const downloadData = getDownloadDataForDrama(downloadList, drama)
+  if (!downloadData || downloadData.task_status !== 2) {
+    return false
+  }
+
+  const dramaName = String(drama.series_name || drama.book_name || '').trim()
+  if (!dramaName) {
+    return false
+  }
+
+  return !(await dramaExistsInFeishuTableGroup(channelId, dramaName, tableGroupId))
+}
+
 async function selectFeishuTableGroupWithAccount(channelId, preferredGroupId = '') {
   const entry = ensureSchedulerEntry(channelId)
   const groups = getSchedulerFeishuTableGroups(channelId)
@@ -1431,16 +1453,16 @@ async function fetchAutoSubmitDramas(channelId, submitRangeDays = 3, feishuTable
 
   serviceConsole.log(`[自动提交-${channelId}] 过滤后的剧集总数:`, filteredDramas.length)
 
-  const candidateDramas = shouldDeferExistingCheck
-    ? filteredDramas
-    : filteredDramas.filter(drama => {
-        if (drama.feishu_downloaded || drama.feishu_exists) {
-          return false
-        }
+  const targetTableGroupId = shouldDeferExistingCheck ? '' : feishuTableGroupId
+  const candidateDramas = shouldDeferExistingCheck ? filteredDramas : []
 
-        const downloadData = getDownloadDataForDrama(downloadList, drama)
-        return downloadData?.task_status === 2
-      })
+  if (!shouldDeferExistingCheck) {
+    for (const drama of filteredDramas) {
+      if (await shouldSubmitDramaCandidate(channelId, drama, downloadList, targetTableGroupId)) {
+        candidateDramas.push(drama)
+      }
+    }
+  }
 
   if (shouldDeferExistingCheck) {
     serviceConsole.log(
@@ -1448,7 +1470,7 @@ async function fetchAutoSubmitDramas(channelId, submitRangeDays = 3, feishuTable
     )
   } else {
     serviceConsole.log(
-      `[自动提交-${channelId}] 可新增待下载候选剧集数: ${candidateDramas.length}（已前置过滤飞书已存在/已下载/下载未完成）`
+      `[自动提交-${channelId}] 可新增待下载候选剧集数: ${candidateDramas.length}（已实时校验飞书未存在、下载完成）`
     )
   }
 
