@@ -57,7 +57,12 @@ export function generatePromotionName(dramaName, brandName = '小红') {
  * @param {string} accountId 广告账户ID
  * @returns {string} 推广链接名称
  */
-export function generateSmartPromotionName(douyinAccount, dramaName, accountId, brandName = '小红') {
+export function generateSmartPromotionName(
+  douyinAccount,
+  dramaName,
+  accountId,
+  brandName = '小红'
+) {
   return `${brandName}短剧-${douyinAccount}-${cleanDramaName(dramaName)}-${accountId}`
 }
 
@@ -393,7 +398,7 @@ export function parseDouyinMaterialFromFeishu(douyinMaterialText) {
       const douyinAccountId = parts[1].trim()
       const materialRange = parts[2].trim()
 
-      // 验证素材序号格式（如 01-05 或 01）
+      // 验证素材序号格式（如 01-05、101-105 或 01）
       if (isValidMaterialRange(materialRange)) {
         configs.push({
           douyinAccount,
@@ -412,24 +417,19 @@ export function parseDouyinMaterialFromFeishu(douyinMaterialText) {
 
 /**
  * 验证素材序号范围格式是否有效
- * @param {string} range 素材序号范围，如 "01-04" 或 "01"
+ * @param {string} range 素材序号范围，如 "01-04"、"101-105" 或 "01"
  * @returns {boolean} 是否有效
  */
 function isValidMaterialRange(range) {
   if (!range) return false
 
-  // 单个素材序号（如 "01"）
-  const singlePattern = /^\d{2}$/
-  if (singlePattern.test(range)) return true
-
-  // 范围格式（如 "01-04"）
-  const rangePattern = /^(\d{2})-(\d{2})$/
+  const rangePattern = /^(\d+)(?:-(\d+))?$/
   const match = range.match(rangePattern)
-  if (match) {
-    const start = parseInt(match[1], 10)
-    const end = parseInt(match[2], 10)
-    return end >= start // 确保结束序号大于等于开始序号
+  if (!match) {
+    return false
   }
 
-  return false
+  const start = parseInt(match[1], 10)
+  const end = match[2] ? parseInt(match[2], 10) : start
+  return Number.isFinite(start) && Number.isFinite(end) && start > 0 && end >= start
 }

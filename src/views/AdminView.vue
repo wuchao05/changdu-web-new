@@ -3247,6 +3247,10 @@ function getMaterialMatchTotalCount(
   return totalCount > 0 ? totalCount : null
 }
 
+function formatMaterialRangeNumber(value: number) {
+  return String(value).padStart(2, '0')
+}
+
 function getFeishuTableGroupKey(channelId: string, groupId: string) {
   return `${channelId}::${groupId || DEFAULT_FEISHU_TABLE_GROUP_ID}`
 }
@@ -3474,17 +3478,17 @@ function applyUserChannelGroupAverageMaterialRanges(
 
   const baseCount = Math.floor(totalCount / matches.length)
   const remainder = totalCount % matches.length
-  const padLength = Math.max(2, String(totalCount).length)
   let currentIndex = 1
 
   matches.forEach((match, index) => {
     const count = baseCount + (index < remainder ? 1 : 0)
     const start = currentIndex
     const end = currentIndex + count - 1
-    const formatNumber = (value: number) => String(value).padStart(padLength, '0')
 
     match.materialRange =
-      count === 1 ? formatNumber(start) : `${formatNumber(start)}-${formatNumber(end)}`
+      count === 1
+        ? formatMaterialRangeNumber(start)
+        : `${formatMaterialRangeNumber(start)}-${formatMaterialRangeNumber(end)}`
     currentIndex = end + 1
   })
 
