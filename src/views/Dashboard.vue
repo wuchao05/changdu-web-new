@@ -522,10 +522,22 @@
                     <Icon icon="mdi:receipt-text-outline" class="w-5 h-5 text-amber-600" />
                     <div>
                       <h3 class="text-lg font-semibold text-slate-900">订单统计</h3>
-                      <p class="text-sm text-slate-500">查看当前渠道的订单明细和支付情况</p>
+                      <p class="text-sm text-slate-500">查看当前渠道的订单明细和短剧排行</p>
                     </div>
                   </div>
                   <div class="flex flex-wrap items-center gap-2">
+                    <div class="order-stats-view-switch" aria-label="订单统计视图">
+                      <n-button
+                        v-for="option in orderStatsViewOptions"
+                        :key="option.value"
+                        size="small"
+                        :type="orderStatsViewMode === option.value ? 'primary' : 'default'"
+                        :secondary="orderStatsViewMode !== option.value"
+                        @click="handleOrderStatsViewModeChange(option.value)"
+                      >
+                        {{ option.label }}
+                      </n-button>
+                    </div>
                     <DateRangePicker
                       v-model="orderDateRange"
                       select-class-name="w-40"
@@ -656,23 +668,26 @@
               </div>
               <n-data-table
                 class="orders-table"
-                :columns="orderColumns"
-                :data="pagedOrderRows"
+                :columns="currentOrderStatsColumns"
+                :data="currentOrderStatsRows"
                 :loading="ordersLoading"
                 :bordered="false"
                 :single-line="false"
+                :row-class-name="getOrderStatsRowClassName"
                 striped
                 size="small"
+                :remote="orderStatsViewMode === 'dramas'"
                 :scroll-x="1100"
+                @update:sorter="handleOrderStatsSorterChange"
               />
               <div class="orders-table-footer">
                 <span class="orders-pagination-prefix">
-                  共{{ formatNumberValue(orderRows.length) }}个订单
+                  {{ orderStatsTotalLabel }}
                 </span>
                 <n-pagination
                   :page="ordersCurrentPage"
                   :page-size="ordersPagination.pageSize"
-                  :item-count="orderRows.length"
+                  :item-count="orderStatsTotalCount"
                   @update:page="handleOrdersPageChange"
                 />
               </div>
@@ -820,7 +835,12 @@ import {
   type FormInst,
   type FormRules,
 } from 'naive-ui'
-import type { DataTableColumns } from 'naive-ui'
+import type {
+  DataTableColumns,
+  DataTableCreateRowClassName,
+  DataTableSortOrder,
+  DataTableSortState,
+} from 'naive-ui'
 import BuildWorkflowSchedulerModal from '@/components/BuildWorkflowSchedulerModal.vue'
 import SyncAccountModal from '@/components/SyncAccountModal.vue'
 import DateRangePicker from '@/components/DateRangePicker.vue'
@@ -896,6 +916,8 @@ type DateRangeValue = [string, string] | null
 type DashboardRequestScope = 'overview' | 'report' | 'orders' | 'material'
 type RuntimeWebMenus = adminApi.UserChannelBindingConfig['permissions']['webMenus']
 type OrderUserCardScope = 'all' | 'summary' | 'branch' | 'loading'
+type OrderStatsViewMode = 'orders' | 'dramas'
+type DramaRankingSortKey = 'totalOrders' | 'paidOrderCount' | 'totalAmount' | 'paidOrderRate'
 interface DashboardRequestContext {
   scope: DashboardRequestScope
   controller: AbortController
@@ -910,6 +932,13 @@ interface OrderUserCardItem {
   meta: string
   scope: OrderUserCardScope
   aliases?: string[]
+}
+interface DramaRankingRow {
+  dramaName: string
+  totalOrders: number
+  paidOrderCount: number
+  totalAmount: number
+  paidOrderRate: number
 }
 interface ThirdPartyRevenueRow {
   date: string
@@ -942,12 +971,16 @@ const THIRD_PARTY_REVENUE_START_DATE = '2026-05-22'
 const THIRD_PARTY_LOW_SHARE_DATES = new Set(['2026-05-22', '2026-05-23', '2026-05-24'])
 const THIRD_PARTY_LOW_SHARE_RATE = 0.025
 const THIRD_PARTY_DEFAULT_SHARE_RATE = 0.05
+const HOT_DRAMA_AMOUNT_THRESHOLD = 100 * 100
 const JCYB_AD_REPORT_TOKEN_STORAGE_KEY = 'jcybAdReportToken'
 const JCYB_TEAM_ID = 500015
 const JCYB_AD_INFO_DIMENSION = 'app,agent,ad_account_name,ad_account_id'
 const JCYB_AD_INFO_ORDER = 'real_cost desc'
 const reportDateRange = ref<DateRangeValue>(null)
 const orderDateRange = ref<DateRangeValue>(null)
+const orderStatsViewMode = ref<OrderStatsViewMode>('orders')
+const dramaRankingSortKey = ref<DramaRankingSortKey>('totalAmount')
+const dramaRankingSortOrder = ref<Exclude<DataTableSortOrder, false>>('descend')
 const thirdPartyRevenueRows = ref<ThirdPartyRevenueRow[]>([])
 const thirdPartyRevenueLoading = ref(false)
 const thirdPartyRevenueError = ref('')
@@ -1547,6 +1580,87 @@ const pagedOrderRows = computed<OrderItem[]>(() => {
   return orderRows.value.slice(startIndex, startIndex + pageSize)
 })
 
+function parseDramaNameFromPromotionName(promotionName: string) {
+  const parts = String(promotionName || '')
+    .trim()
+    .split('-')
+    .map(part => part.trim())
+    .filter(Boolean)
+
+  if (parts.length < 3) {
+    return ''
+  }
+
+  const contentParts = parts.slice(2)
+  const lastPart = contentParts[contentParts.length - 1]
+  if (/^\d+$/.test(lastPart)) {
+    contentParts.pop()
+  }
+
+  return contentParts.join('-').trim()
+}
+
+const dramaRankingRows = computed<DramaRankingRow[]>(() => {
+  const rankingMap = new Map<string, DramaRankingRow>()
+
+  orderRows.value.forEach(order => {
+    const dramaName = parseDramaNameFromPromotionName(order.promotion_name)
+    if (!dramaName) {
+      return
+    }
+
+    const rankingRow =
+      rankingMap.get(dramaName) ||
+      ({
+        dramaName,
+        totalOrders: 0,
+        paidOrderCount: 0,
+        totalAmount: 0,
+        paidOrderRate: 0,
+      } satisfies DramaRankingRow)
+
+    rankingRow.totalOrders += 1
+    if (order.pay_status === 0) {
+      rankingRow.paidOrderCount += 1
+      rankingRow.totalAmount += Number(order.pay_amount || 0)
+    }
+
+    rankingMap.set(dramaName, rankingRow)
+  })
+
+  const rankingRows = Array.from(rankingMap.values()).map(row => ({
+    ...row,
+    paidOrderRate: row.totalOrders > 0 ? row.paidOrderCount / row.totalOrders : 0,
+  }))
+
+  return rankingRows.sort((left, right) => {
+    const activeSortKey = dramaRankingSortKey.value
+    const sortDirection = dramaRankingSortOrder.value === 'ascend' ? 1 : -1
+    const activeSortDiff = left[activeSortKey] - right[activeSortKey]
+    if (activeSortDiff !== 0) {
+      return activeSortDiff * sortDirection
+    }
+
+    const totalAmountDiff = right.totalAmount - left.totalAmount
+    if (totalAmountDiff !== 0) {
+      return totalAmountDiff
+    }
+
+    const paidOrderDiff = right.paidOrderCount - left.paidOrderCount
+    if (paidOrderDiff !== 0) {
+      return paidOrderDiff
+    }
+
+    return left.dramaName.localeCompare(right.dramaName, 'zh-CN')
+  })
+})
+
+const pagedDramaRankingRows = computed<DramaRankingRow[]>(() => {
+  const pageSize = Number(ordersPagination.pageSize || 10)
+  const startIndex = Math.max(ordersCurrentPage.value - 1, 0) * pageSize
+  return dramaRankingRows.value.slice(startIndex, startIndex + pageSize)
+})
+
 const orderUserTabs = computed<OrderUserCardItem[]>(() => {
   const summaries = Array.isArray(ordersData.value?.promotion_user_summaries)
     ? ordersData.value?.promotion_user_summaries || []
@@ -1666,6 +1780,11 @@ const payStatusOptions = [
   { label: '全部支付', value: -1 },
   { label: '支付成功', value: 0 },
   { label: '未支付', value: 1 },
+]
+
+const orderStatsViewOptions: Array<{ label: string; value: OrderStatsViewMode }> = [
+  { label: '订单明细', value: 'orders' },
+  { label: '短剧排行', value: 'dramas' },
 ]
 
 const reportPagination = reactive({
@@ -1839,6 +1958,117 @@ const orderColumns: DataTableColumns<OrderItem> = [
   },
 ]
 
+const dramaRankingColumns = computed<DataTableColumns<DramaRankingRow>>(() => [
+  {
+    title: '排名',
+    key: 'rank',
+    width: 80,
+    render: (_row, index) => {
+      const pageSize = Number(ordersPagination.pageSize || 10)
+      return (ordersCurrentPage.value - 1) * pageSize + index + 1
+    },
+  },
+  {
+    title: '剧名',
+    key: 'dramaName',
+    minWidth: 320,
+    render: row =>
+      h(
+        'div',
+        {
+          title: row.dramaName,
+          class: [
+            'drama-ranking-title-cell',
+            isHotDramaRankingRow(row) ? 'drama-ranking-title-cell--hot' : '',
+          ],
+        },
+        [
+          h('span', { class: 'drama-ranking-title-cell__name' }, row.dramaName),
+          isHotDramaRankingRow(row)
+            ? h('span', { class: 'drama-ranking-hot-corner' }, [
+                h('span', { class: 'drama-ranking-hot-corner__spark' }),
+                h('span', { class: 'drama-ranking-hot-corner__text' }, '爆'),
+              ])
+            : null,
+        ]
+      ),
+  },
+  {
+    title: '总充值金额',
+    key: 'totalAmount',
+    width: 130,
+    sorter: true,
+    customNextSortOrder: order => (order === 'descend' ? 'ascend' : 'descend'),
+    sortOrder: dramaRankingSortKey.value === 'totalAmount' ? dramaRankingSortOrder.value : false,
+    render: row =>
+      h('span', { class: 'font-semibold text-emerald-600' }, formatCurrency(row.totalAmount)),
+  },
+  {
+    title: '总订单数',
+    key: 'totalOrders',
+    width: 120,
+    sorter: true,
+    customNextSortOrder: order => (order === 'descend' ? 'ascend' : 'descend'),
+    sortOrder: dramaRankingSortKey.value === 'totalOrders' ? dramaRankingSortOrder.value : false,
+    render: row => formatNumberValue(row.totalOrders),
+  },
+  {
+    title: '充值订单数',
+    key: 'paidOrderCount',
+    width: 120,
+    sorter: true,
+    customNextSortOrder: order => (order === 'descend' ? 'ascend' : 'descend'),
+    sortOrder: dramaRankingSortKey.value === 'paidOrderCount' ? dramaRankingSortOrder.value : false,
+    render: row => formatNumberValue(row.paidOrderCount),
+  },
+  {
+    title: '充值率',
+    key: 'paidOrderRate',
+    width: 110,
+    sorter: true,
+    customNextSortOrder: order => (order === 'descend' ? 'ascend' : 'descend'),
+    sortOrder: dramaRankingSortKey.value === 'paidOrderRate' ? dramaRankingSortOrder.value : false,
+    render: row => formatPercentRate(row.paidOrderRate),
+  },
+])
+
+const currentOrderStatsColumns = computed<DataTableColumns<OrderItem | DramaRankingRow>>(() =>
+  orderStatsViewMode.value === 'dramas'
+    ? (dramaRankingColumns.value as DataTableColumns<OrderItem | DramaRankingRow>)
+    : (orderColumns as DataTableColumns<OrderItem | DramaRankingRow>)
+)
+const currentOrderStatsRows = computed<Array<OrderItem | DramaRankingRow>>(() =>
+  orderStatsViewMode.value === 'dramas' ? pagedDramaRankingRows.value : pagedOrderRows.value
+)
+const orderStatsTotalCount = computed(() =>
+  orderStatsViewMode.value === 'dramas' ? dramaRankingRows.value.length : orderRows.value.length
+)
+const orderStatsTotalLabel = computed(() =>
+  orderStatsViewMode.value === 'dramas'
+    ? `共${formatNumberValue(dramaRankingRows.value.length)}部剧`
+    : `共${formatNumberValue(orderRows.value.length)}个订单`
+)
+
+function isDramaRankingRow(row: OrderItem | DramaRankingRow): row is DramaRankingRow {
+  return 'dramaName' in row
+}
+
+function isHotDramaRankingRow(row: DramaRankingRow) {
+  return row.totalAmount >= HOT_DRAMA_AMOUNT_THRESHOLD
+}
+
+const getOrderStatsRowClassName: DataTableCreateRowClassName<OrderItem | DramaRankingRow> = row => {
+  if (
+    orderStatsViewMode.value === 'dramas' &&
+    isDramaRankingRow(row) &&
+    isHotDramaRankingRow(row)
+  ) {
+    return 'orders-table__hot-drama-row'
+  }
+
+  return ''
+}
+
 function checkMobile() {
   isMobile.value = window.innerWidth < 768
 }
@@ -1940,6 +2170,10 @@ function formatSignedPlainNumber(value: number) {
 
 function formatReportPercent(value: number) {
   return `${(Number(value || 0) / 100).toFixed(2)}%`
+}
+
+function formatPercentRate(value: number) {
+  return `${(Number(value || 0) * 100).toFixed(2)}%`
 }
 
 function calculateOrderRechargeAmount(orders: OrderItem[]) {
@@ -2622,6 +2856,51 @@ function handlePayStatusChange() {
   ordersCurrentPage.value = 1
   ordersPagination.page = 1
   fetchOrdersData()
+}
+
+function resetDramaRankingSorter() {
+  dramaRankingSortKey.value = 'totalAmount'
+  dramaRankingSortOrder.value = 'descend'
+}
+
+function handleOrderStatsViewModeChange(mode: OrderStatsViewMode) {
+  if (orderStatsViewMode.value === mode) {
+    return
+  }
+
+  orderStatsViewMode.value = mode
+  if (mode === 'dramas') {
+    resetDramaRankingSorter()
+  }
+  ordersCurrentPage.value = 1
+  ordersPagination.page = 1
+}
+
+function handleOrderStatsSorterChange(sortState: DataTableSortState | DataTableSortState[] | null) {
+  if (orderStatsViewMode.value !== 'dramas') {
+    return
+  }
+
+  const activeSortState = Array.isArray(sortState) ? sortState[0] : sortState
+  const sortableKeys: DramaRankingSortKey[] = [
+    'totalOrders',
+    'paidOrderCount',
+    'totalAmount',
+    'paidOrderRate',
+  ]
+  if (
+    activeSortState &&
+    sortableKeys.includes(activeSortState.columnKey as DramaRankingSortKey) &&
+    activeSortState.order
+  ) {
+    dramaRankingSortKey.value = activeSortState.columnKey as DramaRankingSortKey
+    dramaRankingSortOrder.value = activeSortState.order
+  } else {
+    resetDramaRankingSorter()
+  }
+
+  ordersCurrentPage.value = 1
+  ordersPagination.page = 1
 }
 
 function isOrderUserCardActive(tab: OrderUserCardItem) {
@@ -3674,6 +3953,16 @@ onUnmounted(() => {
   color: rgb(120 113 108);
 }
 
+.order-stats-view-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem;
+  border-radius: 0.5rem;
+  background: rgb(248 250 252);
+  border: 1px solid rgb(226 232 240);
+}
+
 .own-order-summary {
   position: relative;
   overflow: hidden;
@@ -3807,6 +4096,147 @@ onUnmounted(() => {
 
 :deep(.orders-table-footer .n-pagination) {
   margin-left: auto;
+}
+
+:deep(.drama-ranking-title-cell) {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding-right: 2.45rem;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+:deep(.drama-ranking-title-cell__name) {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:deep(.drama-ranking-title-cell--hot .drama-ranking-title-cell__name) {
+  font-weight: 700;
+  color: rgb(185 28 28);
+}
+
+:deep(.drama-ranking-hot-corner) {
+  position: absolute;
+  top: 0;
+  right: 0.08rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.95rem;
+  height: 1.35rem;
+  overflow: hidden;
+  clip-path: polygon(18% 0, 100% 0, 82% 100%, 0 100%);
+  background:
+    linear-gradient(
+      110deg,
+      transparent 0%,
+      transparent 38%,
+      rgba(255, 255, 255, 0.62) 48%,
+      transparent 58%
+    ),
+    radial-gradient(circle at 24% 18%, rgba(254, 240, 138, 0.92), transparent 26%),
+    linear-gradient(135deg, rgb(220 38 38) 0%, rgb(249 115 22) 58%, rgb(245 158 11) 100%);
+  background-position:
+    -2.4rem 0,
+    0 0,
+    0 0;
+  background-size:
+    2.4rem 100%,
+    100% 100%,
+    100% 100%;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0;
+  text-shadow: 0 1px 2px rgba(127, 29, 29, 0.55);
+  box-shadow:
+    0 8px 16px -10px rgba(220, 38, 38, 0.95),
+    0 0 0 1px rgba(255, 255, 255, 0.72) inset;
+  transform: rotate(9deg);
+  transform-origin: center;
+  pointer-events: none;
+  animation: drama-hot-corner-pop 1.7s ease-in-out infinite;
+}
+
+:deep(.drama-ranking-hot-corner__spark) {
+  position: absolute;
+  top: 0.16rem;
+  left: 0.34rem;
+  z-index: 1;
+  width: 0.28rem;
+  height: 0.28rem;
+  border-radius: 9999px;
+  background: rgb(254 240 138);
+  box-shadow:
+    0 0 0 3px rgba(254, 240, 138, 0.18),
+    0 0 10px rgba(254, 240, 138, 0.8);
+}
+
+:deep(.drama-ranking-hot-corner__text) {
+  position: relative;
+  z-index: 2;
+  transform: translateX(0.06rem);
+}
+
+:deep(.orders-table__hot-drama-row td:nth-child(2)) {
+  overflow: visible;
+}
+
+:deep(.orders-table__hot-drama-row td:nth-child(2) .n-data-table-td__ellipsis) {
+  overflow: visible;
+}
+
+:deep(.orders-table__hot-drama-row td) {
+  background:
+    linear-gradient(90deg, rgba(255, 247, 237, 0.95), rgba(255, 255, 255, 0.98)),
+    radial-gradient(circle at 0 50%, rgba(248, 113, 113, 0.2), transparent 34%) !important;
+  animation: drama-hot-row-glow 2.4s ease-in-out infinite;
+}
+
+:deep(.orders-table__hot-drama-row:hover td) {
+  background:
+    linear-gradient(90deg, rgba(255, 237, 213, 0.98), rgba(255, 255, 255, 0.98)),
+    radial-gradient(circle at 0 50%, rgba(248, 113, 113, 0.26), transparent 34%) !important;
+}
+
+@keyframes drama-hot-corner-pop {
+  0%,
+  100% {
+    background-position:
+      -2.4rem 0,
+      0 0,
+      0 0;
+    transform: rotate(9deg) translateY(0) scale(1);
+  }
+
+  50% {
+    background-position:
+      2.4rem 0,
+      0 0,
+      0 0;
+    transform: rotate(9deg) translateY(-1px) scale(1.06);
+  }
+}
+
+@keyframes drama-hot-row-glow {
+  0%,
+  100% {
+    box-shadow: inset 3px 0 0 rgba(239, 68, 68, 0.48);
+  }
+
+  50% {
+    box-shadow: inset 3px 0 0 rgba(245, 158, 11, 0.72);
+  }
 }
 
 .order-user-tab.active .order-user-tab__label,
