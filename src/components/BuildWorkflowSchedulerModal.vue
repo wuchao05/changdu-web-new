@@ -365,6 +365,51 @@ const manuallyBuildingIds = ref<Set<string>>(new Set())
 // 抖音号配置列表（从飞书状态表的"抖音素材"字段解析）
 const douyinConfigs = ref<DouyinMaterialConfig[]>([])
 
+function normalizeFfSeeSetting(value: unknown): 1 | 2 {
+  return Number(value) === 2 ? 2 : 1
+}
+
+function resolveDouyinConfigFfSeeSettings(configs: DouyinMaterialConfig[]) {
+  const runtimeUser = sessionStore.currentRuntimeUser || sessionStore.currentUser
+  const matches = [
+    ...(Array.isArray(runtimeUser?.douyinMaterialMatches) ? runtimeUser.douyinMaterialMatches : []),
+    ...(Array.isArray(runtimeUser?.douyinAccounts)
+      ? runtimeUser.douyinAccounts.map(account => ({
+          douyinAccount: account.douyinAccount,
+          douyinAccountId: account.douyinAccountId,
+          ffSeeSetting: account.ffSeeSetting,
+        }))
+      : []),
+  ]
+  const settingByAccountId = new Map<string, 1 | 2>()
+  const settingByAccountName = new Map<string, 1 | 2>()
+
+  matches.forEach(match => {
+    const setting = normalizeFfSeeSetting(match?.ffSeeSetting)
+    const accountId = String(match?.douyinAccountId || '').trim()
+    const accountName = String(match?.douyinAccount || '').trim()
+    if (accountId && !settingByAccountId.has(accountId)) {
+      settingByAccountId.set(accountId, setting)
+    }
+    if (accountName && !settingByAccountName.has(accountName)) {
+      settingByAccountName.set(accountName, setting)
+    }
+  })
+
+  return configs.map(config => {
+    const accountId = String(config.douyinAccountId || '').trim()
+    const accountName = String(config.douyinAccount || '').trim()
+    return {
+      ...config,
+      ffSeeSetting: normalizeFfSeeSetting(
+        config.ffSeeSetting ??
+          settingByAccountId.get(accountId) ??
+          settingByAccountName.get(accountName)
+      ),
+    }
+  })
+}
+
 function getBuildTimestamp() {
   return dayjs().tz('Asia/Shanghai').format('YYYYMMDDHHmmss')
 }
@@ -1101,7 +1146,9 @@ async function loadPendingDramas() {
     if (dramas.value.length > 0) {
       const firstDrama = dramas.value[0]
       const douyinMaterialField = firstDrama.fields['抖音素材']?.[0]?.text
-      douyinConfigs.value = parseDouyinMaterialFromFeishu(douyinMaterialField)
+      douyinConfigs.value = resolveDouyinConfigFfSeeSettings(
+        parseDouyinMaterialFromFeishu(douyinMaterialField)
+      )
       console.log(
         `从飞书状态表解析到 ${douyinConfigs.value.length} 个抖音号配置:`,
         douyinConfigs.value
@@ -1239,7 +1286,9 @@ async function buildSingleDramaInPolling(drama: FeishuDramaRecord) {
 
   // 从当前剧集的"抖音素材"字段解析配置
   const douyinMaterialField = drama.fields['抖音素材']?.[0]?.text
-  const dramaDouyinConfigs = parseDouyinMaterialFromFeishu(douyinMaterialField)
+  const dramaDouyinConfigs = resolveDouyinConfigFfSeeSettings(
+    parseDouyinMaterialFromFeishu(douyinMaterialField)
+  )
   console.log(
     `剧集 ${drama.fields['剧名']?.[0]?.text} 解析到 ${dramaDouyinConfigs.length} 个抖音号配置`
   )
@@ -1750,7 +1799,9 @@ async function startAutoBuildWithDramas(dramasToBeBuilt: FeishuDramaRecord[]) {
 
       // 从当前剧集的"抖音素材"字段解析配置
       const douyinMaterialField = drama.fields['抖音素材']?.[0]?.text
-      const dramaDouyinConfigs = parseDouyinMaterialFromFeishu(douyinMaterialField)
+      const dramaDouyinConfigs = resolveDouyinConfigFfSeeSettings(
+        parseDouyinMaterialFromFeishu(douyinMaterialField)
+      )
       console.log(
         `剧集 ${drama.fields['剧名']?.[0]?.text} 解析到 ${dramaDouyinConfigs.length} 个抖音号配置`
       )
@@ -2243,7 +2294,7 @@ async function executeSetup(
 // 为单个抖音号批次创建项目和广告
 async function buildBatchForDouyin(
   drama: FeishuDramaRecord,
-  config: { douyinAccount: string; douyinAccountId: string; materialRange: string },
+  config: DouyinMaterialConfig,
   initData: InitializationData,
   record: AutoBuildRecord,
   dramaName: string,
@@ -2398,6 +2449,7 @@ async function buildBatchForDouyin(
         product_image_uri: initData.product_image_uri,
         product_image_width: initData.product_image_width,
         product_image_height: initData.product_image_height,
+        ff_see_setting: config.ffSeeSetting,
       })
 
       // 检查返回结果的 code

@@ -941,6 +941,7 @@ function createDraftMaterialMatch(douyinAccountRefId: string) {
     douyinAccount: '',
     douyinAccountId: '',
     cooperationCode: '',
+    ffSeeSetting: 1 as const,
     materialRange: '',
     createdAt: '',
     updatedAt: '',

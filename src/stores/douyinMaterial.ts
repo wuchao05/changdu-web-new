@@ -9,6 +9,7 @@ export interface DouyinMaterialMatch {
   douyinAccount: string
   douyinAccountId: string
   cooperationCode: string
+  ffSeeSetting: 1 | 2
   materialRange: string
   createdAt: string
   updatedAt: string
@@ -50,10 +51,15 @@ function normalizeMaterialRange(materialRange?: string) {
   return match[2] ? `${startText}-${endText}` : startText
 }
 
+function normalizeFfSeeSetting(value: unknown): 1 | 2 {
+  return Number(value) === 2 ? 2 : 1
+}
+
 function normalizeMatches(list: DouyinMaterialMatch[]) {
   return Array.isArray(list)
     ? list.map(match => ({
         ...match,
+        ffSeeSetting: normalizeFfSeeSetting(match.ffSeeSetting),
         materialRange: normalizeMaterialRange(match.materialRange),
       }))
     : []
@@ -62,6 +68,7 @@ function normalizeMatches(list: DouyinMaterialMatch[]) {
 function normalizeMatch(match: DouyinMaterialMatch) {
   return {
     ...match,
+    ffSeeSetting: normalizeFfSeeSetting(match.ffSeeSetting),
     materialRange: normalizeMaterialRange(match.materialRange),
   }
 }

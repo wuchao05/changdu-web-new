@@ -19,7 +19,7 @@ import {
 } from '../utils/buildWorkflowUtils.js'
 import { clearExistingProjects } from '../utils/buildWorkflowProjectCleanup.js'
 import { createSessionRuntimeContextMiddleware } from '../utils/runtimeContextMiddleware.js'
-import { readUser, resolveRuntimeContext } from '../utils/studioData.js'
+import { normalizeFfSeeSetting, readUser, resolveRuntimeContext } from '../utils/studioData.js'
 import { normalizeChannelRuntime } from '../utils/channelRuntime.js'
 import { resolveEffectiveBuildBid } from '../utils/buildBid.js'
 import {
@@ -1529,6 +1529,7 @@ router.post('/create-promotion', async ctx => {
       product_image_uri,
       product_image_width,
       product_image_height,
+      ff_see_setting,
     } = ctx.request.body
 
     if (
@@ -1555,6 +1556,7 @@ router.post('/create-promotion', async ctx => {
     const cookie = getJuliangCookie(runtime)
     const promotionConfig = BUILD_WORKFLOW_CONFIG.build.promotion
     const buildConfig = getBuildConfig(runtime)
+    const ffSeeSetting = normalizeFfSeeSetting(ff_see_setting)
 
     console.log('========== 创建广告 ==========')
     console.log('account_id:', account_id)
@@ -1611,7 +1613,7 @@ router.post('/create-promotion', async ctx => {
         },
         is_ebp_share: false,
         image_mode: 15,
-        f_f_see_setting: 1,
+        f_f_see_setting: ffSeeSetting,
         cover_type: 1,
       }
     })

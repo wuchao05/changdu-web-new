@@ -117,6 +117,7 @@ function defaultDouyinAccount() {
     douyinAccount: '',
     douyinAccountId: '',
     cooperationCode: '',
+    ffSeeSetting: 1,
     createdAt: nowIso(),
     updatedAt: nowIso(),
   }
@@ -304,6 +305,10 @@ function buildDouyinAccountIdentity(account = {}) {
   return `${String(account.douyinAccount || '').trim()}::${String(account.douyinAccountId || '').trim()}`
 }
 
+export function normalizeFfSeeSetting(value = 1) {
+  return Number(value) === 2 ? 2 : 1
+}
+
 export function normalizeDouyinAccount(account = {}) {
   const base = defaultDouyinAccount()
 
@@ -312,6 +317,7 @@ export function normalizeDouyinAccount(account = {}) {
     douyinAccount: String(account.douyinAccount || '').trim(),
     douyinAccountId: String(account.douyinAccountId || '').trim(),
     cooperationCode: String(account.cooperationCode || '').trim(),
+    ffSeeSetting: normalizeFfSeeSetting(account.ffSeeSetting ?? account.f_f_see_setting),
     createdAt: account.createdAt || base.createdAt,
     updatedAt: account.updatedAt || nowIso(),
   }
@@ -336,6 +342,7 @@ function collectLegacyDouyinAccounts(user = {}) {
       douyinAccount,
       douyinAccountId,
       cooperationCode,
+      ffSeeSetting: match.ffSeeSetting ?? match.f_f_see_setting,
     })
   }
 
@@ -389,6 +396,10 @@ function normalizeDouyinAccounts(accounts = []) {
         existingAccount.douyinAccountId || normalizedAccount.douyinAccountId
       existingAccount.cooperationCode =
         existingAccount.cooperationCode || normalizedAccount.cooperationCode
+      existingAccount.ffSeeSetting =
+        normalizeFfSeeSetting(normalizedAccount.ffSeeSetting) === 2
+          ? 2
+          : normalizeFfSeeSetting(existingAccount.ffSeeSetting)
       existingAccount.updatedAt = normalizedAccount.updatedAt || existingAccount.updatedAt
       return
     }
@@ -503,6 +514,7 @@ export function resolveDouyinMaterialMatches(matches = [], douyinAccounts = []) 
         douyinAccount: relatedDouyinAccount.douyinAccount,
         douyinAccountId: relatedDouyinAccount.douyinAccountId,
         cooperationCode: relatedDouyinAccount.cooperationCode,
+        ffSeeSetting: relatedDouyinAccount.ffSeeSetting,
       }
     })
     .filter(match => match && match.douyinAccount && match.douyinAccountId && match.materialRange)
@@ -655,6 +667,7 @@ export function resolveFeishuTableGroups(groups = [], douyinAccounts = []) {
             douyinAccount: relatedDouyinAccount.douyinAccount,
             douyinAccountId: relatedDouyinAccount.douyinAccountId,
             cooperationCode: relatedDouyinAccount.cooperationCode,
+            ffSeeSetting: relatedDouyinAccount.ffSeeSetting,
           }
         })
         .filter(

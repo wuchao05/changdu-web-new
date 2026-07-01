@@ -313,6 +313,11 @@
                       v-model:value="accountItem.cooperationCode"
                       placeholder="请输入合作码"
                     />
+                    <n-select
+                      v-model:value="accountItem.ffSeeSetting"
+                      :options="ffSeeSettingOptions"
+                      placeholder="请选择主页可见性"
+                    />
                   </div>
                 </div>
 
@@ -2493,6 +2498,15 @@ function handleUserBuildBidChange(config: adminApi.UserChannelBindingConfig, val
   config.buildPreference.bid = formatBuildBidInputValue(value)
 }
 
+const ffSeeSettingOptions = [
+  { label: '主页始终可见', value: 1 },
+  { label: '仅单次展示可见', value: 2 },
+]
+
+function normalizeFfSeeSetting(value: unknown): 1 | 2 {
+  return Number(value) === 2 ? 2 : 1
+}
+
 function formatAdvanceHourLabel(value: string | number | null | undefined) {
   return `${String(normalizeAdvanceHourValue(value)).padStart(2, '0')}:00`
 }
@@ -2532,6 +2546,7 @@ function cloneDouyinAccounts(accounts?: adminApi.DouyinAccount[]) {
         douyinAccount: String(account?.douyinAccount || ''),
         douyinAccountId: String(account?.douyinAccountId || ''),
         cooperationCode: String(account?.cooperationCode || ''),
+        ffSeeSetting: normalizeFfSeeSetting(account?.ffSeeSetting),
         createdAt: account?.createdAt,
         updatedAt: account?.updatedAt,
       }))
@@ -2544,6 +2559,7 @@ function createEmptyDouyinAccount(): adminApi.DouyinAccount {
     douyinAccount: '',
     douyinAccountId: '',
     cooperationCode: '',
+    ffSeeSetting: 1,
   }
 }
 
@@ -2695,6 +2711,7 @@ function getMaterialMatchAccountMeta(
     douyinAccount: boundAccount?.douyinAccount || String(match.douyinAccount || '').trim(),
     douyinAccountId: boundAccount?.douyinAccountId || String(match.douyinAccountId || '').trim(),
     cooperationCode: boundAccount?.cooperationCode || String(match.cooperationCode || '').trim(),
+    ffSeeSetting: normalizeFfSeeSetting(boundAccount?.ffSeeSetting || match.ffSeeSetting),
   }
 }
 
@@ -2704,6 +2721,7 @@ function validateDouyinAccountDrafts(user: adminApi.UserProfile) {
     douyinAccount: String(account.douyinAccount || '').trim(),
     douyinAccountId: String(account.douyinAccountId || '').trim(),
     cooperationCode: String(account.cooperationCode || '').trim(),
+    ffSeeSetting: normalizeFfSeeSetting(account.ffSeeSetting),
   }))
   const visibleDrafts = drafts.filter(
     account => account.douyinAccount || account.douyinAccountId || account.cooperationCode
@@ -2738,6 +2756,7 @@ async function saveDouyinAccounts(user: adminApi.UserProfile) {
       douyinAccount: String(account.douyinAccount || '').trim(),
       douyinAccountId: String(account.douyinAccountId || '').trim(),
       cooperationCode: String(account.cooperationCode || '').trim(),
+      ffSeeSetting: normalizeFfSeeSetting(account.ffSeeSetting),
     }))
     .filter(account => account.douyinAccount || account.douyinAccountId || account.cooperationCode)
 
@@ -2908,6 +2927,7 @@ function normalizeFeishuTableGroups(
             douyinAccount: String(match?.douyinAccount || ''),
             douyinAccountId: String(match?.douyinAccountId || ''),
             cooperationCode: String(match?.cooperationCode || ''),
+            ffSeeSetting: normalizeFfSeeSetting(match?.ffSeeSetting),
             materialRange: normalizeMaterialRange(match?.materialRange),
             createdAt: match?.createdAt,
             updatedAt: match?.updatedAt,

@@ -7,6 +7,7 @@ export interface DouyinMaterialMatch {
   douyinAccount: string
   douyinAccountId: string
   cooperationCode: string
+  ffSeeSetting: 1 | 2
   materialRange: string
   createdAt: string
   updatedAt: string

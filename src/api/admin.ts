@@ -13,6 +13,7 @@ export interface DouyinAccount {
   douyinAccount: string
   douyinAccountId: string
   cooperationCode: string
+  ffSeeSetting: 1 | 2
   createdAt?: string
   updatedAt?: string
 }
@@ -54,6 +55,7 @@ export interface UserChannelBindingConfig {
       douyinAccount?: string
       douyinAccountId?: string
       cooperationCode?: string
+      ffSeeSetting?: 1 | 2
       materialRange: string
       createdAt?: string
       updatedAt?: string
@@ -104,6 +106,7 @@ export interface UserChannelBindingConfig {
     douyinAccount?: string
     douyinAccountId?: string
     cooperationCode?: string
+    ffSeeSetting?: 1 | 2
     materialRange: string
     createdAt?: string
     updatedAt?: string
@@ -191,6 +194,7 @@ export interface UserProfile {
     douyinAccount?: string
     douyinAccountId?: string
     cooperationCode?: string
+    ffSeeSetting?: 1 | 2
     materialRange: string
   }>
   createdAt: string

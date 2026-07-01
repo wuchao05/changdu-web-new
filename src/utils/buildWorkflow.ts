@@ -84,6 +84,7 @@ export interface DouyinMaterialConfig {
   douyinAccount: string
   douyinAccountId: string
   materialRange: string
+  ffSeeSetting?: 1 | 2
 }
 
 /**

@@ -392,6 +392,7 @@ export async function createPromotion(params: {
   product_image_uri: string
   product_image_width?: number
   product_image_height?: number
+  ff_see_setting?: 1 | 2
 }): Promise<any> {
   const response = await fetch(`${ENV.BASE_URL}/build-workflow/create-promotion`, {
     method: 'POST',

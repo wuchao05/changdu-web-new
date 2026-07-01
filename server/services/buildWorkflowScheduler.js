@@ -53,7 +53,7 @@ import {
   applyUserBuildAdvanceToBuildConfig,
   normalizeUserBuildAdvanceConfig,
 } from '../utils/buildAdvanceConfig.js'
-import { buildRuntimeUser, readUser } from '../utils/studioData.js'
+import { buildRuntimeUser, normalizeFfSeeSetting, readUser } from '../utils/studioData.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -111,6 +111,7 @@ function createDefaultSchedulerState() {
         dramaStatusTableId: '',
       },
       feishuTableGroups: [],
+      douyinMaterialMatches: [],
       brandName: '小红',
     },
     nextRunTime: null,
@@ -318,6 +319,9 @@ async function ensureSchedulerRuntime(channelRuntime = null, instanceKey = getAc
       feishuTableGroups: Array.isArray(channelRuntime.runtimeUser?.feishuTableGroups)
         ? channelRuntime.runtimeUser.feishuTableGroups
         : [],
+      douyinMaterialMatches: Array.isArray(channelRuntime.runtimeUser?.douyinMaterialMatches)
+        ? channelRuntime.runtimeUser.douyinMaterialMatches
+        : [],
       brandName: String(
         channelRuntime.runtimeUser?.brandName ||
           channelRuntime.runtimeUserConfig?.brandName ||
@@ -350,6 +354,9 @@ async function ensureSchedulerRuntime(channelRuntime = null, instanceKey = getAc
           },
           feishuTableGroups: Array.isArray(latestRuntimeUser?.feishuTableGroups)
             ? latestRuntimeUser.feishuTableGroups
+            : [],
+          douyinMaterialMatches: Array.isArray(latestRuntimeUser?.douyinMaterialMatches)
+            ? latestRuntimeUser.douyinMaterialMatches
             : [],
           brandName: String(latestRuntimeUser?.brandName || '小红').trim() || '小红',
         }
@@ -952,7 +959,48 @@ function getDramaDouyinConfigs(drama) {
     douyinMaterialText = rawField.text || rawField.value || ''
   }
 
-  return parseDouyinMaterialFromFeishu(douyinMaterialText)
+  return resolveDouyinConfigFfSeeSettings(parseDouyinMaterialFromFeishu(douyinMaterialText))
+}
+
+function resolveDouyinConfigFfSeeSettings(configs = []) {
+  const runtimeConfig = getActiveSchedulerState().runtimeUserConfig || {}
+  const matches = [
+    ...(Array.isArray(runtimeConfig.douyinMaterialMatches)
+      ? runtimeConfig.douyinMaterialMatches
+      : []),
+    ...(Array.isArray(runtimeConfig.feishuTableGroups)
+      ? runtimeConfig.feishuTableGroups.flatMap(group =>
+          Array.isArray(group?.douyinMaterialMatches) ? group.douyinMaterialMatches : []
+        )
+      : []),
+  ]
+  const settingByAccountId = new Map()
+  const settingByAccountName = new Map()
+
+  matches.forEach(match => {
+    const setting = normalizeFfSeeSetting(match?.ffSeeSetting)
+    const accountId = String(match?.douyinAccountId || '').trim()
+    const accountName = String(match?.douyinAccount || '').trim()
+    if (accountId && !settingByAccountId.has(accountId)) {
+      settingByAccountId.set(accountId, setting)
+    }
+    if (accountName && !settingByAccountName.has(accountName)) {
+      settingByAccountName.set(accountName, setting)
+    }
+  })
+
+  return configs.map(config => {
+    const accountId = String(config?.douyinAccountId || '').trim()
+    const accountName = String(config?.douyinAccount || '').trim()
+    return {
+      ...config,
+      ffSeeSetting: normalizeFfSeeSetting(
+        config?.ffSeeSetting ??
+          settingByAccountId.get(accountId) ??
+          settingByAccountName.get(accountName)
+      ),
+    }
+  })
 }
 
 function getChangduDistributorId() {
@@ -1439,7 +1487,9 @@ async function createPromotion(params) {
     product_image_uri,
     product_image_width,
     product_image_height,
+    ff_see_setting,
   } = params
+  const ffSeeSetting = normalizeFfSeeSetting(ff_see_setting)
 
   const promotionConfig = BUILD_WORKFLOW_CONFIG.build.promotion
   const buildConfig = getBuildConfig()
@@ -1486,7 +1536,7 @@ async function createPromotion(params) {
       },
       is_ebp_share: false,
       image_mode: 15,
-      f_f_see_setting: 1,
+      f_f_see_setting: ffSeeSetting,
       cover_type: 1,
     }
   })
@@ -1835,6 +1885,7 @@ async function buildBatchForDouyin(drama, config, initData, dramaName, accountId
         product_image_uri: initData.product_image_uri,
         product_image_width: initData.product_image_width,
         product_image_height: initData.product_image_height,
+        ff_see_setting: config.ffSeeSetting,
       })
 
       if (result.code !== 0) {

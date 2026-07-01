@@ -29,6 +29,7 @@ export interface ApiConfig {
       douyinAccount?: string
       douyinAccountId?: string
       cooperationCode?: string
+      ffSeeSetting?: 1 | 2
       materialRange?: string
     }>
   }>
