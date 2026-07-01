@@ -207,10 +207,15 @@ function runWithSchedulerContext(instanceKey, fn) {
 
 function isRetryableBuildErrorMessage(messageText = '') {
   const normalizedMessage = String(messageText || '').toLowerCase()
+  const hasRetryableHttpStatus = /(^|[^\d])50[0234]([^\d]|$)/.test(normalizedMessage)
+
   return (
     normalizedMessage.includes('服务器连接超时') ||
+    normalizedMessage.includes('内部服务错误') ||
     normalizedMessage.includes('连接超时') ||
     normalizedMessage.includes('请求超时') ||
+    normalizedMessage.includes('internal service error') ||
+    normalizedMessage.includes('internal server error') ||
     normalizedMessage.includes('timeout') ||
     normalizedMessage.includes('timed out') ||
     normalizedMessage.includes('econnreset') ||
@@ -218,9 +223,7 @@ function isRetryableBuildErrorMessage(messageText = '') {
     normalizedMessage.includes('socket hang up') ||
     normalizedMessage.includes('network error') ||
     normalizedMessage.includes('fetch failed') ||
-    normalizedMessage.includes('502') ||
-    normalizedMessage.includes('503') ||
-    normalizedMessage.includes('504')
+    hasRetryableHttpStatus
   )
 }
 
