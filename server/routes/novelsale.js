@@ -517,7 +517,8 @@ function splitOrderTimeRange(beginTime, endTime, maxDays = MAX_ORDER_RANGE_DAYS)
 async function fetchAllOrdersByRange(ctx, timeRange) {
   const rangeOrders = []
   let currentFetchIndex = 0
-  const fetchPageSize = 1000
+  // 常读多数列表接口 page_size 上限为 100；传 1000 时可能直接返回空 body
+  const fetchPageSize = 100
   let hasMoreData = true
 
   while (hasMoreData) {
@@ -535,8 +536,27 @@ async function fetchAllOrdersByRange(ctx, timeRange) {
 
     ctx.query = originalQuery
 
-    const extracted = extractPromotionDetailOrders(ctx.body)
+    const upstreamBody = ctx.body
+    const extracted = extractPromotionDetailOrders(upstreamBody)
     if (!extracted.ok || !Array.isArray(extracted.orders)) {
+      const upstreamPreview =
+        typeof upstreamBody === 'string'
+          ? upstreamBody.slice(0, 200)
+          : upstreamBody && typeof upstreamBody === 'object'
+            ? JSON.stringify(upstreamBody).slice(0, 200)
+            : String(upstreamBody ?? '')
+
+      console.error('[订单统计] 上游响应无法解析为订单列表', {
+        begin_time: timeRange.begin_time,
+        end_time: timeRange.end_time,
+        page_index: currentFetchIndex,
+        page_size: fetchPageSize,
+        code: extracted.code,
+        message: extracted.message,
+        bodyType: typeof upstreamBody,
+        bodyPreview: upstreamPreview,
+      })
+
       // 首页解析失败：向上抛错，避免“成功但全 0”
       if (currentFetchIndex === 0 && rangeOrders.length === 0) {
         const error = new Error(extracted.message || '获取订单统计失败')
