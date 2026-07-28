@@ -62,6 +62,27 @@ export function updateDouyinMaterialMatch(
 }
 
 /**
+ * 保存抖音号素材匹配规则的展示和分配顺序
+ */
+export function updateDouyinMaterialMatchOrder(
+  matchIds: string[],
+  feishuTableGroupId?: string
+): Promise<DouyinMaterialMatch[]> {
+  return httpInstance
+    .put(
+      '/douyin-material/config/order',
+      {
+        matchIds,
+        feishuTableGroupId,
+      },
+      {
+        headers: buildFeishuTableGroupHeaders(feishuTableGroupId),
+      }
+    )
+    .then(res => res.data.data)
+}
+
+/**
  * 删除抖音号素材匹配规则
  */
 export function deleteDouyinMaterialMatch(id: string, feishuTableGroupId?: string): Promise<void> {

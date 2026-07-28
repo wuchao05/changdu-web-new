@@ -817,6 +817,9 @@
                               <div class="material-match-builder__toolbar">
                                 <div class="material-match-builder__selector">
                                   <p class="material-match-builder__label">选择抖音号</p>
+                                  <p class="material-match-builder__subtext">
+                                    选择后可拖动列表左侧手柄调整素材分配顺序
+                                  </p>
                                   <n-select
                                     :value="
                                       getUserChannelGroupSelectedMaterialAccountIds(
@@ -870,75 +873,87 @@
                                 </div>
                               </div>
 
-                              <div
+                              <draggable
                                 v-if="group.douyinMaterialMatches.length > 0"
+                                v-model="group.douyinMaterialMatches"
+                                item-key="id"
+                                handle=".material-match-card__drag-handle"
+                                ghost-class="material-match-card--ghost"
+                                chosen-class="material-match-card--chosen"
                                 class="material-match-list material-match-list--compact"
+                                @end="handleUserChannelMaterialSortEnd(item.channel.id, group.id)"
                               >
-                                <div
-                                  v-for="(match, matchIndex) in group.douyinMaterialMatches"
-                                  :key="match.id"
-                                  class="material-match-card material-match-card--compact"
-                                >
-                                  <div class="material-match-card__summary">
-                                    <div
-                                      class="material-match-card__items material-match-card__items--stacked"
-                                    >
-                                      <div class="material-match-card__item">
-                                        <span class="material-match-card__order">{{
-                                          matchIndex + 1
-                                        }}</span>
-                                        <div class="material-match-card__account-line">
-                                          <span class="material-match-card__name">
-                                            {{
-                                              getMaterialMatchAccountMeta(match).douyinAccount ||
-                                              '未选择抖音号'
-                                            }}
-                                          </span>
-                                          <span
-                                            v-if="
-                                              getMaterialMatchAccountMeta(match).douyinAccountId
-                                            "
-                                            class="material-match-card__account-id"
+                                <template #item="{ element: match, index: matchIndex }">
+                                  <div class="material-match-card material-match-card--compact">
+                                    <div class="material-match-card__summary">
+                                      <div
+                                        class="material-match-card__items material-match-card__items--stacked"
+                                      >
+                                        <div class="material-match-card__item">
+                                          <button
+                                            type="button"
+                                            class="material-match-card__order material-match-card__drag-handle"
+                                            :aria-label="`拖动调整第 ${matchIndex + 1} 个抖音号的顺序`"
+                                            title="按住拖动调整顺序"
                                           >
-                                            ID
-                                            {{ getMaterialMatchAccountMeta(match).douyinAccountId }}
-                                          </span>
+                                            <Icon icon="mdi:drag-vertical" />
+                                            <span>{{ matchIndex + 1 }}</span>
+                                          </button>
+                                          <div class="material-match-card__account-line">
+                                            <span class="material-match-card__name">
+                                              {{
+                                                getMaterialMatchAccountMeta(match).douyinAccount ||
+                                                '未选择抖音号'
+                                              }}
+                                            </span>
+                                            <span
+                                              v-if="
+                                                getMaterialMatchAccountMeta(match).douyinAccountId
+                                              "
+                                              class="material-match-card__account-id"
+                                            >
+                                              ID
+                                              {{
+                                                getMaterialMatchAccountMeta(match).douyinAccountId
+                                              }}
+                                            </span>
+                                          </div>
                                         </div>
-                                      </div>
-                                      <div class="material-match-card__meta-row">
-                                        <label class="material-match-card__allocation">
-                                          <span>素材数</span>
-                                          <n-input-number
-                                            :value="
-                                              getMaterialRangeCount(match.materialRange) || null
-                                            "
-                                            :min="1"
-                                            :precision="0"
-                                            placeholder="数量"
-                                            @update:value="
-                                              setUserChannelMaterialCount(
-                                                item.channel.id,
-                                                group.id,
-                                                matchIndex,
-                                                $event
-                                              )
-                                            "
-                                          />
-                                        </label>
-                                        <div class="material-match-card__range-preview">
-                                          <span class="material-match-card__range">{{
-                                            normalizeMaterialRange(match.materialRange) || '--'
-                                          }}</span>
-                                          <span class="material-match-card__count">
-                                            {{ getMaterialRangeCount(match.materialRange) || 0 }}
-                                            个素材
-                                          </span>
+                                        <div class="material-match-card__meta-row">
+                                          <label class="material-match-card__allocation">
+                                            <span>素材数</span>
+                                            <n-input-number
+                                              :value="
+                                                getMaterialRangeCount(match.materialRange) || null
+                                              "
+                                              :min="1"
+                                              :precision="0"
+                                              placeholder="数量"
+                                              @update:value="
+                                                setUserChannelMaterialCount(
+                                                  item.channel.id,
+                                                  group.id,
+                                                  matchIndex,
+                                                  $event
+                                                )
+                                              "
+                                            />
+                                          </label>
+                                          <div class="material-match-card__range-preview">
+                                            <span class="material-match-card__range">{{
+                                              normalizeMaterialRange(match.materialRange) || '--'
+                                            }}</span>
+                                            <span class="material-match-card__count">
+                                              {{ getMaterialRangeCount(match.materialRange) || 0 }}
+                                              个素材
+                                            </span>
+                                          </div>
                                         </div>
                                       </div>
                                     </div>
                                   </div>
-                                </div>
-                              </div>
+                                </template>
+                              </draggable>
 
                               <div
                                 v-else
@@ -3613,6 +3628,21 @@ function setUserChannelMaterialCount(
   rebuildUserChannelGroupMaterialRanges(channelId, groupId, materialCounts)
 }
 
+function handleUserChannelMaterialSortEnd(channelId: string, groupId: string) {
+  const group = ensureUserChannelFeishuGroups(channelId).find(item => item.id === groupId)
+  if (!group) return
+
+  const key = getFeishuTableGroupKey(channelId, groupId)
+  selectedMaterialAccountIdsByChannel[key] = group.douyinMaterialMatches
+    .map(match => String(match.douyinAccountRefId || '').trim())
+    .filter(Boolean)
+  rebuildUserChannelGroupMaterialRanges(
+    channelId,
+    groupId,
+    group.douyinMaterialMatches.map(match => getMaterialRangeCount(match.materialRange))
+  )
+}
+
 function countUserCustomizableSections(
   channel: adminApi.ChannelConfig,
   config: adminApi.UserChannelBindingConfig
@@ -5805,6 +5835,31 @@ watch(
   color: #6d28d9;
   font-size: 0.75rem;
   font-weight: 700;
+}
+
+.material-match-card__drag-handle {
+  width: 2.4rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  gap: 0;
+  cursor: grab;
+  user-select: none;
+}
+
+.material-match-card__drag-handle:active {
+  cursor: grabbing;
+}
+
+.material-match-card--ghost {
+  opacity: 0.35;
+  border-color: #a78bfa;
+  background: #f5f3ff;
+}
+
+.material-match-card--chosen {
+  border-color: #8b5cf6;
+  box-shadow: 0 18px 36px -24px rgba(109, 40, 217, 0.48);
 }
 
 .material-match-card__item--muted {

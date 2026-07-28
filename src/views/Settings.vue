@@ -234,7 +234,7 @@
                 </n-button>
               </div>
               <p class="material-panel__note">
-                可直接为每个抖音号指定素材数；修改素材总数仍会自动平均分配。同一渠道内已占用的抖音号不可重复选择。
+                拖动左侧序号可调整抖音号顺序，也可直接指定每个抖音号的素材数；修改素材总数仍会自动平均分配。
               </p>
             </div>
 
@@ -270,52 +270,67 @@
               </p>
             </div>
 
-            <div v-if="materialMatches.length" class="material-rule-grid">
-              <div
-                v-for="(match, index) in materialMatches"
-                :key="match.id"
-                class="material-rule-card material-rule-card--compact"
-              >
-                <div class="material-rule-card__index">{{ index + 1 }}</div>
-                <div class="material-rule-card__content">
-                  <div class="material-rule-card__top">
-                    <div class="material-rule-card__account-block">
-                      <p class="material-rule-card__account-name-row">
-                        <span class="material-rule-card__account-name">
-                          {{ getMaterialMatchAccountMeta(match).douyinAccount || '未命名抖音号' }}
-                        </span>
-                        <span
-                          v-if="getMaterialMatchAccountMeta(match).douyinAccountId"
-                          class="material-rule-card__account-id"
-                        >
-                          ID {{ getMaterialMatchAccountMeta(match).douyinAccountId }}
-                        </span>
-                      </p>
+            <draggable
+              v-if="materialMatches.length"
+              v-model="materialMatches"
+              item-key="id"
+              handle=".material-rule-card__drag-handle"
+              ghost-class="material-rule-card--ghost"
+              chosen-class="material-rule-card--chosen"
+              class="material-rule-grid"
+              @end="handleMaterialMatchSortEnd"
+            >
+              <template #item="{ element: match, index }">
+                <div class="material-rule-card material-rule-card--compact">
+                  <button
+                    type="button"
+                    class="material-rule-card__index material-rule-card__drag-handle"
+                    :aria-label="`拖动调整第 ${index + 1} 个抖音号的顺序`"
+                    title="按住拖动调整顺序"
+                  >
+                    <Icon icon="mdi:drag-vertical" class="material-rule-card__drag-icon" />
+                    <span>{{ index + 1 }}</span>
+                  </button>
+                  <div class="material-rule-card__content">
+                    <div class="material-rule-card__top">
+                      <div class="material-rule-card__account-block">
+                        <p class="material-rule-card__account-name-row">
+                          <span class="material-rule-card__account-name">
+                            {{ getMaterialMatchAccountMeta(match).douyinAccount || '未命名抖音号' }}
+                          </span>
+                          <span
+                            v-if="getMaterialMatchAccountMeta(match).douyinAccountId"
+                            class="material-rule-card__account-id"
+                          >
+                            ID {{ getMaterialMatchAccountMeta(match).douyinAccountId }}
+                          </span>
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  <div class="material-rule-card__bottom material-rule-card__bottom--compact">
-                    <label class="material-rule-card__allocation">
-                      <span>素材数</span>
-                      <n-input-number
-                        :value="getMaterialRangeCount(match.materialRange) || null"
-                        :min="1"
-                        :precision="0"
-                        placeholder="数量"
-                        @update:value="setMaterialMatchCount(index, $event)"
-                      />
-                    </label>
-                    <div class="material-rule-card__range-preview">
-                      <span class="material-rule-card__range">{{
-                        normalizeMaterialRange(match.materialRange) || '--'
-                      }}</span>
-                      <span class="material-rule-card__count">
-                        {{ getMaterialRangeCount(match.materialRange) || 0 }} 个素材
-                      </span>
+                    <div class="material-rule-card__bottom material-rule-card__bottom--compact">
+                      <label class="material-rule-card__allocation">
+                        <span>素材数</span>
+                        <n-input-number
+                          :value="getMaterialRangeCount(match.materialRange) || null"
+                          :min="1"
+                          :precision="0"
+                          placeholder="数量"
+                          @update:value="setMaterialMatchCount(index, $event)"
+                        />
+                      </label>
+                      <div class="material-rule-card__range-preview">
+                        <span class="material-rule-card__range">{{
+                          normalizeMaterialRange(match.materialRange) || '--'
+                        }}</span>
+                        <span class="material-rule-card__count">
+                          {{ getMaterialRangeCount(match.materialRange) || 0 }} 个素材
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
+              </template>
+            </draggable>
 
             <div
               v-else
@@ -383,6 +398,7 @@
 import { computed, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useMessage, useDialog, NButton, NCard, NInput, NSelect, NInputNumber } from 'naive-ui'
+import draggable from 'vuedraggable'
 import { getBuildBidConfig, updateBuildBidConfig, type BuildBidConfig } from '@/api/buildBid'
 import { updateCurrentChannelXtToken, type UserChannelBindingConfig } from '@/api/admin'
 import { useSettingsStore } from '@/stores/settings'
@@ -1075,6 +1091,15 @@ function setMaterialMatchCount(index: number, value: number | null) {
   rebuildMaterialRanges(materialCounts)
 }
 
+function handleMaterialMatchSortEnd() {
+  selectedMaterialAccountIds.value = materialMatches.value
+    .map(match => String(match.douyinAccountRefId || '').trim())
+    .filter(Boolean)
+  rebuildMaterialRanges(
+    materialMatches.value.map(match => getMaterialRangeCount(match.materialRange))
+  )
+}
+
 async function saveAllMaterialMatches() {
   const feishuTableGroupId = selectedFeishuTableGroupId.value
   if (!feishuTableGroupId) {
@@ -1107,6 +1132,7 @@ async function saveAllMaterialMatches() {
   const originalMatchMap = new Map(
     originalMatches.map(match => [String(match.douyinAccountRefId || '').trim(), match])
   )
+  const orderedMatchIds: string[] = []
 
   savingAllMaterialMatches.value = true
   try {
@@ -1120,22 +1146,25 @@ async function saveAllMaterialMatches() {
     for (const match of targetMatches) {
       const existingMatch = originalMatchMap.get(match.douyinAccountRefId)
       if (existingMatch) {
-        await douyinMaterialStore.updateMatch(
+        const updatedMatch = await douyinMaterialStore.updateMatch(
           existingMatch.id,
           match.douyinAccountRefId,
           match.materialRange,
           feishuTableGroupId
         )
+        orderedMatchIds.push(updatedMatch.id)
         continue
       }
 
-      await douyinMaterialStore.addMatch(
+      const createdMatch = await douyinMaterialStore.addMatch(
         match.douyinAccountRefId,
         match.materialRange,
         feishuTableGroupId
       )
+      orderedMatchIds.push(createdMatch.id)
     }
 
+    await douyinMaterialStore.updateMatchOrder(orderedMatchIds, feishuTableGroupId)
     await douyinMaterialStore.loadFromServer(true, undefined, feishuTableGroupId)
     await sessionStore.loadSession()
     message.success('抖音号素材配置已保存')
@@ -1338,6 +1367,36 @@ async function resetAllSettings() {
   color: #2563eb;
   font-size: 13px;
   font-weight: 700;
+}
+
+.material-rule-card__drag-handle {
+  flex-direction: column;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  cursor: grab;
+  user-select: none;
+}
+
+.material-rule-card__drag-handle:active {
+  cursor: grabbing;
+}
+
+.material-rule-card__drag-icon {
+  width: 15px;
+  height: 15px;
+  margin-bottom: -2px;
+}
+
+.material-rule-card--ghost {
+  opacity: 0.35;
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.material-rule-card--chosen {
+  border-color: #60a5fa;
+  box-shadow: 0 16px 32px rgba(37, 99, 235, 0.16);
 }
 
 .material-rule-card__content {

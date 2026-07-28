@@ -244,6 +244,24 @@ export const useDouyinMaterialStore = defineStore('douyinMaterial', () => {
   }
 
   /**
+   * 保存匹配规则顺序
+   */
+  async function updateMatchOrder(matchIds: string[], feishuTableGroupId = '') {
+    try {
+      const orderedMatches = await douyinMaterialApi.updateDouyinMaterialMatchOrder(
+        matchIds,
+        feishuTableGroupId
+      )
+      matches.value = normalizeMatches(orderedMatches)
+      saveToCache(feishuTableGroupId)
+      return matches.value
+    } catch (error) {
+      console.error('更新抖音号素材匹配规则顺序失败:', error)
+      throw error
+    }
+  }
+
+  /**
    * 删除匹配规则
    */
   async function deleteMatch(id: string, feishuTableGroupId = '') {
@@ -273,6 +291,7 @@ export const useDouyinMaterialStore = defineStore('douyinMaterial', () => {
     loadFromServer,
     addMatch,
     updateMatch,
+    updateMatchOrder,
     deleteMatch,
     findMaterialRange,
   }

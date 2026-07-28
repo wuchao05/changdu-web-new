@@ -290,6 +290,51 @@ router.post('/config', async ctx => {
   }
 })
 
+router.put('/config/order', async ctx => {
+  try {
+    const requestedMatchIds = Array.isArray(ctx.request.body?.matchIds)
+      ? ctx.request.body.matchIds.map(item => String(item || '').trim()).filter(Boolean)
+      : []
+    const uniqueMatchIds = Array.from(new Set(requestedMatchIds))
+    const { user, channelConfig, channelId } = await getCurrentUserContext(ctx)
+    const feishuTableGroupId = getRequestedFeishuTableGroupId(ctx)
+    assertDouyinMaterialCustomizable(ctx, channelConfig)
+    const targetGroup = getTargetFeishuTableGroup(channelConfig, feishuTableGroupId)
+    const matches = targetGroup.douyinMaterialMatches
+    const currentMatchMap = new Map(matches.map(match => [String(match.id || '').trim(), match]))
+
+    if (
+      uniqueMatchIds.length !== matches.length ||
+      uniqueMatchIds.some(matchId => !currentMatchMap.has(matchId))
+    ) {
+      ctx.status = 400
+      ctx.body = {
+        code: -1,
+        message: '素材配置已变化，请刷新后重新排序',
+      }
+      return
+    }
+
+    targetGroup.douyinMaterialMatches = uniqueMatchIds.map(matchId => currentMatchMap.get(matchId))
+    syncDefaultFeishuTableGroupMatches(channelConfig)
+    user.updatedAt = new Date().toISOString()
+    const savedUser = await writeUser(user)
+
+    ctx.body = {
+      code: 0,
+      message: '排序保存成功',
+      data: getResolvedMatches(savedUser, channelId, feishuTableGroupId),
+    }
+  } catch (error) {
+    ctx.status = error.status || 500
+    ctx.body = {
+      code: -1,
+      message: error.message || '排序保存失败',
+      error: error.message,
+    }
+  }
+})
+
 router.put('/config/:id', async ctx => {
   try {
     const { id } = ctx.params
