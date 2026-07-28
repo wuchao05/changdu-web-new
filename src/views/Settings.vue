@@ -215,11 +215,12 @@
                 <div class="material-panel__average-box">
                   <span class="material-panel__average-label">素材总数</span>
                   <n-input-number
-                    v-model:value="averageMaterialTotal"
+                    :value="averageMaterialTotal"
                     :min="1"
                     :precision="0"
                     placeholder="素材总数"
                     class="material-panel__average-input"
+                    @update:value="setAverageMaterialTotal"
                   />
                 </div>
                 <n-button
@@ -233,7 +234,7 @@
                 </n-button>
               </div>
               <p class="material-panel__note">
-                先选择表格组和抖音号，再填写素材总数自动平均分配；同一渠道内已占用的抖音号不可重复选择。
+                可直接为每个抖音号指定素材数；修改素材总数仍会自动平均分配。同一渠道内已占用的抖音号不可重复选择。
               </p>
             </div>
 
@@ -293,12 +294,24 @@
                     </div>
                   </div>
                   <div class="material-rule-card__bottom material-rule-card__bottom--compact">
-                    <span class="material-rule-card__range">{{
-                      normalizeMaterialRange(match.materialRange) || '--'
-                    }}</span>
-                    <span class="material-rule-card__count">
-                      {{ getMaterialRangeCount(match.materialRange) || 0 }} 个素材
-                    </span>
+                    <label class="material-rule-card__allocation">
+                      <span>素材数</span>
+                      <n-input-number
+                        :value="getMaterialRangeCount(match.materialRange) || null"
+                        :min="1"
+                        :precision="0"
+                        placeholder="数量"
+                        @update:value="setMaterialMatchCount(index, $event)"
+                      />
+                    </label>
+                    <div class="material-rule-card__range-preview">
+                      <span class="material-rule-card__range">{{
+                        normalizeMaterialRange(match.materialRange) || '--'
+                      }}</span>
+                      <span class="material-rule-card__count">
+                        {{ getMaterialRangeCount(match.materialRange) || 0 }} 个素材
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -308,7 +321,7 @@
               v-else
               class="rounded-2xl border border-dashed border-gray-300 bg-white px-4 py-10 text-center text-sm text-gray-500"
             >
-              先从上方选择抖音号，再填写素材总数自动平均分配。
+              先从上方选择抖音号，再为每个抖音号指定素材数。
             </div>
           </div>
         </n-card>
@@ -739,14 +752,6 @@ watch(
   { deep: true }
 )
 
-watch(averageMaterialTotal, value => {
-  if (!materialMatchesWithAccountCount.value || !value) {
-    return
-  }
-
-  applyAverageMaterialRanges(true)
-})
-
 watch(
   () => sessionStore.activeChannelId,
   activeChannelId => {
@@ -971,12 +976,14 @@ function syncMaterialMatchesFromSelectedIds(accountIds: string[]) {
       : createDraftMaterialMatch(accountId)
   })
 
-  if (averageMaterialTotal.value) {
-    applyAverageMaterialRanges(true)
+  if (!materialMatches.value.length) {
+    averageMaterialTotal.value = null
     return
   }
 
-  averageMaterialTotal.value = getMaterialMatchTotalCount(materialMatches.value)
+  rebuildMaterialRanges(
+    materialMatches.value.map(match => getMaterialRangeCount(match.materialRange) || 1)
+  )
 }
 
 function handleMaterialSelectionChange(value: string[] | null) {
@@ -1024,13 +1031,25 @@ function applyAverageMaterialRanges(silent = false) {
 
   const baseCount = Math.floor(totalCount / matches.length)
   const remainder = totalCount % matches.length
+  rebuildMaterialRanges(matches.map((_, index) => baseCount + (index < remainder ? 1 : 0)))
+
+  if (!silent) {
+    message.success(`已按 ${matches.length} 个抖音号平均分配 ${totalCount} 个素材`)
+  }
+}
+
+function rebuildMaterialRanges(materialCounts: number[]) {
   let currentIndex = 1
 
-  matches.forEach((match, index) => {
-    const count = baseCount + (index < remainder ? 1 : 0)
+  materialMatches.value.forEach((match, index) => {
+    const count = Math.floor(Number(materialCounts[index]))
+    if (!Number.isFinite(count) || count <= 0) {
+      match.materialRange = ''
+      return
+    }
+
     const start = currentIndex
     const end = currentIndex + count - 1
-
     match.materialRange =
       count === 1
         ? formatMaterialRangeNumber(start)
@@ -1038,9 +1057,22 @@ function applyAverageMaterialRanges(silent = false) {
     currentIndex = end + 1
   })
 
-  if (!silent) {
-    message.success(`已按 ${matches.length} 个抖音号平均分配 ${totalCount} 个素材`)
+  averageMaterialTotal.value = currentIndex > 1 ? currentIndex - 1 : null
+}
+
+function setAverageMaterialTotal(value: number | null) {
+  averageMaterialTotal.value = value
+  if (value && materialMatchesWithAccountCount.value > 0) {
+    applyAverageMaterialRanges(true)
   }
+}
+
+function setMaterialMatchCount(index: number, value: number | null) {
+  const materialCounts = materialMatches.value.map(match =>
+    getMaterialRangeCount(match.materialRange)
+  )
+  materialCounts[index] = Number(value) || 0
+  rebuildMaterialRanges(materialCounts)
 }
 
 async function saveAllMaterialMatches() {
@@ -1061,7 +1093,7 @@ async function saveAllMaterialMatches() {
 
   const invalidMatch = materialMatches.value.find(match => !isMaterialMatchValid(match))
   if (invalidMatch) {
-    message.warning('请先填写素材总数完成平均分配')
+    message.warning('请为每个已选择的抖音号填写有效的素材数')
     return
   }
 
@@ -1351,6 +1383,21 @@ async function resetAllSettings() {
 }
 
 .material-rule-card__bottom--compact {
+  display: grid;
+  gap: 10px;
+}
+
+.material-rule-card__allocation {
+  display: grid;
+  grid-template-columns: auto minmax(88px, 120px);
+  align-items: center;
+  gap: 10px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.material-rule-card__range-preview {
   display: flex;
   align-items: center;
   justify-content: space-between;

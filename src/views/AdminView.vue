@@ -906,13 +906,34 @@
                                         </div>
                                       </div>
                                       <div class="material-match-card__meta-row">
-                                        <span class="material-match-card__range">{{
-                                          normalizeMaterialRange(match.materialRange) || '--'
-                                        }}</span>
-                                        <span class="material-match-card__count">
-                                          {{ getMaterialRangeCount(match.materialRange) || 0 }}
-                                          个素材
-                                        </span>
+                                        <label class="material-match-card__allocation">
+                                          <span>素材数</span>
+                                          <n-input-number
+                                            :value="
+                                              getMaterialRangeCount(match.materialRange) || null
+                                            "
+                                            :min="1"
+                                            :precision="0"
+                                            placeholder="数量"
+                                            @update:value="
+                                              setUserChannelMaterialCount(
+                                                item.channel.id,
+                                                group.id,
+                                                matchIndex,
+                                                $event
+                                              )
+                                            "
+                                          />
+                                        </label>
+                                        <div class="material-match-card__range-preview">
+                                          <span class="material-match-card__range">{{
+                                            normalizeMaterialRange(match.materialRange) || '--'
+                                          }}</span>
+                                          <span class="material-match-card__count">
+                                            {{ getMaterialRangeCount(match.materialRange) || 0 }}
+                                            个素材
+                                          </span>
+                                        </div>
                                       </div>
                                     </div>
                                   </div>
@@ -923,7 +944,7 @@
                                 v-else
                                 class="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-500"
                               >
-                                先选择该表格组使用的抖音号，再填写素材总数自动平均分配。
+                                先选择该表格组使用的抖音号，再为每个抖音号指定素材数。
                               </div>
                             </div>
                           </div>
@@ -3488,12 +3509,16 @@ function handleUserChannelGroupMaterialSelectionChange(
   selectedMaterialAccountIdsByChannel[key] = selectedIds
   syncDefaultUserChannelFeishuGroup(channelId)
 
-  if (materialMatchBatchTotals[key]) {
-    applyUserChannelGroupAverageMaterialRanges(channelId, groupId, true)
+  if (!group.douyinMaterialMatches.length) {
+    materialMatchBatchTotals[key] = null
     return
   }
 
-  syncUserChannelGroupMaterialBatchTotal(channelId, groupId)
+  rebuildUserChannelGroupMaterialRanges(
+    channelId,
+    groupId,
+    group.douyinMaterialMatches.map(match => getMaterialRangeCount(match.materialRange) || 1)
+  )
 }
 
 function setMaterialMatchGroupBatchTotal(channelId: string, groupId: string, value: number | null) {
@@ -3531,13 +3556,35 @@ function applyUserChannelGroupAverageMaterialRanges(
 
   const baseCount = Math.floor(totalCount / matches.length)
   const remainder = totalCount % matches.length
-  let currentIndex = 1
+  rebuildUserChannelGroupMaterialRanges(
+    channelId,
+    groupId,
+    matches.map((_, index) => baseCount + (index < remainder ? 1 : 0))
+  )
 
-  matches.forEach((match, index) => {
-    const count = baseCount + (index < remainder ? 1 : 0)
+  if (!silent) {
+    message.success(`已为当前表格组平均分配 ${totalCount} 个素材`)
+  }
+}
+
+function rebuildUserChannelGroupMaterialRanges(
+  channelId: string,
+  groupId: string,
+  materialCounts: number[]
+) {
+  const group = ensureUserChannelFeishuGroups(channelId).find(item => item.id === groupId)
+  if (!group) return
+
+  let currentIndex = 1
+  group.douyinMaterialMatches.forEach((match, index) => {
+    const count = Math.floor(Number(materialCounts[index]))
+    if (!Number.isFinite(count) || count <= 0) {
+      match.materialRange = ''
+      return
+    }
+
     const start = currentIndex
     const end = currentIndex + count - 1
-
     match.materialRange =
       count === 1
         ? formatMaterialRangeNumber(start)
@@ -3545,11 +3592,25 @@ function applyUserChannelGroupAverageMaterialRanges(
     currentIndex = end + 1
   })
 
+  materialMatchBatchTotals[getFeishuTableGroupKey(channelId, groupId)] =
+    currentIndex > 1 ? currentIndex - 1 : null
   syncDefaultUserChannelFeishuGroup(channelId)
+}
 
-  if (!silent) {
-    message.success(`已为当前表格组平均分配 ${totalCount} 个素材`)
-  }
+function setUserChannelMaterialCount(
+  channelId: string,
+  groupId: string,
+  matchIndex: number,
+  value: number | null
+) {
+  const group = ensureUserChannelFeishuGroups(channelId).find(item => item.id === groupId)
+  if (!group) return
+
+  const materialCounts = group.douyinMaterialMatches.map(match =>
+    getMaterialRangeCount(match.materialRange)
+  )
+  materialCounts[matchIndex] = Number(value) || 0
+  rebuildUserChannelGroupMaterialRanges(channelId, groupId, materialCounts)
 }
 
 function countUserCustomizableSections(
@@ -3956,7 +4017,7 @@ async function saveUser() {
           }
 
           if (!hasRef || !hasRange) {
-            message.error(`【${groupLabel}】请先填写素材总数并完成平均分配`)
+            message.error(`【${groupLabel}】请为每个已选择的抖音号填写有效的素材数`)
             return
           }
 
@@ -5698,6 +5759,23 @@ watch(
   flex-direction: column;
   align-items: stretch;
   gap: 0.55rem;
+}
+
+.material-match-card__allocation {
+  display: grid;
+  grid-template-columns: auto minmax(88px, 120px);
+  align-items: center;
+  gap: 0.55rem;
+  color: #475569;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.material-match-card__range-preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
 }
 
 .material-match-card__item {
