@@ -80,6 +80,7 @@ function generateABogus(payload) {
   const reverseDirCandidates = [
     process.env.CHANGDU_REVERSE_DIR,
     '/Users/wuchao/Documents/code/reverse/changdu',
+    path.resolve(process.cwd(), 'server/data/reverse-bogus'),
   ].filter(Boolean);
   const reverseDir = reverseDirCandidates.find(candidate => {
     return (

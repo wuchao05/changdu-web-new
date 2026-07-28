@@ -8,11 +8,13 @@ const execFileAsync = promisify(execFile)
 
 const CHANGDU_INTERNAL_BASE_URL = 'https://www.changdupingtai.com'
 const LEGACY_LOCAL_REVERSE_DIR = '/Users/wuchao/Documents/code/reverse/changdu'
+const PROJECT_REVERSE_DIR = path.resolve(process.cwd(), 'server/data/reverse-bogus')
 const CHANGDU_BOGUS_SCRIPT = path.resolve(process.cwd(), 'server/scripts/generate-abogus.cjs')
 const LOCAL_ABOGUS_API_URL = `http://127.0.0.1:${process.env.PORT || 3000}/api/novelsale/a-bogus`
 const DEFAULT_REVERSE_DIR_CANDIDATES = [
   process.env.CHANGDU_REVERSE_DIR,
   LEGACY_LOCAL_REVERSE_DIR,
+  PROJECT_REVERSE_DIR,
 ].filter(Boolean)
 const DEFAULT_CHANNEL_HEADERS = {
   appid: '40012555',
@@ -21,7 +23,8 @@ const DEFAULT_CHANNEL_HEADERS = {
 }
 const INTERNAL_USER_AGENT =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36'
-const USE_ABOGUS_API_FOR_INTERNAL_REQUEST = true
+// 默认走本地脚本生成，避免请求自己的 /a-bogus 接口造成递归和额外失败点
+const USE_ABOGUS_API_FOR_INTERNAL_REQUEST = false
 
 function isValidReverseDir(reverseDir) {
   return Boolean(
@@ -100,13 +103,26 @@ export function normalizeChangduHeaders(inputHeaders = {}) {
 async function getChannelInternalHeaders(ctx = null) {
   const authConfig = await readAuthConfig(ctx)
   const channelConfig = authConfig.platforms?.changdu?.channel || {}
+  const requestHeaders = ctx?.headers || {}
+  // 前端 GET 会把 cookie 放在 query；优先使用请求侧鉴权，避免渠道配置过期
+  const requestCookie = ctx
+    ? String(ctx.query?.cookie || ctx.request?.body?.cookie || '').trim()
+    : ''
 
   const headers = normalizeChangduHeaders({
-    cookie: channelConfig.cookie,
-    aduserid: channelConfig.adUserId,
-    distributorid: channelConfig.distributorId,
-    appid: channelConfig.appId,
-    apptype: channelConfig.appType,
+    cookie: requestCookie || channelConfig.cookie,
+    aduserid:
+      requestHeaders.aduserid ||
+      requestHeaders.Aduserid ||
+      requestHeaders.adUserId ||
+      channelConfig.adUserId,
+    distributorid:
+      requestHeaders.distributorid ||
+      requestHeaders.Distributorid ||
+      requestHeaders.distributorId ||
+      channelConfig.distributorId,
+    appid: requestHeaders.appid || requestHeaders.Appid || channelConfig.appId,
+    apptype: requestHeaders.apptype || requestHeaders.Apptype || channelConfig.appType,
     agwJsConv: channelConfig.agwJsConv,
   })
 

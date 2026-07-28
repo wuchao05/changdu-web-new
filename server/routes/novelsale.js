@@ -514,6 +514,49 @@ function splitOrderTimeRange(beginTime, endTime, maxDays = MAX_ORDER_RANGE_DAYS)
   return ranges
 }
 
+async function fetchPromotionDetailPage(ctx, query) {
+  const upstreamQuery = { ...query }
+  delete upstreamQuery.cookie
+
+  // 优先走带 a_bogus 的常读内部接口（与新剧列表一致）。
+  // 旧的裸转发常会拿到 HTTP 200 + 空 body，最终被误判成“无订单”。
+  let internalError = null
+  try {
+    const result = await requestChangduInternalApi({
+      method: 'GET',
+      pathname: '/novelsale/distributor/promotion/detail/v2/',
+      query: upstreamQuery,
+      ctx,
+    })
+    return {
+      body: result.data,
+      source: 'internal_abogus',
+      internalError: null,
+    }
+  } catch (error) {
+    internalError = error instanceof Error ? error.message : String(error)
+    console.warn('[订单统计] a_bogus 内部请求失败，回退普通代理:', {
+      message: internalError,
+      begin_time: upstreamQuery.begin_time,
+      end_time: upstreamQuery.end_time,
+      page_index: upstreamQuery.page_index,
+    })
+  }
+
+  const originalQuery = ctx.query
+  ctx.query = query
+  try {
+    await createGetHandler('Promotion Detail', '/novelsale/distributor/promotion/detail/v2/')(ctx)
+    return {
+      body: ctx.body,
+      source: 'proxy_fallback',
+      internalError,
+    }
+  } finally {
+    ctx.query = originalQuery
+  }
+}
+
 async function fetchAllOrdersByRange(ctx, timeRange) {
   const rangeOrders = []
   let currentFetchIndex = 0
@@ -529,37 +572,44 @@ async function fetchAllOrdersByRange(ctx, timeRange) {
       page_index: currentFetchIndex.toString(),
     })
 
-    const originalQuery = ctx.query
-    ctx.query = modifiedQuery
-
-    await createGetHandler('Promotion Detail', '/novelsale/distributor/promotion/detail/v2/')(ctx)
-
-    ctx.query = originalQuery
-
-    const upstreamBody = ctx.body
+    const pageResult = await fetchPromotionDetailPage(ctx, modifiedQuery)
+    const upstreamBody = pageResult.body
     const extracted = extractPromotionDetailOrders(upstreamBody)
     if (!extracted.ok || !Array.isArray(extracted.orders)) {
+      const isEmptyBody =
+        upstreamBody === '' ||
+        upstreamBody === null ||
+        upstreamBody === undefined ||
+        (typeof upstreamBody === 'string' && upstreamBody.trim() === '')
       const upstreamPreview =
         typeof upstreamBody === 'string'
           ? upstreamBody.slice(0, 200)
           : upstreamBody && typeof upstreamBody === 'object'
             ? JSON.stringify(upstreamBody).slice(0, 200)
             : String(upstreamBody ?? '')
+      let message = isEmptyBody
+        ? '订单接口响应为空，常读可能拦截了未签名请求或 Cookie 无效'
+        : extracted.message || '订单接口响应格式异常，无法解析订单列表'
+      if (pageResult.internalError) {
+        message = `${message}（a_bogus 签名请求失败: ${pageResult.internalError}）`
+      }
 
       console.error('[订单统计] 上游响应无法解析为订单列表', {
+        source: pageResult.source,
         begin_time: timeRange.begin_time,
         end_time: timeRange.end_time,
         page_index: currentFetchIndex,
         page_size: fetchPageSize,
         code: extracted.code,
-        message: extracted.message,
+        message,
+        internalError: pageResult.internalError || '',
         bodyType: typeof upstreamBody,
         bodyPreview: upstreamPreview,
       })
 
       // 首页解析失败：向上抛错，避免“成功但全 0”
       if (currentFetchIndex === 0 && rangeOrders.length === 0) {
-        const error = new Error(extracted.message || '获取订单统计失败')
+        const error = new Error(message)
         error.code = extracted.code
         throw error
       }
