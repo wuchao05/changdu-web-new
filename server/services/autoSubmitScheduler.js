@@ -695,14 +695,12 @@ async function resolvePersistedInstanceKey(instanceKey, savedState = {}) {
   const parsedIdentity = parseRuntimeInstanceKey(normalizedInstanceKey)
   const stateUserId = String(savedState.userId || '').trim()
   const stateChannelId = String(savedState.channelId || parsedIdentity.channelId || '').trim()
+  const parsedUserId =
+    parsedIdentity.userId && parsedIdentity.userId !== 'anonymous' ? parsedIdentity.userId : ''
 
-  if (parsedIdentity.userId && parsedIdentity.userId !== 'anonymous' && stateChannelId) {
-    return normalizedInstanceKey
-  }
-
-  if (stateUserId && stateChannelId) {
+  if ((stateUserId || parsedUserId) && stateChannelId) {
     return buildRuntimeInstanceKey({
-      userId: stateUserId,
+      userId: stateUserId || parsedUserId,
       channelId: stateChannelId,
     })
   }
@@ -2495,7 +2493,24 @@ export async function listSchedulerStatuses() {
     }
   }
 
-  return instanceKeys.map(instanceKey => getSchedulerStatus(instanceKey))
+  const statusMap = new Map()
+  for (const instanceKey of Object.keys(schedulers)) {
+    const status = getSchedulerStatus(instanceKey)
+    if (!status.userId || !status.channelId) {
+      continue
+    }
+
+    const canonicalKey = buildRuntimeInstanceKey({
+      userId: status.userId,
+      channelId: status.channelId,
+    })
+    const existingStatus = statusMap.get(canonicalKey)
+    if (!existingStatus || status.instanceKey === canonicalKey) {
+      statusMap.set(canonicalKey, status)
+    }
+  }
+
+  return [...statusMap.values()]
 }
 
 /**
