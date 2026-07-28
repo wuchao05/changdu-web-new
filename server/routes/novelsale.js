@@ -420,6 +420,76 @@ function normalizeTimestamp(value) {
   return Number.isFinite(numericValue) ? Math.floor(numericValue) : 0
 }
 
+/**
+ * 解析常读推广订单接口响应。
+ * 兼容两种历史/线上结构：
+ * 1) { code, data: OrderItem[], total }
+ * 2) { code, data: { data: OrderItem[], total } }
+ * 过去只认第 1 种，遇到第 2 种会静默当成“无订单”并返回全 0。
+ */
+function extractPromotionDetailOrders(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return {
+      ok: false,
+      code: undefined,
+      message: '订单接口响应为空或格式异常',
+      orders: null,
+      total: 0,
+    }
+  }
+
+  const code = body.code
+  const message = String(body.message || '').trim()
+
+  if (code !== undefined && code !== 0) {
+    return {
+      ok: false,
+      code,
+      message: message || `订单接口返回错误 code=${code}`,
+      orders: null,
+      total: 0,
+    }
+  }
+
+  if (Array.isArray(body.data)) {
+    return {
+      ok: true,
+      code,
+      message,
+      orders: body.data,
+      total: Number(body.total ?? body.data.length ?? 0) || 0,
+    }
+  }
+
+  if (body.data && typeof body.data === 'object') {
+    const nestedOrders = Array.isArray(body.data.data)
+      ? body.data.data
+      : Array.isArray(body.data.list)
+        ? body.data.list
+        : Array.isArray(body.data.orders)
+          ? body.data.orders
+          : null
+
+    if (nestedOrders) {
+      return {
+        ok: true,
+        code,
+        message,
+        orders: nestedOrders,
+        total: Number(body.data.total ?? body.total ?? nestedOrders.length ?? 0) || 0,
+      }
+    }
+  }
+
+  return {
+    ok: false,
+    code,
+    message: message || '订单接口响应格式异常，无法解析订单列表',
+    orders: null,
+    total: 0,
+  }
+}
+
 function splitOrderTimeRange(beginTime, endTime, maxDays = MAX_ORDER_RANGE_DAYS) {
   const normalizedBegin = normalizeTimestamp(beginTime)
   const normalizedEnd = normalizeTimestamp(endTime)
@@ -451,10 +521,6 @@ async function fetchAllOrdersByRange(ctx, timeRange) {
   let hasMoreData = true
 
   while (hasMoreData) {
-    // console.log(
-    //   `🔄 [订单统计] 时间段 ${timeRange.begin_time}-${timeRange.end_time} 第 ${currentFetchIndex + 1} 次请求，已有 ${rangeOrders.length} 条`
-    // )
-
     const modifiedQuery = buildPromotionDetailQuery(ctx.query, {
       begin_time: String(timeRange.begin_time),
       end_time: String(timeRange.end_time),
@@ -469,29 +535,29 @@ async function fetchAllOrdersByRange(ctx, timeRange) {
 
     ctx.query = originalQuery
 
-    if (!ctx.body || !Array.isArray(ctx.body.data)) {
-      // console.log(
-      //   `⚠️ [订单统计] 时间段 ${timeRange.begin_time}-${timeRange.end_time} 响应格式错误，停止`
-      // )
+    const extracted = extractPromotionDetailOrders(ctx.body)
+    if (!extracted.ok || !Array.isArray(extracted.orders)) {
+      // 首页解析失败：向上抛错，避免“成功但全 0”
+      if (currentFetchIndex === 0 && rangeOrders.length === 0) {
+        const error = new Error(extracted.message || '获取订单统计失败')
+        error.code = extracted.code
+        throw error
+      }
+      // 后续页异常则停止翻页，保留已拉取数据
       break
     }
 
-    const batchOrders = ctx.body.data
-    const batchTotal = ctx.body.total || 0
+    const batchOrders = extracted.orders
+    const batchTotal = extracted.total
 
     if (batchOrders.length === 0) {
-      // console.log(`✅ [订单统计] 时间段 ${timeRange.begin_time}-${timeRange.end_time} 已到末尾`)
       break
     }
 
     rangeOrders.push(...batchOrders)
 
-    // console.log(
-    //   `  📦 时间段 ${timeRange.begin_time}-${timeRange.end_time}: 本批 ${batchOrders.length} 条，总计 ${batchTotal} 条，累计 ${rangeOrders.length} 条`
-    // )
-
     const fetchedCount = (currentFetchIndex + 1) * fetchPageSize
-    if (fetchedCount >= batchTotal) {
+    if (batchTotal > 0 ? fetchedCount >= batchTotal : batchOrders.length < fetchPageSize) {
       hasMoreData = false
     }
 
@@ -737,86 +803,102 @@ router.get('/distributor/application_overview_list/v1', async ctx => {
 
 // 推广详情 - 统一全量拉取后返回给前端分页
 router.get('/distributor/promotion/detail/v2', async ctx => {
-  const channelDouyinAccounts = ctx.query.channel_douyin_accounts
-  const selectedPromotionUserName = String(ctx.query.promotion_user_name || '').trim()
-  const orderUserStatsConfig = await resolveOrderUserStatsRuntime(ctx)
-  const promotionUserTargets =
-    orderUserStatsConfig.enabled && orderUserStatsConfig.canViewAllOrders
-      ? normalizePromotionUserTargets(orderUserStatsConfig.matchTargets)
+  try {
+    const channelDouyinAccounts = ctx.query.channel_douyin_accounts
+    const selectedPromotionUserName = String(ctx.query.promotion_user_name || '').trim()
+    const orderUserStatsConfig = await resolveOrderUserStatsRuntime(ctx)
+    const promotionUserTargets =
+      orderUserStatsConfig.enabled && orderUserStatsConfig.canViewAllOrders
+        ? normalizePromotionUserTargets(orderUserStatsConfig.matchTargets)
+        : []
+    const configuredPromotionUsernames = promotionUserTargets.map(target => target.username)
+    const shouldBuildPromotionUserStats = promotionUserTargets.length > 0
+
+    const timeRanges = splitOrderTimeRange(ctx.query.begin_time, ctx.query.end_time)
+    const queryRanges =
+      timeRanges.length > 0
+        ? timeRanges
+        : [
+            {
+              begin_time: normalizeTimestamp(ctx.query.begin_time),
+              end_time: normalizeTimestamp(ctx.query.end_time),
+            },
+          ]
+
+    const allOrders = []
+
+    for (const timeRange of queryRanges) {
+      const rangeResult = await fetchAllOrdersByRange(ctx, timeRange)
+      allOrders.push(...rangeResult.orders)
+    }
+
+    const scopedOrders = orderUserStatsConfig.restrictToOwnDouyinAccounts
+      ? filterOrdersByPromotionAliases(allOrders, orderUserStatsConfig.ownDouyinAccounts)
+      : allOrders
+    const douyinFilteredOrders = filterOrdersByDouyinAccounts(scopedOrders, channelDouyinAccounts)
+    const promotionUserSummaries = shouldBuildPromotionUserStats
+      ? buildPromotionUserSummaries(douyinFilteredOrders, promotionUserTargets)
       : []
-  const configuredPromotionUsernames = promotionUserTargets.map(target => target.username)
-  const shouldBuildPromotionUserStats = promotionUserTargets.length > 0
+    const promotionUserBranchSummaries = shouldBuildPromotionUserStats
+      ? buildPromotionUserSummaries(douyinFilteredOrders, orderUserStatsConfig.branchTargets || [])
+      : []
+    const resolvedActivePromotionUserName =
+      shouldBuildPromotionUserStats &&
+      configuredPromotionUsernames.includes(selectedPromotionUserName)
+        ? selectedPromotionUserName
+        : ''
+    const activePromotionUserTarget = promotionUserTargets.find(
+      target => target.username === resolvedActivePromotionUserName
+    )
+    const activeOrders = activePromotionUserTarget
+      ? douyinFilteredOrders.filter(order =>
+          isOrderMatchedByTarget(order, activePromotionUserTarget)
+        )
+      : douyinFilteredOrders
+    const totalAmount = calculateRechargeAmount(activeOrders)
+    const allTotalAmount = calculateRechargeAmount(douyinFilteredOrders)
 
-  // console.log('🔍 [订单统计] 开始拉取全量数据用于本地统计', {
-  //   channelDouyinAccounts: channelDouyinAccounts || '',
-  //   promotionUsers: configuredPromotionUsernames,
-  //   selectedPromotionUserName,
-  // })
+    // 返回所有数据给前端
+    ctx.body = {
+      code: 0,
+      message: 'success',
+      data: activeOrders,
+      total: activeOrders.length,
+      total_amount: totalAmount, // 总充值金额（单位：分）
+      all_total: douyinFilteredOrders.length,
+      all_total_amount: allTotalAmount,
+      active_promotion_user_name: resolvedActivePromotionUserName,
+      promotion_user_stats_enabled: shouldBuildPromotionUserStats,
+      order_visibility_scope: orderUserStatsConfig.restrictToOwnDouyinAccounts ? 'own' : 'all',
+      promotion_user_summaries: promotionUserSummaries,
+      promotion_user_branch_summaries: promotionUserBranchSummaries,
+    }
+  } catch (error) {
+    const errorCode = Number(error?.code)
+    const message = error instanceof Error && error.message ? error.message : '获取订单统计失败'
 
-  const timeRanges = splitOrderTimeRange(ctx.query.begin_time, ctx.query.end_time)
-  const queryRanges =
-    timeRanges.length > 0
-      ? timeRanges
-      : [
-          {
-            begin_time: normalizeTimestamp(ctx.query.begin_time),
-            end_time: normalizeTimestamp(ctx.query.end_time),
-          },
-        ]
+    console.error('[订单统计] 拉取失败:', {
+      message,
+      code: Number.isFinite(errorCode) ? errorCode : undefined,
+      begin_time: ctx.query?.begin_time,
+      end_time: ctx.query?.end_time,
+    })
 
-  // console.log(
-  //   `🧩 [订单统计] 当前查询将拆分为 ${queryRanges.length} 个时间段，按最多 ${MAX_ORDER_RANGE_DAYS} 天一段拉取`
-  // )
-
-  const allOrders = []
-
-  for (const timeRange of queryRanges) {
-    const rangeResult = await fetchAllOrdersByRange(ctx, timeRange)
-    allOrders.push(...rangeResult.orders)
-  }
-
-  const scopedOrders = orderUserStatsConfig.restrictToOwnDouyinAccounts
-    ? filterOrdersByPromotionAliases(allOrders, orderUserStatsConfig.ownDouyinAccounts)
-    : allOrders
-  const douyinFilteredOrders = filterOrdersByDouyinAccounts(scopedOrders, channelDouyinAccounts)
-  const promotionUserSummaries = shouldBuildPromotionUserStats
-    ? buildPromotionUserSummaries(douyinFilteredOrders, promotionUserTargets)
-    : []
-  const promotionUserBranchSummaries = shouldBuildPromotionUserStats
-    ? buildPromotionUserSummaries(douyinFilteredOrders, orderUserStatsConfig.branchTargets || [])
-    : []
-  const resolvedActivePromotionUserName =
-    shouldBuildPromotionUserStats &&
-    configuredPromotionUsernames.includes(selectedPromotionUserName)
-      ? selectedPromotionUserName
-      : ''
-  const activePromotionUserTarget = promotionUserTargets.find(
-    target => target.username === resolvedActivePromotionUserName
-  )
-  const activeOrders = activePromotionUserTarget
-    ? douyinFilteredOrders.filter(order => isOrderMatchedByTarget(order, activePromotionUserTarget))
-    : douyinFilteredOrders
-  const totalAmount = calculateRechargeAmount(activeOrders)
-  const allTotalAmount = calculateRechargeAmount(douyinFilteredOrders)
-
-  // console.log(
-  //   `✅ [订单统计] 完成: 共拉取 ${allOrders.length} 条数据，筛选后 ${activeOrders.length} 条，当前总充值: ${totalAmount / 100} 元`
-  // )
-
-  // 返回所有数据给前端
-  ctx.body = {
-    code: 0,
-    message: 'success',
-    data: activeOrders,
-    total: activeOrders.length,
-    total_amount: totalAmount, // 总充值金额（单位：分）
-    all_total: douyinFilteredOrders.length,
-    all_total_amount: allTotalAmount,
-    active_promotion_user_name: resolvedActivePromotionUserName,
-    promotion_user_stats_enabled: shouldBuildPromotionUserStats,
-    order_visibility_scope: orderUserStatsConfig.restrictToOwnDouyinAccounts ? 'own' : 'all',
-    promotion_user_summaries: promotionUserSummaries,
-    promotion_user_branch_summaries: promotionUserBranchSummaries,
+    // 透传业务错误码（如 Cookie 过期 4001），便于前端拦截器提示
+    ctx.body = {
+      code: Number.isFinite(errorCode) && errorCode !== 0 ? errorCode : 500,
+      message,
+      data: [],
+      total: 0,
+      total_amount: 0,
+      all_total: 0,
+      all_total_amount: 0,
+      active_promotion_user_name: '',
+      promotion_user_stats_enabled: false,
+      order_visibility_scope: 'all',
+      promotion_user_summaries: [],
+      promotion_user_branch_summaries: [],
+    }
   }
 })
 
