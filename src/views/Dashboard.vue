@@ -522,7 +522,9 @@
                     <Icon icon="mdi:receipt-text-outline" class="w-5 h-5 text-amber-600" />
                     <div>
                       <h3 class="text-lg font-semibold text-slate-900">订单统计</h3>
-                      <p class="text-sm text-slate-500">查看当前渠道的订单明细和短剧排行</p>
+                      <p class="text-sm text-slate-500">
+                        查看当前渠道的订单明细、短剧排行和抖音号排行
+                      </p>
                     </div>
                   </div>
                   <div class="flex flex-wrap items-center gap-2">
@@ -538,17 +540,8 @@
                         {{ option.label }}
                       </n-button>
                     </div>
-                    <DateRangePicker
-                      v-model="orderDateRange"
-                      select-class-name="w-40"
-                      @update:model-value="handleOrderDateChange"
-                    />
-                    <n-select
-                      v-model:value="payStatus"
-                      class="w-28"
-                      :options="payStatusOptions"
-                      @update:value="handlePayStatusChange"
-                    />
+                    <DateRangePicker v-model="orderDateRange" select-class-name="w-40" />
+                    <n-select v-model:value="payStatus" class="w-28" :options="payStatusOptions" />
                     <n-button
                       type="primary"
                       ghost
@@ -676,7 +669,7 @@
                 :row-class-name="getOrderStatsRowClassName"
                 striped
                 size="small"
-                :remote="orderStatsViewMode === 'dramas'"
+                :remote="isOrderStatsRankingView"
                 :scroll-x="1100"
                 @update:sorter="handleOrderStatsSorterChange"
               />
@@ -916,8 +909,10 @@ type DateRangeValue = [string, string] | null
 type DashboardRequestScope = 'overview' | 'report' | 'orders' | 'material'
 type RuntimeWebMenus = adminApi.UserChannelBindingConfig['permissions']['webMenus']
 type OrderUserCardScope = 'all' | 'summary' | 'branch' | 'loading'
-type OrderStatsViewMode = 'orders' | 'dramas'
-type DramaRankingSortKey = 'totalOrders' | 'paidOrderCount' | 'totalAmount' | 'paidOrderRate'
+type OrderStatsViewMode = 'orders' | 'dramas' | 'douyinAccounts'
+type RankingSortKey = 'totalOrders' | 'paidOrderCount' | 'totalAmount' | 'paidOrderRate'
+type DramaRankingSortKey = RankingSortKey
+type DouyinAccountRankingSortKey = RankingSortKey
 interface DashboardRequestContext {
   scope: DashboardRequestScope
   controller: AbortController
@@ -940,6 +935,14 @@ interface DramaRankingRow {
   totalAmount: number
   paidOrderRate: number
 }
+interface DouyinAccountRankingRow {
+  douyinAccount: string
+  totalOrders: number
+  paidOrderCount: number
+  totalAmount: number
+  paidOrderRate: number
+}
+type OrderStatsTableRow = OrderItem | DramaRankingRow | DouyinAccountRankingRow
 interface ThirdPartyRevenueRow {
   date: string
   realCost: number
@@ -972,6 +975,9 @@ const THIRD_PARTY_LOW_SHARE_DATES = new Set(['2026-05-22', '2026-05-23', '2026-0
 const THIRD_PARTY_LOW_SHARE_RATE = 0.025
 const THIRD_PARTY_DEFAULT_SHARE_RATE = 0.05
 const HOT_DRAMA_AMOUNT_THRESHOLD = 100 * 100
+const ORDER_QUERY_MAX_DAYS = 10
+const ORDER_QUERY_CONCURRENCY = 2
+const ORDER_PAGE_MAX_ATTEMPTS = 3
 const JCYB_AD_REPORT_TOKEN_STORAGE_KEY = 'jcybAdReportToken'
 const JCYB_TEAM_ID = 500015
 const JCYB_AD_INFO_DIMENSION = 'app,agent,ad_account_name,ad_account_id'
@@ -981,6 +987,8 @@ const orderDateRange = ref<DateRangeValue>(null)
 const orderStatsViewMode = ref<OrderStatsViewMode>('orders')
 const dramaRankingSortKey = ref<DramaRankingSortKey>('totalAmount')
 const dramaRankingSortOrder = ref<Exclude<DataTableSortOrder, false>>('descend')
+const douyinAccountRankingSortKey = ref<DouyinAccountRankingSortKey>('totalAmount')
+const douyinAccountRankingSortOrder = ref<Exclude<DataTableSortOrder, false>>('descend')
 const thirdPartyRevenueRows = ref<ThirdPartyRevenueRow[]>([])
 const thirdPartyRevenueLoading = ref(false)
 const thirdPartyRevenueError = ref('')
@@ -1600,6 +1608,45 @@ function parseDramaNameFromPromotionName(promotionName: string) {
   return contentParts.join('-').trim()
 }
 
+const knownDouyinAccountNames = computed(() => {
+  const channelUsers = [
+    sessionStore.currentRuntimeUser,
+    ...(sessionStore.currentChannelUsers || []),
+  ].filter(Boolean)
+  const accountNames = channelUsers.flatMap(user =>
+    Array.isArray(user?.douyinAccounts)
+      ? user.douyinAccounts.map(account => String(account?.douyinAccount || '').trim())
+      : []
+  )
+
+  return [...new Set(accountNames.filter(Boolean))].sort(
+    (left, right) => right.length - left.length
+  )
+})
+
+/** 从推广链名称中解析抖音号，优先匹配渠道配置以兼容名称中包含短横线的情况 */
+function parseDouyinAccountFromPromotionName(promotionName: string) {
+  const text = String(promotionName || '').trim()
+  const configuredAccount = knownDouyinAccountNames.value.find(account =>
+    text.includes(`-${account}-`)
+  )
+  if (configuredAccount) {
+    return configuredAccount
+  }
+
+  const firstDash = text.indexOf('-')
+  if (firstDash < 0) {
+    return ''
+  }
+
+  const secondDash = text.indexOf('-', firstDash + 1)
+  if (secondDash < 0) {
+    return ''
+  }
+
+  return text.slice(firstDash + 1, secondDash).trim()
+}
+
 const dramaRankingRows = computed<DramaRankingRow[]>(() => {
   const rankingMap = new Map<string, DramaRankingRow>()
 
@@ -1659,6 +1706,67 @@ const pagedDramaRankingRows = computed<DramaRankingRow[]>(() => {
   const pageSize = Number(ordersPagination.pageSize || 10)
   const startIndex = Math.max(ordersCurrentPage.value - 1, 0) * pageSize
   return dramaRankingRows.value.slice(startIndex, startIndex + pageSize)
+})
+
+const douyinAccountRankingRows = computed<DouyinAccountRankingRow[]>(() => {
+  const rankingMap = new Map<string, DouyinAccountRankingRow>()
+
+  orderRows.value.forEach(order => {
+    const douyinAccount = parseDouyinAccountFromPromotionName(order.promotion_name)
+    if (!douyinAccount) {
+      return
+    }
+
+    const rankingRow =
+      rankingMap.get(douyinAccount) ||
+      ({
+        douyinAccount,
+        totalOrders: 0,
+        paidOrderCount: 0,
+        totalAmount: 0,
+        paidOrderRate: 0,
+      } satisfies DouyinAccountRankingRow)
+
+    rankingRow.totalOrders += 1
+    if (order.pay_status === 0) {
+      rankingRow.paidOrderCount += 1
+      rankingRow.totalAmount += Number(order.pay_amount || 0)
+    }
+
+    rankingMap.set(douyinAccount, rankingRow)
+  })
+
+  const rankingRows = Array.from(rankingMap.values()).map(row => ({
+    ...row,
+    paidOrderRate: row.totalOrders > 0 ? row.paidOrderCount / row.totalOrders : 0,
+  }))
+
+  return rankingRows.sort((left, right) => {
+    const activeSortKey = douyinAccountRankingSortKey.value
+    const sortDirection = douyinAccountRankingSortOrder.value === 'ascend' ? 1 : -1
+    const activeSortDiff = left[activeSortKey] - right[activeSortKey]
+    if (activeSortDiff !== 0) {
+      return activeSortDiff * sortDirection
+    }
+
+    const totalAmountDiff = right.totalAmount - left.totalAmount
+    if (totalAmountDiff !== 0) {
+      return totalAmountDiff
+    }
+
+    const paidOrderDiff = right.paidOrderCount - left.paidOrderCount
+    if (paidOrderDiff !== 0) {
+      return paidOrderDiff
+    }
+
+    return left.douyinAccount.localeCompare(right.douyinAccount, 'zh-CN')
+  })
+})
+
+const pagedDouyinAccountRankingRows = computed<DouyinAccountRankingRow[]>(() => {
+  const pageSize = Number(ordersPagination.pageSize || 10)
+  const startIndex = Math.max(ordersCurrentPage.value - 1, 0) * pageSize
+  return douyinAccountRankingRows.value.slice(startIndex, startIndex + pageSize)
 })
 
 const orderUserTabs = computed<OrderUserCardItem[]>(() => {
@@ -1785,6 +1893,7 @@ const payStatusOptions = [
 const orderStatsViewOptions: Array<{ label: string; value: OrderStatsViewMode }> = [
   { label: '订单明细', value: 'orders' },
   { label: '短剧排行', value: 'dramas' },
+  { label: '抖音号排行', value: 'douyinAccounts' },
 ]
 
 const reportPagination = reactive({
@@ -2024,24 +2133,112 @@ const dramaRankingColumns = computed<DataTableColumns<DramaRankingRow>>(() => [
   },
 ])
 
-const currentOrderStatsColumns = computed<DataTableColumns<OrderItem | DramaRankingRow>>(() =>
-  orderStatsViewMode.value === 'dramas'
-    ? (dramaRankingColumns.value as DataTableColumns<OrderItem | DramaRankingRow>)
-    : (orderColumns as DataTableColumns<OrderItem | DramaRankingRow>)
-)
-const currentOrderStatsRows = computed<Array<OrderItem | DramaRankingRow>>(() =>
-  orderStatsViewMode.value === 'dramas' ? pagedDramaRankingRows.value : pagedOrderRows.value
-)
-const orderStatsTotalCount = computed(() =>
-  orderStatsViewMode.value === 'dramas' ? dramaRankingRows.value.length : orderRows.value.length
-)
-const orderStatsTotalLabel = computed(() =>
-  orderStatsViewMode.value === 'dramas'
-    ? `共${formatNumberValue(dramaRankingRows.value.length)}部剧`
-    : `共${formatNumberValue(orderRows.value.length)}个订单`
-)
+const douyinAccountRankingColumns = computed<DataTableColumns<DouyinAccountRankingRow>>(() => [
+  {
+    title: '排名',
+    key: 'rank',
+    width: 72,
+    render: (_row, index) => {
+      const pageSize = Number(ordersPagination.pageSize || 10)
+      return (ordersCurrentPage.value - 1) * pageSize + index + 1
+    },
+  },
+  {
+    title: '抖音号名称',
+    key: 'douyinAccount',
+    minWidth: 180,
+    ellipsis: { tooltip: true },
+  },
+  {
+    title: '总充值金额',
+    key: 'totalAmount',
+    width: 130,
+    sorter: true,
+    customNextSortOrder: order => (order === 'descend' ? 'ascend' : 'descend'),
+    sortOrder:
+      douyinAccountRankingSortKey.value === 'totalAmount'
+        ? douyinAccountRankingSortOrder.value
+        : false,
+    render: row =>
+      h('span', { class: 'font-semibold text-emerald-600' }, formatCurrency(row.totalAmount)),
+  },
+  {
+    title: '总订单数',
+    key: 'totalOrders',
+    width: 110,
+    sorter: true,
+    customNextSortOrder: order => (order === 'descend' ? 'ascend' : 'descend'),
+    sortOrder:
+      douyinAccountRankingSortKey.value === 'totalOrders'
+        ? douyinAccountRankingSortOrder.value
+        : false,
+    render: row => formatNumberValue(row.totalOrders),
+  },
+  {
+    title: '充值订单数',
+    key: 'paidOrderCount',
+    width: 120,
+    sorter: true,
+    customNextSortOrder: order => (order === 'descend' ? 'ascend' : 'descend'),
+    sortOrder:
+      douyinAccountRankingSortKey.value === 'paidOrderCount'
+        ? douyinAccountRankingSortOrder.value
+        : false,
+    render: row => formatNumberValue(row.paidOrderCount),
+  },
+  {
+    title: '充值率',
+    key: 'paidOrderRate',
+    width: 105,
+    sorter: true,
+    customNextSortOrder: order => (order === 'descend' ? 'ascend' : 'descend'),
+    sortOrder:
+      douyinAccountRankingSortKey.value === 'paidOrderRate'
+        ? douyinAccountRankingSortOrder.value
+        : false,
+    render: row => formatPercentRate(row.paidOrderRate),
+  },
+])
 
-function isDramaRankingRow(row: OrderItem | DramaRankingRow): row is DramaRankingRow {
+const isOrderStatsRankingView = computed(() => orderStatsViewMode.value !== 'orders')
+const currentOrderStatsColumns = computed<DataTableColumns<OrderStatsTableRow>>(() => {
+  if (orderStatsViewMode.value === 'dramas') {
+    return dramaRankingColumns.value as DataTableColumns<OrderStatsTableRow>
+  }
+  if (orderStatsViewMode.value === 'douyinAccounts') {
+    return douyinAccountRankingColumns.value as DataTableColumns<OrderStatsTableRow>
+  }
+  return orderColumns as DataTableColumns<OrderStatsTableRow>
+})
+const currentOrderStatsRows = computed<OrderStatsTableRow[]>(() => {
+  if (orderStatsViewMode.value === 'dramas') {
+    return pagedDramaRankingRows.value
+  }
+  if (orderStatsViewMode.value === 'douyinAccounts') {
+    return pagedDouyinAccountRankingRows.value
+  }
+  return pagedOrderRows.value
+})
+const orderStatsTotalCount = computed(() => {
+  if (orderStatsViewMode.value === 'dramas') {
+    return dramaRankingRows.value.length
+  }
+  if (orderStatsViewMode.value === 'douyinAccounts') {
+    return douyinAccountRankingRows.value.length
+  }
+  return orderRows.value.length
+})
+const orderStatsTotalLabel = computed(() => {
+  if (orderStatsViewMode.value === 'dramas') {
+    return `共${formatNumberValue(dramaRankingRows.value.length)}部剧`
+  }
+  if (orderStatsViewMode.value === 'douyinAccounts') {
+    return `共${formatNumberValue(douyinAccountRankingRows.value.length)}个抖音号`
+  }
+  return `共${formatNumberValue(orderRows.value.length)}个订单`
+})
+
+function isDramaRankingRow(row: OrderStatsTableRow): row is DramaRankingRow {
   return 'dramaName' in row
 }
 
@@ -2049,7 +2246,7 @@ function isHotDramaRankingRow(row: DramaRankingRow) {
   return row.totalAmount >= HOT_DRAMA_AMOUNT_THRESHOLD
 }
 
-const getOrderStatsRowClassName: DataTableCreateRowClassName<OrderItem | DramaRankingRow> = row => {
+const getOrderStatsRowClassName: DataTableCreateRowClassName<OrderStatsTableRow> = row => {
   if (
     orderStatsViewMode.value === 'dramas' &&
     isDramaRankingRow(row) &&
@@ -2107,6 +2304,240 @@ function toCompactDate(date: string) {
 
 function dateStringToTimestamp(date: string, endOfDay = false) {
   return Math.floor(new Date(`${date} ${endOfDay ? '23:59:59' : '00:00:00'}`).getTime() / 1000)
+}
+
+function splitOrderDateRange(begin: string, end: string) {
+  const beginDate = new Date(`${begin} 00:00:00`)
+  const endDate = new Date(`${end} 00:00:00`)
+  if (Number.isNaN(beginDate.getTime()) || Number.isNaN(endDate.getTime()) || endDate < beginDate) {
+    return [] as Array<[string, string]>
+  }
+
+  const ranges: Array<[string, string]> = []
+  const cursor = new Date(beginDate)
+  while (cursor <= endDate) {
+    const rangeBegin = new Date(cursor)
+    const rangeEnd = new Date(cursor)
+    rangeEnd.setDate(rangeEnd.getDate() + ORDER_QUERY_MAX_DAYS - 1)
+    if (rangeEnd > endDate) {
+      rangeEnd.setTime(endDate.getTime())
+    }
+
+    ranges.push([formatDate(rangeBegin), formatDate(rangeEnd)])
+    cursor.setTime(rangeEnd.getTime())
+    cursor.setDate(cursor.getDate() + 1)
+  }
+
+  return ranges
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T) => Promise<R>
+) {
+  const results = new Array<R>(items.length)
+  let nextIndex = 0
+  const workerCount = Math.min(Math.max(1, concurrency), items.length)
+
+  async function runWorker() {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex
+      nextIndex += 1
+      results[currentIndex] = await mapper(items[currentIndex])
+    }
+  }
+
+  await Promise.all(Array.from({ length: workerCount }, () => runWorker()))
+  return results
+}
+
+function mergePromotionUserSummaries(
+  responses: OrderData[],
+  key: 'promotion_user_summaries' | 'promotion_user_branch_summaries'
+) {
+  const summaryMap = new Map<string, PromotionUserSummary>()
+
+  responses.forEach(response => {
+    const summaries = Array.isArray(response[key]) ? response[key] || [] : []
+    summaries.forEach(summary => {
+      const username = String(summary.username || '').trim()
+      if (!username) {
+        return
+      }
+
+      const current = summaryMap.get(username) || {
+        username,
+        aliases: [],
+        total: 0,
+        total_amount: 0,
+        paid_order_count: 0,
+      }
+      current.total += Number(summary.total || 0)
+      current.total_amount += Number(summary.total_amount || 0)
+      current.paid_order_count += Number(summary.paid_order_count || 0)
+      current.aliases = [
+        ...new Set([...(current.aliases || []), ...(summary.aliases || [])].filter(Boolean)),
+      ]
+      summaryMap.set(username, current)
+    })
+  })
+
+  return [...summaryMap.values()]
+}
+
+function mergeOrderResponses(responses: OrderData[]): OrderData {
+  const rows = responses.flatMap(response => (Array.isArray(response.data) ? response.data : []))
+  const firstResponse = responses[0]
+
+  return {
+    code: 0,
+    message: 'success',
+    data: rows,
+    total: responses.reduce(
+      (sum, response) => sum + Number(response.total ?? response.data?.length ?? 0),
+      0
+    ),
+    total_amount: responses.reduce(
+      (sum, response) =>
+        sum +
+        Number(
+          response.total_amount ??
+            calculateOrderRechargeAmount(Array.isArray(response.data) ? response.data : [])
+        ),
+      0
+    ),
+    all_total: responses.reduce(
+      (sum, response) => sum + Number(response.all_total ?? response.data?.length ?? 0),
+      0
+    ),
+    all_total_amount: responses.reduce(
+      (sum, response) =>
+        sum +
+        Number(
+          response.all_total_amount ??
+            calculateOrderRechargeAmount(Array.isArray(response.data) ? response.data : [])
+        ),
+      0
+    ),
+    active_promotion_user_name: firstResponse?.active_promotion_user_name || '',
+    promotion_user_stats_enabled: responses.some(response => response.promotion_user_stats_enabled),
+    order_visibility_scope: firstResponse?.order_visibility_scope || 'all',
+    promotion_user_summaries: mergePromotionUserSummaries(responses, 'promotion_user_summaries'),
+    promotion_user_branch_summaries: mergePromotionUserSummaries(
+      responses,
+      'promotion_user_branch_summaries'
+    ),
+  }
+}
+
+function waitForOrderPageRetry(delay: number, signal: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    if (signal.aborted) {
+      reject(signal.reason)
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      signal.removeEventListener('abort', handleAbort)
+      resolve()
+    }, delay)
+    const handleAbort = () => {
+      window.clearTimeout(timer)
+      reject(signal.reason)
+    }
+    signal.addEventListener('abort', handleAbort, { once: true })
+  })
+}
+
+async function fetchOrderPageWithRetry(params: OrderParams, signal: AbortSignal) {
+  for (let attempt = 1; attempt <= ORDER_PAGE_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      return await getOrders(params, { signal })
+    } catch (error) {
+      const errorName = error instanceof Error ? error.name : ''
+      if (
+        signal.aborted ||
+        errorName === 'AuthenticationError' ||
+        attempt === ORDER_PAGE_MAX_ATTEMPTS
+      ) {
+        throw error
+      }
+
+      console.warn('[订单统计诊断] 单页请求失败，准备重试:', {
+        begin_time: params.begin_time,
+        end_time: params.end_time,
+        page_index: params.page_index,
+        attempt,
+        error_name: errorName,
+        message: error instanceof Error ? error.message : String(error),
+      })
+      await waitForOrderPageRetry(attempt * 800, signal)
+    }
+  }
+
+  throw new Error('订单分页请求重试失败')
+}
+
+async function fetchOrderDateRangePages(
+  rangeBegin: string,
+  rangeEnd: string,
+  selectedPayStatus: number,
+  signal: AbortSignal
+) {
+  const responses: OrderData[] = []
+  let pageIndex = 0
+
+  while (true) {
+    const params: OrderParams = {
+      begin_time: dateStringToTimestamp(rangeBegin, false),
+      end_time: dateStringToTimestamp(rangeEnd, true),
+      page_index: pageIndex,
+      page_size: 100,
+      page_only: true,
+      ...(selectedPayStatus >= 0 ? { pay_status: selectedPayStatus } : {}),
+    }
+    const response = await fetchOrderPageWithRetry(params, signal)
+    responses.push(response)
+
+    if (!response.has_more) {
+      break
+    }
+    pageIndex += 1
+  }
+
+  return mergeOrderResponses(responses)
+}
+
+async function fetchOrdersByDateRanges(
+  begin: string,
+  end: string,
+  selectedPayStatus: number,
+  parentSignal: AbortSignal
+) {
+  const dateRanges = splitOrderDateRange(begin, end)
+  const controller = new AbortController()
+  const forwardAbort = () => controller.abort(parentSignal.reason)
+  if (parentSignal.aborted) {
+    forwardAbort()
+  } else {
+    parentSignal.addEventListener('abort', forwardAbort, { once: true })
+  }
+
+  try {
+    const responses = await mapWithConcurrency(
+      dateRanges,
+      ORDER_QUERY_CONCURRENCY,
+      async ([rangeBegin, rangeEnd]) =>
+        fetchOrderDateRangePages(rangeBegin, rangeEnd, selectedPayStatus, controller.signal)
+    )
+    return mergeOrderResponses(responses)
+  } catch (error) {
+    controller.abort(error)
+    throw error
+  } finally {
+    parentSignal.removeEventListener('abort', forwardAbort)
+  }
 }
 
 function formatCurrency(amountInCent: number) {
@@ -2642,14 +3073,12 @@ async function fetchOrdersData() {
   try {
     const [begin, end] = orderDateRange.value
     const previousActivePromotionUserName = activePromotionUserName.value
-    const params: OrderParams = {
-      begin_time: dateStringToTimestamp(begin, false),
-      end_time: dateStringToTimestamp(end, true),
-      page_index: 0,
-      page_size: 100,
-      ...(payStatus.value >= 0 ? { pay_status: payStatus.value } : {}),
-    }
-    const response = await getOrders(params, { signal: requestContext.signal })
+    const response = await fetchOrdersByDateRanges(
+      begin,
+      end,
+      payStatus.value,
+      requestContext.signal
+    )
     if (!isActiveDashboardRequest(requestContext)) return
 
     ordersData.value = response
@@ -2838,21 +3267,14 @@ function handleReportDateChange() {
   fetchReportData()
 }
 
-function handleOrderDateChange() {
-  ordersCurrentPage.value = 1
-  ordersPagination.page = 1
-  fetchOrdersData()
-}
-
-function handlePayStatusChange() {
-  ordersCurrentPage.value = 1
-  ordersPagination.page = 1
-  fetchOrdersData()
-}
-
 function resetDramaRankingSorter() {
   dramaRankingSortKey.value = 'totalAmount'
   dramaRankingSortOrder.value = 'descend'
+}
+
+function resetDouyinAccountRankingSorter() {
+  douyinAccountRankingSortKey.value = 'totalAmount'
+  douyinAccountRankingSortOrder.value = 'descend'
 }
 
 function handleOrderStatsViewModeChange(mode: OrderStatsViewMode) {
@@ -2864,31 +3286,49 @@ function handleOrderStatsViewModeChange(mode: OrderStatsViewMode) {
   if (mode === 'dramas') {
     resetDramaRankingSorter()
   }
+  if (mode === 'douyinAccounts') {
+    resetDouyinAccountRankingSorter()
+  }
   ordersCurrentPage.value = 1
   ordersPagination.page = 1
 }
 
 function handleOrderStatsSorterChange(sortState: DataTableSortState | DataTableSortState[] | null) {
-  if (orderStatsViewMode.value !== 'dramas') {
+  if (!isOrderStatsRankingView.value) {
     return
   }
 
   const activeSortState = Array.isArray(sortState) ? sortState[0] : sortState
-  const sortableKeys: DramaRankingSortKey[] = [
+  const commonSortableKeys: RankingSortKey[] = [
     'totalOrders',
     'paidOrderCount',
     'totalAmount',
     'paidOrderRate',
   ]
-  if (
-    activeSortState &&
-    sortableKeys.includes(activeSortState.columnKey as DramaRankingSortKey) &&
-    activeSortState.order
-  ) {
-    dramaRankingSortKey.value = activeSortState.columnKey as DramaRankingSortKey
-    dramaRankingSortOrder.value = activeSortState.order
+
+  if (orderStatsViewMode.value === 'dramas') {
+    if (
+      activeSortState &&
+      commonSortableKeys.includes(activeSortState.columnKey as DramaRankingSortKey) &&
+      activeSortState.order
+    ) {
+      dramaRankingSortKey.value = activeSortState.columnKey as DramaRankingSortKey
+      dramaRankingSortOrder.value = activeSortState.order
+    } else {
+      resetDramaRankingSorter()
+    }
   } else {
-    resetDramaRankingSorter()
+    const sortableKeys: DouyinAccountRankingSortKey[] = [...commonSortableKeys]
+    if (
+      activeSortState &&
+      sortableKeys.includes(activeSortState.columnKey as DouyinAccountRankingSortKey) &&
+      activeSortState.order
+    ) {
+      douyinAccountRankingSortKey.value = activeSortState.columnKey as DouyinAccountRankingSortKey
+      douyinAccountRankingSortOrder.value = activeSortState.order
+    } else {
+      resetDouyinAccountRankingSorter()
+    }
   }
 
   ordersCurrentPage.value = 1

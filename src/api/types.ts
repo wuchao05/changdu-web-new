@@ -85,6 +85,7 @@ export interface OrderData {
   order_visibility_scope?: 'all' | 'own' // 订单可见范围
   promotion_user_summaries?: PromotionUserSummary[]
   promotion_user_branch_summaries?: PromotionUserSummary[]
+  has_more?: boolean // 分页模式下是否还有下一页
   data: OrderItem[]
 }
 
@@ -132,6 +133,7 @@ export interface OrderParams {
   page_size: number
   channel_douyin_accounts?: string // 抖音号过滤（逗号分隔）
   promotion_user_name?: string // 推广链来源用户名过滤
+  page_only?: boolean // 每次仅获取一页，由前端持续翻页，避免长请求超时
 }
 
 export interface ReportRow {

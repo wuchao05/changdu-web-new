@@ -145,6 +145,7 @@ export async function generateChangduABogus({
   query,
   body,
   headers: customHeaders,
+  signal,
 }) {
   const reverseDir = resolveChangduReverseDir()
   const headers = customHeaders
@@ -164,6 +165,7 @@ export async function generateChangduABogus({
       CHANGDU_REVERSE_DIR: reverseDir,
     },
     maxBuffer: 1024 * 1024,
+    signal,
   })
 
   const normalizedOutput = stdout
@@ -185,7 +187,14 @@ export async function generateChangduABogus({
   return result
 }
 
-async function generateChangduABogusViaApi({ method = 'GET', pathname, query, body, headers }) {
+async function generateChangduABogusViaApi({
+  method = 'GET',
+  pathname,
+  query,
+  body,
+  headers,
+  signal,
+}) {
   const normalizedMethod = method.toUpperCase()
   const params =
     normalizedMethod === 'GET' || normalizedMethod === 'HEAD'
@@ -193,6 +202,7 @@ async function generateChangduABogusViaApi({ method = 'GET', pathname, query, bo
       : sanitizeRecord(body ?? {})
   const response = await fetch(LOCAL_ABOGUS_API_URL, {
     method: 'POST',
+    signal,
     headers: {
       'Content-Type': 'application/json',
       aduserid: headers.aduserid,
@@ -263,6 +273,7 @@ export async function requestChangduInternalApi({
   query,
   body,
   ctx = null,
+  signal,
 }) {
   const normalizedMethod = method.toUpperCase()
   const headers = await getChannelInternalHeaders(ctx)
@@ -277,6 +288,7 @@ export async function requestChangduInternalApi({
         query,
         body,
         headers,
+        signal,
       })
       aBogusSource = 'api'
     } catch (error) {
@@ -295,6 +307,7 @@ export async function requestChangduInternalApi({
       query,
       body,
       headers,
+      signal,
     })
   }
 
@@ -330,6 +343,7 @@ export async function requestChangduInternalApi({
       method: normalizedMethod,
       headers: requestHeaders,
       body: isPost ? JSON.stringify(body ?? {}) : undefined,
+      signal,
     })
   } catch (error) {
     console.error('[常读内部接口] 请求异常:', {

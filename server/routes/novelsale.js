@@ -1,4 +1,6 @@
 import Router from '@koa/router'
+import { appendFile, mkdir } from 'node:fs/promises'
+import { buildHeaders } from '../config/headers.js'
 import { createGetHandler } from '../utils/apiHandler.js'
 import {
   buildRequestPath,
@@ -11,10 +13,47 @@ import { getSessionUser } from '../utils/studioSession.js'
 const router = new Router()
 const SECONDS_PER_DAY = 24 * 60 * 60
 const MAX_ORDER_RANGE_DAYS = 10
+const ORDER_RANGE_CONCURRENCY = 3
+const ORDER_RANGE_TIMEOUT_MS = 45 * 1000
+const ORDER_PAGE_TIMEOUT_MS = 45 * 1000
+const CHANGDU_LEGACY_BASE_URL = 'https://www.changdunovel.com'
 const AUTO_RED_FLAG_START_HOUR = 0
 const AUTO_RED_FLAG_END_HOUR = 1
 const FEISHU_DRAMA_STATUS_CHUNK_SIZE = 40
 const feishuDramaStatusInflightMap = new Map()
+const orderDiagnosticLogDirectoryUrl = new URL('../../logs/', import.meta.url)
+const orderDiagnosticLogUrl = new URL('order-stats-debug.log', orderDiagnosticLogDirectoryUrl)
+let orderRequestSequence = 0
+let orderDiagnosticLogWriteQueue = Promise.resolve()
+
+function createOrderTraceId() {
+  orderRequestSequence = (orderRequestSequence + 1) % 100000
+  return `${Date.now().toString(36)}-${orderRequestSequence.toString(36)}`
+}
+
+function logOrderDiagnostic(level, event, payload = {}) {
+  const consoleMethod = typeof console[level] === 'function' ? console[level] : console.info
+  consoleMethod.call(console, `[订单统计诊断] ${event}:`, payload)
+
+  if (process.env.NODE_ENV !== 'development') {
+    return
+  }
+
+  const line = `${JSON.stringify({
+    timestamp: new Date().toISOString(),
+    level,
+    event,
+    ...payload,
+  })}\n`
+  orderDiagnosticLogWriteQueue = orderDiagnosticLogWriteQueue
+    .then(async () => {
+      await mkdir(orderDiagnosticLogDirectoryUrl, { recursive: true })
+      await appendFile(orderDiagnosticLogUrl, line, 'utf8')
+    })
+    .catch(error => {
+      console.error('[订单统计诊断] 写入诊断日志失败:', error)
+    })
+}
 
 function getPublishHour(publishTime) {
   if (!publishTime) return null
@@ -411,6 +450,7 @@ function buildPromotionDetailQuery(query = {}, overrides = {}) {
 
   delete nextQuery.channel_douyin_accounts
   delete nextQuery.promotion_user_name
+  delete nextQuery.page_only
 
   return nextQuery
 }
@@ -418,6 +458,20 @@ function buildPromotionDetailQuery(query = {}, overrides = {}) {
 function normalizeTimestamp(value) {
   const numericValue = Number(value || 0)
   return Number.isFinite(numericValue) ? Math.floor(numericValue) : 0
+}
+
+function normalizeOrderPageIndex(value) {
+  const numericValue = Number(value)
+  return Number.isInteger(numericValue) && numericValue >= 0 ? numericValue : 0
+}
+
+function normalizeOrderPageSize(value) {
+  const numericValue = Number(value)
+  return Number.isInteger(numericValue) && numericValue > 0 ? Math.min(numericValue, 100) : 100
+}
+
+function isPageOnlyOrderRequest(value) {
+  return value === true || value === 'true' || value === '1'
 }
 
 /**
@@ -514,9 +568,59 @@ function splitOrderTimeRange(beginTime, endTime, maxDays = MAX_ORDER_RANGE_DAYS)
   return ranges
 }
 
-async function fetchPromotionDetailPage(ctx, query) {
+function createOrderPageSignal(signal) {
+  const timeoutSignal = AbortSignal.timeout(ORDER_PAGE_TIMEOUT_MS)
+  return signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal
+}
+
+function isAbortError(error) {
+  return (
+    error?.name === 'AbortError' ||
+    error?.name === 'TimeoutError' ||
+    error?.code === 'ABORT_ERR' ||
+    error?.code === 'ERR_ABORTED'
+  )
+}
+
+async function fetchPromotionDetailFallback(ctx, query, signal) {
+  const targetUrl = `${CHANGDU_LEGACY_BASE_URL}${buildRequestPath(
+    '/novelsale/distributor/promotion/detail/v2/',
+    query
+  )}`
+  const response = await fetch(targetUrl, {
+    method: 'GET',
+    headers: buildHeaders(ctx),
+    signal,
+  })
+  const text = await response.text()
+  let body = text
+
+  try {
+    body = JSON.parse(text)
+  } catch {
+    // 保留原始响应，交给统一的订单响应解析器生成可读错误。
+  }
+
+  return {
+    body,
+    status: response.status,
+  }
+}
+
+async function fetchPromotionDetailPage(ctx, query, signal, traceId = '') {
   const upstreamQuery = { ...query }
   delete upstreamQuery.cookie
+  const pageSignal = createOrderPageSignal(signal)
+  const pageStartedAt = Date.now()
+  const pageLogContext = {
+    trace_id: traceId,
+    begin_time: upstreamQuery.begin_time,
+    end_time: upstreamQuery.end_time,
+    page_index: upstreamQuery.page_index,
+    page_size: upstreamQuery.page_size,
+  }
+
+  logOrderDiagnostic('info', '单页请求开始', pageLogContext)
 
   // 优先走带 a_bogus 的常读内部接口（与新剧列表一致）。
   // 旧的裸转发常会拿到 HTTP 200 + 空 body，最终被误判成“无订单”。
@@ -527,6 +631,16 @@ async function fetchPromotionDetailPage(ctx, query) {
       pathname: '/novelsale/distributor/promotion/detail/v2/',
       query: upstreamQuery,
       ctx,
+      signal: pageSignal,
+    })
+    const extracted = extractPromotionDetailOrders(result.data)
+    logOrderDiagnostic('info', '单页请求成功', {
+      ...pageLogContext,
+      source: 'internal_abogus',
+      duration_ms: Date.now() - pageStartedAt,
+      response_code: extracted.code,
+      response_order_count: Array.isArray(extracted.orders) ? extracted.orders.length : undefined,
+      response_total: extracted.total,
     })
     return {
       body: result.data,
@@ -534,108 +648,207 @@ async function fetchPromotionDetailPage(ctx, query) {
       internalError: null,
     }
   } catch (error) {
+    if (signal?.aborted) {
+      throw error
+    }
+    if (pageSignal.aborted) {
+      logOrderDiagnostic('error', '单页请求超时', {
+        ...pageLogContext,
+        duration_ms: Date.now() - pageStartedAt,
+      })
+      throw new Error(`常读订单单页请求超过 ${ORDER_PAGE_TIMEOUT_MS / 1000} 秒`)
+    }
+
     internalError = error instanceof Error ? error.message : String(error)
     console.warn('[订单统计] a_bogus 内部请求失败，回退普通代理:', {
+      trace_id: traceId,
       message: internalError,
       begin_time: upstreamQuery.begin_time,
       end_time: upstreamQuery.end_time,
       page_index: upstreamQuery.page_index,
+      duration_ms: Date.now() - pageStartedAt,
     })
   }
 
-  const originalQuery = ctx.query
-  ctx.query = query
-  try {
-    await createGetHandler('Promotion Detail', '/novelsale/distributor/promotion/detail/v2/')(ctx)
-    return {
-      body: ctx.body,
-      source: 'proxy_fallback',
-      internalError,
-    }
-  } finally {
-    ctx.query = originalQuery
+  const fallbackResult = await fetchPromotionDetailFallback(ctx, upstreamQuery, pageSignal)
+  const fallbackExtracted = extractPromotionDetailOrders(fallbackResult.body)
+  logOrderDiagnostic('info', '单页回退请求完成', {
+    ...pageLogContext,
+    source: 'proxy_fallback',
+    duration_ms: Date.now() - pageStartedAt,
+    upstream_status: fallbackResult.status,
+    response_code: fallbackExtracted.code,
+    response_order_count: Array.isArray(fallbackExtracted.orders)
+      ? fallbackExtracted.orders.length
+      : undefined,
+    response_total: fallbackExtracted.total,
+  })
+  return {
+    body: fallbackResult.body,
+    source: 'proxy_fallback',
+    upstreamStatus: fallbackResult.status,
+    internalError,
   }
 }
 
-async function fetchAllOrdersByRange(ctx, timeRange) {
+function parsePromotionDetailPageResult(pageResult, requestMeta) {
+  const upstreamBody = pageResult.body
+  const extracted = extractPromotionDetailOrders(upstreamBody)
+  if (extracted.ok && Array.isArray(extracted.orders)) {
+    return extracted
+  }
+
+  const isEmptyBody =
+    upstreamBody === '' ||
+    upstreamBody === null ||
+    upstreamBody === undefined ||
+    (typeof upstreamBody === 'string' && upstreamBody.trim() === '')
+  const upstreamPreview =
+    typeof upstreamBody === 'string'
+      ? upstreamBody.slice(0, 200)
+      : upstreamBody && typeof upstreamBody === 'object'
+        ? JSON.stringify(upstreamBody).slice(0, 200)
+        : String(upstreamBody ?? '')
+  let message = isEmptyBody
+    ? '订单接口响应为空，常读可能拦截了未签名请求或 Cookie 无效'
+    : extracted.message || '订单接口响应格式异常，无法解析订单列表'
+  if (pageResult.internalError) {
+    message = `${message}（a_bogus 签名请求失败: ${pageResult.internalError}）`
+  }
+
+  console.error('[订单统计] 上游响应无法解析为订单列表', {
+    source: pageResult.source,
+    ...requestMeta,
+    code: extracted.code,
+    message,
+    internalError: pageResult.internalError || '',
+    upstreamStatus: pageResult.upstreamStatus,
+    bodyType: typeof upstreamBody,
+    bodyPreview: upstreamPreview,
+  })
+
+  const error = new Error(message)
+  error.code = extracted.code
+  throw error
+}
+
+async function fetchAllOrdersByRange(ctx, timeRange, signal, traceId = '') {
   const rangeOrders = []
   let currentFetchIndex = 0
+  let pageRequestCount = 0
+  const rangeTimeoutSignal = AbortSignal.timeout(ORDER_RANGE_TIMEOUT_MS)
+  const rangeSignal = signal ? AbortSignal.any([signal, rangeTimeoutSignal]) : rangeTimeoutSignal
   // 常读多数列表接口 page_size 上限为 100；传 1000 时可能直接返回空 body
   const fetchPageSize = 100
   let hasMoreData = true
 
-  while (hasMoreData) {
-    const modifiedQuery = buildPromotionDetailQuery(ctx.query, {
-      begin_time: String(timeRange.begin_time),
-      end_time: String(timeRange.end_time),
-      page_size: fetchPageSize.toString(),
-      page_index: currentFetchIndex.toString(),
-    })
-
-    const pageResult = await fetchPromotionDetailPage(ctx, modifiedQuery)
-    const upstreamBody = pageResult.body
-    const extracted = extractPromotionDetailOrders(upstreamBody)
-    if (!extracted.ok || !Array.isArray(extracted.orders)) {
-      const isEmptyBody =
-        upstreamBody === '' ||
-        upstreamBody === null ||
-        upstreamBody === undefined ||
-        (typeof upstreamBody === 'string' && upstreamBody.trim() === '')
-      const upstreamPreview =
-        typeof upstreamBody === 'string'
-          ? upstreamBody.slice(0, 200)
-          : upstreamBody && typeof upstreamBody === 'object'
-            ? JSON.stringify(upstreamBody).slice(0, 200)
-            : String(upstreamBody ?? '')
-      let message = isEmptyBody
-        ? '订单接口响应为空，常读可能拦截了未签名请求或 Cookie 无效'
-        : extracted.message || '订单接口响应格式异常，无法解析订单列表'
-      if (pageResult.internalError) {
-        message = `${message}（a_bogus 签名请求失败: ${pageResult.internalError}）`
+  try {
+    while (hasMoreData) {
+      if (rangeSignal.aborted) {
+        throw rangeSignal.reason || new DOMException('订单统计请求已取消', 'AbortError')
       }
 
-      console.error('[订单统计] 上游响应无法解析为订单列表', {
-        source: pageResult.source,
-        begin_time: timeRange.begin_time,
-        end_time: timeRange.end_time,
-        page_index: currentFetchIndex,
-        page_size: fetchPageSize,
-        code: extracted.code,
-        message,
-        internalError: pageResult.internalError || '',
-        bodyType: typeof upstreamBody,
-        bodyPreview: upstreamPreview,
+      const modifiedQuery = buildPromotionDetailQuery(ctx.query, {
+        begin_time: String(timeRange.begin_time),
+        end_time: String(timeRange.end_time),
+        page_size: fetchPageSize.toString(),
+        page_index: currentFetchIndex.toString(),
       })
 
-      // 首页解析失败：向上抛错，避免“成功但全 0”
-      if (currentFetchIndex === 0 && rangeOrders.length === 0) {
-        const error = new Error(message)
-        error.code = extracted.code
-        throw error
+      pageRequestCount += 1
+      const pageResult = await fetchPromotionDetailPage(ctx, modifiedQuery, rangeSignal, traceId)
+      let extracted
+      try {
+        extracted = parsePromotionDetailPageResult(pageResult, {
+          begin_time: timeRange.begin_time,
+          end_time: timeRange.end_time,
+          page_index: currentFetchIndex,
+          page_size: fetchPageSize,
+        })
+      } catch (error) {
+        // 首页失败时明确报错；后续页异常则保留已经成功拉取的数据。
+        if (currentFetchIndex === 0 && rangeOrders.length === 0) {
+          throw error
+        }
+        break
       }
-      // 后续页异常则停止翻页，保留已拉取数据
-      break
+
+      const batchOrders = extracted.orders
+      const batchTotal = extracted.total
+
+      if (batchOrders.length === 0) {
+        break
+      }
+
+      rangeOrders.push(...batchOrders)
+
+      const fetchedCount = (currentFetchIndex + 1) * fetchPageSize
+      if (batchTotal > 0 ? fetchedCount >= batchTotal : batchOrders.length < fetchPageSize) {
+        hasMoreData = false
+      }
+
+      currentFetchIndex++
     }
-
-    const batchOrders = extracted.orders
-    const batchTotal = extracted.total
-
-    if (batchOrders.length === 0) {
-      break
+  } catch (error) {
+    if (!signal?.aborted && rangeTimeoutSignal.aborted) {
+      throw new Error(`常读订单分段请求超过 ${ORDER_RANGE_TIMEOUT_MS / 1000} 秒`)
     }
-
-    rangeOrders.push(...batchOrders)
-
-    const fetchedCount = (currentFetchIndex + 1) * fetchPageSize
-    if (batchTotal > 0 ? fetchedCount >= batchTotal : batchOrders.length < fetchPageSize) {
-      hasMoreData = false
-    }
-
-    currentFetchIndex++
+    throw error
   }
 
   return {
     orders: rangeOrders,
+    pageCount: pageRequestCount,
+  }
+}
+
+async function mapWithConcurrency(items, concurrency, mapper) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return []
+  }
+
+  const results = new Array(items.length)
+  let nextIndex = 0
+  const workerCount = Math.min(Math.max(1, concurrency), items.length)
+
+  async function runWorker() {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex
+      nextIndex += 1
+      results[currentIndex] = await mapper(items[currentIndex], currentIndex)
+    }
+  }
+
+  await Promise.all(Array.from({ length: workerCount }, () => runWorker()))
+  return results
+}
+
+function createOrderRequestController(ctx) {
+  const controller = new AbortController()
+  let clientDisconnected = false
+
+  const abortForClientDisconnect = () => {
+    clientDisconnected = true
+    controller.abort(new DOMException('客户端已断开订单统计请求', 'AbortError'))
+  }
+  const handleResponseClose = () => {
+    if (!ctx.res.writableEnded) {
+      abortForClientDisconnect()
+    }
+  }
+
+  ctx.req.once('aborted', abortForClientDisconnect)
+  ctx.res.once('close', handleResponseClose)
+
+  return {
+    controller,
+    get clientDisconnected() {
+      return clientDisconnected
+    },
+    dispose() {
+      ctx.req.off('aborted', abortForClientDisconnect)
+      ctx.res.off('close', handleResponseClose)
+    },
   }
 }
 
@@ -871,8 +1084,22 @@ router.get('/distributor/application_overview_list/v1', async ctx => {
   }
 })
 
-// 推广详情 - 统一全量拉取后返回给前端分页
+// 推广详情 - 支持单页模式，避免大订单量查询形成超长 HTTP 请求
 router.get('/distributor/promotion/detail/v2', async ctx => {
+  const requestLifecycle = createOrderRequestController(ctx)
+  const startedAt = Date.now()
+  const traceId = createOrderTraceId()
+
+  logOrderDiagnostic('info', '浏览器请求进入', {
+    trace_id: traceId,
+    begin_time: ctx.query.begin_time,
+    end_time: ctx.query.end_time,
+    page_only: ctx.query.page_only,
+    page_index: ctx.query.page_index,
+    page_size: ctx.query.page_size,
+    pay_status: ctx.query.pay_status,
+  })
+
   try {
     const channelDouyinAccounts = ctx.query.channel_douyin_accounts
     const selectedPromotionUserName = String(ctx.query.promotion_user_name || '').trim()
@@ -883,24 +1110,71 @@ router.get('/distributor/promotion/detail/v2', async ctx => {
         : []
     const configuredPromotionUsernames = promotionUserTargets.map(target => target.username)
     const shouldBuildPromotionUserStats = promotionUserTargets.length > 0
-
-    const timeRanges = splitOrderTimeRange(ctx.query.begin_time, ctx.query.end_time)
-    const queryRanges =
-      timeRanges.length > 0
-        ? timeRanges
-        : [
-            {
-              begin_time: normalizeTimestamp(ctx.query.begin_time),
-              end_time: normalizeTimestamp(ctx.query.end_time),
-            },
-          ]
+    const pageOnly = isPageOnlyOrderRequest(ctx.query.page_only)
+    const requestedTimeRange = {
+      begin_time: normalizeTimestamp(ctx.query.begin_time),
+      end_time: normalizeTimestamp(ctx.query.end_time),
+    }
+    const timeRanges = pageOnly
+      ? [requestedTimeRange]
+      : splitOrderTimeRange(ctx.query.begin_time, ctx.query.end_time)
+    const queryRanges = timeRanges.length > 0 ? timeRanges : [requestedTimeRange]
 
     const allOrders = []
-
-    for (const timeRange of queryRanges) {
-      const rangeResult = await fetchAllOrdersByRange(ctx, timeRange)
-      allOrders.push(...rangeResult.orders)
+    let rangeResults
+    let hasMore = false
+    try {
+      if (pageOnly) {
+        const pageIndex = normalizeOrderPageIndex(ctx.query.page_index)
+        const pageSize = normalizeOrderPageSize(ctx.query.page_size)
+        const modifiedQuery = buildPromotionDetailQuery(ctx.query, {
+          begin_time: String(requestedTimeRange.begin_time),
+          end_time: String(requestedTimeRange.end_time),
+          page_size: String(pageSize),
+          page_index: String(pageIndex),
+        })
+        const pageResult = await fetchPromotionDetailPage(
+          ctx,
+          modifiedQuery,
+          requestLifecycle.controller.signal,
+          traceId
+        )
+        const extracted = parsePromotionDetailPageResult(pageResult, {
+          begin_time: requestedTimeRange.begin_time,
+          end_time: requestedTimeRange.end_time,
+          page_index: pageIndex,
+          page_size: pageSize,
+        })
+        const fetchedCount = (pageIndex + 1) * pageSize
+        hasMore =
+          extracted.total > 0
+            ? fetchedCount < extracted.total
+            : extracted.orders.length === pageSize
+        rangeResults = [
+          {
+            orders: extracted.orders,
+            pageCount: 1,
+          },
+        ]
+      } else {
+        rangeResults = await mapWithConcurrency(queryRanges, ORDER_RANGE_CONCURRENCY, timeRange =>
+          fetchAllOrdersByRange(ctx, timeRange, requestLifecycle.controller.signal, traceId)
+        )
+      }
+    } catch (error) {
+      requestLifecycle.controller.abort(error)
+      throw error
     }
+    if (requestLifecycle.controller.signal.aborted) {
+      throw (
+        requestLifecycle.controller.signal.reason ||
+        new DOMException('订单统计请求已取消', 'AbortError')
+      )
+    }
+
+    rangeResults.forEach(rangeResult => {
+      allOrders.push(...rangeResult.orders)
+    })
 
     const scopedOrders = orderUserStatsConfig.restrictToOwnDouyinAccounts
       ? filterOrdersByPromotionAliases(allOrders, orderUserStatsConfig.ownDouyinAccounts)
@@ -942,19 +1216,53 @@ router.get('/distributor/promotion/detail/v2', async ctx => {
       order_visibility_scope: orderUserStatsConfig.restrictToOwnDouyinAccounts ? 'own' : 'all',
       promotion_user_summaries: promotionUserSummaries,
       promotion_user_branch_summaries: promotionUserBranchSummaries,
+      has_more: pageOnly ? hasMore : false,
     }
+    console.info('[订单统计] 拉取完成:', {
+      trace_id: traceId,
+      duration_ms: Date.now() - startedAt,
+      page_only: pageOnly,
+      page_index: pageOnly ? normalizeOrderPageIndex(ctx.query.page_index) : undefined,
+      range_count: queryRanges.length,
+      page_count: rangeResults.reduce((sum, result) => sum + result.pageCount, 0),
+      order_count: allOrders.length,
+    })
+    logOrderDiagnostic('info', '浏览器请求完成', {
+      trace_id: traceId,
+      duration_ms: Date.now() - startedAt,
+      page_only: pageOnly,
+      page_index: pageOnly ? normalizeOrderPageIndex(ctx.query.page_index) : undefined,
+      response_order_count: activeOrders.length,
+      has_more: pageOnly ? hasMore : false,
+    })
   } catch (error) {
+    if (requestLifecycle.clientDisconnected && isAbortError(error)) {
+      return
+    }
+
     const errorCode = Number(error?.code)
     const message = error instanceof Error && error.message ? error.message : '获取订单统计失败'
 
     console.error('[订单统计] 拉取失败:', {
+      trace_id: traceId,
       message,
       code: Number.isFinite(errorCode) ? errorCode : undefined,
       begin_time: ctx.query?.begin_time,
       end_time: ctx.query?.end_time,
+      duration_ms: Date.now() - startedAt,
+    })
+    logOrderDiagnostic('error', '浏览器请求失败', {
+      trace_id: traceId,
+      message,
+      code: Number.isFinite(errorCode) ? errorCode : undefined,
+      begin_time: ctx.query?.begin_time,
+      end_time: ctx.query?.end_time,
+      page_index: ctx.query?.page_index,
+      duration_ms: Date.now() - startedAt,
     })
 
     // 透传业务错误码（如 Cookie 过期 4001），便于前端拦截器提示
+    ctx.status = 200
     ctx.body = {
       code: Number.isFinite(errorCode) && errorCode !== 0 ? errorCode : 500,
       message,
@@ -968,7 +1276,10 @@ router.get('/distributor/promotion/detail/v2', async ctx => {
       order_visibility_scope: 'all',
       promotion_user_summaries: [],
       promotion_user_branch_summaries: [],
+      has_more: false,
     }
+  } finally {
+    requestLifecycle.dispose()
   }
 })
 
