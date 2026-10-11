@@ -2849,11 +2849,12 @@ async function fetchDramaListByPageCount(
 
     if (sequential) {
       // 全量查询使用串行分页，避免接口瞬时并发压力
+      // 上游 page_index 从 0 开始，这里必须从 0 请求，否则会跳过装有最新新剧的第一页
       for (let pageIndex = 0; pageIndex < safePageCount; pageIndex++) {
         const pageResult = await getNewDramaList({
           page_size: NEW_DRAMA_PAGE_SIZE,
           permission_statuses: '3,4',
-          page_index: pageIndex + 1,
+          page_index: pageIndex,
           drama_list_table_id: currentDramaListTableId.value,
           skip_feishu_status: 1,
         })
@@ -2871,7 +2872,7 @@ async function fetchDramaListByPageCount(
         getNewDramaList({
           page_size: NEW_DRAMA_PAGE_SIZE,
           permission_statuses: '3,4',
-          page_index: pageIndex + 1,
+          page_index: pageIndex,
           drama_list_table_id: currentDramaListTableId.value,
           skip_feishu_status: 1,
         })
